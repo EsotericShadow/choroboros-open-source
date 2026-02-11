@@ -1,0 +1,208 @@
+#include "FeedbackCollector.h"
+
+FeedbackCollector::FeedbackCollector()
+{
+    loadStats();
+    trackSessionStart();
+}
+
+FeedbackCollector::~FeedbackCollector()
+{
+    trackSessionEnd();
+    saveStats();
+}
+
+void FeedbackCollector::trackEngineSwitch(int engineIndex, bool hq)
+{
+    switch (engineIndex)
+    {
+        case 0: stats.engineGreenCount++; break;
+        case 1: stats.engineBlueCount++; break;
+        case 2: stats.engineRedCount++; break;
+        case 3: stats.enginePurpleCount++; break;
+    }
+    
+    if (hq)
+        stats.hqEnabledCount++;
+    
+    saveStats();
+}
+
+void FeedbackCollector::trackPresetLoad(int presetIndex, const juce::String& presetName)
+{
+    if (presetIndex >= 0 && presetIndex < 6)
+    {
+        stats.presetLoads[presetIndex]++;
+        saveStats();
+    }
+}
+
+void FeedbackCollector::trackSessionStart()
+{
+    sessionStart = juce::Time::getCurrentTime();
+    stats.sessionCount++;
+}
+
+void FeedbackCollector::trackSessionEnd()
+{
+    if (sessionStart.toMilliseconds() > 0)
+    {
+        auto sessionDuration = juce::Time::getCurrentTime().toMilliseconds() - sessionStart.toMilliseconds();
+        stats.totalSessionTime += sessionDuration;
+    }
+}
+
+juce::String FeedbackCollector::getUsageSummary() const
+{
+    juce::String summary;
+    summary << "Choroboros Alpha Usage Summary\n";
+    summary << "=============================\n\n";
+    summary << "Version: 1.0.1 (Alpha)\n";
+    summary << "Date: " << juce::Time::getCurrentTime().toString(true, true) << "\n\n";
+    
+    summary << "Engine Usage:\n";
+    summary << "  Green: " << stats.engineGreenCount << " switches\n";
+    summary << "  Blue: " << stats.engineBlueCount << " switches\n";
+    summary << "  Red: " << stats.engineRedCount << " switches\n";
+    summary << "  Purple: " << stats.enginePurpleCount << " switches\n";
+    summary << "  HQ Enabled: " << stats.hqEnabledCount << " times\n\n";
+    
+    summary << "Preset Usage:\n";
+    const char* presetNames[] = {"Classic", "Vintage", "Rich", "Psychedelic", "Duck", "Ouroboros"};
+    for (int i = 0; i < 6; i++)
+    {
+        if (stats.presetLoads[i] > 0)
+        {
+            summary << "  " << presetNames[i] << ": " << stats.presetLoads[i] << " loads\n";
+        }
+    }
+    summary << "\n";
+    
+    summary << "Sessions: " << stats.sessionCount << "\n";
+    if (stats.sessionCount > 0)
+    {
+        auto avgSessionTime = stats.totalSessionTime / stats.sessionCount;
+        summary << "Avg Session Time: " << (avgSessionTime / 1000.0) << " seconds\n";
+    }
+    
+    return summary;
+}
+
+bool FeedbackCollector::saveFeedbackToFile(const juce::String& feedbackText) const
+{
+    auto feedbackDir = getFeedbackDirectory();
+    if (!feedbackDir.createDirectory())
+        return false;
+    
+    auto timestamp = juce::Time::getCurrentTime().toString(true, true).replaceCharacters(":", "-");
+    auto feedbackFile = feedbackDir.getChildFile("feedback_" + timestamp + ".txt");
+    
+    juce::String fullFeedback;
+    fullFeedback << getUsageSummary() << "\n";
+    fullFeedback << "User Feedback:\n";
+    fullFeedback << "==============\n";
+    fullFeedback << feedbackText << "\n";
+    
+    return feedbackFile.replaceWithText(fullFeedback);
+}
+
+juce::File FeedbackCollector::getFeedbackDirectory()
+{
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Choroboros")
+        .getChildFile("Feedback");
+}
+
+bool FeedbackCollector::isOptedOut()
+{
+    juce::PropertiesFile::Options options;
+    options.applicationName = "Choroboros";
+    options.filenameSuffix = "settings";
+    options.osxLibrarySubFolder = "Application Support";
+    
+    juce::PropertiesFile props(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Choroboros")
+        .getChildFile("Choroboros.settings"), options);
+    
+    return props.getBoolValue("feedbackOptedOut", false);
+}
+
+void FeedbackCollector::setOptedOut(bool optedOut)
+{
+    juce::PropertiesFile::Options options;
+    options.applicationName = "Choroboros";
+    options.filenameSuffix = "settings";
+    options.osxLibrarySubFolder = "Application Support";
+    
+    auto settingsFile = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Choroboros")
+        .getChildFile("Choroboros.settings");
+    
+    juce::PropertiesFile props(settingsFile, options);
+    props.setValue("feedbackOptedOut", optedOut);
+    props.save();
+}
+
+void FeedbackCollector::loadStats()
+{
+    auto statsFile = getStatsFile();
+    if (!statsFile.existsAsFile())
+        return;
+    
+    juce::var json = juce::JSON::parse(statsFile);
+    if (json.isObject())
+    {
+        auto obj = json.getDynamicObject();
+        if (obj != nullptr)
+        {
+            stats.engineGreenCount = obj->getProperty("engineGreenCount");
+            stats.engineBlueCount = obj->getProperty("engineBlueCount");
+            stats.engineRedCount = obj->getProperty("engineRedCount");
+            stats.enginePurpleCount = obj->getProperty("enginePurpleCount");
+            stats.hqEnabledCount = obj->getProperty("hqEnabledCount");
+            stats.sessionCount = obj->getProperty("sessionCount");
+            stats.totalSessionTime = obj->getProperty("totalSessionTime");
+            
+            auto presetArray = obj->getProperty("presetLoads");
+            if (presetArray.isArray())
+            {
+                auto* arr = presetArray.getArray();
+                for (int i = 0; i < juce::jmin(6, arr->size()); i++)
+                {
+                    stats.presetLoads[i] = arr->getUnchecked(i);
+                }
+            }
+        }
+    }
+}
+
+void FeedbackCollector::saveStats() const
+{
+    auto statsFile = getStatsFile();
+    if (!statsFile.getParentDirectory().createDirectory())
+        return;
+    
+    juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+    obj->setProperty("engineGreenCount", stats.engineGreenCount);
+    obj->setProperty("engineBlueCount", stats.engineBlueCount);
+    obj->setProperty("engineRedCount", stats.engineRedCount);
+    obj->setProperty("enginePurpleCount", stats.enginePurpleCount);
+    obj->setProperty("hqEnabledCount", stats.hqEnabledCount);
+    obj->setProperty("sessionCount", stats.sessionCount);
+    obj->setProperty("totalSessionTime", stats.totalSessionTime);
+    
+    juce::Array<juce::var> presetArray;
+    for (int i = 0; i < 6; i++)
+        presetArray.add(stats.presetLoads[i]);
+    obj->setProperty("presetLoads", juce::var(presetArray));
+    
+    statsFile.replaceWithText(juce::JSON::toString(juce::var(obj.get())));
+}
+
+
+juce::File FeedbackCollector::getStatsFile() const
+{
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Choroboros")
+        .getChildFile("usage_stats.json");
+}

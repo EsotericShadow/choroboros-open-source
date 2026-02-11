@@ -1,0 +1,68 @@
+# Build directories
+Build/
+Universal-Build/
+Windows-Build/
+Linux-Build/
+cmake-build*/
+build*/
+
+# Release packages
+Release/
+*.zip
+*.tar.gz
+*.dmg
+*.pkg
+*.sha256
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Cache directories
+.cache/
+.codacy/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Visual Studio
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# Compiled binaries
+*.dylib
+*.so
+*.dll
+*.exe
+*.app
+*.component
+*.vst3
+
+# Object files
+*.o
+*.obj
+*.a
+*.lib
+
+# Cursor AI rules (keep this)
+.cursor/rules/codacy.mdc
+
+# Cursor debug logs (can be large)
+.cursor/debug.log
