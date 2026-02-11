@@ -1,0 +1,75 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libasound2-dev \
+          libfreetype6-dev \
+          libx11-dev \
+          libxcomposite-dev \
+          libxcursor-dev \
+          libxext-dev \
+          libxinerama-dev \
+          libxrandr-dev \
+          libxrender-dev \
+          libwebkit2gtk-4.0-dev \
+          libglu1-mesa-dev
+          
+    - name: Configure CMake
+      run: |
+        cmake -B Linux-Build -DCMAKE_BUILD_TYPE=Release
+        
+    - name: Build
+      run: |
+        cmake --build Linux-Build --config Release --parallel
+        
+    - name: Create Release Directory
+      run: |
+        mkdir -p Release
+        cp -r Linux-Build/Choroboros_artefacts/Release/VST3 Release/
+        cp -r Linux-Build/Choroboros_artefacts/Release/Standalone Release/
+        cp README.md DISTRIBUTION.md EULA.md Release/
+        
+    - name: Create Tarball
+      run: |
+        cd Release
+        tar -czf ../Choroboros-v1.0.1-Linux.tar.gz *
+        cd ..
+        
+    - name: Create ZIP Archive
+      run: |
+        cd Release
+        zip -r ../Choroboros-v1.0.1-Linux.zip *
+        cd ..
+        
+    - name: Generate SHA256 Checksum
+      run: |
+        sha256sum Release/Choroboros-v1.0.1-Linux.zip > Release/Choroboros-v1.0.1-Linux.zip.sha256
+        sha256sum Release/Choroboros-v1.0.1-Linux.tar.gz > Release/Choroboros-v1.0.1-Linux.tar.gz.sha256
+        
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Choroboros-Linux
+        path: |
+          Release/Choroboros-v1.0.1-Linux.zip
+          Release/Choroboros-v1.0.1-Linux.tar.gz
+        retention-days: 30

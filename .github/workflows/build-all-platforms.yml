@@ -1,0 +1,183 @@
+name: Build All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.1)'
+        required: true
+        default: '1.0.1'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+      with:
+        cmake-version: '3.22'
+        
+    - name: Configure CMake (Universal)
+      run: |
+        cmake -B Universal-Build \
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+          -DCMAKE_BUILD_TYPE=Release
+          
+    - name: Build
+      run: |
+        cmake --build Universal-Build --config Release --parallel
+        
+    - name: Verify Architectures
+      run: |
+        lipo -info Universal-Build/Choroboros_artefacts/Release/VST3/Choroboros.vst3/Contents/MacOS/Choroboros
+        lipo -info Universal-Build/Choroboros_artefacts/Release/AU/Choroboros.component/Contents/MacOS/Choroboros
+        lipo -info Universal-Build/Choroboros_artefacts/Release/Standalone/Choroboros.app/Contents/MacOS/Choroboros
+        
+    - name: Package
+      run: |
+        mkdir -p Release
+        cd Universal-Build/Choroboros_artefacts/Release
+        zip -r ../../../Release/Choroboros-v1.0.1-macOS-Universal.zip VST3 AU Standalone
+        cd ../../..
+        cp README.md DISTRIBUTION.md EULA.md Release/
+        cd Release
+        zip -r Choroboros-v1.0.1-macOS-Universal.zip README.md DISTRIBUTION.md EULA.md
+        cd ..
+        
+    - name: Generate Checksum
+      run: |
+        shasum -a 256 Release/Choroboros-v1.0.1-macOS-Universal.zip > Release/Choroboros-v1.0.1-macOS-Universal.zip.sha256
+        
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Choroboros-macOS
+        path: Release/Choroboros-v1.0.1-macOS-Universal.zip
+        retention-days: 90
+
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+      with:
+        cmake-version: '3.22'
+        
+    - name: Configure CMake
+      run: |
+        cmake -B Windows-Build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+      shell: cmd
+      
+    - name: Build
+      run: |
+        cmake --build Windows-Build --config Release --parallel
+      shell: cmd
+      
+    - name: Package
+      run: |
+        mkdir Release
+        xcopy /E /I Windows-Build\Choroboros_artefacts\Release\VST3 Release\VST3
+        xcopy /E /I Windows-Build\Choroboros_artefacts\Release\Standalone Release\Standalone
+        copy README.md Release\
+        copy DISTRIBUTION.md Release\
+        copy EULA.md Release\
+        powershell Compress-Archive -Path Release\* -DestinationPath Release\Choroboros-v1.0.1-Windows.zip -Force
+      shell: cmd
+      
+    - name: Generate Checksum
+      run: |
+        powershell Get-FileHash -Path Release\Choroboros-v1.0.1-Windows.zip -Algorithm SHA256 | Out-File -FilePath Release\Choroboros-v1.0.1-Windows.zip.sha256 -Encoding ASCII
+      shell: cmd
+      
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Choroboros-Windows
+        path: Release/Choroboros-v1.0.1-Windows.zip
+        retention-days: 90
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libasound2-dev \
+          libfreetype6-dev \
+          libx11-dev \
+          libxcomposite-dev \
+          libxcursor-dev \
+          libxext-dev \
+          libxinerama-dev \
+          libxrandr-dev \
+          libxrender-dev \
+          libwebkit2gtk-4.0-dev \
+          libglu1-mesa-dev
+          
+    - name: Configure CMake
+      run: |
+        cmake -B Linux-Build -DCMAKE_BUILD_TYPE=Release
+        
+    - name: Build
+      run: |
+        cmake --build Linux-Build --config Release --parallel
+        
+    - name: Package
+      run: |
+        mkdir -p Release
+        cp -r Linux-Build/Choroboros_artefacts/Release/VST3 Release/
+        cp -r Linux-Build/Choroboros_artefacts/Release/Standalone Release/
+        cp README.md DISTRIBUTION.md EULA.md Release/
+        cd Release
+        zip -r ../Choroboros-v1.0.1-Linux.zip *
+        cd ..
+        
+    - name: Generate Checksum
+      run: |
+        sha256sum Release/Choroboros-v1.0.1-Linux.zip > Release/Choroboros-v1.0.1-Linux.zip.sha256
+        
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Choroboros-Linux
+        path: Release/Choroboros-v1.0.1-Linux.zip
+        retention-days: 90
+
+  create-release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Choroboros-macOS/Choroboros-v1.0.1-macOS-Universal.zip
+          Choroboros-Windows/Choroboros-v1.0.1-Windows.zip
+          Choroboros-Linux/Choroboros-v1.0.1-Linux.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
