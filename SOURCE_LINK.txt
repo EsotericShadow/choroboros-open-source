@@ -1,0 +1,22 @@
+Choroboros - Source Code (GPLv3)
+
+This software is licensed under the GNU General Public License version 3 (GPLv3).
+
+The complete source code for this software is available at:
+
+https://github.com/EsotericShadow/choroboros-open-source
+
+You are free to:
+- View the source code
+- Modify the source code
+- Redistribute the source code
+- Redistribute modified versions
+
+All under the terms of the GPLv3 license.
+
+For the full license text, see the LICENSE file included with this distribution,
+or visit: https://www.gnu.org/licenses/gpl-3.0.html
+
+---
+
+Copyright (C) 2026 Kaizen Strategic AI Inc.

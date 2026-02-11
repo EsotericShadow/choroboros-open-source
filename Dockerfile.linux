@@ -29,9 +29,9 @@ WORKDIR /workspace
 # Copy source code
 COPY . .
 
-# Build the plugin
+# Build the plugin (limit parallel jobs to avoid OOM)
 RUN cmake -B Linux-Build -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build Linux-Build --config Release --parallel
+    cmake --build Linux-Build --config Release -j2
 
 # Create release package
 RUN mkdir -p Release && \
@@ -39,9 +39,8 @@ RUN mkdir -p Release && \
     cp -r Linux-Build/Choroboros_artefacts/Release/Standalone Release/ && \
     cp README.md DISTRIBUTION.md EULA.md Release/ && \
     cd Release && \
-    zip -r ../Choroboros-v1.0.1-Linux.zip * && \
-    cd .. && \
-    sha256sum Release/Choroboros-v1.0.1-Linux.zip > Release/Choroboros-v1.0.1-Linux.zip.sha256
+    zip -r Choroboros-v1.0.1-Linux.zip * && \
+    sha256sum Choroboros-v1.0.1-Linux.zip > Choroboros-v1.0.1-Linux.zip.sha256
 
 # Output directory
 VOLUME ["/workspace/Release"]

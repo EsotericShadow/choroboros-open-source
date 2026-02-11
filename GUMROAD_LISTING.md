@@ -15,7 +15,23 @@ Choroboros by GreenDSP
 ```
 Choroboros - A chorus that eats its own tail
 
+**Open Source (GPLv3) - Multi-Engine Chorus Plugin**
+
 Four colors, eight algorithms. Switch between engines to explore classic, modern, vintage, and experimental chorus sounds.
+
+This is an **open-source chorus plugin** built with **JUCE** and released under the **GNU General Public License version 3 (GPLv3)**.
+
+You are purchasing **pre-compiled binaries** for macOS (VST3, AU, standalone), plus presets and installation instructions.
+
+**Source Code Available:** The complete source code is freely available under GPLv3 at:
+👉 https://github.com/EsotericShadow/choroboros-open-source
+
+By purchasing, you receive:
+• Easy-to-install plugin builds
+• Presets and documentation
+• Continued updates
+
+📌 Source code ownership stays with the GPL; you must honor those terms if redistributing.
 
 🎵 FOUR DISTINCT ENGINES
 
@@ -60,7 +76,8 @@ Perfect for: Experimental sounds, unique textures, creative modulation
 ✅ Standalone application
 ✅ 6 Factory Presets (Classic, Vintage, Rich, Psychedelic, Duck, Ouroboros)
 ✅ Complete documentation
-✅ End User License Agreement
+✅ GPLv3 License (full license text included)
+✅ Source code link (GitHub repository)
 
 💻 SYSTEM REQUIREMENTS
 
@@ -89,8 +106,11 @@ Perfect for: Experimental sounds, unique textures, creative modulation
 • Smooth parameter automation
 
 Created by Gabriel Lacroix Marko
-© 2026 Kaizen Strategic AI Inc. (DBA: Green DSP)
+Copyright (C) 2026 Kaizen Strategic AI Inc. (DBA: Green DSP)
 British Columbia, Canada
+
+**License:** GNU General Public License v3 (GPLv3)
+**Source Code:** https://github.com/EsotericShadow/choroboros-open-source
 
 For support: info@kaizenstrategic.ai
 ```

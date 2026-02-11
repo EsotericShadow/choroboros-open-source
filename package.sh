@@ -55,9 +55,14 @@ if [ -f "LICENSE" ]; then
     echo "  ✅ LICENSE copied"
 fi
 
-if [ -f "EULA.md" ]; then
-    cp EULA.md "${RELEASE_DIR}/"
-    echo "  ✅ EULA.md copied"
+if [ -f "COPYING" ]; then
+    cp COPYING "${RELEASE_DIR}/"
+    echo "  ✅ COPYING copied"
+fi
+
+if [ -f "SOURCE_LINK.txt" ]; then
+    cp SOURCE_LINK.txt "${RELEASE_DIR}/"
+    echo "  ✅ SOURCE_LINK.txt copied"
 fi
 
 if [ -f "DISTRIBUTION.md" ]; then

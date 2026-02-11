@@ -77,11 +77,37 @@ After installation, rescan plugins in your DAW.
 
 ## License
 
-Copyright © 2026 Kaizen Strategic AI Inc. All rights reserved.
+**Choroboros is free software licensed under the GNU General Public License version 3 (GPLv3).**
 
-This software is licensed, not sold. By installing or using Choroboros, you agree to the terms of the End User License Agreement (EULA). The EULA can be viewed from the About dialog within the plugin, or contact us for a copy.
+Copyright (C) 2026 Kaizen Strategic AI Inc.
 
-**Proprietary Algorithms:** The Purple engine algorithms (Phase-Warped Chorus and Orbit Chorus) are proprietary intellectual property of Kaizen Strategic AI Inc. and are protected by trade secret law.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+### Source Code
+
+The complete source code for Choroboros is available at:
+**https://github.com/EsotericShadow/choroboros-open-source**
+
+You are free to view, modify, and redistribute the source code under the terms of the GPLv3 license.
+
+### Third-Party Components
+
+This software uses the JUCE framework, which is dual-licensed under:
+- GNU Affero General Public License v3 (AGPLv3), or
+- Commercial license from Raw Material Software Limited
+
+For more information about JUCE licensing, visit: https://juce.com/legal/juce-8-licence/
 
 ## Support & Contact
 

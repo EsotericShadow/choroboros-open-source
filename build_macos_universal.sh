@@ -57,10 +57,10 @@ cd ../../..
 # Add documentation
 cd Release
 unzip -q Choroboros-v1.0.1-macOS-Universal.zip || true
-cp ../README.md ../DISTRIBUTION.md ../EULA.md ../INSTALL.txt . 2>/dev/null || true
+cp ../README.md ../DISTRIBUTION.md ../LICENSE ../COPYING ../SOURCE_LINK.txt . 2>/dev/null || true
 zip -r Choroboros-v1.0.1-macOS-Universal.zip \
-    README.md DISTRIBUTION.md EULA.md INSTALL.txt 2>/dev/null || true
-rm -f README.md DISTRIBUTION.md EULA.md INSTALL.txt
+    README.md DISTRIBUTION.md LICENSE COPYING SOURCE_LINK.txt 2>/dev/null || true
+rm -f README.md DISTRIBUTION.md LICENSE COPYING SOURCE_LINK.txt
 cd ..
 
 # Generate checksum
