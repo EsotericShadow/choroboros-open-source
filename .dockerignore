@@ -1,0 +1,33 @@
+# Build directories
+Build/
+Universal-Build/
+Windows-Build/
+Linux-Build/
+cmake-build*/
+build*/
+
+# Release packages (we'll create new ones)
+Release/
+
+# Git
+.git/
+.github/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Cache
+.cache/
+.codacy/
+
+# Documentation (keep source, ignore generated)
+*.zip
+*.tar.gz
+*.dmg
+*.pkg
