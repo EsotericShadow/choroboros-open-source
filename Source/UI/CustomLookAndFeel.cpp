@@ -169,8 +169,8 @@ void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBa
         shadowSize = 0;
         trackName = nullptr;
         trackSize = 0;
-        thumbName = BinaryData::red_slider_thumb_png;
-        thumbSize = BinaryData::red_slider_thumb_pngSize;
+        thumbName = BinaryData::green_slider_thumb_png;
+        thumbSize = BinaryData::green_slider_thumb_pngSize;
         mixKnobName = nullptr;
         mixKnobSize = 0;
         knobSheetRateName = BinaryData::rate_knob_spritesheet_png;
@@ -194,8 +194,8 @@ void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBa
         shadowSize = BinaryData::indicator_shadow_overlay_pngSize;
         trackName = nullptr;
         trackSize = 0;
-        thumbName = BinaryData::red_slider_thumb_png;
-        thumbSize = BinaryData::red_slider_thumb_pngSize;
+        thumbName = BinaryData::blue_slider_thumb_png;
+        thumbSize = BinaryData::blue_slider_thumb_pngSize;
         mixKnobName = BinaryData::blue_mix_knob_png;
         mixKnobSize = BinaryData::blue_mix_knob_pngSize;
         knobSheetRateName = BinaryData::Blue_knob_spritesheet_png;
@@ -232,8 +232,8 @@ void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBa
         shadowSize = BinaryData::indicator_shadow_overlay_png3Size;
         trackName = nullptr;
         trackSize = 0;
-        thumbName = BinaryData::red_slider_thumb_png;
-        thumbSize = BinaryData::red_slider_thumb_pngSize;
+        thumbName = BinaryData::purple_slider_thumb_png;
+        thumbSize = BinaryData::purple_slider_thumb_pngSize;
         mixKnobName = BinaryData::purple_mix_knob_png;
         mixKnobSize = BinaryData::purple_mix_knob_pngSize;
         knobSheetRateName = BinaryData::purple_knob_spritesheet_png;
@@ -251,8 +251,8 @@ void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBa
         shadowSize = BinaryData::indicator_shadow_overlay_png3Size;
         trackName = nullptr;
         trackSize = 0;
-        thumbName = BinaryData::red_slider_thumb_png;
-        thumbSize = BinaryData::red_slider_thumb_pngSize;
+        thumbName = BinaryData::black__slider_thumb_png;
+        thumbSize = BinaryData::black__slider_thumb_pngSize;
         mixKnobName = BinaryData::purple_mix_knob_png;
         mixKnobSize = BinaryData::purple_mix_knob_pngSize;
         knobSheetRateName = BinaryData::black_Knob_spritesheet_png;

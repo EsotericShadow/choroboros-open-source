@@ -65,6 +65,32 @@ struct LayoutTuning
     int sliderTrackEndX = 485;
     int sliderTrackEndY = 268;
     int sliderSize = 100;  // Thumb height scale: 100 = 18px, 200 = 36px, etc.
+    // Per-engine slider overrides (fallback to base values above when not set)
+    int sliderTrackStartXGreen = 235;
+    int sliderTrackStartYGreen = 268;
+    int sliderTrackEndXGreen = 485;
+    int sliderTrackEndYGreen = 268;
+    int sliderSizeGreen = 100;
+    int sliderTrackStartXBlue = 235;
+    int sliderTrackStartYBlue = 268;
+    int sliderTrackEndXBlue = 485;
+    int sliderTrackEndYBlue = 268;
+    int sliderSizeBlue = 100;
+    int sliderTrackStartXRed = 235;
+    int sliderTrackStartYRed = 268;
+    int sliderTrackEndXRed = 485;
+    int sliderTrackEndYRed = 268;
+    int sliderSizeRed = 100;
+    int sliderTrackStartXPurple = 235;
+    int sliderTrackStartYPurple = 268;
+    int sliderTrackEndXPurple = 485;
+    int sliderTrackEndYPurple = 268;
+    int sliderSizePurple = 100;
+    int sliderTrackStartXBlack = 235;
+    int sliderTrackStartYBlack = 268;
+    int sliderTrackEndXBlack = 485;
+    int sliderTrackEndYBlack = 268;
+    int sliderSizeBlack = 100;
 
     int mixKnobSize = 58; // Legacy fallback/default
     int mixKnobSizeGreen = 58;

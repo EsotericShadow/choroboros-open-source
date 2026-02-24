@@ -57,12 +57,17 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
                                             layout.offsetCenterXPurple, layout.offsetCenterXBlack, layout.offsetCenterX));
     const int widthCenterX = s(pickByColor(layout.widthCenterXGreen, layout.widthCenterXBlue, layout.widthCenterXRed,
                                            layout.widthCenterXPurple, layout.widthCenterXBlack, layout.widthCenterX));
-    const float sizeScale = layout.sliderSize / 100.0f;
+    const int trackStartX = s(pickByColor(layout.sliderTrackStartXGreen, layout.sliderTrackStartXBlue, layout.sliderTrackStartXRed,
+                                          layout.sliderTrackStartXPurple, layout.sliderTrackStartXBlack, layout.sliderTrackStartX));
+    const int trackStartY = s(pickByColor(layout.sliderTrackStartYGreen, layout.sliderTrackStartYBlue, layout.sliderTrackStartYRed,
+                                          layout.sliderTrackStartYPurple, layout.sliderTrackStartYBlack, layout.sliderTrackStartY));
+    const int trackEndX = s(pickByColor(layout.sliderTrackEndXGreen, layout.sliderTrackEndXBlue, layout.sliderTrackEndXRed,
+                                        layout.sliderTrackEndXPurple, layout.sliderTrackEndXBlack, layout.sliderTrackEndX));
+    const int trackEndY = s(pickByColor(layout.sliderTrackEndYGreen, layout.sliderTrackEndYBlue, layout.sliderTrackEndYRed,
+                                        layout.sliderTrackEndYPurple, layout.sliderTrackEndYBlack, layout.sliderTrackEndY));
+    const float sizeScale = pickByColor(layout.sliderSizeGreen, layout.sliderSizeBlue, layout.sliderSizeRed,
+                                        layout.sliderSizePurple, layout.sliderSizeBlack, layout.sliderSize) / 100.0f;
     const int sliderH = juce::roundToInt(s(18) * sizeScale);
-    const int trackStartX = s(layout.sliderTrackStartX);
-    const int trackStartY = s(layout.sliderTrackStartY);
-    const int trackEndX = s(layout.sliderTrackEndX);
-    const int trackEndY = s(layout.sliderTrackEndY);
     const int sliderX = juce::jmin(trackStartX, trackEndX);
     const int sliderW = juce::jmax(1, std::abs(trackEndX - trackStartX));
     const int trackCenterY = (trackStartY + trackEndY) / 2;

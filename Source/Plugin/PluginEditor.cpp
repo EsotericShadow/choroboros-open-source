@@ -104,6 +104,31 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.sliderTrackEndX = getIntOrDefault(layoutVar, "sliderTrackEndX", layout.sliderTrackEndX);
     layout.sliderTrackEndY = getIntOrDefault(layoutVar, "sliderTrackEndY", layout.sliderTrackEndY);
     layout.sliderSize = getIntOrDefault(layoutVar, "sliderSize", layout.sliderSize);
+    layout.sliderTrackStartXGreen = getIntOrDefault(layoutVar, "sliderTrackStartXGreen", layout.sliderTrackStartX);
+    layout.sliderTrackStartYGreen = getIntOrDefault(layoutVar, "sliderTrackStartYGreen", layout.sliderTrackStartY);
+    layout.sliderTrackEndXGreen = getIntOrDefault(layoutVar, "sliderTrackEndXGreen", layout.sliderTrackEndX);
+    layout.sliderTrackEndYGreen = getIntOrDefault(layoutVar, "sliderTrackEndYGreen", layout.sliderTrackEndY);
+    layout.sliderSizeGreen = getIntOrDefault(layoutVar, "sliderSizeGreen", layout.sliderSize);
+    layout.sliderTrackStartXBlue = getIntOrDefault(layoutVar, "sliderTrackStartXBlue", layout.sliderTrackStartX);
+    layout.sliderTrackStartYBlue = getIntOrDefault(layoutVar, "sliderTrackStartYBlue", layout.sliderTrackStartY);
+    layout.sliderTrackEndXBlue = getIntOrDefault(layoutVar, "sliderTrackEndXBlue", layout.sliderTrackEndX);
+    layout.sliderTrackEndYBlue = getIntOrDefault(layoutVar, "sliderTrackEndYBlue", layout.sliderTrackEndY);
+    layout.sliderSizeBlue = getIntOrDefault(layoutVar, "sliderSizeBlue", layout.sliderSize);
+    layout.sliderTrackStartXRed = getIntOrDefault(layoutVar, "sliderTrackStartXRed", layout.sliderTrackStartX);
+    layout.sliderTrackStartYRed = getIntOrDefault(layoutVar, "sliderTrackStartYRed", layout.sliderTrackStartY);
+    layout.sliderTrackEndXRed = getIntOrDefault(layoutVar, "sliderTrackEndXRed", layout.sliderTrackEndX);
+    layout.sliderTrackEndYRed = getIntOrDefault(layoutVar, "sliderTrackEndYRed", layout.sliderTrackEndY);
+    layout.sliderSizeRed = getIntOrDefault(layoutVar, "sliderSizeRed", layout.sliderSize);
+    layout.sliderTrackStartXPurple = getIntOrDefault(layoutVar, "sliderTrackStartXPurple", layout.sliderTrackStartX);
+    layout.sliderTrackStartYPurple = getIntOrDefault(layoutVar, "sliderTrackStartYPurple", layout.sliderTrackStartY);
+    layout.sliderTrackEndXPurple = getIntOrDefault(layoutVar, "sliderTrackEndXPurple", layout.sliderTrackEndX);
+    layout.sliderTrackEndYPurple = getIntOrDefault(layoutVar, "sliderTrackEndYPurple", layout.sliderTrackEndY);
+    layout.sliderSizePurple = getIntOrDefault(layoutVar, "sliderSizePurple", layout.sliderSize);
+    layout.sliderTrackStartXBlack = getIntOrDefault(layoutVar, "sliderTrackStartXBlack", layout.sliderTrackStartX);
+    layout.sliderTrackStartYBlack = getIntOrDefault(layoutVar, "sliderTrackStartYBlack", layout.sliderTrackStartY);
+    layout.sliderTrackEndXBlack = getIntOrDefault(layoutVar, "sliderTrackEndXBlack", layout.sliderTrackEndX);
+    layout.sliderTrackEndYBlack = getIntOrDefault(layoutVar, "sliderTrackEndYBlack", layout.sliderTrackEndY);
+    layout.sliderSizeBlack = getIntOrDefault(layoutVar, "sliderSizeBlack", layout.sliderSize);
     // Backwards compat: migrate old sliderX/sliderY/sliderCenterX/sliderCenterY/sliderW/sliderH
     if (const auto* obj = layoutVar.getDynamicObject())
     {
@@ -652,6 +677,13 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
             audioProcessor.feedbackCollector->trackEngineSwitch(colorIndex, hq);
         }
         
+        // Force sliders to repaint with new thumb image
+        rateSlider.repaint();
+        depthSlider.repaint();
+        offsetSlider.repaint();
+        widthSlider.repaint();
+        colorSlider.repaint();
+        mixSlider.repaint();
         repaint();
     };
 }

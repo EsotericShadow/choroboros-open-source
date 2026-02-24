@@ -103,7 +103,9 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/green/offset_knob_spritesheet.png
         Assets/green/width_knob_spritesheet.png
         Assets/green/mix_knob_spritesheet.png
+        Assets/green/green_slider_thumb.png
         Assets/blue/blue_backpanel.png
+        Assets/blue/blue_slider_thumb.png
         Assets/blue/Blue_knob_spritesheet.png
         Assets/blue/blue_knob_base.png
         Assets/blue/blue_mix_knob_spritesheet.png
@@ -116,6 +118,7 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/purple/purple_knob_spritesheet.png
         Assets/purple/purple_knob_base.png
         Assets/purple/purple_mix_knob_spritesheet.png
+        Assets/purple/purple_slider_thumb.png
         Assets/blue/blue_mix_knob.png
         Assets/blue/indicator_north_facing.png
         Assets/blue/indicator_shadow_overlay.png
@@ -129,6 +132,7 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/black/black_knob_base.png
         Assets/black/black_Knob_spritesheet.png
         Assets/black/black_mix_knob_spritesheet.png
+        Assets/black/black__slider_thumb.png
         Assets/switch_a_spritesheet.png
         Assets/fonts/Technology.ttf
         Assets/fonts/Retroica.ttf
