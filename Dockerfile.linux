@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /workspace
 
-# Copy source code
+# Copy source code. Before docker build, run: git submodule update --init --recursive
 COPY . .
 
 # Build the plugin (limit parallel jobs to avoid OOM)
@@ -37,7 +37,7 @@ RUN cmake -B Linux-Build -DCMAKE_BUILD_TYPE=Release && \
 RUN mkdir -p Release && \
     cp -r Linux-Build/Choroboros_artefacts/Release/VST3 Release/ && \
     cp -r Linux-Build/Choroboros_artefacts/Release/Standalone Release/ && \
-    cp README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt Release/ && \
+    cp README.md DISTRIBUTION.md EULA.md Release/ && \
     cd Release && \
     zip -r Choroboros-v1.0.1-Linux.zip * && \
     sha256sum Choroboros-v1.0.1-Linux.zip > Choroboros-v1.0.1-Linux.zip.sha256

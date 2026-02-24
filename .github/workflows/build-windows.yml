@@ -1,0 +1,60 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+      
+    - name: Install CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+      with:
+        cmake-version: '3.22'
+        
+    - name: Configure CMake
+      run: |
+        cmake -B Windows-Build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+      shell: cmd
+      
+    - name: Build
+      run: |
+        cmake --build Windows-Build --config Release --parallel
+      shell: cmd
+      
+    - name: Create Release Directory
+      run: |
+        mkdir Release
+        xcopy /E /I Windows-Build\Choroboros_artefacts\Release\VST3 Release\VST3
+        xcopy /E /I Windows-Build\Choroboros_artefacts\Release\Standalone Release\Standalone
+        copy README.md Release\
+        copy DISTRIBUTION.md Release\
+        copy EULA.md Release\
+      shell: cmd
+      
+    - name: Create ZIP Archive
+      run: |
+        powershell Compress-Archive -Path Release\* -DestinationPath Release\Choroboros-v1.0.1-Windows.zip -Force
+      shell: cmd
+      
+    - name: Generate SHA256 Checksum
+      run: |
+        powershell Get-FileHash -Path Release\Choroboros-v1.0.1-Windows.zip -Algorithm SHA256 | Out-File -FilePath Release\Choroboros-v1.0.1-Windows.zip.sha256 -Encoding ASCII
+      shell: cmd
+      
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Choroboros-Windows
+        path: Release/Choroboros-v1.0.1-Windows.zip
+        retention-days: 30
