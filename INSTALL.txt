@@ -1,0 +1,75 @@
+Choroboros Installation Instructions
+====================================
+
+EASIEST METHOD (Recommended):
+------------------------------
+1. Download and unzip the package
+2. Double-click "Install Choroboros.command"
+3. Follow the prompts
+4. Rescan plugins in your DAW
+5. Done!
+
+MANUAL METHOD:
+--------------
+1. Download and unzip the package
+2. Copy the plugin files to the correct locations (see below)
+3. Rescan plugins in your DAW
+
+---
+
+VST3 PLUGIN (for most DAWs):
+-----------------------------
+1. Find "Choroboros.vst3" in the VST3 folder
+2. Copy it to one of these locations:
+   
+   User-specific (recommended, no admin needed):
+   ~/Library/Audio/Plug-Ins/VST3/
+   
+   System-wide (requires admin password):
+   /Library/Audio/Plug-Ins/VST3/
+
+3. Rescan plugins in your DAW
+
+---
+
+AU PLUGIN (for Logic Pro):
+---------------------------
+1. Find "Choroboros.component" in the AU folder
+2. Copy it to one of these locations:
+   
+   User-specific (recommended):
+   ~/Library/Audio/Plug-Ins/Components/
+   
+   System-wide (requires admin):
+   /Library/Audio/Plug-Ins/Components/
+
+3. Rescan plugins in your DAW
+
+---
+
+STANDALONE APPLICATION:
+-----------------------
+1. Find "Choroboros.app" in the Standalone folder
+2. Drag it to /Applications/ or any location you prefer
+3. Double-click to launch
+
+Note: On first launch, macOS may show a security warning.
+      Go to System Preferences > Security & Privacy > Click "Open Anyway"
+
+---
+
+TROUBLESHOOTING:
+----------------
+- Plugin not appearing? Make sure you copied it to the correct location and rescanned plugins in your DAW
+- macOS blocking it? Go to System Preferences > Security & Privacy and allow it
+- Need help? Email: info@kaizenstrategic.ai
+
+---
+
+For detailed instructions, see DISTRIBUTION.md
+
+---
+
+Copyright (C) 2026 Kaizen Strategic AI Inc.
+Licensed under GPLv3 - See LICENSE file for details
+Source code: https://github.com/EsotericShadow/choroboros-open-source

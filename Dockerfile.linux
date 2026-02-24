@@ -1,0 +1,48 @@
+# Dockerfile for building Choroboros on Linux
+FROM ubuntu:22.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    libasound2-dev \
+    libfreetype6-dev \
+    libx11-dev \
+    libxcomposite-dev \
+    libxcursor-dev \
+    libxext-dev \
+    libxinerama-dev \
+    libxrandr-dev \
+    libxrender-dev \
+    libwebkit2gtk-4.0-dev \
+    libglu1-mesa-dev \
+    zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy source code
+COPY . .
+
+# Build the plugin (limit parallel jobs to avoid OOM)
+RUN cmake -B Linux-Build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build Linux-Build --config Release -j2
+
+# Create release package
+RUN mkdir -p Release && \
+    cp -r Linux-Build/Choroboros_artefacts/Release/VST3 Release/ && \
+    cp -r Linux-Build/Choroboros_artefacts/Release/Standalone Release/ && \
+    cp README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt Release/ && \
+    cd Release && \
+    zip -r Choroboros-v1.0.1-Linux.zip * && \
+    sha256sum Choroboros-v1.0.1-Linux.zip > Choroboros-v1.0.1-Linux.zip.sha256
+
+# Output directory
+VOLUME ["/workspace/Release"]
+
+CMD ["bash"]

@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# JUCE (external dependency - clone/symlink separately)
+JUCE/
+
+# Build and cache
+Build/
+build/
+Release/
+Universal-Build/
+AU/
+VST3/
+.cache/
+.codacy/
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.vst3
+*.component
+*.app
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+.juce/
+dmg_temp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+
+# Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
