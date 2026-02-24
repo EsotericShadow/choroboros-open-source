@@ -1,9 +1,6 @@
 # macOS
 .DS_Store
 
-# JUCE (external dependency - clone/symlink separately)
-JUCE/
-
 # Build and cache
 Build/
 build/
