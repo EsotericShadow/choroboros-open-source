@@ -16,21 +16,26 @@
 
 ### Option 1: Using Visual Studio GUI
 
-1. Open Visual Studio
-2. File → Open → CMake...
-3. Navigate to `green_chorus/CMakeLists.txt`
-4. Select "x64-Release" configuration
-5. Build → Build All
+1. Clone the repo with submodules: `git clone --recursive https://github.com/EsotericShadow/choroboros-open-source.git choroboros`
+2. Open Visual Studio
+3. File → Open → CMake...
+4. Navigate to `choroboros/CMakeLists.txt`
+5. Select "x64-Release" configuration
+6. Build → Build All
 
 ### Option 2: Using Command Line
 
 ```powershell
-# Navigate to project directory
-cd C:\path\to\green_chorus
+# Clone with submodules (JUCE is required)
+git clone --recursive https://github.com/EsotericShadow/choroboros-open-source.git choroboros
+cd choroboros
+
+# If already cloned without --recursive:
+# git submodule update --init --recursive
 
 # Create build directory
-mkdir Windows-Build
-cd Windows-Build
+mkdir build
+cd build
 
 # Configure CMake
 cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -47,8 +52,8 @@ build_windows.bat
 
 ## Output Locations
 
-- **VST3:** `Windows-Build/Choroboros_artefacts/Release/VST3/Choroboros.vst3`
-- **Standalone:** `Windows-Build/Choroboros_artefacts/Release/Standalone/Choroboros.exe`
+- **VST3:** `build/Choroboros_artefacts/Release/VST3/Choroboros.vst3`
+- **Standalone:** `build/Choroboros_artefacts/Release/Standalone/Choroboros.exe`
 
 ## Installation Paths
 

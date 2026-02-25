@@ -1140,7 +1140,7 @@ float ChoroborosPluginEditor::parseRateValue(const juce::String& trimmed)
 {
     juce::String clean = trimmed.removeCharacters("Hz").trim();
     const float value = clean.getFloatValue();
-    if (value > 0.0f && value <= 10.0f)
+    if (value > 0.0f && value <= 20.0f)
         return value;
     return -1.0f;
 }

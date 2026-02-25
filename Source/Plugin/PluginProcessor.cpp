@@ -901,10 +901,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChoroborosAudioProcessor::cr
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
     
-    // Rate: 0.01 Hz → 10.0 Hz
+    // Rate: 0.01 Hz → 20.0 Hz
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         RATE_ID, "Rate",
-        juce::NormalisableRange<float>(0.01f, 10.0f, 0.01f, 0.5f), // Skewed for more resolution at low end
+        juce::NormalisableRange<float>(0.01f, 20.0f, 0.01f, 0.5f), // Skewed for more resolution at low end
         0.5f  // Default: 0.5 Hz
     ));
     

@@ -129,7 +129,7 @@ public:
     static constexpr const char* MIX_ID = "mix"; // Dry/wet mix (0.0 = dry, 1.0 = wet)
 
     static constexpr float RATE_MIN = 0.01f;
-    static constexpr float RATE_MAX = 10.0f;
+    static constexpr float RATE_MAX = 20.0f;
     static constexpr float DEPTH_MIN = 0.0f;
     static constexpr float DEPTH_MAX = 1.0f;
     static constexpr float OFFSET_MIN = 0.0f;

@@ -355,7 +355,7 @@ float ChorusDSP::mapColorToEngineRange(float normalizedColor) const
 float ChorusDSP::mapRateToEngineRange(float normalizedRate) const
 {
     // Map normalized rate (0-1) to engine-specific ranges
-    // Currently all engines use the same rate range (0.01-10.0 Hz)
+    // Currently all engines use the same rate range (0.01-20.0 Hz)
     // This can be customized per engine if needed
     return normalizedRate;
 }
@@ -443,7 +443,7 @@ void ChorusDSP::process(const juce::dsp::AudioBlock<float>& block)
 
 void ChorusDSP::setRate(float rateHz_)
 {
-    rateHz = juce::jlimit(0.01f, 10.0f, rateHz_);
+    rateHz = juce::jlimit(0.01f, 20.0f, rateHz_);
     smoothedRate.setTargetValue(rateHz);
 }
 
