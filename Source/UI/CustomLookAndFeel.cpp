@@ -184,77 +184,83 @@ void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBa
         mixKnobSpriteSheetName = BinaryData::mix_knob_spritesheet_png;
         mixKnobSpriteSheetSize = BinaryData::mix_knob_spritesheet_pngSize;
     }
-    else if (colorIndex == 1) // Blue
+    else if (colorIndex == 1) // Blue (spritesheets only)
     {
-        knobBaseName = BinaryData::blue_knob_base_png;
-        knobBaseSize = BinaryData::blue_knob_base_pngSize;
-        indicatorName = BinaryData::indicator_north_facing_png;
-        indicatorSize = BinaryData::indicator_north_facing_pngSize;
-        shadowName = BinaryData::indicator_shadow_overlay_png;
-        shadowSize = BinaryData::indicator_shadow_overlay_pngSize;
+        knobBaseName = nullptr;
+        knobBaseSize = 0;
+        indicatorName = nullptr;
+        indicatorSize = 0;
+        shadowName = nullptr;
+        shadowSize = 0;
         trackName = nullptr;
         trackSize = 0;
         thumbName = BinaryData::blue_slider_thumb_png;
         thumbSize = BinaryData::blue_slider_thumb_pngSize;
-        mixKnobName = BinaryData::blue_mix_knob_png;
-        mixKnobSize = BinaryData::blue_mix_knob_pngSize;
+        mixKnobName = nullptr;
+        mixKnobSize = 0;
         knobSheetRateName = BinaryData::Blue_knob_spritesheet_png;
         knobSheetRateSize = BinaryData::Blue_knob_spritesheet_pngSize;
         mixKnobSpriteSheetName = BinaryData::blue_mix_knob_spritesheet_png;
         mixKnobSpriteSheetSize = BinaryData::blue_mix_knob_spritesheet_pngSize;
     }
-    else if (colorIndex == 2) // Red
+    else if (colorIndex == 2) // Red (spritesheets only, per-control like Green)
     {
-        knobBaseName = BinaryData::red_knob_base_png;
-        knobBaseSize = BinaryData::red_knob_base_pngSize;
-        indicatorName = BinaryData::worn_indicator_north_facing_png;
-        indicatorSize = BinaryData::worn_indicator_north_facing_pngSize;
-        shadowName = BinaryData::indicator_shadow_overlay_png2;
-        shadowSize = BinaryData::indicator_shadow_overlay_png2Size;
+        knobBaseName = nullptr;
+        knobBaseSize = 0;
+        indicatorName = nullptr;
+        indicatorSize = 0;
+        shadowName = nullptr;
+        shadowSize = 0;
         trackName = nullptr;
         trackSize = 0;
         thumbName = BinaryData::red_slider_thumb_png;
         thumbSize = BinaryData::red_slider_thumb_pngSize;
-        mixKnobName = BinaryData::red_mix_knob_png;
-        mixKnobSize = BinaryData::red_mix_knob_pngSize;
-        knobSheetRateName = BinaryData::red_dragon_knob_png;
-        knobSheetRateSize = BinaryData::red_dragon_knob_pngSize;
+        mixKnobName = nullptr;
+        mixKnobSize = 0;
+        knobSheetRateName = BinaryData::red_rate_knob_spritesheet_png;
+        knobSheetRateSize = BinaryData::red_rate_knob_spritesheet_pngSize;
+        knobSheetDepthName = BinaryData::red_depth_knob_spritesheet_png;
+        knobSheetDepthSize = BinaryData::red_depth_knob_spritesheet_pngSize;
+        knobSheetOffsetName = BinaryData::red_offset_knob_spritesheet_png;
+        knobSheetOffsetSize = BinaryData::red_offset_knob_spritesheet_pngSize;
+        knobSheetWidthName = BinaryData::red_width_knob_spritesheet_png;
+        knobSheetWidthSize = BinaryData::red_width_knob_spritesheet_pngSize;
         mixKnobSpriteSheetName = BinaryData::red_mix_knob_spritesheet_png;
         mixKnobSpriteSheetSize = BinaryData::red_mix_knob_spritesheet_pngSize;
     }
-    else if (colorIndex == 3) // Purple
+    else if (colorIndex == 3) // Purple (spritesheets only)
     {
-        knobBaseName = BinaryData::purple_knob_base_png;
-        knobBaseSize = BinaryData::purple_knob_base_pngSize;
-        indicatorName = BinaryData::indicator_north_facing_png2;
-        indicatorSize = BinaryData::indicator_north_facing_png2Size;
-        shadowName = BinaryData::indicator_shadow_overlay_png3;
-        shadowSize = BinaryData::indicator_shadow_overlay_png3Size;
+        knobBaseName = nullptr;
+        knobBaseSize = 0;
+        indicatorName = nullptr;
+        indicatorSize = 0;
+        shadowName = nullptr;
+        shadowSize = 0;
         trackName = nullptr;
         trackSize = 0;
         thumbName = BinaryData::purple_slider_thumb_png;
         thumbSize = BinaryData::purple_slider_thumb_pngSize;
-        mixKnobName = BinaryData::purple_mix_knob_png;
-        mixKnobSize = BinaryData::purple_mix_knob_pngSize;
+        mixKnobName = nullptr;
+        mixKnobSize = 0;
         knobSheetRateName = BinaryData::purple_knob_spritesheet_png;
         knobSheetRateSize = BinaryData::purple_knob_spritesheet_pngSize;
         mixKnobSpriteSheetName = BinaryData::purple_mix_knob_spritesheet_png;
         mixKnobSpriteSheetSize = BinaryData::purple_mix_knob_spritesheet_pngSize;
     }
-    else // Black (colorIndex == 4)
+    else // Black (colorIndex == 4, spritesheets only)
     {
-        knobBaseName = BinaryData::black_knob_base_png;
-        knobBaseSize = BinaryData::black_knob_base_pngSize;
-        indicatorName = BinaryData::indicator_north_facing_png2;
-        indicatorSize = BinaryData::indicator_north_facing_png2Size;
-        shadowName = BinaryData::indicator_shadow_overlay_png3;
-        shadowSize = BinaryData::indicator_shadow_overlay_png3Size;
+        knobBaseName = nullptr;
+        knobBaseSize = 0;
+        indicatorName = nullptr;
+        indicatorSize = 0;
+        shadowName = nullptr;
+        shadowSize = 0;
         trackName = nullptr;
         trackSize = 0;
         thumbName = BinaryData::black__slider_thumb_png;
         thumbSize = BinaryData::black__slider_thumb_pngSize;
-        mixKnobName = BinaryData::purple_mix_knob_png;
-        mixKnobSize = BinaryData::purple_mix_knob_pngSize;
+        mixKnobName = nullptr;
+        mixKnobSize = 0;
         knobSheetRateName = BinaryData::black_Knob_spritesheet_png;
         knobSheetRateSize = BinaryData::black_Knob_spritesheet_pngSize;
         mixKnobSpriteSheetName = BinaryData::black_mix_knob_spritesheet_png;
@@ -398,40 +404,55 @@ void CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wi
         }
     }
 
-    // Red theme filmstrip knob (shared sheet for all main knobs)
-    if (currentColorIndex == 2 && !isMixKnob && knobSpriteSheetRateImage.isValid())
+    // Red theme filmstrip knobs (individual sheets per control, like Green)
+    if (currentColorIndex == 2 && !isMixKnob)
     {
-        const juce::Image& knobSheet = knobSpriteSheetRateImage;
-        const int numColumns = 13;
-        const int numRows = 12;
-        const int numFrames = numColumns * numRows; // 156
-        const int frameWidth = 512;
-        const int frameHeight = 512;
-        // Use sheet-derived padding so red sheets with different export spacing still align.
-        const int padding = juce::jmax(0, (knobSheet.getWidth() - (numColumns * frameWidth)) / (numColumns + 1));
-        const int stepX = frameWidth + padding;
-        const int stepY = frameHeight + padding;
+        const auto knobId = slider.getComponentID();
+        const juce::Image* knobSheet = nullptr;
+        if (knobId == "Rate" && knobSpriteSheetRateImage.isValid())
+            knobSheet = &knobSpriteSheetRateImage;
+        else if (knobId == "Depth" && knobSpriteSheetDepthImage.isValid())
+            knobSheet = &knobSpriteSheetDepthImage;
+        else if (knobId == "Offset" && knobSpriteSheetOffsetImage.isValid())
+            knobSheet = &knobSpriteSheetOffsetImage;
+        else if (knobId == "Width" && knobSpriteSheetWidthImage.isValid())
+            knobSheet = &knobSpriteSheetWidthImage;
+        else if (knobSpriteSheetRateImage.isValid())
+            knobSheet = &knobSpriteSheetRateImage;
 
-        const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
-        const int col = frameIndex % numColumns;
-        const int row = frameIndex / numColumns;
-
-        const int sx = padding + col * stepX;
-        const int sy = padding + row * stepY;
-
-        const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-        const juce::Rectangle<int> imgBounds(0, 0, knobSheet.getWidth(), knobSheet.getHeight());
-        const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-        if (!clip.isEmpty())
+        if (knobSheet)
         {
-            const juce::Image frame = knobSheet.getClippedImage(clip);
-            if (frame.isValid())
+            // Red sheets: 13 columns x 12 rows = 156 frames, 384x384 px per frame, 12px padding
+            const int numColumns = 13;
+            const int numRows = 12;
+            const int numFrames = numColumns * numRows; // 156
+            const int frameWidth = 384;
+            const int frameHeight = 384;
+            const int padding = 12;
+            const int stepX = frameWidth + padding;
+            const int stepY = frameHeight + padding;
+
+            const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
+            const int col = frameIndex % numColumns;
+            const int row = frameIndex / numColumns;
+
+            const int sx = padding + col * stepX;
+            const int sy = padding + row * stepY;
+
+            const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
+            const juce::Rectangle<int> imgBounds(0, 0, knobSheet->getWidth(), knobSheet->getHeight());
+            const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
+            if (!clip.isEmpty())
             {
-                g.saveState();
-                g.setOpacity(1.0f);
-                g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
-                g.restoreState();
-                return;
+                const juce::Image frame = knobSheet->getClippedImage(clip);
+                if (frame.isValid())
+                {
+                    g.saveState();
+                    g.setOpacity(1.0f);
+                    g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
+                    g.restoreState();
+                    return;
+                }
             }
         }
     }

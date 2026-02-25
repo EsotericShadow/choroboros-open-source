@@ -19,7 +19,8 @@ juce_add_plugin(Choroboros
     BUNDLE_ID "com.kaizenstrategicai.Choroboros"
     PLUGIN_MANUFACTURER_CODE ChBr
     PLUGIN_CODE ChBr
-    FORMATS AU VST3 Standalone
+    FORMATS AU VST3 AAX Standalone
+    AAX_CATEGORY AAX_ePlugInCategory_Modulation
     PRODUCT_NAME "Choroboros"
     DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms"
     VERSION 1.0.1
@@ -107,29 +108,19 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/blue/blue_backpanel.png
         Assets/blue/blue_slider_thumb.png
         Assets/blue/Blue_knob_spritesheet.png
-        Assets/blue/blue_knob_base.png
         Assets/blue/blue_mix_knob_spritesheet.png
         Assets/red/red_backpanel.png
-        Assets/red/red_dragon_knob.png
-        Assets/red/red_knob_base.png
+        Assets/red/red_rate_knob_spritesheet.png
+        Assets/red/red_depth_knob_spritesheet.png
+        Assets/red/red_offset_knob_spritesheet.png
+        Assets/red/red_width_knob_spritesheet.png
         Assets/red/red_slider_thumb.png
         Assets/red/red_mix_knob_spritesheet.png
         Assets/purple/purple_backpanel.png
         Assets/purple/purple_knob_spritesheet.png
-        Assets/purple/purple_knob_base.png
         Assets/purple/purple_mix_knob_spritesheet.png
         Assets/purple/purple_slider_thumb.png
-        Assets/blue/blue_mix_knob.png
-        Assets/blue/indicator_north_facing.png
-        Assets/blue/indicator_shadow_overlay.png
-        Assets/red/red_mix_knob.png
-        Assets/red/worn_indicator_north_facing.png
-        Assets/red/indicator_shadow_overlay.png
-        Assets/purple/purple_mix_knob.png
-        Assets/purple/indicator_north_facing.png
-        Assets/purple/indicator_shadow_overlay.png
         Assets/black/black_backpanel.png
-        Assets/black/black_knob_base.png
         Assets/black/black_Knob_spritesheet.png
         Assets/black/black_mix_knob_spritesheet.png
         Assets/black/black__slider_thumb.png
@@ -168,6 +159,13 @@ if(APPLE)
     add_custom_command(TARGET Choroboros_VST3 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.vst3 to user VST3 folder..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/Release/VST3/Choroboros.vst3" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/VST3/Choroboros.vst3" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
         COMMENT "Copy Choroboros.vst3 to ~/Library/Audio/Plug-Ins/VST3 for Reaper")
+    # After AAX build, copy to Avid Plug-Ins (Pro Tools Developer loads from user path if present)
+    add_custom_command(TARGET Choroboros_AAX POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins"
+        COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.aaxplugin to Avid Plug-Ins..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/AAX/Choroboros.aaxplugin" "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
+        COMMENT "Copy Choroboros.aaxplugin to ~/Library/Application Support/Avid/Audio/Plug-Ins for Pro Tools Developer")
 endif()

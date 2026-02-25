@@ -23,7 +23,8 @@ AnimatedToggleButton::AnimatedToggleButton()
 {
     setSliderStyle(juce::Slider::LinearVertical);
     setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    setRange(0.0, 1.0, 1.0);
+    // Inverted range: top = 1 (HQ on), bottom = 0 (HQ off) so drag up = ON, drag down = OFF
+    setRange(1.0, 0.0, 1.0);
     setMouseDragSensitivity(2);
     setScrollWheelEnabled(false);
     setWantsKeyboardFocus(false);
@@ -36,7 +37,7 @@ AnimatedToggleButton::AnimatedToggleButton()
 
 void AnimatedToggleButton::paint(juce::Graphics& g)
 {
-    const float targetFrame = (getValue() >= 0.5) ? 0.0f : static_cast<float>(kNumFrames - 1);
+    const float targetFrame = (getValue() >= 0.5) ? static_cast<float>(kNumFrames - 1) : 0.0f;
     if (!isTimerRunning() && std::abs(animatedFrame - targetFrame) > 0.01f)
         animatedFrame = targetFrame;
 
@@ -58,7 +59,7 @@ void AnimatedToggleButton::paint(juce::Graphics& g)
 
 void AnimatedToggleButton::startAnimationToState(bool on)
 {
-    const float target = on ? 0.0f : static_cast<float>(kNumFrames - 1);
+    const float target = on ? static_cast<float>(kNumFrames - 1) : 0.0f;
     animationStartFrame = animatedFrame;
     animationEndFrame = target;
     animationStartMs = juce::Time::getMillisecondCounterHiRes();
@@ -87,23 +88,33 @@ void AnimatedToggleButton::mouseDrag(const juce::MouseEvent& e)
     if (dragTriggered)
         return;
 
-    constexpr float flickThresholdPx = 0.0f; // any upward movement
     const float dragDeltaY = static_cast<float>(e.getScreenPosition().y - dragStartScreenY);
-    if (dragDeltaY < flickThresholdPx && getValue() < 0.5)
+    // HQ on = up, HQ off = down: drag up -> ON, drag down -> OFF
+    if (dragDeltaY < 0.0f && getValue() < 0.5)
     {
         dragTriggered = true;
         commitToggleState(true, juce::sendNotificationSync);
+    }
+    else if (dragDeltaY > 0.0f && getValue() >= 0.5)
+    {
+        dragTriggered = true;
+        commitToggleState(false, juce::sendNotificationSync);
     }
 }
 
 void AnimatedToggleButton::mouseUp(const juce::MouseEvent& e)
 {
-    constexpr float flickThresholdPx = 0.0f; // any upward movement
     const float dragDeltaY = static_cast<float>(e.getScreenPosition().y - dragStartScreenY);
-    if (!dragTriggered && dragDeltaY < flickThresholdPx && getValue() < 0.5)
+    // HQ on = up, HQ off = down: drag up -> ON, drag down -> OFF
+    if (!dragTriggered && dragDeltaY < 0.0f && getValue() < 0.5)
     {
         dragTriggered = true;
         commitToggleState(true, juce::sendNotificationSync);
+    }
+    else if (!dragTriggered && dragDeltaY > 0.0f && getValue() >= 0.5)
+    {
+        dragTriggered = true;
+        commitToggleState(false, juce::sendNotificationSync);
     }
     pointerIsDown = false;
     juce::Slider::mouseUp(e);
@@ -117,13 +128,19 @@ void AnimatedToggleButton::mouseDoubleClick(const juce::MouseEvent& e)
 
 void AnimatedToggleButton::timerCallback()
 {
-    if (pointerIsDown && !dragTriggered && getValue() < 0.5)
+    if (pointerIsDown && !dragTriggered)
     {
         const int currentScreenY = juce::Desktop::getInstance().getMousePosition().y;
-        if (currentScreenY < dragStartScreenY)
+        // HQ on = up, HQ off = down
+        if (currentScreenY < dragStartScreenY && getValue() < 0.5)
         {
             dragTriggered = true;
             commitToggleState(true, juce::sendNotificationSync);
+        }
+        else if (currentScreenY > dragStartScreenY && getValue() >= 0.5)
+        {
+            dragTriggered = true;
+            commitToggleState(false, juce::sendNotificationSync);
         }
     }
 

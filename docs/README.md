@@ -9,6 +9,8 @@
 ## Root Docs (operational)
 
 - `README.md` - Main project readme
+- `../CHANGELOG.md` - Version history
+- `KNOWN_ISSUES.md` - Beta known issues
 - `EULA.md` - End-user license (packaged with plugin)
 - `GPL_NOTICE.md` - GPL compliance notice
 - `CUSTOMER_INSTALL_INSTRUCTIONS.md` - Install guide

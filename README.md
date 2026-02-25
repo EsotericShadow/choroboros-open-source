@@ -1,12 +1,12 @@
 # Choroboros
 
-**A chorus that eats its own tail - Four colors, eight algorithms**
+**A chorus that eats its own tail - Five colors, ten algorithms**
 
-Choroboros is a multi-engine chorus plugin featuring four distinct engines, each with two unique algorithms. Switch between engines to explore classic, modern, vintage, and experimental chorus sounds.
+Choroboros is a multi-engine chorus plugin featuring five distinct engines, each with two unique algorithms. Switch between engines to explore classic, modern, vintage, experimental, and linear chorus sounds.
 
 ## Features
 
-### Four Engine Colors
+### Five Engine Colors
 
 - **🟢 Green (Classic):** Smooth, musical chorus with Lagrange interpolation
   - Normal: 3rd order Lagrange
@@ -23,6 +23,10 @@ Choroboros is a multi-engine chorus plugin featuring four distinct engines, each
 - **🟣 Purple (Experimental):** Unique, psychedelic chorus algorithms
   - Normal: Phase-Warped Chorus (non-uniform phase modulation)
   - HQ: Orbit Chorus (2D rotating modulation)
+
+- **⬛ Black (Linear):** Transparent, CPU-efficient chorus with linear interpolation
+  - Normal: Linear interpolation
+  - HQ: Linear Ensemble (multi-voice)
 
 ### Parameters
 
@@ -60,6 +64,8 @@ Copy `Choroboros.app` to `/Applications/` or any location you prefer.
 
 After installation, rescan plugins in your DAW.
 
+**Beta testers:** See [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for known issues and how to report feedback.
+
 ## System Requirements
 
 - **macOS:** 10.13 or later
@@ -68,7 +74,7 @@ After installation, rescan plugins in your DAW.
 
 ## Technical Details
 
-- **Version:** 1.0.1
+- **Version:** 2.01-beta
 - **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
