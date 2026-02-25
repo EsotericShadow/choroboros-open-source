@@ -104,7 +104,12 @@ struct LayoutTuning
     int mixCenterXRed = 612;
     int mixCenterXPurple = 612;
     int mixCenterXBlack = 612;
-    int mixKnobY = 251;  // Mix knob top Y - independent of slider
+    int mixKnobY = 251;  // Mix knob top Y - legacy fallback
+    int mixKnobYGreen = 251;
+    int mixKnobYBlue = 251;
+    int mixKnobYRed = 251;
+    int mixKnobYPurple = 251;
+    int mixKnobYBlack = 251;
     int mixKnobYOffset = 12;
     int mixKnobYOffsetGreen = 12;
     int mixKnobYOffsetBlue = 12;

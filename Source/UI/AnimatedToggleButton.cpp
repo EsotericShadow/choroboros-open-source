@@ -35,9 +35,17 @@ AnimatedToggleButton::AnimatedToggleButton()
     };
 }
 
+float AnimatedToggleButton::getAnimationProgress() const
+{
+    // Frame 0 = switch UP = HQ on = light on. Frame 17 = switch DOWN = HQ off = light off.
+    const float frame = animationRunning ? animatedFrame : ((getValue() >= 0.5f) ? 0.0f : static_cast<float>(kNumFrames - 1));
+    return juce::jlimit(0.0f, 1.0f, 1.0f - frame / static_cast<float>(kNumFrames - 1));
+}
+
 void AnimatedToggleButton::paint(juce::Graphics& g)
 {
-    const float targetFrame = (getValue() >= 0.5) ? static_cast<float>(kNumFrames - 1) : 0.0f;
+    // Frame 0 = switch UP = HQ on. Frame 17 = switch DOWN = HQ off.
+    const float targetFrame = (getValue() >= 0.5) ? 0.0f : static_cast<float>(kNumFrames - 1);
     if (!isTimerRunning() && std::abs(animatedFrame - targetFrame) > 0.01f)
         animatedFrame = targetFrame;
 
@@ -59,7 +67,8 @@ void AnimatedToggleButton::paint(juce::Graphics& g)
 
 void AnimatedToggleButton::startAnimationToState(bool on)
 {
-    const float target = on ? static_cast<float>(kNumFrames - 1) : 0.0f;
+    // Frame 0 = up = on, frame 17 = down = off
+    const float target = on ? 0.0f : static_cast<float>(kNumFrames - 1);
     animationStartFrame = animatedFrame;
     animationEndFrame = target;
     animationStartMs = juce::Time::getMillisecondCounterHiRes();
@@ -158,6 +167,8 @@ void AnimatedToggleButton::timerCallback()
             animationRunning = false;
         }
         repaint();
+        if (onAnimationTick)
+            onAnimationTick();
     }
 
     if (!pointerIsDown && !animationRunning)

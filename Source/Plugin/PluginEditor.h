@@ -56,6 +56,7 @@ private:
     
     CustomLookAndFeel customLookAndFeel;
     juce::Image backgroundImage;
+    juce::Image backgroundImageLit;  // Light-on overlay (opacity synced to HQ switch) for all themes
     
     // Sliders (with visual smoothing for natural feel)
     SmoothedSlider rateSlider;

@@ -710,7 +710,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     addLayoutByColor("Slider Track End X", layout.sliderTrackEndXGreen, layout.sliderTrackEndXBlue, layout.sliderTrackEndXRed, layout.sliderTrackEndXPurple, layout.sliderTrackEndXBlack, 0, 800);
     addLayoutByColor("Slider Track End Y", layout.sliderTrackEndYGreen, layout.sliderTrackEndYBlue, layout.sliderTrackEndYRed, layout.sliderTrackEndYPurple, layout.sliderTrackEndYBlack, 0, 500);
     addLayoutByColor("Slider Size (%)", layout.sliderSizeGreen, layout.sliderSizeBlue, layout.sliderSizeRed, layout.sliderSizePurple, layout.sliderSizeBlack, 10, 500);
-    addLayout(layoutSliderProps, "Mix Knob Y", layout.mixKnobY, 0, 500);
+    addLayout(layoutSliderProps, "Mix Knob Y (legacy)", layout.mixKnobY, 0, 500);
+    addLayoutByColor("Mix Knob Y", layout.mixKnobYGreen, layout.mixKnobYBlue, layout.mixKnobYRed, layout.mixKnobYPurple, layout.mixKnobYBlack, 0, 500);
     addLayout(layoutSliderProps, "Color Value Center X", layout.colorValueCenterX, 0, 800);
     addLayoutByColor("Mix Knob Size", layout.mixKnobSizeGreen, layout.mixKnobSizeBlue, layout.mixKnobSizeRed, layout.mixKnobSizePurple, layout.mixKnobSizeBlack, 10, 260);
     addLayoutByColor("Mix Center X", layout.mixCenterXGreen, layout.mixCenterXBlue, layout.mixCenterXRed, layout.mixCenterXPurple, layout.mixCenterXBlack, 0, 800);
@@ -1131,6 +1132,11 @@ juce::String DevPanel::buildJson() const
     json << "    \"mixCenterXPurple\": " << layout.mixCenterXPurple << ",\n";
     json << "    \"mixCenterXBlack\": " << layout.mixCenterXBlack << ",\n";
     json << "    \"mixKnobY\": " << layout.mixKnobY << ",\n";
+    json << "    \"mixKnobYGreen\": " << layout.mixKnobYGreen << ",\n";
+    json << "    \"mixKnobYBlue\": " << layout.mixKnobYBlue << ",\n";
+    json << "    \"mixKnobYRed\": " << layout.mixKnobYRed << ",\n";
+    json << "    \"mixKnobYPurple\": " << layout.mixKnobYPurple << ",\n";
+    json << "    \"mixKnobYBlack\": " << layout.mixKnobYBlack << ",\n";
     json << "    \"mixKnobYOffset\": " << layout.mixKnobYOffsetGreen << ",\n";
     json << "    \"mixKnobYOffsetGreen\": " << layout.mixKnobYOffsetGreen << ",\n";
     json << "    \"mixKnobYOffsetBlue\": " << layout.mixKnobYOffsetBlue << ",\n";

@@ -489,7 +489,12 @@ void CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wi
             {
                 g.saveState();
                 g.setOpacity(1.0f);
-                g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
+                // Purple knob shadow extends below frame; add bottom overflow so it isn't clipped
+                constexpr int shadowOverflowBottom = 12;
+                const int drawHeight = height + shadowOverflowBottom;
+                g.drawImageWithin(frame, x, y, width, drawHeight,
+                                 juce::RectanglePlacement::centred | juce::RectanglePlacement::onlyReduceInSize,
+                                  false);
                 g.restoreState();
                 return;
             }
