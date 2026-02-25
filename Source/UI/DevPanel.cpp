@@ -1052,6 +1052,23 @@ juce::String DevPanel::buildJson() const
     appendInternalsObject("internalsPurpleHQ", processor.getEngineDspInternals(3, true));
     appendInternalsObject("internalsBlackHQ", processor.getEngineDspInternals(4, true));
 
+    json << "  \"engineParamProfiles\": {\n";
+    const char* engineKeys[] = { "green", "blue", "red", "purple", "black" };
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto& p = processor.getEngineParamProfiles()[i];
+        json << "    \"" << engineKeys[i] << "\": {"
+             << "\"valid\": " << (p.valid ? "true" : "false")
+             << ", \"rate\": " << formatFloat(p.rate)
+             << ", \"depth\": " << formatFloat(p.depth)
+             << ", \"offset\": " << formatFloat(p.offset)
+             << ", \"width\": " << formatFloat(p.width)
+             << ", \"mix\": " << formatFloat(p.mix)
+             << ", \"color\": " << formatFloat(p.color)
+             << "}" << (i < 4 ? ",\n" : "\n");
+    }
+    json << "  },\n";
+
     json << "  \"layout\": {\n";
     json << "    \"mainKnobSize\": " << layout.mainKnobSizeGreen << ",\n";
     json << "    \"mainKnobSizeGreen\": " << layout.mainKnobSizeGreen << ",\n";
@@ -1349,6 +1366,7 @@ void DevPanel::saveCurrentAsDefaults()
         const bool semanticMatch = !generated.isVoid() && varsEquivalent(generated, roundTrip);
         const bool hasCoreSections = (root != nullptr
             && root->hasProperty("tuning") && root->hasProperty("layout")
+            && root->hasProperty("engineParamProfiles")
             && root->hasProperty("internalsGreen") && root->hasProperty("internalsGreenHQ")
             && root->hasProperty("internalsBlue") && root->hasProperty("internalsBlueHQ")
             && root->hasProperty("internalsRed") && root->hasProperty("internalsRedHQ")

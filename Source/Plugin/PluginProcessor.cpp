@@ -250,6 +250,9 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
         const bool activeHQ = processor.isHqEnabled();
         processor.syncEngineInternalsToActiveDsp(activeEngine, activeHQ);
     }
+
+    if (root->hasProperty("engineParamProfiles"))
+        processor.loadEngineParamProfilesFromVar(root->getProperty("engineParamProfiles"));
 }
 } // namespace
 
@@ -272,10 +275,13 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     initTuningDefaults();
     initializeEngineInternalProfiles();
     loadPersistedDefaults(*this);
+    parameters.addParameterListener(ENGINE_COLOR_ID, this);
+    lastEngineIndex = getCurrentEngineColorIndex();
 }
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
+    parameters.removeParameterListener(ENGINE_COLOR_ID, this);
 }
 
 //==============================================================================
@@ -318,7 +324,7 @@ double ChoroborosAudioProcessor::getTailLengthSeconds() const
 
 int ChoroborosAudioProcessor::getNumPrograms()
 {
-    return 6; // Classic, Vintage, Rich, Psychedelic, Duck, and Ouroboros
+    return 7; // Classic, Vintage, Modern, Psychedelic, Core, Duck, Ouroboros
 }
 
 int ChoroborosAudioProcessor::getCurrentProgram()
@@ -331,6 +337,7 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
     if (index < 0 || index >= getNumPrograms())
         return;
     
+    presetLoadInProgress = true;
     currentProgram = index;
     
     // Track preset load for feedback
@@ -340,127 +347,102 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
     }
     
     // Apply preset values
-    if (index == 0) // Classic preset (defaults)
+    if (index == 0) // Classic (Green): NQ, R=1.2Hz, D=21%, O=33°, W=153%, M=33%, C=16%
     {
-        // Rate: 0.5 Hz
         if (auto* param = parameters.getParameter(RATE_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(0.5f));
-        
-        // Depth: 50%
+            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(1.2f));
         if (auto* param = parameters.getParameter(DEPTH_ID))
-            param->setValueNotifyingHost(0.5f);
-        
-        // Offset: 90°
+            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.21f));
         if (auto* param = parameters.getParameter(OFFSET_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(90.0f));
-        
-        // Width: 100%
+            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(33.0f));
         if (auto* param = parameters.getParameter(WIDTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.0f));
-        
-        // Color: 50%
+            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.53f));
+        if (auto* param = parameters.getParameter(MIX_ID))
+            param->setValueNotifyingHost(0.33f);
         if (auto* param = parameters.getParameter(COLOR_ID))
-            param->setValueNotifyingHost(0.5f);
-        
-        // Engine Color: Green (0)
+            param->setValueNotifyingHost(0.16f);
         if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
             param->setValueNotifyingHost(0.0f);
-        
-        // HQ: Off
         if (auto* param = parameters.getParameter(HQ_ID))
             param->setValueNotifyingHost(0.0f);
     }
-    else if (index == 1) // Vintage preset
+    else if (index == 1) // Vintage (Red): HQ, R=0.62Hz, D=21%, O=56°, W=125%, M=50%, C=50%
     {
-        // Rate: 0.44 Hz
         if (auto* param = parameters.getParameter(RATE_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(0.44f));
-        
-        // Depth: 33% (convert actual value to normalized for skewed range)
+            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(0.62f));
         if (auto* param = parameters.getParameter(DEPTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.33f));
-        
-        // Offset: 110°
+            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.21f));
         if (auto* param = parameters.getParameter(OFFSET_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(110.0f));
-        
-        // Width: 125%
+            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(56.0f));
         if (auto* param = parameters.getParameter(WIDTH_ID))
             param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.25f));
-        
-        // Color: 77%
+        if (auto* param = parameters.getParameter(MIX_ID))
+            param->setValueNotifyingHost(0.5f);
         if (auto* param = parameters.getParameter(COLOR_ID))
-            param->setValueNotifyingHost(0.77f);
-        
-        // Engine Color: Red (2)
+            param->setValueNotifyingHost(0.5f);
         if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
             param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(2.0f));
-        
-        // HQ: On
         if (auto* param = parameters.getParameter(HQ_ID))
             param->setValueNotifyingHost(1.0f);
     }
-    else if (index == 2) // Rich preset
+    else if (index == 2) // Modern (Blue): HQ, R=0.26Hz, D=53%, O=59°, W=100%, M=50%, C=41%
     {
-        // Rate: 1.1 Hz
         if (auto* param = parameters.getParameter(RATE_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(1.1f));
-        
-        // Depth: 30%
+            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(0.26f));
         if (auto* param = parameters.getParameter(DEPTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.30f));
-        
-        // Offset: 25°
+            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.53f));
         if (auto* param = parameters.getParameter(OFFSET_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(25.0f));
-        
-        // Width: 150%
+            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(59.0f));
         if (auto* param = parameters.getParameter(WIDTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.5f));
-        
-        // Color: 90%
+            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.0f));
+        if (auto* param = parameters.getParameter(MIX_ID))
+            param->setValueNotifyingHost(0.5f);
         if (auto* param = parameters.getParameter(COLOR_ID))
-            param->setValueNotifyingHost(0.90f);
-        
-        // Engine Color: Red (2)
+            param->setValueNotifyingHost(0.41f);
         if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(2.0f));
-        
-        // HQ: Off
+            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(1.0f));
+        if (auto* param = parameters.getParameter(HQ_ID))
+            param->setValueNotifyingHost(1.0f);
+    }
+    else if (index == 3) // Psychedelic (Purple): NQ, R=0.12Hz, D=52%, O=22°, W=200%, M=69%, C=13%
+    {
+        if (auto* param = parameters.getParameter(RATE_ID))
+            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(0.12f));
+        if (auto* param = parameters.getParameter(DEPTH_ID))
+            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.52f));
+        if (auto* param = parameters.getParameter(OFFSET_ID))
+            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(22.0f));
+        if (auto* param = parameters.getParameter(WIDTH_ID))
+            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(2.0f));
+        if (auto* param = parameters.getParameter(MIX_ID))
+            param->setValueNotifyingHost(0.69f);
+        if (auto* param = parameters.getParameter(COLOR_ID))
+            param->setValueNotifyingHost(0.13f);
+        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
+            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(3.0f));
         if (auto* param = parameters.getParameter(HQ_ID))
             param->setValueNotifyingHost(0.0f);
     }
-    else if (index == 3) // Psychedelic preset
+    else if (index == 4) // Core (Black): HQ, R=1.4Hz, D=35%, O=41°, W=159%, M=50%, C=28%
     {
-        // Rate: 0.13 Hz
         if (auto* param = parameters.getParameter(RATE_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(0.13f));
-        
-        // Depth: 64%
+            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(1.4f));
         if (auto* param = parameters.getParameter(DEPTH_ID))
-            param->setValueNotifyingHost(0.64f);
-        
-        // Offset: 45°
+            param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(0.35f));
         if (auto* param = parameters.getParameter(OFFSET_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(45.0f));
-        
-        // Width: 145%
+            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(41.0f));
         if (auto* param = parameters.getParameter(WIDTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.45f));
-        
-        // Color: 66%
+            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(1.59f));
+        if (auto* param = parameters.getParameter(MIX_ID))
+            param->setValueNotifyingHost(0.5f);
         if (auto* param = parameters.getParameter(COLOR_ID))
-            param->setValueNotifyingHost(0.66f);
-        
-        // Engine Color: Purple (3)
+            param->setValueNotifyingHost(0.28f);
         if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(3.0f));
-        
-        // HQ: On
+            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(4.0f));
         if (auto* param = parameters.getParameter(HQ_ID))
             param->setValueNotifyingHost(1.0f);
     }
-    else if (index == 4) // Duck preset
+    else if (index == 5) // Duck preset
     {
         // Rate: 10.0 Hz
         if (auto* param = parameters.getParameter(RATE_ID))
@@ -498,7 +480,7 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
         if (auto* param = parameters.getParameter(MIX_ID))
             param->setValueNotifyingHost(1.0f);
     }
-    else if (index == 5) // Ouroboros preset
+    else if (index == 6) // Ouroboros preset
     {
         // Rate: 2.0 Hz
         if (auto* param = parameters.getParameter(RATE_ID))
@@ -532,21 +514,26 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
         if (auto* param = parameters.getParameter(MIX_ID))
             param->setValueNotifyingHost(1.0f);
     }
+    if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
+        lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
+    presetLoadInProgress = false;
 }
 
 const juce::String ChoroborosAudioProcessor::getProgramName (int index)
 {
     if (index == 0)
-        return "Classic";
+        return "Classic (Green)";
     else if (index == 1)
-        return "Vintage";
+        return "Vintage (Red)";
     else if (index == 2)
-        return "Rich";
+        return "Modern (Blue)";
     else if (index == 3)
-        return "Psychedelic";
+        return "Psychedelic (Purple)";
     else if (index == 4)
-        return "Duck";
+        return "Core (Black)";
     else if (index == 5)
+        return "Duck";
+    else if (index == 6)
         return "Ouroboros";
     return {};
 }
@@ -793,8 +780,119 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
     if (xmlState.get() != nullptr)
+    {
         if (xmlState->hasTagName (parameters.state.getType()))
+        {
+            stateLoadInProgress = true;
             parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
+            if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
+                lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
+            stateLoadInProgress = false;
+        }
+    }
+}
+
+void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID != ENGINE_COLOR_ID)
+        return;
+    const int newEngine = juce::jlimit(0, 4, static_cast<int>(newValue));
+    if (presetLoadInProgress || stateLoadInProgress)
+    {
+        lastEngineIndex = newEngine;
+        return;
+    }
+    saveCurrentParamsToEngineProfile(lastEngineIndex);
+    lastEngineIndex = newEngine;
+    applyEngineParamProfile(newEngine);
+}
+
+void ChoroborosAudioProcessor::saveCurrentParamsToEngineProfile(int engineIndex)
+{
+    if (engineIndex < 0 || engineIndex >= 5)
+        return;
+    auto& p = engineParamProfiles[engineIndex];
+    if (auto* r = parameters.getRawParameterValue(RATE_ID))
+        p.rate = parameters.getParameterRange(RATE_ID).convertFrom0to1(r->load());
+    if (auto* d = parameters.getRawParameterValue(DEPTH_ID))
+        p.depth = parameters.getParameterRange(DEPTH_ID).convertFrom0to1(d->load());
+    if (auto* o = parameters.getRawParameterValue(OFFSET_ID))
+        p.offset = parameters.getParameterRange(OFFSET_ID).convertFrom0to1(o->load());
+    if (auto* w = parameters.getRawParameterValue(WIDTH_ID))
+        p.width = parameters.getParameterRange(WIDTH_ID).convertFrom0to1(w->load());
+    if (auto* m = parameters.getRawParameterValue(MIX_ID))
+        p.mix = m->load();
+    if (auto* c = parameters.getRawParameterValue(COLOR_ID))
+        p.color = c->load();
+    p.valid = true;
+}
+
+void ChoroborosAudioProcessor::applyEngineParamProfile(int engineIndex)
+{
+    const EngineParamProfile& prof = engineParamProfiles[engineIndex].valid
+        ? engineParamProfiles[engineIndex]
+        : getEngineDefaults(engineIndex);
+    if (auto* param = parameters.getParameter(RATE_ID))
+        param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(prof.rate));
+    if (auto* param = parameters.getParameter(DEPTH_ID))
+        param->setValueNotifyingHost(parameters.getParameterRange(DEPTH_ID).convertTo0to1(prof.depth));
+    if (auto* param = parameters.getParameter(OFFSET_ID))
+        param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(prof.offset));
+    if (auto* param = parameters.getParameter(WIDTH_ID))
+        param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(prof.width));
+    if (auto* param = parameters.getParameter(MIX_ID))
+        param->setValueNotifyingHost(prof.mix);
+    if (auto* param = parameters.getParameter(COLOR_ID))
+        param->setValueNotifyingHost(prof.color);
+}
+
+void ChoroborosAudioProcessor::loadEngineParamProfilesFromVar(const juce::var& profilesVar)
+{
+    const auto* obj = profilesVar.getDynamicObject();
+    if (obj == nullptr)
+        return;
+    auto getNum = [](const juce::var& v, const char* k, double def) -> float
+    {
+        if (const auto* o = v.getDynamicObject())
+        {
+            const auto val = o->getProperty(juce::Identifier(k));
+            if (val.isDouble() || val.isInt() || val.isInt64())
+                return static_cast<float>(static_cast<double>(val));
+        }
+        return static_cast<float>(def);
+    };
+    const char* keys[] = { "green", "blue", "red", "purple", "black" };
+    for (int i = 0; i < 5; ++i)
+    {
+        const juce::var engVar = obj->getProperty(keys[i]);
+        const auto* engObj = engVar.getDynamicObject();
+        if (engObj == nullptr)
+            continue;
+        auto& p = engineParamProfiles[i];
+        p.valid = static_cast<bool>(engObj->getProperty("valid"));
+        p.rate = getNum(engVar, "rate", p.rate);
+        p.depth = getNum(engVar, "depth", p.depth);
+        p.offset = getNum(engVar, "offset", p.offset);
+        p.width = getNum(engVar, "width", p.width);
+        p.mix = getNum(engVar, "mix", p.mix);
+        p.color = getNum(engVar, "color", p.color);
+    }
+}
+
+EngineParamProfile ChoroborosAudioProcessor::getEngineDefaults(int engineIndex)
+{
+    EngineParamProfile p;
+    p.valid = true;
+    switch (engineIndex)
+    {
+        case 0: p.rate = 1.2f;  p.depth = 0.21f; p.offset = 33.0f; p.width = 1.53f; p.mix = 0.33f; p.color = 0.16f; break;
+        case 1: p.rate = 0.26f; p.depth = 0.53f; p.offset = 59.0f; p.width = 1.0f;  p.mix = 0.5f;  p.color = 0.41f; break;
+        case 2: p.rate = 0.62f; p.depth = 0.21f; p.offset = 56.0f; p.width = 1.25f; p.mix = 0.5f;  p.color = 0.5f;  break;
+        case 3: p.rate = 0.12f; p.depth = 0.52f; p.offset = 22.0f; p.width = 2.0f;  p.mix = 0.69f; p.color = 0.13f; break;
+        case 4: p.rate = 1.4f;  p.depth = 0.35f; p.offset = 41.0f; p.width = 1.59f; p.mix = 0.5f;  p.color = 0.28f; break;
+        default: p.rate = 0.5f; p.depth = 0.5f; p.offset = 90.0f; p.width = 1.0f; p.mix = 0.5f; p.color = 0.5f;
+    }
+    return p;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ChoroborosAudioProcessor::createParameterLayout()

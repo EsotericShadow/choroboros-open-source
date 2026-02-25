@@ -36,6 +36,8 @@ public:
     // Set callback for when value is edited (called when text editor loses focus or Enter is pressed)
     // Returns true if value was applied successfully, false if invalid
     std::function<bool(const juce::String&)> onValueEdited;
+    /** Show custom popup editor (avoids JUCE Label built-in editor). */
+    void showCustomEditor();
     void setAnimatedValueText(const juce::String& text);
     void setFlipAnimationParams(bool enabled, int durationMs, float travelUpPx, float travelDownPx,
                                 float travelOutScale, float travelInScale, float shearAmount, float minScale);
@@ -60,11 +62,10 @@ public:
     
     // Set the text editor color (for when editing value labels)
     void setEditorTextColor(juce::Colour color);
+    juce::Colour getEditorTextColor() const { return editorTextColor; }
     
 private:
     bool isValueLabelStyle = false;
-    bool isEditing = false;
-    juce::String pendingFormattedText;  // Store formatted text to apply after editor hides
     juce::Colour editorTextColor = juce::Colour(0xff9dbd78);  // Default green, will be updated
     bool isAnimatingFlip = false;
     float flipProgress = 1.0f;
@@ -101,9 +102,6 @@ private:
     juce::String flipToText;
     juce::String flipFromMappedText;
     juce::Array<int> flippingCharIndices;
-    void editorShown(juce::TextEditor* editor) override;
-    void editorAboutToBeHidden(juce::TextEditor* editor) override;
-    juce::TextEditor* createEditorComponent() override;
     void timerCallback() override;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LabelWithContainer)

@@ -519,6 +519,9 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     addAndMakeVisible(devButton);
     devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(40), uiScaleInt(10));
     
+    // Listen for engine color changes (preset load or manual) to update value label colors
+    audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
+    
     // Set fixed size
     setSize(uiScaleInt(700), uiScaleInt(363));
     applyLayout();
@@ -577,7 +580,21 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
+    audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
     setLookAndFeel(nullptr);
+}
+
+void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == ChoroborosAudioProcessor::ENGINE_COLOR_ID)
+    {
+        const int colorIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
+        customLookAndFeel.setColorTheme(colorIndex);
+        loadBackgroundImage(colorIndex);
+        updateValueLabelColors(colorIndex);
+        PluginEditorSetup::applyLayout(*this, layoutTuning);
+        repaint();
+    }
 }
 
 //==============================================================================
@@ -1084,13 +1101,16 @@ void ChoroborosPluginEditor::setupValueLabelEditing(LabelWithContainer& label, j
             
             // Format and set the label text - this will be picked up by editorAboutToBeHidden
             updateValueLabel(label, clampedValue, paramId);
-            
+            label.repaint();
+            repaint();
             return true;  // Value was applied successfully
         }
         else
         {
             // Invalid value - restore previous value
             updateValueLabel(label, slider.getValue(), paramId);
+            label.repaint();
+            repaint();
             return false;  // Value was not applied
         }
     };

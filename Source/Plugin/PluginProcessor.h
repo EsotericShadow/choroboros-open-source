@@ -27,8 +27,21 @@
 //==============================================================================
 /**
 */
+/** Per-engine user modifier profile (Rate, Depth, Offset, Width, Mix, Color). HQ excluded. */
+struct EngineParamProfile
+{
+    bool valid = false;
+    float rate = 0.5f;
+    float depth = 0.5f;
+    float offset = 90.0f;
+    float width = 1.0f;
+    float mix = 0.5f;
+    float color = 0.5f;
+};
+
 class ChoroborosAudioProcessor  : public juce::AudioProcessor,
-                                  private juce::Timer
+                                  private juce::Timer,
+                                  private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     //==============================================================================
@@ -97,6 +110,8 @@ public:
     const ChorusDSP::RuntimeTuning& getEngineDspInternals(int colorIndex, bool hqEnabled = false) const;
     int getCurrentEngineColorIndex() const;
     bool isHqEnabled() const;
+    const std::array<EngineParamProfile, 5>& getEngineParamProfiles() const { return engineParamProfiles; }
+    void loadEngineParamProfilesFromVar(const juce::var& profilesVar);
     void syncEngineInternalsToActiveDsp(int colorIndex, bool hqEnabled = false);
     float mapParameterValue(const juce::String& paramId, float rawValue) const;
     
@@ -137,6 +152,10 @@ private:
 
     void initTuningDefaults();
     float mapTunedValue(float rawValue, float baseMin, float baseMax, const ParamTuning& tuning) const;
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void applyEngineParamProfile(int engineIndex);
+    void saveCurrentParamsToEngineProfile(int engineIndex);
+    static EngineParamProfile getEngineDefaults(int engineIndex);
     void initializeEngineInternalProfiles();
     void persistActiveEngineInternalsFromDsp();
     void restoreEngineInternalsToDsp(int colorIndex, bool hqEnabled);
@@ -149,6 +168,10 @@ private:
     bool activeInternalsHQ = false;
     
     int currentProgram = 0; // Current preset index
+    std::array<EngineParamProfile, 5> engineParamProfiles;
+    int lastEngineIndex = 0;
+    std::atomic<bool> presetLoadInProgress { false };
+    std::atomic<bool> stateLoadInProgress { false };
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChoroborosAudioProcessor)
 };
