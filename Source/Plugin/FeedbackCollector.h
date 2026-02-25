@@ -59,7 +59,7 @@ private:
         int enginePurpleCount = 0;
         int engineBlackCount = 0;
         int hqEnabledCount = 0;
-        int presetLoads[6] = {0, 0, 0, 0, 0, 0};
+        int presetLoads[7] = {0, 0, 0, 0, 0, 0, 0};
         juce::int64 sessionStartTime = 0;
         juce::int64 totalSessionTime = 0;
         int sessionCount = 0;

@@ -49,7 +49,7 @@ void FeedbackCollector::trackEngineSwitch(int engineIndex, bool hq)
 
 void FeedbackCollector::trackPresetLoad(int presetIndex, const juce::String& presetName)
 {
-    if (presetIndex >= 0 && presetIndex < 6)
+    if (presetIndex >= 0 && presetIndex < 7)
     {
         stats.presetLoads[presetIndex]++;
         saveStats();
@@ -100,8 +100,8 @@ juce::String FeedbackCollector::getUsageSummary() const
     summary << "  HQ Enabled: " << stats.hqEnabledCount << " times\n\n";
     
     summary << "Preset Usage:\n";
-    const char* presetNames[] = {"Classic", "Vintage", "Rich", "Psychedelic", "Duck", "Ouroboros"};
-    for (int i = 0; i < 6; i++)
+    const char* presetNames[] = {"Classic (Green)", "Vintage (Red)", "Modern (Blue)", "Psychedelic (Purple)", "Core (Black)", "Duck", "Ouroboros"};
+    for (int i = 0; i < 7; i++)
     {
         if (stats.presetLoads[i] > 0)
         {
@@ -200,7 +200,7 @@ void FeedbackCollector::loadStats()
             if (presetArray.isArray())
             {
                 auto* arr = presetArray.getArray();
-                for (int i = 0; i < juce::jmin(6, arr->size()); i++)
+                for (int i = 0; i < juce::jmin(7, arr->size()); i++)
                 {
                     stats.presetLoads[i] = arr->getUnchecked(i);
                 }
@@ -226,7 +226,7 @@ void FeedbackCollector::saveStats() const
     obj->setProperty("totalSessionTime", stats.totalSessionTime);
     
     juce::Array<juce::var> presetArray;
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
         presetArray.add(stats.presetLoads[i]);
     obj->setProperty("presetLoads", juce::var(presetArray));
     

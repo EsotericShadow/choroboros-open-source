@@ -115,10 +115,18 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     editor.offsetSlider.setBounds(offsetCenterX - (mainKnobSize / 2), knobTopY, mainKnobSize, mainKnobSize);
     editor.widthSlider.setBounds(widthCenterX - (mainKnobSize / 2), knobTopY, mainKnobSize, mainKnobSize);
 
+    // Purple knob shadow extends below bounds; allow drawing overflow so it isn't clipped
+    const bool allowKnobOverflow = (colorIndex == 3);
+    editor.rateSlider.setPaintingIsUnclipped(allowKnobOverflow);
+    editor.depthSlider.setPaintingIsUnclipped(allowKnobOverflow);
+    editor.offsetSlider.setPaintingIsUnclipped(allowKnobOverflow);
+    editor.widthSlider.setPaintingIsUnclipped(allowKnobOverflow);
+
     editor.colorSlider.setBounds(sliderX, sliderY, sliderW, sliderH);
 
     const int mixKnobX = mixCenterX - (mixKnobSize / 2);
-    const int mixKnobY = s(layout.mixKnobY);
+    const int mixKnobY = s(pickByColor(layout.mixKnobYGreen, layout.mixKnobYBlue, layout.mixKnobYRed,
+                                       layout.mixKnobYPurple, layout.mixKnobYBlack, layout.mixKnobY));
     editor.mixSlider.setBounds(mixKnobX, mixKnobY, mixKnobSize, mixKnobSize);
 
     const juce::Font labelFont = editor.makeUiTextFont(12.25f * editor.getUiScale(), true);
@@ -455,5 +463,9 @@ void PluginEditorSetup::setupHQButton(ChoroborosPluginEditor& editor)
     // Set HQ button tooltip
     editor.hqButton.setTooltip("High Quality Mode: Enables higher-quality algorithm variant for the selected engine. Increases CPU usage but improves audio fidelity.");
     editor.hqLabel.setVisible(false);
+
+    // Repaint editor when HQ switch animates so lit backpanel overlay stays synced (all themes)
+    editor.hqButton.onAnimationTick = [&editor] { editor.repaint(); };
+
     applyLayout(editor, editor.layoutTuning);
 }

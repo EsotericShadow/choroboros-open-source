@@ -98,29 +98,34 @@ target_compile_definitions(Choroboros
 
 juce_add_binary_data(ChoroborosBinaryData
     SOURCES
-        Assets/green/green_backpanel.png
+        Assets/green/green_light_off_backpanel.png
+        Assets/green/green_light_on_backpanel.png
         Assets/green/rate_knob_spritesheet.png
         Assets/green/depth_knob_spritesheet.png
         Assets/green/offset_knob_spritesheet.png
         Assets/green/width_knob_spritesheet.png
         Assets/green/mix_knob_spritesheet.png
         Assets/green/green_slider_thumb.png
-        Assets/blue/blue_backpanel.png
+        Assets/blue/blue_light_off_backpanel.png
+        Assets/blue/blue_light_on_backpanel.png
         Assets/blue/blue_slider_thumb.png
         Assets/blue/Blue_knob_spritesheet.png
         Assets/blue/blue_mix_knob_spritesheet.png
-        Assets/red/red_backpanel.png
+        Assets/red/red_light_off_backpanel.png
+        Assets/red/red_light_on_backpanel.png
         Assets/red/red_rate_knob_spritesheet.png
         Assets/red/red_depth_knob_spritesheet.png
         Assets/red/red_offset_knob_spritesheet.png
         Assets/red/red_width_knob_spritesheet.png
         Assets/red/red_slider_thumb.png
         Assets/red/red_mix_knob_spritesheet.png
-        Assets/purple/purple_backpanel.png
+        Assets/purple/purple_light_off_backpanel.png
+        Assets/purple/purple_light_on_backpanel.png
         Assets/purple/purple_knob_spritesheet.png
         Assets/purple/purple_mix_knob_spritesheet.png
         Assets/purple/purple_slider_thumb.png
-        Assets/black/black_backpanel.png
+        Assets/black/black_light_off_backpanel.png
+        Assets/black/black_light_on_backpanel.png
         Assets/black/black_Knob_spritesheet.png
         Assets/black/black_mix_knob_spritesheet.png
         Assets/black/black__slider_thumb.png

@@ -41,6 +41,7 @@ public:
         std::atomic<float> centreDelaySmoothingMs { 150.0f };
         std::atomic<float> colorSmoothingMs { 20.0f };
         std::atomic<float> widthSmoothingMs { 20.0f };
+        std::atomic<float> coreSwitchCrossfadeMs { 15.0f };
         std::atomic<float> centreDelayBaseMs { 8.0f };
         std::atomic<float> centreDelayScale { 10.0f };
 

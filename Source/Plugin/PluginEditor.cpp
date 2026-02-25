@@ -177,6 +177,11 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.mixCenterXPurple = getIntOrDefault(layoutVar, "mixCenterXPurple", layout.mixCenterX);
     layout.mixCenterXBlack = getIntOrDefault(layoutVar, "mixCenterXBlack", layout.mixCenterX);
     layout.mixKnobY = getIntOrDefault(layoutVar, "mixKnobY", layout.mixKnobY);
+    layout.mixKnobYGreen = getIntOrDefault(layoutVar, "mixKnobYGreen", layout.mixKnobY);
+    layout.mixKnobYBlue = getIntOrDefault(layoutVar, "mixKnobYBlue", layout.mixKnobY);
+    layout.mixKnobYRed = getIntOrDefault(layoutVar, "mixKnobYRed", layout.mixKnobY);
+    layout.mixKnobYPurple = getIntOrDefault(layoutVar, "mixKnobYPurple", layout.mixKnobY);
+    layout.mixKnobYBlack = getIntOrDefault(layoutVar, "mixKnobYBlack", layout.mixKnobY);
     layout.mixKnobYOffset = getIntOrDefault(layoutVar, "mixKnobYOffset", layout.mixKnobYOffset);
     layout.mixKnobYOffsetGreen = getIntOrDefault(layoutVar, "mixKnobYOffsetGreen", layout.mixKnobYOffset);
     layout.mixKnobYOffsetBlue = getIntOrDefault(layoutVar, "mixKnobYOffsetBlue", layout.mixKnobYOffset);
@@ -514,6 +519,9 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     addAndMakeVisible(devButton);
     devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(40), uiScaleInt(10));
     
+    // Listen for engine color changes (preset load or manual) to update value label colors
+    audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
+    
     // Set fixed size
     setSize(uiScaleInt(700), uiScaleInt(363));
     applyLayout();
@@ -572,7 +580,21 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
+    audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
     setLookAndFeel(nullptr);
+}
+
+void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == ChoroborosAudioProcessor::ENGINE_COLOR_ID)
+    {
+        const int colorIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
+        customLookAndFeel.setColorTheme(colorIndex);
+        loadBackgroundImage(colorIndex);
+        updateValueLabelColors(colorIndex);
+        PluginEditorSetup::applyLayout(*this, layoutTuning);
+        repaint();
+    }
 }
 
 //==============================================================================
@@ -587,6 +609,18 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
     else
     {
         g.fillAll(juce::Colours::black);
+    }
+
+    // Overlay lit panel with opacity synced to HQ switch animation (all themes)
+    if (backgroundImageLit.isValid())
+    {
+        const float litOpacity = hqButton.getAnimationProgress();
+        if (litOpacity > 0.0f)
+        {
+            g.setOpacity(litOpacity);
+            g.drawImage(backgroundImageLit, 0, 0, getWidth(), getHeight(), 0, 0,
+                        backgroundImageLit.getWidth(), backgroundImageLit.getHeight());
+        }
     }
 }
 
@@ -766,37 +800,56 @@ void ChoroborosPluginEditor::loadBackgroundImage(int colorIndex)
 {
     colorIndex = juce::jlimit(0, 4, colorIndex);
     
-    const char* bgName = nullptr;
-    int bgSize = 0;
+    const char* offName = nullptr;
+    int offSize = 0;
+    const char* onName = nullptr;
+    int onSize = 0;
     
     if (colorIndex == 0) // Green
     {
-        bgName = BinaryData::green_backpanel_png;
-        bgSize = BinaryData::green_backpanel_pngSize;
+        offName = BinaryData::green_light_off_backpanel_png;
+        offSize = BinaryData::green_light_off_backpanel_pngSize;
+        onName = BinaryData::green_light_on_backpanel_png;
+        onSize = BinaryData::green_light_on_backpanel_pngSize;
     }
     else if (colorIndex == 1) // Blue
     {
-        bgName = BinaryData::blue_backpanel_png;
-        bgSize = BinaryData::blue_backpanel_pngSize;
+        offName = BinaryData::blue_light_off_backpanel_png;
+        offSize = BinaryData::blue_light_off_backpanel_pngSize;
+        onName = BinaryData::blue_light_on_backpanel_png;
+        onSize = BinaryData::blue_light_on_backpanel_pngSize;
     }
     else if (colorIndex == 2) // Red
     {
-        bgName = BinaryData::red_backpanel_png;
-        bgSize = BinaryData::red_backpanel_pngSize;
+        offName = BinaryData::red_light_off_backpanel_png;
+        offSize = BinaryData::red_light_off_backpanel_pngSize;
+        onName = BinaryData::red_light_on_backpanel_png;
+        onSize = BinaryData::red_light_on_backpanel_pngSize;
     }
     else if (colorIndex == 3) // Purple
     {
-        bgName = BinaryData::purple_backpanel_png;
-        bgSize = BinaryData::purple_backpanel_pngSize;
+        offName = BinaryData::purple_light_off_backpanel_png;
+        offSize = BinaryData::purple_light_off_backpanel_pngSize;
+        onName = BinaryData::purple_light_on_backpanel_png;
+        onSize = BinaryData::purple_light_on_backpanel_pngSize;
     }
     else // Black (colorIndex == 4)
     {
-        bgName = BinaryData::black_backpanel_png;
-        bgSize = BinaryData::black_backpanel_pngSize;
+        offName = BinaryData::black_light_off_backpanel_png;
+        offSize = BinaryData::black_light_off_backpanel_pngSize;
+        onName = BinaryData::black_light_on_backpanel_png;
+        onSize = BinaryData::black_light_on_backpanel_pngSize;
     }
     
-    if (bgName && bgSize > 0)
-        backgroundImage = juce::ImageCache::getFromMemory(bgName, bgSize);
+    if (offName && offSize > 0)
+        backgroundImage = juce::ImageCache::getFromMemory(offName, offSize);
+    else
+        backgroundImage = juce::Image();
+
+    if (onName && onSize > 0)
+        backgroundImageLit = juce::ImageCache::getFromMemory(onName, onSize);
+    else
+        backgroundImageLit = juce::Image();
 }
 
 int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const
@@ -1048,13 +1101,16 @@ void ChoroborosPluginEditor::setupValueLabelEditing(LabelWithContainer& label, j
             
             // Format and set the label text - this will be picked up by editorAboutToBeHidden
             updateValueLabel(label, clampedValue, paramId);
-            
+            label.repaint();
+            repaint();
             return true;  // Value was applied successfully
         }
         else
         {
             // Invalid value - restore previous value
             updateValueLabel(label, slider.getValue(), paramId);
+            label.repaint();
+            repaint();
             return false;  // Value was not applied
         }
     };

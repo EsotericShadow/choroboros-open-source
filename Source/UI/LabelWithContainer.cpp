@@ -33,7 +33,7 @@ bool tryParseNumericValue(const juce::String& text, double& out)
 
 void LabelWithContainer::setAnimatedValueText(const juce::String& text)
 {
-    if (!isValueLabelStyle || isEditing || !flipAnimationEnabled || !flipHasVisualEffect)
+    if (!isValueLabelStyle || !flipAnimationEnabled || !flipHasVisualEffect)
     {
         stopTimer();
         isAnimatingFlip = false;
@@ -176,22 +176,16 @@ void LabelWithContainer::setValueFxParams(bool enabled,
 void LabelWithContainer::setValueLabelStyle(bool isValueLabel)
 {
     isValueLabelStyle = isValueLabel;
-    if (isValueLabel)
-    {
-        setEditable(true, false, false);  // Editable on double-click, not single-click
-    }
+    if (isValueLabelStyle)
+        setEditable(false, false, false);  // No built-in editor - we use custom overlay
 }
 
 void LabelWithContainer::mouseDoubleClick(const juce::MouseEvent& e)
 {
     if (isValueLabelStyle && onValueEdited)
-    {
-        showEditor();
-    }
+        showCustomEditor();
     else
-    {
         juce::Label::mouseDoubleClick(e);
-    }
 }
 
 void LabelWithContainer::setEditorTextColor(juce::Colour color)
@@ -199,108 +193,76 @@ void LabelWithContainer::setEditorTextColor(juce::Colour color)
     editorTextColor = color;
 }
 
-juce::TextEditor* LabelWithContainer::createEditorComponent()
+void LabelWithContainer::showCustomEditor()
 {
-    if (!isValueLabelStyle)
-        return juce::Label::createEditorComponent();
-    
-    auto* editor = new juce::TextEditor();
-    editor->setJustification(juce::Justification::centred);
-    editor->setColour(juce::TextEditor::textColourId, editorTextColor);
-    editor->setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff000000));
-    editor->setColour(juce::TextEditor::outlineColourId, juce::Colour(0xff404040));
-    editor->setColour(juce::TextEditor::focusedOutlineColourId, editorTextColor);
-    editor->setBorder(juce::BorderSize<int>(0));
-    editor->setFont(getFont());
-    editor->setText(getText(), false);
-    editor->setSelectAllWhenFocused(true);
-    editor->setReturnKeyStartsNewLine(false);
-    
-    return editor;
-}
+    if (!onValueEdited || !isValueLabelStyle)
+        return;
 
-void LabelWithContainer::editorShown(juce::TextEditor* editor)
-{
-    if (editor && isValueLabelStyle)
+    class ValueEditorOverlay : public juce::Component
     {
-        isEditing = true;
-        stopTimer();
-        isAnimatingFlip = false;
-        repaint();  // Repaint to hide underlying text
-        
-        // Select all text for easy replacement
-        editor->selectAll();
-        
-        // Store original text in case we need to restore it
-        juce::String originalText = getText();
-        
-        // Set up callback for when editing finishes
-        editor->onReturnKey = [this, editor, originalText]()
+    public:
+        ValueEditorOverlay(LabelWithContainer& label)
+            : owner(label)
         {
-            bool valueApplied = false;
-            pendingFormattedText = originalText;  // Default to original
-            
-            if (onValueEdited)
-            {
-                valueApplied = onValueEdited(editor->getText());
-                // If value was applied, get the formatted text that was set
-                if (valueApplied)
-                {
-                    pendingFormattedText = getText();  // Get the formatted text that was set
-                }
-            }
-            
-            isEditing = false;
-            hideEditor(true);  // Discard editor contents - we'll set text in editorAboutToBeHidden
-        };
-        
-        editor->onEscapeKey = [this, originalText]()
-        {
-            pendingFormattedText = originalText;  // Restore original
-            isEditing = false;
-            hideEditor(true);  // Discard editor contents
-        };
-        
-        editor->onFocusLost = [this, editor, originalText]()
-        {
-            bool valueApplied = false;
-            pendingFormattedText = originalText;  // Default to original
-            
-            if (onValueEdited)
-            {
-                valueApplied = onValueEdited(editor->getText());
-                // If value was applied, get the formatted text that was set
-                if (valueApplied)
-                {
-                    pendingFormattedText = getText();  // Get the formatted text that was set
-                }
-            }
-            
-            isEditing = false;
-            hideEditor(true);  // Discard editor contents - we'll set text in editorAboutToBeHidden
-        };
-    }
-    else
-    {
-        juce::Label::editorShown(editor);
-    }
-}
+            editor.setJustification(juce::Justification::centred);
+            editor.setColour(juce::TextEditor::textColourId, label.getEditorTextColor());
+            editor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff1a1a1a));
+            editor.setColour(juce::TextEditor::outlineColourId, juce::Colour(0xff404040));
+            editor.setColour(juce::TextEditor::focusedOutlineColourId, label.getEditorTextColor());
+            editor.setBorder(juce::BorderSize<int>(1));
+            editor.setFont(label.getFont());
+            editor.setText(label.getText(), false);
+            editor.setSelectAllWhenFocused(true);
+            editor.setReturnKeyStartsNewLine(false);
+            addAndMakeVisible(editor);
 
-void LabelWithContainer::editorAboutToBeHidden(juce::TextEditor* editor)
-{
-    if (editor && isValueLabelStyle)
-    {
-        // Set the formatted text AFTER editor is about to be hidden but BEFORE it's actually hidden
-        // This ensures the text is set correctly and won't be overwritten
-        if (!pendingFormattedText.isEmpty())
-        {
-            setText(pendingFormattedText, juce::dontSendNotification);
-            pendingFormattedText.clear();
+            editor.onReturnKey = [this]() { applyAndClose(); };
+            editor.onEscapeKey = [this]() { cancelAndClose(); };
+            editor.onFocusLost = [this]() { applyAndClose(); };
         }
-    }
-    
-    // Call base class to maintain JUCE's normal behavior
-    juce::Label::editorAboutToBeHidden(editor);
+
+        void resized() override { editor.setBounds(getLocalBounds()); }
+        void grabFocus() { editor.grabKeyboardFocus(); }
+
+        void applyAndClose()
+        {
+            if (owner.onValueEdited && owner.onValueEdited(editor.getText()))
+            {
+                owner.repaint();
+                if (auto* p = owner.getParentComponent())
+                    p->repaint();
+            }
+            close();
+        }
+
+        void cancelAndClose()
+        {
+            close();
+        }
+
+        void close()
+        {
+            if (auto* p = getParentComponent())
+            {
+                p->removeChildComponent(this);
+                p->repaint();
+            }
+            delete this;
+        }
+
+    private:
+        LabelWithContainer& owner;
+        juce::TextEditor editor;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ValueEditorOverlay)
+    };
+
+    auto* overlay = new ValueEditorOverlay(*this);
+    overlay->setBounds(getBoundsInParent());
+    overlay->setVisible(true);
+    getParentComponent()->addAndMakeVisible(overlay);
+    overlay->setAlwaysOnTop(true);
+    overlay->grabFocus();
 }
 
 void LabelWithContainer::paint(juce::Graphics& g)
@@ -313,8 +275,6 @@ void LabelWithContainer::paint(juce::Graphics& g)
     {
         // Value label style: text only (no background)
         const auto innerBounds = bounds.reduced(borderWidth);
-        // Only draw text if not editing (editor will show its own text)
-        if (!isEditing)
         {
             g.setColour(findColour(juce::Label::textColourId));
             g.setFont(getFont());

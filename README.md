@@ -40,12 +40,13 @@ Choroboros is a multi-engine chorus plugin featuring five distinct engines, each
 
 ### Presets
 
-1. **Classic** - Green engine, classic chorus sound
-2. **Vintage** - Red engine, warm tape-style chorus
-3. **Rich** - Blue engine, modern clean chorus
-4. **Psychedelic** - Purple engine, experimental warped chorus
-5. **Duck** - Purple HQ, fast modulation
-6. **Ouroboros** - Blue HQ, medium modulation
+1. **Classic (Green)** - NQ, R=1.2Hz, D=21%, O=33°, W=153%, M=33%, C=16%
+2. **Vintage (Red)** - HQ, R=0.62Hz, D=21%, O=56°, W=125%, M=50%, C=50%
+3. **Modern (Blue)** - HQ, R=0.26Hz, D=53%, O=59°, W=100%, M=50%, C=41%
+4. **Psychedelic (Purple)** - NQ, R=0.12Hz, D=52%, O=22°, W=200%, M=69%, C=13%
+5. **Core (Black)** - HQ, R=1.4Hz, D=35%, O=41°, W=159%, M=50%, C=28%
+6. **Duck** - Purple HQ, fast modulation
+7. **Ouroboros** - Blue HQ, medium modulation
 
 ## Installation
 

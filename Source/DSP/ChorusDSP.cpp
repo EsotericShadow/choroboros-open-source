@@ -520,7 +520,8 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     currentCore = newCore;
     if (spec.sampleRate > 0.0)
     {
-        coreSwitchCrossfadeTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * 0.015))); // 15 ms
+        const float crossfadeMs = juce::jlimit(5.0f, 100.0f, runtimeTuning.coreSwitchCrossfadeMs.load());
+        coreSwitchCrossfadeTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * crossfadeMs * 0.001f)));
         coreSwitchCrossfadeSamplesRemaining = coreSwitchCrossfadeTotalSamples;
         coreSwitchCrossfadeActive = (previousCore != nullptr);
     }

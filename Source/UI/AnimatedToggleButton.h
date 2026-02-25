@@ -19,13 +19,20 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
 
 class AnimatedToggleButton : public juce::Slider, public juce::Timer
 {
 public:
     AnimatedToggleButton();
     ~AnimatedToggleButton() override = default;
-    
+
+    /** Returns 0..1 for animation progress toward ON state (1 = fully lit). Use to sync overlays. */
+    float getAnimationProgress() const;
+
+    /** Optional: called each animation tick so parent can repaint (e.g. for synced backpanel overlay). */
+    std::function<void()> onAnimationTick;
+
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;

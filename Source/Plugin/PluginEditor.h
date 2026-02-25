@@ -31,7 +31,8 @@
 //==============================================================================
 /**
 */
-class ChoroborosPluginEditor  : public juce::AudioProcessorEditor
+class ChoroborosPluginEditor  : public juce::AudioProcessorEditor,
+                                private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     ChoroborosPluginEditor (ChoroborosAudioProcessor&);
@@ -56,6 +57,7 @@ private:
     
     CustomLookAndFeel customLookAndFeel;
     juce::Image backgroundImage;
+    juce::Image backgroundImageLit;  // Light-on overlay (opacity synced to HQ switch) for all themes
     
     // Sliders (with visual smoothing for natural feel)
     SmoothedSlider rateSlider;
@@ -120,6 +122,7 @@ private:
                      const juce::String& name, const juce::String& paramId);
     void updateValueLabel(LabelWithContainer& label, float value, const juce::String& paramId);
     void setupValueLabelEditing(LabelWithContainer& label, juce::Slider& slider, const juce::String& paramId);
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
     float parseValueFromText(const juce::String& text, const juce::String& paramId);
     
     // Helper to calculate label width with 8px padding on each side

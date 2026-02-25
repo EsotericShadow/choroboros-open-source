@@ -404,6 +404,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             return "Controls phase behavior/stability. Can affect stereo image and motion smoothness.";
         if (n.contains("depth rate limit"))
             return "Limits how fast depth can change over time. Prevents zipper/crackle during aggressive automation.";
+        if (n.contains("engine switch") || n.contains("crossfade"))
+            return "Duration of crossfade when switching engines. Longer values (50-100 ms) reduce click/pop by masking the delay-line warm-up.";
         if (n.contains("centre base"))
             return "Base chorus delay before modulation. Lower values feel tighter; higher values feel wider/slower.";
         if (n.contains("centre scale"))
@@ -525,6 +527,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Depth Smooth (ms)", engineTuning.depthSmoothingMs, 0.0, 500.0, 0.1, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Depth Rate Limit", engineTuning.depthRateLimit, 0.01, 5.0, 0.01, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Centre Smooth (ms)", engineTuning.centreDelaySmoothingMs, 0.0, 500.0, 0.1, 1.0));
+        dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Engine Switch Crossfade (ms)", engineTuning.coreSwitchCrossfadeMs, 5.0, 100.0, 0.5, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Centre Base (ms)", engineTuning.centreDelayBaseMs, 0.0, 30.0, 0.1, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Centre Scale", engineTuning.centreDelayScale, 0.0, 30.0, 0.1, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Color Smooth (ms)", engineTuning.colorSmoothingMs, 0.0, 200.0, 0.1, 1.0));
@@ -710,7 +713,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     addLayoutByColor("Slider Track End X", layout.sliderTrackEndXGreen, layout.sliderTrackEndXBlue, layout.sliderTrackEndXRed, layout.sliderTrackEndXPurple, layout.sliderTrackEndXBlack, 0, 800);
     addLayoutByColor("Slider Track End Y", layout.sliderTrackEndYGreen, layout.sliderTrackEndYBlue, layout.sliderTrackEndYRed, layout.sliderTrackEndYPurple, layout.sliderTrackEndYBlack, 0, 500);
     addLayoutByColor("Slider Size (%)", layout.sliderSizeGreen, layout.sliderSizeBlue, layout.sliderSizeRed, layout.sliderSizePurple, layout.sliderSizeBlack, 10, 500);
-    addLayout(layoutSliderProps, "Mix Knob Y", layout.mixKnobY, 0, 500);
+    addLayout(layoutSliderProps, "Mix Knob Y (legacy)", layout.mixKnobY, 0, 500);
+    addLayoutByColor("Mix Knob Y", layout.mixKnobYGreen, layout.mixKnobYBlue, layout.mixKnobYRed, layout.mixKnobYPurple, layout.mixKnobYBlack, 0, 500);
     addLayout(layoutSliderProps, "Color Value Center X", layout.colorValueCenterX, 0, 800);
     addLayoutByColor("Mix Knob Size", layout.mixKnobSizeGreen, layout.mixKnobSizeBlue, layout.mixKnobSizeRed, layout.mixKnobSizePurple, layout.mixKnobSizeBlack, 10, 260);
     addLayoutByColor("Mix Center X", layout.mixCenterXGreen, layout.mixCenterXBlue, layout.mixCenterXRed, layout.mixCenterXPurple, layout.mixCenterXBlack, 0, 800);
@@ -987,6 +991,7 @@ juce::String DevPanel::buildJson() const
         json << "    \"centreDelayScale\": " << formatFloat(internals.centreDelayScale.load()) << ",\n";
         json << "    \"colorSmoothingMs\": " << formatFloat(internals.colorSmoothingMs.load()) << ",\n";
         json << "    \"widthSmoothingMs\": " << formatFloat(internals.widthSmoothingMs.load()) << ",\n";
+        json << "    \"coreSwitchCrossfadeMs\": " << formatFloat(internals.coreSwitchCrossfadeMs.load()) << ",\n";
         json << "    \"hpfCutoffHz\": " << formatFloat(internals.hpfCutoffHz.load()) << ",\n";
         json << "    \"hpfQ\": " << formatFloat(internals.hpfQ.load()) << ",\n";
         json << "    \"preEmphasisFreqHz\": " << formatFloat(internals.preEmphasisFreqHz.load()) << ",\n";
@@ -1050,6 +1055,23 @@ juce::String DevPanel::buildJson() const
     appendInternalsObject("internalsRedHQ", processor.getEngineDspInternals(2, true));
     appendInternalsObject("internalsPurpleHQ", processor.getEngineDspInternals(3, true));
     appendInternalsObject("internalsBlackHQ", processor.getEngineDspInternals(4, true));
+
+    json << "  \"engineParamProfiles\": {\n";
+    const char* engineKeys[] = { "green", "blue", "red", "purple", "black" };
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto& p = processor.getEngineParamProfiles()[i];
+        json << "    \"" << engineKeys[i] << "\": {"
+             << "\"valid\": " << (p.valid ? "true" : "false")
+             << ", \"rate\": " << formatFloat(p.rate)
+             << ", \"depth\": " << formatFloat(p.depth)
+             << ", \"offset\": " << formatFloat(p.offset)
+             << ", \"width\": " << formatFloat(p.width)
+             << ", \"mix\": " << formatFloat(p.mix)
+             << ", \"color\": " << formatFloat(p.color)
+             << "}" << (i < 4 ? ",\n" : "\n");
+    }
+    json << "  },\n";
 
     json << "  \"layout\": {\n";
     json << "    \"mainKnobSize\": " << layout.mainKnobSizeGreen << ",\n";
@@ -1131,6 +1153,11 @@ juce::String DevPanel::buildJson() const
     json << "    \"mixCenterXPurple\": " << layout.mixCenterXPurple << ",\n";
     json << "    \"mixCenterXBlack\": " << layout.mixCenterXBlack << ",\n";
     json << "    \"mixKnobY\": " << layout.mixKnobY << ",\n";
+    json << "    \"mixKnobYGreen\": " << layout.mixKnobYGreen << ",\n";
+    json << "    \"mixKnobYBlue\": " << layout.mixKnobYBlue << ",\n";
+    json << "    \"mixKnobYRed\": " << layout.mixKnobYRed << ",\n";
+    json << "    \"mixKnobYPurple\": " << layout.mixKnobYPurple << ",\n";
+    json << "    \"mixKnobYBlack\": " << layout.mixKnobYBlack << ",\n";
     json << "    \"mixKnobYOffset\": " << layout.mixKnobYOffsetGreen << ",\n";
     json << "    \"mixKnobYOffsetGreen\": " << layout.mixKnobYOffsetGreen << ",\n";
     json << "    \"mixKnobYOffsetBlue\": " << layout.mixKnobYOffsetBlue << ",\n";
@@ -1343,6 +1370,7 @@ void DevPanel::saveCurrentAsDefaults()
         const bool semanticMatch = !generated.isVoid() && varsEquivalent(generated, roundTrip);
         const bool hasCoreSections = (root != nullptr
             && root->hasProperty("tuning") && root->hasProperty("layout")
+            && root->hasProperty("engineParamProfiles")
             && root->hasProperty("internalsGreen") && root->hasProperty("internalsGreenHQ")
             && root->hasProperty("internalsBlue") && root->hasProperty("internalsBlueHQ")
             && root->hasProperty("internalsRed") && root->hasProperty("internalsRedHQ")
