@@ -61,6 +61,31 @@ void CustomLookAndFeel::setColorTheme(int colorIndex)
     }
 }
 
+juce::Colour CustomLookAndFeel::getThemeAccentColour() const
+{
+    switch (currentColorIndex)
+    {
+        case 0: return juce::Colour(0xff9dbd78); // Green
+        case 1: return juce::Colour(0xff7fb8ff); // Blue
+        case 2: return juce::Colour(0xffff8d8b); // Red
+        case 3: return juce::Colour(0xffb88dd8); // Purple
+        case 4: return juce::Colour(0xffd4d4d4); // Black
+        default: break;
+    }
+
+    return juce::Colour(0xff9dbd78);
+}
+
+juce::Colour CustomLookAndFeel::getThemePanelColour() const
+{
+    return juce::Colour(0xff121417).interpolatedWith(getThemeAccentColour(), 0.12f);
+}
+
+juce::Colour CustomLookAndFeel::getThemePanelOutlineColour() const
+{
+    return getThemeAccentColour().withAlpha(0.82f);
+}
+
 void CustomLookAndFeel::loadImages(int colorIndex)
 {
     const char* knobBaseName = nullptr;
@@ -801,15 +826,48 @@ void CustomLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, b
                                      int buttonX, int buttonY, int buttonW, int buttonH,
                                      juce::ComboBox& box)
 {
-    // Don't draw background - let it be transparent
-    // JUCE will draw the text automatically, we just need to draw the arrow
-    // Draw the dropdown arrow (simple triangle)
+    auto boxArea = juce::Rectangle<float>(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)).reduced(0.5f);
+    const auto accent = getThemeAccentColour();
+
+    auto baseBackground = box.findColour(juce::ComboBox::backgroundColourId);
+    if (baseBackground.getAlpha() == 0)
+        baseBackground = getThemePanelColour().withAlpha(0.82f);
+
+    auto outlineColour = box.findColour(juce::ComboBox::outlineColourId);
+    if (outlineColour.getAlpha() == 0)
+        outlineColour = getThemePanelOutlineColour();
+
+    juce::ColourGradient gradient(baseBackground.brighter(isButtonDown ? 0.08f : 0.15f),
+                                  boxArea.getX(), boxArea.getY(),
+                                  baseBackground.darker(0.32f).interpolatedWith(accent, 0.06f),
+                                  boxArea.getX(), boxArea.getBottom(),
+                                  false);
+    g.setGradientFill(gradient);
+    g.fillRoundedRectangle(boxArea, 4.0f);
+
+    if (buttonW > 0 && buttonH > 0)
+    {
+        const auto arrowZone = juce::Rectangle<float>(static_cast<float>(buttonX),
+                                                      static_cast<float>(buttonY),
+                                                      static_cast<float>(buttonW),
+                                                      static_cast<float>(buttonH));
+        g.setColour(accent.withAlpha(0.18f));
+        g.fillRoundedRectangle(arrowZone.reduced(1.0f), 3.0f);
+
+        g.setColour(outlineColour.withAlpha(0.35f));
+        g.drawLine(arrowZone.getX(), arrowZone.getY() + 2.0f, arrowZone.getX(), arrowZone.getBottom() - 2.0f, 1.0f);
+    }
+
+    g.setColour(outlineColour.withAlpha(box.isEnabled() ? 0.95f : 0.45f));
+    g.drawRoundedRectangle(boxArea, 4.0f, 1.05f);
+
     juce::Path arrow;
     const float arrowSize = 6.0f;
     const float arrowX = static_cast<float>(buttonX) + static_cast<float>(buttonW) * 0.5f;
     const float arrowY = static_cast<float>(buttonY) + static_cast<float>(buttonH) * 0.5f;
     
-    g.setColour(box.findColour(juce::ComboBox::arrowColourId));
+    g.setColour(box.findColour(juce::ComboBox::arrowColourId)
+                    .withMultipliedAlpha(box.isEnabled() ? 0.95f : 0.45f));
     
     if (isButtonDown)
     {
@@ -827,6 +885,198 @@ void CustomLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, b
     }
     
     g.fillPath(arrow);
+}
+
+void CustomLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
+{
+    label.setBounds(3, 1, juce::jmax(1, box.getWidth() - 28), juce::jmax(1, box.getHeight() - 2));
+    label.setFont(getComboBoxFont(box));
+    label.setJustificationType(box.getJustificationType());
+}
+
+void CustomLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width, int height)
+{
+    const auto accent = getThemeAccentColour();
+    auto base = findColour(juce::PopupMenu::backgroundColourId);
+    if (base.getAlpha() == 0)
+        base = getThemePanelColour().withAlpha(0.98f);
+
+    g.fillAll(base.darker(0.45f));
+
+    const auto bounds = juce::Rectangle<float>(0.5f, 0.5f,
+                                               static_cast<float>(width) - 1.0f,
+                                               static_cast<float>(height) - 1.0f);
+    juce::ColourGradient fill(base.brighter(0.08f),
+                              bounds.getX(), bounds.getY(),
+                              base.darker(0.25f).interpolatedWith(accent, 0.08f),
+                              bounds.getX(), bounds.getBottom(),
+                              false);
+    g.setGradientFill(fill);
+    g.fillRoundedRectangle(bounds.reduced(0.6f), 6.0f);
+
+    g.setColour(getThemePanelOutlineColour().withAlpha(0.92f));
+    g.drawRoundedRectangle(bounds.reduced(0.6f), 6.0f, 1.15f);
+}
+
+void CustomLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area,
+                                          bool isSeparator, bool isActive, bool isHighlighted, bool isTicked, bool hasSubMenu,
+                                          const juce::String& text, const juce::String& shortcutKeyText,
+                                          const juce::Drawable* icon, const juce::Colour* textColourToUse)
+{
+    if (isSeparator)
+    {
+        const auto separator = area.reduced(10, juce::jmax(1, area.getHeight() / 3));
+        const float y = static_cast<float>(separator.getCentreY());
+        g.setColour(getThemeAccentColour().withAlpha(0.42f));
+        g.drawLine(static_cast<float>(separator.getX()), y,
+                   static_cast<float>(separator.getRight()), y, 1.0f);
+        return;
+    }
+
+    auto row = area.reduced(4, 2);
+    const auto rowf = row.toFloat();
+    const auto accent = getThemeAccentColour();
+
+    if (isHighlighted)
+    {
+        auto hl = findColour(juce::PopupMenu::highlightedBackgroundColourId);
+        if (hl.getAlpha() == 0)
+            hl = accent.withAlpha(0.30f);
+        g.setColour(hl);
+        g.fillRoundedRectangle(rowf, 4.0f);
+        g.setColour(accent.withAlpha(0.65f));
+        g.drawRoundedRectangle(rowf, 4.0f, 1.0f);
+    }
+
+    juce::Colour textColour = textColourToUse != nullptr ? *textColourToUse
+                                                          : findColour(juce::PopupMenu::textColourId);
+    if (textColour.getAlpha() == 0)
+        textColour = juce::Colours::white;
+
+    if (isHighlighted)
+    {
+        const auto highlighted = findColour(juce::PopupMenu::highlightedTextColourId);
+        if (highlighted.getAlpha() != 0)
+            textColour = highlighted;
+    }
+
+    if (!isActive)
+        textColour = textColour.withMultipliedAlpha(0.48f);
+
+    auto iconArea = row.removeFromLeft(20);
+    if (icon != nullptr)
+    {
+        icon->drawWithin(g, iconArea.toFloat().reduced(2.0f),
+                         juce::RectanglePlacement::centred, 1.0f);
+    }
+    else if (isTicked)
+    {
+        juce::Path tick;
+        tick.startNewSubPath(static_cast<float>(iconArea.getX() + 4), static_cast<float>(iconArea.getCentreY()));
+        tick.lineTo(static_cast<float>(iconArea.getX() + 8), static_cast<float>(iconArea.getBottom() - 5));
+        tick.lineTo(static_cast<float>(iconArea.getRight() - 4), static_cast<float>(iconArea.getY() + 5));
+        g.setColour(accent.withMultipliedAlpha(isActive ? 1.0f : 0.55f));
+        g.strokePath(tick, juce::PathStrokeType(2.0f));
+    }
+
+    const int shortcutWidth = shortcutKeyText.isNotEmpty() ? 70 : 0;
+    auto shortcutArea = row.removeFromRight(shortcutWidth);
+    auto arrowArea = row.removeFromRight(hasSubMenu ? 12 : 0);
+
+    g.setColour(textColour);
+    g.setFont(getPopupMenuFont());
+    g.drawFittedText(text, row, juce::Justification::centredLeft, 1);
+
+    if (shortcutKeyText.isNotEmpty())
+    {
+        g.setColour(textColour.withMultipliedAlpha(0.7f));
+        g.setFont(getPopupMenuFont().withHeight(getPopupMenuFont().getHeight() * 0.85f));
+        g.drawFittedText(shortcutKeyText, shortcutArea, juce::Justification::centredRight, 1);
+    }
+
+    if (hasSubMenu)
+    {
+        juce::Path submenuArrow;
+        const float cx = static_cast<float>(arrowArea.getCentreX());
+        const float cy = static_cast<float>(arrowArea.getCentreY());
+        submenuArrow.startNewSubPath(cx - 2.0f, cy - 4.0f);
+        submenuArrow.lineTo(cx + 2.0f, cy);
+        submenuArrow.lineTo(cx - 2.0f, cy + 4.0f);
+        g.setColour(textColour.withMultipliedAlpha(0.8f));
+        g.strokePath(submenuArrow, juce::PathStrokeType(1.4f));
+    }
+}
+
+void CustomLookAndFeel::drawPopupMenuSectionHeader(juce::Graphics& g, const juce::Rectangle<int>& area,
+                                                   const juce::String& sectionName)
+{
+    auto header = area.reduced(4, 2).toFloat();
+    const auto accent = getThemeAccentColour();
+
+    g.setColour(accent.withAlpha(0.22f));
+    g.fillRoundedRectangle(header, 4.0f);
+    g.setColour(accent.withAlpha(0.65f));
+    g.drawRoundedRectangle(header, 4.0f, 1.0f);
+
+    auto textColour = findColour(juce::PopupMenu::headerTextColourId);
+    if (textColour.getAlpha() == 0)
+        textColour = accent.brighter(0.4f);
+
+    g.setColour(textColour);
+    g.setFont(getPopupMenuFont().boldened());
+    g.drawFittedText(sectionName, area.reduced(10, 0), juce::Justification::centredLeft, 1);
+}
+
+void CustomLookAndFeel::getIdealPopupMenuItemSize(const juce::String& text, bool isSeparator,
+                                                  int standardMenuItemHeight, int& idealWidth, int& idealHeight)
+{
+    LookAndFeel_V4::getIdealPopupMenuItemSize(text, isSeparator, standardMenuItemHeight, idealWidth, idealHeight);
+    if (isSeparator)
+    {
+        idealHeight = juce::jmax(6, idealHeight);
+        return;
+    }
+
+    idealHeight = juce::jmax(22, juce::jmax(standardMenuItemHeight, idealHeight));
+    idealWidth += 16;
+}
+
+void CustomLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height)
+{
+    auto bounds = juce::Rectangle<float>(0.5f, 0.5f,
+                                         static_cast<float>(width) - 1.0f,
+                                         static_cast<float>(height) - 1.0f);
+    auto bg = findColour(juce::TooltipWindow::backgroundColourId);
+    if (bg.getAlpha() == 0)
+        bg = getThemePanelColour().darker(0.28f).withAlpha(0.97f);
+
+    g.setColour(bg);
+    g.fillRoundedRectangle(bounds, 5.0f);
+
+    auto outline = findColour(juce::TooltipWindow::outlineColourId);
+    if (outline.getAlpha() == 0)
+        outline = getThemePanelOutlineColour();
+    g.setColour(outline.withAlpha(0.9f));
+    g.drawRoundedRectangle(bounds, 5.0f, 1.0f);
+
+    auto textColour = findColour(juce::TooltipWindow::textColourId);
+    if (textColour.getAlpha() == 0)
+        textColour = juce::Colours::white;
+    g.setColour(textColour);
+    g.setFont(getPopupMenuFont().withHeight(juce::jmax(11.0f, getPopupMenuFont().getHeight() * 0.95f)));
+    g.drawFittedText(text, juce::Rectangle<int>(width, height).reduced(8, 4), juce::Justification::centredLeft, 6);
+}
+
+void CustomLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox&, juce::Graphics& g,
+                                                 const juce::Path& path, juce::Image& cachedImage)
+{
+    juce::ignoreUnused(cachedImage);
+    const auto fill = getThemePanelColour().darker(0.2f).withAlpha(0.97f);
+    g.setColour(fill);
+    g.fillPath(path);
+
+    g.setColour(getThemePanelOutlineColour().withAlpha(0.9f));
+    g.strokePath(path, juce::PathStrokeType(1.15f));
 }
 
 juce::Font CustomLookAndFeel::getComboBoxFont(juce::ComboBox& box)

@@ -329,6 +329,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         const juce::String n = name.toLowerCase();
 
+        if (n.contains("bbd filter max ratio"))
+            return "Caps BBD filter cutoff as a sample-rate ratio (0.1-0.5). Lower values are darker/safer; higher values are brighter.";
+        if (n.contains("bbd stages") || n.contains("stages"))
+            return "Number of BBD delay stages (256-2048). More stages increase max delay and change clock behavior.";
         if (n.contains("bbd"))
             return "Used only in Red NQ (BBD core). BBD emulates analog bucket-brigade delay behavior. Slower clock and lower cutoff sound darker and grainier; faster clock and higher cutoff sound cleaner and brighter.";
         if (n.contains("tape"))
@@ -412,6 +416,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             return "Pre-emphasis boosts selected high frequencies before chorus/saturation. Useful for recovering clarity.";
         if (n.contains("hpf"))
             return "High-pass filter removes low end before modulation to reduce mud/rumble.";
+        if (n.contains("lpf"))
+            return "Low-pass filter rolls off high frequencies. Use to tame BBD aliasing, clock buzz, or harsh highs. Lower cutoff = darker.";
         if (n.contains("knob sweep"))
             return "Sets the rotary animation start/end angle.";
         if (n.contains("frame count"))
@@ -520,6 +526,9 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
                                              bool firstOpen)
     {
         const juce::String profileName = engineName + (hqEnabled ? " HQ" : " NQ");
+        const bool isRedNQ = (engineIndex == 2 && !hqEnabled);
+        const bool usesPreEmphasis = !isRedNQ;
+        const bool usesSaturation = (engineIndex == 0 || engineIndex == 1 || isRedNQ);
         juce::Array<juce::PropertyComponent*> dspTimingAndMotion;
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Rate Smooth (ms)", engineTuning.rateSmoothingMs, 0.0, 200.0, 0.1, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Depth Smooth (ms)", engineTuning.depthSmoothingMs, 0.0, 500.0, 0.1, 1.0));
@@ -533,12 +542,17 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         juce::Array<juce::PropertyComponent*> dspFiltering;
         dspFiltering.add(addInternal(engineIndex, hqEnabled, "HPF Cutoff (Hz)", engineTuning.hpfCutoffHz, 5.0, 200.0, 0.1, 1.0));
         dspFiltering.add(addInternal(engineIndex, hqEnabled, "HPF Q", engineTuning.hpfQ, 0.1, 2.0, 0.001, 1.0));
-        dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Freq (Hz)", engineTuning.preEmphasisFreqHz, 200.0, 12000.0, 1.0, 1.0));
-        dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Q", engineTuning.preEmphasisQ, 0.1, 4.0, 0.001, 1.0));
-        dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Gain", engineTuning.preEmphasisGain, 0.1, 4.0, 0.001, 1.0));
-        dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Level Smooth", engineTuning.preEmphasisLevelSmoothing, 0.0, 1.0, 0.001, 1.0));
-        dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Quiet Thresh", engineTuning.preEmphasisQuietThreshold, 0.0, 1.0, 0.001, 1.0));
-        dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Max Amount", engineTuning.preEmphasisMaxAmount, 0.0, 1.0, 0.001, 1.0));
+        dspFiltering.add(addInternal(engineIndex, hqEnabled, "LPF Cutoff (Hz)", engineTuning.lpfCutoffHz, 100.0, 20000.0, 1.0, 1.0));
+        dspFiltering.add(addInternal(engineIndex, hqEnabled, "LPF Q", engineTuning.lpfQ, 0.1, 4.0, 0.001, 1.0));
+        if (usesPreEmphasis)
+        {
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Freq (Hz)", engineTuning.preEmphasisFreqHz, 200.0, 12000.0, 1.0, 1.0));
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Q", engineTuning.preEmphasisQ, 0.1, 4.0, 0.001, 1.0));
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Gain", engineTuning.preEmphasisGain, 0.1, 4.0, 0.001, 1.0));
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Level Smooth", engineTuning.preEmphasisLevelSmoothing, 0.0, 1.0, 0.001, 1.0));
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Quiet Thresh", engineTuning.preEmphasisQuietThreshold, 0.0, 1.0, 0.001, 1.0));
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Max Amount", engineTuning.preEmphasisMaxAmount, 0.0, 1.0, 0.001, 1.0));
+        }
 
         juce::Array<juce::PropertyComponent*> dspCompressor;
         dspCompressor.add(addInternal(engineIndex, hqEnabled, "Comp Attack (ms)", engineTuning.compressorAttackMs, 0.1, 200.0, 0.1, 1.0));
@@ -546,13 +560,15 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         dspCompressor.add(addInternal(engineIndex, hqEnabled, "Comp Threshold (dB)", engineTuning.compressorThresholdDb, -30.0, 6.0, 0.1, 1.0));
         dspCompressor.add(addInternal(engineIndex, hqEnabled, "Comp Ratio", engineTuning.compressorRatio, 1.0, 12.0, 0.01, 1.0));
 
-        juce::Array<juce::PropertyComponent*> dspSaturation;
-        dspSaturation.add(addInternal(engineIndex, hqEnabled, "Saturation Drive Scale", engineTuning.saturationDriveScale, 0.0, 6.0, 0.01, 1.0));
-
         addPanelSection(internalsPanel, profileName + " - Timing + Motion", dspTimingAndMotion, firstOpen);
-        addPanelSection(internalsPanel, profileName + " - Filtering + Emphasis", dspFiltering, false);
+        addPanelSection(internalsPanel, profileName + (usesPreEmphasis ? " - Filtering + Emphasis" : " - Filtering"), dspFiltering, false);
         addPanelSection(internalsPanel, profileName + " - Compressor", dspCompressor, false);
-        addPanelSection(internalsPanel, profileName + " - Saturation", dspSaturation, false);
+        if (usesSaturation)
+        {
+            juce::Array<juce::PropertyComponent*> dspSaturation;
+            dspSaturation.add(addInternal(engineIndex, hqEnabled, "Saturation Drive Scale", engineTuning.saturationDriveScale, 0.0, 6.0, 0.01, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Saturation", dspSaturation, false);
+        }
 
         // BBD internals are only used by Red NQ (engine 2, HQ off).
         if (engineIndex == 2 && !hqEnabled)
@@ -576,9 +592,14 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             bbdClock.add(addInternal(engineIndex, hqEnabled, "BBD Clock Min (Hz)", engineTuning.bbdClockMinHz, 200.0, 10000.0, 1.0, 1.0));
             bbdClock.add(addInternal(engineIndex, hqEnabled, "BBD Clock Max Ratio", engineTuning.bbdClockMaxRatio, 0.1, 1.0, 0.001, 1.0));
 
+            juce::Array<juce::PropertyComponent*> bbdStructure;
+            bbdStructure.add(addInternal(engineIndex, hqEnabled, "BBD Stages", engineTuning.bbdStages, 256.0, 2048.0, 256.0, 1.0));
+            bbdStructure.add(addInternal(engineIndex, hqEnabled, "BBD Filter Max Ratio", engineTuning.bbdFilterMaxRatio, 0.1, 0.5, 0.01, 1.0));
+
             addPanelSection(bbdPanel, profileName + " - Delay + Depth", bbdDelayAndDepth, firstOpen);
             addPanelSection(bbdPanel, profileName + " - Filter", bbdFilter, false);
             addPanelSection(bbdPanel, profileName + " - Clock", bbdClock, false);
+            addPanelSection(bbdPanel, profileName + " - Structure", bbdStructure, false);
         }
 
         // Tape internals are only used by Red HQ (engine 2, HQ on).
@@ -611,7 +632,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             tapeDriveAndOutput.add(addInternal(engineIndex, hqEnabled, "Tape Ratio Min", engineTuning.tapeRatioMin, 0.9, 1.0, 0.0001, 1.0));
             tapeDriveAndOutput.add(addInternal(engineIndex, hqEnabled, "Tape Ratio Max", engineTuning.tapeRatioMax, 1.0, 1.1, 0.0001, 1.0));
             tapeDriveAndOutput.add(addInternal(engineIndex, hqEnabled, "Tape Wet Gain", engineTuning.tapeWetGain, 0.5, 2.0, 0.001, 1.0));
-            tapeDriveAndOutput.add(addInternal(engineIndex, hqEnabled, "Tape Hermite Tension", engineTuning.tapeHermiteTension, 0.3, 1.2, 0.001, 1.0));
+            tapeDriveAndOutput.add(addInternal(engineIndex, hqEnabled, "Tape Hermite Tension", engineTuning.tapeHermiteTension, 0.0, 1.0, 0.001, 1.0));
 
             addPanelSection(tapePanel, profileName + " - Delay + Tone", tapeDelayAndTone, firstOpen);
             addPanelSection(tapePanel, profileName + " - Motion + Modulation", tapeMotionAndModulation, false);
@@ -990,6 +1011,8 @@ juce::String DevPanel::buildJson() const
         json << "    \"widthSmoothingMs\": " << formatFloat(internals.widthSmoothingMs.load()) << ",\n";
         json << "    \"hpfCutoffHz\": " << formatFloat(internals.hpfCutoffHz.load()) << ",\n";
         json << "    \"hpfQ\": " << formatFloat(internals.hpfQ.load()) << ",\n";
+        json << "    \"lpfCutoffHz\": " << formatFloat(internals.lpfCutoffHz.load()) << ",\n";
+        json << "    \"lpfQ\": " << formatFloat(internals.lpfQ.load()) << ",\n";
         json << "    \"preEmphasisFreqHz\": " << formatFloat(internals.preEmphasisFreqHz.load()) << ",\n";
         json << "    \"preEmphasisQ\": " << formatFloat(internals.preEmphasisQ.load()) << ",\n";
         json << "    \"preEmphasisGain\": " << formatFloat(internals.preEmphasisGain.load()) << ",\n";
@@ -1014,6 +1037,8 @@ juce::String DevPanel::buildJson() const
         json << "    \"bbdFilterCutoffScale\": " << formatFloat(internals.bbdFilterCutoffScale.load()) << ",\n";
         json << "    \"bbdClockMinHz\": " << formatFloat(internals.bbdClockMinHz.load()) << ",\n";
         json << "    \"bbdClockMaxRatio\": " << formatFloat(internals.bbdClockMaxRatio.load()) << ",\n";
+        json << "    \"bbdStages\": " << formatFloat(internals.bbdStages.load()) << ",\n";
+        json << "    \"bbdFilterMaxRatio\": " << formatFloat(internals.bbdFilterMaxRatio.load()) << ",\n";
         json << "    \"tapeDelaySmoothingMs\": " << formatFloat(internals.tapeDelaySmoothingMs.load()) << ",\n";
         json << "    \"tapeCentreBaseMs\": " << formatFloat(internals.tapeCentreBaseMs.load()) << ",\n";
         json << "    \"tapeCentreScale\": " << formatFloat(internals.tapeCentreScale.load()) << ",\n";

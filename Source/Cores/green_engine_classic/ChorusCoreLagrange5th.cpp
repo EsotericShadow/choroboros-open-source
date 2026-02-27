@@ -25,7 +25,7 @@ ChorusCoreLagrange5th::ChorusCoreLagrange5th()
 {
 }
 
-void ChorusCoreLagrange5th::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCoreLagrange5th::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
     

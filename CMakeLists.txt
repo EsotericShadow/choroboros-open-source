@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Choroboros VERSION 1.0.1)
+project(Choroboros VERSION 2.0.1)
 
 # Beta version string for feedback/reports (change to "2.01" for release)
 set(CHOROBOROS_VERSION_STRING "2.01-beta" CACHE STRING "Version string for feedback and display")
@@ -23,7 +23,7 @@ juce_add_plugin(Choroboros
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
     PRODUCT_NAME "Choroboros"
     DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms"
-    VERSION 1.0.1
+    VERSION 2.0.1
 )
 
 target_sources(Choroboros PRIVATE
@@ -162,15 +162,16 @@ target_link_libraries(ChoroborosRegressionTests PRIVATE
 # After each VST3 build, install to user Plug-Ins so Reaper loads the latest build
 if(APPLE)
     add_custom_command(TARGET Choroboros_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
         COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.vst3 to user VST3 folder..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/VST3/Choroboros.vst3" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/Release/VST3/Choroboros.vst3" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
         COMMENT "Copy Choroboros.vst3 to ~/Library/Audio/Plug-Ins/VST3 for Reaper")
     # After AAX build, copy to Avid Plug-Ins (Pro Tools Developer loads from user path if present)
     add_custom_command(TARGET Choroboros_AAX POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins"
         COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.aaxplugin to Avid Plug-Ins..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/AAX/Choroboros.aaxplugin" "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/Release/AAX/Choroboros.aaxplugin" "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
         COMMENT "Copy Choroboros.aaxplugin to ~/Library/Application Support/Avid/Audio/Plug-Ins for Pro Tools Developer")
 endif()

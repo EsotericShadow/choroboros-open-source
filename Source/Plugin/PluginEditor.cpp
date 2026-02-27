@@ -485,7 +485,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     helpButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
     helpButton.onClick = [] {
         // Open help/documentation (for now, just open email - can be updated to PDF link later)
-        juce::URL("mailto:info@kaizenstrategic.ai?subject=Choroboros%20Help").launchInDefaultBrowser();
+        juce::URL("mailto:Greenalderson@gmail.com?subject=Choroboros%20Help").launchInDefaultBrowser();
     };
     helpButton.setTooltip("Help: Get documentation and information");
     addAndMakeVisible(helpButton);
@@ -883,7 +883,7 @@ void ChoroborosPluginEditor::setupSlider(juce::Slider& slider, LabelWithContaine
     else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
         slider.setTooltip("Stereo Width: Controls the stereo spread from 0% (mono) to 200% (wide). Adjusts the phase relationship between left and right channels.");
     else if (paramId == ChoroborosAudioProcessor::COLOR_ID)
-        slider.setTooltip("Tone/Character: Engine-specific parameter. Green=feedback, Blue=filter, Red=saturation, Purple=warp amount, Black=ensemble spread/complexity (HQ) and modulation intensity (Normal).");
+        slider.setTooltip("Tone/Character: Engine-specific parameter. Green/Blue/Red NQ=post-chorus drive, Red HQ=tape tone+drive, Purple=warp/orbit shape, Black=modulation intensity/ensemble spread.");
     else if (paramId == ChoroborosAudioProcessor::MIX_ID)
         slider.setTooltip("Dry/Wet Mix: Blends the original signal (0%) with the processed signal (100%). 50% = equal blend.");
 
@@ -935,6 +935,8 @@ void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
     const double mappedFromMax = static_cast<double>(audioProcessor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, static_cast<float>(rateControl.getMaximum())));
     const double mappedMin = juce::jmin(mappedFromMin, mappedFromMax);
     const double mappedMax = juce::jmax(mappedFromMin, mappedFromMax);
+    constexpr double maxQuantizedRateHz = 20.0;
+    const double quantizedMappedMax = juce::jmin(mappedMax, maxQuantizedRateHz);
 
     juce::PopupMenu menu;
     menu.addSectionHeader("Rate Sync @ " + juce::String(bpm, 2) + " BPM");
@@ -947,7 +949,7 @@ void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
         if (beatsPerCycle <= 0.0)
             return;
         const double hz = bpm / (60.0 * beatsPerCycle);
-        const bool inRange = (hz >= mappedMin && hz <= mappedMax);
+        const bool inRange = (hz >= mappedMin && hz <= quantizedMappedMax);
         const bool isTicked = std::abs(hz - mappedCurrent) <= 0.01;
         targetMenu.addItem(nextId, label + " (" + juce::String(hz, 2) + " Hz)", inRange, isTicked);
         if (inRange)
@@ -955,43 +957,51 @@ void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
         ++nextId;
     };
 
-    const std::vector<int> denominators { 64, 32, 16, 8, 4, 3, 2, 1 };
-
-    juce::PopupMenu straightMenu;
-    for (int denom : denominators)
-        addRateItem(straightMenu, "1/" + juce::String(denom), 4.0 / static_cast<double>(denom));
-    menu.addSubMenu("Straight", straightMenu);
-
-    juce::PopupMenu tripletMenu;
-    for (int denom : denominators)
-        addRateItem(tripletMenu, "1/" + juce::String(denom) + "T", (4.0 / static_cast<double>(denom)) * (2.0 / 3.0));
-    menu.addSubMenu("Triplet", tripletMenu);
-
-    juce::PopupMenu dottedMenu;
-    for (int denom : denominators)
-        addRateItem(dottedMenu, "1/" + juce::String(denom) + ".", (4.0 / static_cast<double>(denom)) * 1.5);
-    menu.addSubMenu("Dotted", dottedMenu);
-
-    juce::PopupMenu swingMenu;
-    const std::vector<int> swingPercents { 54, 58, 62, 66, 70 };
-    for (int baseDenom : { 8, 16 })
+    using RateItem = std::pair<juce::String, double>;
+    const auto addSubdivisionMenu = [&](const juce::String& title, const std::vector<RateItem>& items)
     {
-        juce::PopupMenu baseSwingMenu;
-        const double pairBeats = 8.0 / static_cast<double>(baseDenom);
-        for (int swingPct : swingPercents)
-        {
-            const double longBeats = pairBeats * (static_cast<double>(swingPct) / 100.0);
-            const double shortBeats = pairBeats - longBeats;
-            addRateItem(baseSwingMenu, "1/" + juce::String(baseDenom) + " Swing " + juce::String(swingPct) + "% Long", longBeats);
-            addRateItem(baseSwingMenu, "1/" + juce::String(baseDenom) + " Swing " + juce::String(swingPct) + "% Short", shortBeats);
-        }
-        swingMenu.addSubMenu("1/" + juce::String(baseDenom) + " Swing", baseSwingMenu);
-    }
-    menu.addSubMenu("Swing", swingMenu);
+        juce::PopupMenu subMenu;
+        for (const auto& item : items)
+            addRateItem(subMenu, item.first, item.second);
+        menu.addSubMenu(title, subMenu);
+    };
+
+    addSubdivisionMenu("Straight",
+    {
+        { "4 Bars", 16.0 },
+        { "2 Bars", 8.0 },
+        { "1 Bar", 4.0 },
+        { "1/2", 2.0 },
+        { "1/4", 1.0 },
+        { "1/8", 0.5 },
+        { "1/16", 0.25 },
+        { "1/32", 0.125 },
+        { "1/64", 0.0625 }
+    });
+
+    addSubdivisionMenu("Triplet",
+    {
+        { "1/1T", (4.0 / 1.0) * (2.0 / 3.0) },
+        { "1/2T", (4.0 / 2.0) * (2.0 / 3.0) },
+        { "1/4T", (4.0 / 4.0) * (2.0 / 3.0) },
+        { "1/8T", (4.0 / 8.0) * (2.0 / 3.0) },
+        { "1/16T", (4.0 / 16.0) * (2.0 / 3.0) },
+        { "1/32T", (4.0 / 32.0) * (2.0 / 3.0) }
+    });
+
+    addSubdivisionMenu("Dotted",
+    {
+        { "1/1.", (4.0 / 1.0) * 1.5 },
+        { "1/2.", (4.0 / 2.0) * 1.5 },
+        { "1/4.", (4.0 / 4.0) * 1.5 },
+        { "1/8.", (4.0 / 8.0) * 1.5 },
+        { "1/16.", (4.0 / 16.0) * 1.5 },
+        { "1/32.", (4.0 / 32.0) * 1.5 }
+    });
 
     juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&rateControl),
-                       [safeThis, idToHz, mappedMin, mappedMax](int selectedId)
+                       [safeThis, idToHz, mappedMin, quantizedMappedMax](int selectedId)
                        {
                            if (safeThis == nullptr || selectedId == 0)
                                return;
@@ -1011,7 +1021,7 @@ void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
 
                            const auto toRawRate = [&](double desiredMappedHz) -> double
                            {
-                               const double clampedMapped = juce::jlimit(mappedMin, mappedMax, desiredMappedHz);
+                               const double clampedMapped = juce::jlimit(mappedMin, quantizedMappedMax, desiredMappedHz);
                                double lo = safeThis->rateSlider.getMinimum();
                                double hi = safeThis->rateSlider.getMaximum();
                                for (int i = 0; i < 30; ++i)
@@ -1071,21 +1081,26 @@ void ChoroborosPluginEditor::setupValueLabelEditing(LabelWithContainer& label, j
 {
     label.onValueEdited = [this, &slider, &label, paramId](const juce::String& newText) -> bool
     {
-        float newValue = parseValueFromText(newText, paramId);
-        if (newValue >= 0.0f)  // Valid value
+        const float parsedMappedValue = parseValueFromText(newText, paramId);
+        if (parsedMappedValue >= 0.0f)  // Valid value
         {
-            // Clamp to slider range
-            double minVal = slider.getMinimum();
-            double maxVal = slider.getMaximum();
-            float clampedValue = static_cast<float>(juce::jlimit(minVal, maxVal, static_cast<double>(newValue)));
-            
-            // Update the parameter directly via the value tree state to ensure it applies
-            // This bypasses any potential attachment blocking
+            // Parse/edit values are in mapped display space; clamp in mapped space first.
+            const float mappedFromMin = audioProcessor.mapParameterValue(paramId, static_cast<float>(slider.getMinimum()));
+            const float mappedFromMax = audioProcessor.mapParameterValue(paramId, static_cast<float>(slider.getMaximum()));
+            const float mappedMin = juce::jmin(mappedFromMin, mappedFromMax);
+            const float mappedMax = juce::jmax(mappedFromMin, mappedFromMax);
+            const float clampedMappedValue = juce::jlimit(mappedMin, mappedMax, parsedMappedValue);
+
+            // Convert mapped display value back to raw parameter value.
+            const float rawValue = audioProcessor.unmapParameterValue(paramId, clampedMappedValue);
+            const float clampedRawValue = static_cast<float>(juce::jlimit(slider.getMinimum(), slider.getMaximum(),
+                                                                           static_cast<double>(rawValue)));
+
             auto* param = audioProcessor.getValueTreeState().getParameter(paramId);
             if (param != nullptr)
             {
                 // Convert to normalized 0-1 range
-                float normalizedValue = param->convertTo0to1(clampedValue);
+                float normalizedValue = param->convertTo0to1(clampedRawValue);
                 // Clamp normalized value to valid range
                 normalizedValue = juce::jlimit(0.0f, 1.0f, normalizedValue);
                 param->setValueNotifyingHost(normalizedValue);
@@ -1093,14 +1108,14 @@ void ChoroborosPluginEditor::setupValueLabelEditing(LabelWithContainer& label, j
             else
             {
                 // Parameter not found - fallback to slider update
-                slider.setValue(clampedValue, juce::sendNotificationSync);
+                slider.setValue(clampedRawValue, juce::sendNotificationSync);
             }
             
             // Also set slider value to update visual position
-            slider.setValue(clampedValue, juce::dontSendNotification);
+            slider.setValue(clampedRawValue, juce::dontSendNotification);
             
             // Format and set the label text - this will be picked up by editorAboutToBeHidden
-            updateValueLabel(label, clampedValue, paramId);
+            updateValueLabel(label, clampedRawValue, paramId);
             label.repaint();
             repaint();
             return true;  // Value was applied successfully
@@ -1140,7 +1155,7 @@ float ChoroborosPluginEditor::parseRateValue(const juce::String& trimmed)
 {
     juce::String clean = trimmed.removeCharacters("Hz").trim();
     const float value = clean.getFloatValue();
-    if (value > 0.0f && value <= 10.0f)
+    if (value > 0.0f && std::isfinite(value))
         return value;
     return -1.0f;
 }
@@ -1149,7 +1164,7 @@ float ChoroborosPluginEditor::parseDepthValue(const juce::String& trimmed)
 {
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
-    if (value >= 0.0f && value <= 100.0f)
+    if (value >= 0.0f && std::isfinite(value))
         return (value > 1.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
@@ -1160,7 +1175,7 @@ float ChoroborosPluginEditor::parseOffsetValue(const juce::String& trimmed)
     if (clean.endsWithIgnoreCase("deg"))
         clean = clean.substring(0, clean.length() - 3).trim();
     const float value = clean.getFloatValue();
-    if (value >= 0.0f && value <= 180.0f)
+    if (std::isfinite(value))
         return value;
     return -1.0f;
 }
@@ -1169,7 +1184,7 @@ float ChoroborosPluginEditor::parseWidthValue(const juce::String& trimmed)
 {
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
-    if (value >= 0.0f && value <= 200.0f)
+    if (value >= 0.0f && std::isfinite(value))
         return (value > 2.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
@@ -1178,7 +1193,7 @@ float ChoroborosPluginEditor::parseColorValue(const juce::String& trimmed)
 {
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
-    if (value >= 0.0f && value <= 100.0f)
+    if (value >= 0.0f && std::isfinite(value))
         return (value > 1.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
@@ -1187,7 +1202,7 @@ float ChoroborosPluginEditor::parseMixValue(const juce::String& trimmed)
 {
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
-    if (value >= 0.0f && value <= 100.0f)
+    if (value >= 0.0f && std::isfinite(value))
         return (value > 1.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }

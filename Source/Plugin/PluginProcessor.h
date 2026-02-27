@@ -114,6 +114,7 @@ public:
     void loadEngineParamProfilesFromVar(const juce::var& profilesVar);
     void syncEngineInternalsToActiveDsp(int colorIndex, bool hqEnabled = false);
     float mapParameterValue(const juce::String& paramId, float rawValue) const;
+    float unmapParameterValue(const juce::String& paramId, float mappedValue) const;
     
     // Feedback collector (public for editor access)
     std::unique_ptr<FeedbackCollector> feedbackCollector;
@@ -152,6 +153,7 @@ private:
 
     void initTuningDefaults();
     float mapTunedValue(float rawValue, float baseMin, float baseMax, const ParamTuning& tuning) const;
+    float unmapTunedValue(float mappedValue, float baseMin, float baseMax, const ParamTuning& tuning) const;
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void applyEngineParamProfile(int engineIndex);
     void saveCurrentParamsToEngineProfile(int engineIndex);

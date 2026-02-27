@@ -31,7 +31,7 @@ public:
     ChorusCoreOrbit();
     ~ChorusCoreOrbit() override = default;
     
-    void prepare(const juce::dsp::ProcessSpec& spec) override;
+    void prepare(const juce::dsp::ProcessSpec& spec, ChorusDSP* dsp = nullptr) override;
     void reset() override;
     void processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& block, float currentCentreDelayMs) override;
     

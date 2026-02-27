@@ -20,13 +20,37 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
 
+namespace
+{
+juce::Font makeRetroFont(float height, bool bold)
+{
+    juce::Font font { juce::FontOptions { height, bold ? juce::Font::bold : juce::Font::plain } };
+    if (BinaryData::Retroica_ttfSize > 0)
+    {
+        static juce::Typeface::Ptr retroTypeface = juce::Typeface::createSystemTypefaceFor(
+            BinaryData::Retroica_ttf,
+            static_cast<size_t>(BinaryData::Retroica_ttfSize));
+        if (retroTypeface != nullptr)
+            font = juce::Font { juce::FontOptions { retroTypeface }.withHeight(height) };
+    }
+    if (bold)
+        font.setBold(true);
+    return font;
+}
+} // namespace
+
 AboutDialog::AboutDialog()
 {
     setSize(450, 550);
+
+    const auto accent = juce::Colour(0xff9dbd78);
+    const auto bodyText = juce::Colour(0xffe8ecf1);
+    const auto mutedText = juce::Colour(0xff9aa5b3);
     
     titleLabel.setText("Choroboros", juce::dontSendNotification);
-    titleLabel.setFont(juce::Font { juce::FontOptions { 32.0f, juce::Font::bold } });
+    titleLabel.setFont(makeRetroFont(33.0f, true));
     titleLabel.setJustificationType(juce::Justification::centred);
+    titleLabel.setColour(juce::Label::textColourId, accent);
     addAndMakeVisible(titleLabel);
     
 #ifdef CHOROBOROS_VERSION_STRING
@@ -34,65 +58,91 @@ AboutDialog::AboutDialog()
 #else
     versionLabel.setText("Version 2.01-beta", juce::dontSendNotification);
 #endif
-    versionLabel.setFont(juce::Font { juce::FontOptions { 14.0f } });
+    versionLabel.setFont(makeRetroFont(14.0f, false));
     versionLabel.setJustificationType(juce::Justification::centred);
+    versionLabel.setColour(juce::Label::textColourId, mutedText);
     addAndMakeVisible(versionLabel);
     
     descriptionLabel.setText("A chorus that eats its own tail\nFive colors, ten algorithms", juce::dontSendNotification);
-    descriptionLabel.setFont(juce::Font { juce::FontOptions { 14.0f } });
+    descriptionLabel.setFont(makeRetroFont(14.0f, false));
     descriptionLabel.setJustificationType(juce::Justification::centred);
+    descriptionLabel.setColour(juce::Label::textColourId, bodyText);
     addAndMakeVisible(descriptionLabel);
     
     companyLabel.setText("Kaizen Strategic AI Inc", juce::dontSendNotification);
-    companyLabel.setFont(juce::Font { juce::FontOptions { 16.0f, juce::Font::bold } });
+    companyLabel.setFont(makeRetroFont(16.0f, true));
     companyLabel.setJustificationType(juce::Justification::centred);
+    companyLabel.setColour(juce::Label::textColourId, bodyText);
     addAndMakeVisible(companyLabel);
     
     dbaLabel.setText("DBA: Green DSP", juce::dontSendNotification);
-    dbaLabel.setFont(juce::Font { juce::FontOptions { 14.0f } });
+    dbaLabel.setFont(makeRetroFont(14.0f, false));
     dbaLabel.setJustificationType(juce::Justification::centred);
+    dbaLabel.setColour(juce::Label::textColourId, bodyText);
     addAndMakeVisible(dbaLabel);
     
     locationLabel.setText("British Columbia, Canada", juce::dontSendNotification);
-    locationLabel.setFont(juce::Font { juce::FontOptions { 14.0f } });
+    locationLabel.setFont(makeRetroFont(14.0f, false));
     locationLabel.setJustificationType(juce::Justification::centred);
+    locationLabel.setColour(juce::Label::textColourId, bodyText);
     addAndMakeVisible(locationLabel);
     
     copyrightLabel.setText("(C) 2026 Kaizen Strategic AI Inc", juce::dontSendNotification);
-    copyrightLabel.setFont(juce::Font { juce::FontOptions { 12.0f } });
+    copyrightLabel.setFont(makeRetroFont(12.0f, false));
     copyrightLabel.setJustificationType(juce::Justification::centred);
+    copyrightLabel.setColour(juce::Label::textColourId, mutedText);
     addAndMakeVisible(copyrightLabel);
     
     contactLabel.setText("Info:", juce::dontSendNotification);
-    contactLabel.setFont(juce::Font { juce::FontOptions { 14.0f } });
+    contactLabel.setFont(makeRetroFont(14.0f, false));
     contactLabel.setJustificationType(juce::Justification::centred);
+    contactLabel.setColour(juce::Label::textColourId, bodyText);
     addAndMakeVisible(contactLabel);
     
     contactLink.setButtonText("info@kaizenstrategic.ai");
     contactLink.setURL(juce::URL("mailto:info@kaizenstrategic.ai?subject=Choroboros%20Info"));
-    contactLink.setFont(juce::Font { juce::FontOptions { 14.0f } }, false);
+    contactLink.setFont(makeRetroFont(14.0f, false), false);
+    contactLink.setColour(juce::HyperlinkButton::textColourId, accent.brighter(0.18f));
     addAndMakeVisible(contactLink);
     
     juceLabel.setText("Built with JUCE 8.0.12", juce::dontSendNotification);
-    juceLabel.setFont(juce::Font { juce::FontOptions { 11.0f } });
+    juceLabel.setFont(makeRetroFont(11.0f, false));
     juceLabel.setJustificationType(juce::Justification::centred);
-    juceLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+    juceLabel.setColour(juce::Label::textColourId, mutedText);
     addAndMakeVisible(juceLabel);
     
     closeButton.setButtonText("Close");
+    closeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2a3138));
+    closeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff3a444d));
+    closeButton.setColour(juce::TextButton::textColourOffId, bodyText);
+    closeButton.setColour(juce::TextButton::textColourOnId, bodyText);
     closeButton.onClick = [this] { closeDialog(); };
     addAndMakeVisible(closeButton);
     
     licenseButton.setButtonText("View License");
+    licenseButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1f2f23));
+    licenseButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff2a4130));
+    licenseButton.setColour(juce::TextButton::textColourOffId, accent.brighter(0.18f));
+    licenseButton.setColour(juce::TextButton::textColourOnId, accent.brighter(0.18f));
     licenseButton.onClick = [this] { showLicense(); };
     addAndMakeVisible(licenseButton);
 }
 
 void AboutDialog::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff1a1a1a));
-    g.setColour(juce::Colours::white);
-    g.drawRect(getLocalBounds(), 1);
+    const auto accent = juce::Colour(0xff9dbd78);
+    const auto bounds = getLocalBounds().toFloat();
+
+    g.fillAll(juce::Colour(0xff090b0d));
+    juce::ColourGradient bg(juce::Colour(0xff151a1f), 0.0f, 0.0f,
+                            juce::Colour(0xff11161b), 0.0f, bounds.getBottom(), false);
+    g.setGradientFill(bg);
+    g.fillRoundedRectangle(bounds.reduced(8.0f), 10.0f);
+
+    g.setColour(accent.withAlpha(0.78f));
+    g.drawRoundedRectangle(bounds.reduced(8.5f), 10.0f, 1.2f);
+    g.setColour(accent.withAlpha(0.18f));
+    g.drawRoundedRectangle(bounds.reduced(12.0f), 8.0f, 1.0f);
 }
 
 void AboutDialog::resized()

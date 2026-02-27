@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../ChorusCore.h"
+#include "../../DSP/BBDCascadeFilter.h"
 #include <vector>
 
 // Bucket-Brigade Device (BBD) emulation chorus core
@@ -29,7 +30,7 @@ public:
     ChorusCoreBBD();
     ~ChorusCoreBBD() override = default;
     
-    void prepare(const juce::dsp::ProcessSpec& spec) override;
+    void prepare(const juce::dsp::ProcessSpec& spec, ChorusDSP* dsp = nullptr) override;
     void reset() override;
     void processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& block, float currentCentreDelayMs) override;
     
@@ -37,29 +38,24 @@ public:
     float getMaxDelaySamples() const override;
     
 private:
-    static constexpr int BBD_STAGES = 1024; // Number of BBD stages
+    static constexpr int BBD_STAGES_MAX = 2048; // Max stages (allocate buffer this size)
     
     struct BBDChannel
     {
         std::vector<float> stages; // BBD stage buffer
         int head = 0;
         double clockPhase = 0.0;
-        float heldOutput = 0.0f;
         float heldPrev = 0.0f;  // Previous held output for time interpolation
         float heldNext = 0.0f;  // Next held output for time interpolation
-        
-        // One-pole lowpass filters (no coefficient swapping, click-free)
-        float inputLPState = 0.0f;   // One-pole filter state
-        float inputLPState2 = 0.0f;  // Second pole for stronger anti-aliasing
-        float outputLPState = 0.0f;  // One-pole filter state
-        float outputLPState2 = 0.0f; // Second pole for stronger reconstruction
-        
-        // Smoothed delay and clock frequency to prevent crackling
-        juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDelayMs; // Smooth delay changes
+        float prevFilteredInput = 0.0f; // For input interpolation (Raffel)
+
+        choroboros::BBDCascadeFilter inputFilter;
+        choroboros::BBDCascadeFilter outputFilter;
+
+        juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDelayMs;
         float smoothedClockFreq = 5000.0f;
-        float smoothedFilterCutoff = 5000.0f; // Smoothly interpolated filter cutoff
-        float cachedOnePoleG = 0.0f; // Cached LP coefficient to avoid per-sample exp()
-        float cachedCutoffForG = -1.0f;
+        float smoothedFilterCutoffHz = 4000.0f;
+        float lastDesignedFilterCutoffHz = -1.0f;
     };
     
     std::vector<BBDChannel> channels;
@@ -68,8 +64,9 @@ private:
     
     // Process one channel's BBD
     float processBBDChannel(int channel, float input, float clockFreq, float clockSmoothCoeff,
-                            float filterSmoothCoeff, float filterCutoffScale,
-                            float filterCutoffMinHz, float filterCutoffMaxHz);
+                            int effectiveStages);
+
+    choroboros::BBD5thOrderButterworthCoeffs filterCoeffs;
 
     float lastDelaySmoothingMs = -1.0f;
 };

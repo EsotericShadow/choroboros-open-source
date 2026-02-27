@@ -47,6 +47,8 @@ void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeT
     internals.widthSmoothingMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "widthSmoothingMs", internals.widthSmoothingMs.load())));
     internals.hpfCutoffHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "hpfCutoffHz", internals.hpfCutoffHz.load())));
     internals.hpfQ.store(static_cast<float>(getNumberOrDefault(internalsVar, "hpfQ", internals.hpfQ.load())));
+    internals.lpfCutoffHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "lpfCutoffHz", internals.lpfCutoffHz.load())));
+    internals.lpfQ.store(static_cast<float>(getNumberOrDefault(internalsVar, "lpfQ", internals.lpfQ.load())));
     internals.preEmphasisFreqHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "preEmphasisFreqHz", internals.preEmphasisFreqHz.load())));
     internals.preEmphasisQ.store(static_cast<float>(getNumberOrDefault(internalsVar, "preEmphasisQ", internals.preEmphasisQ.load())));
     internals.preEmphasisGain.store(static_cast<float>(getNumberOrDefault(internalsVar, "preEmphasisGain", internals.preEmphasisGain.load())));
@@ -71,6 +73,8 @@ void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeT
     internals.bbdFilterCutoffScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdFilterCutoffScale", internals.bbdFilterCutoffScale.load())));
     internals.bbdClockMinHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdClockMinHz", internals.bbdClockMinHz.load())));
     internals.bbdClockMaxRatio.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdClockMaxRatio", internals.bbdClockMaxRatio.load())));
+    internals.bbdStages.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdStages", internals.bbdStages.load())));
+    internals.bbdFilterMaxRatio.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdFilterMaxRatio", internals.bbdFilterMaxRatio.load())));
     internals.tapeDelaySmoothingMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeDelaySmoothingMs", internals.tapeDelaySmoothingMs.load())));
     internals.tapeCentreBaseMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeCentreBaseMs", internals.tapeCentreBaseMs.load())));
     internals.tapeCentreScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeCentreScale", internals.tapeCentreScale.load())));
@@ -96,6 +100,71 @@ void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeT
     internals.tapeHermiteTension.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeHermiteTension", internals.tapeHermiteTension.load())));
 }
 
+void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
+{
+    r.rateSmoothingMs.store(23.1f);
+    r.depthSmoothingMs.store(43.2f);
+    r.depthRateLimit.store(5.0f);
+    r.centreDelaySmoothingMs.store(152.4f);
+    r.centreDelayBaseMs.store(9.3f);
+    r.centreDelayScale.store(1.6f);
+    r.colorSmoothingMs.store(127.4f);
+    r.widthSmoothingMs.store(98.7f);
+    r.hpfCutoffHz.store(82.2f);
+    r.hpfQ.store(1.184f);
+    r.lpfCutoffHz.store(12956.0f);
+    r.lpfQ.store(1.28f);
+    r.preEmphasisFreqHz.store(1502.0f);
+    r.preEmphasisQ.store(1.706f);
+    r.preEmphasisGain.store(1.343f);
+    r.preEmphasisLevelSmoothing.store(0.866f);
+    r.preEmphasisQuietThreshold.store(0.535f);
+    r.preEmphasisMaxAmount.store(0.961f);
+    r.compressorAttackMs.store(19.4f);
+    r.compressorReleaseMs.store(141.9f);
+    r.compressorThresholdDb.store(-18.0f);
+    r.compressorRatio.store(3.82f);
+    r.saturationDriveScale.store(1.93f);
+    r.bbdDelaySmoothingMs.store(52.2f);
+    r.bbdDelayMinMs.store(5.9f);
+    r.bbdDelayMaxMs.store(86.9f);
+    r.bbdCentreBaseMs.store(14.7f);
+    r.bbdCentreScale.store(3.28f);
+    r.bbdDepthMs.store(13.2f);
+    r.bbdClockSmoothingMs.store(41.7f);
+    r.bbdFilterSmoothingMs.store(46.7f);
+    r.bbdFilterCutoffMinHz.store(469.0f);
+    r.bbdFilterCutoffMaxHz.store(12176.0f);
+    r.bbdFilterCutoffScale.store(0.531f);
+    r.bbdClockMinHz.store(750.0f);
+    r.bbdClockMaxRatio.store(1.0f);
+    r.bbdStages.store(1024.0f);
+    r.bbdFilterMaxRatio.store(0.35f);
+    r.tapeDelaySmoothingMs.store(180.0f);
+    r.tapeCentreBaseMs.store(16.0f);
+    r.tapeCentreScale.store(2.0f);
+    r.tapeToneMaxHz.store(16000.0f);
+    r.tapeToneMinHz.store(12000.0f);
+    r.tapeToneSmoothingCoeff.store(0.08f);
+    r.tapeDriveScale.store(0.35f);
+    r.tapeLfoRatioScale.store(0.05f);
+    r.tapeLfoModSmoothingCoeff.store(0.0015f);
+    r.tapeRatioSmoothingCoeff.store(0.004f);
+    r.tapePhaseDamping.store(1.0f);
+    r.tapeWowFreqBase.store(0.33f);
+    r.tapeWowFreqSpread.store(0.03f);
+    r.tapeFlutterFreqBase.store(5.8f);
+    r.tapeFlutterFreqSpread.store(0.2f);
+    r.tapeWowDepthBase.store(0.0022f);
+    r.tapeWowDepthSpread.store(0.0002f);
+    r.tapeFlutterDepthBase.store(0.0011f);
+    r.tapeFlutterDepthSpread.store(0.0001f);
+    r.tapeRatioMin.store(0.96f);
+    r.tapeRatioMax.store(1.04f);
+    r.tapeWetGain.store(1.15f);
+    r.tapeHermiteTension.store(0.75f);
+}
+
 void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::RuntimeTuning& dst)
 {
     dst.rateSmoothingMs.store(src.rateSmoothingMs.load());
@@ -108,6 +177,8 @@ void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::Run
     dst.widthSmoothingMs.store(src.widthSmoothingMs.load());
     dst.hpfCutoffHz.store(src.hpfCutoffHz.load());
     dst.hpfQ.store(src.hpfQ.load());
+    dst.lpfCutoffHz.store(src.lpfCutoffHz.load());
+    dst.lpfQ.store(src.lpfQ.load());
     dst.preEmphasisFreqHz.store(src.preEmphasisFreqHz.load());
     dst.preEmphasisQ.store(src.preEmphasisQ.load());
     dst.preEmphasisGain.store(src.preEmphasisGain.load());
@@ -132,6 +203,8 @@ void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::Run
     dst.bbdFilterCutoffScale.store(src.bbdFilterCutoffScale.load());
     dst.bbdClockMinHz.store(src.bbdClockMinHz.load());
     dst.bbdClockMaxRatio.store(src.bbdClockMaxRatio.load());
+    dst.bbdStages.store(src.bbdStages.load());
+    dst.bbdFilterMaxRatio.store(src.bbdFilterMaxRatio.load());
     dst.tapeDelaySmoothingMs.store(src.tapeDelaySmoothingMs.load());
     dst.tapeCentreBaseMs.store(src.tapeCentreBaseMs.load());
     dst.tapeCentreScale.store(src.tapeCentreScale.load());
@@ -275,13 +348,27 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     initTuningDefaults();
     initializeEngineInternalProfiles();
     loadPersistedDefaults(*this);
+    applyEngineParamProfile(getCurrentEngineColorIndex());
+    saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
     parameters.addParameterListener(ENGINE_COLOR_ID, this);
+    parameters.addParameterListener(RATE_ID, this);
+    parameters.addParameterListener(DEPTH_ID, this);
+    parameters.addParameterListener(OFFSET_ID, this);
+    parameters.addParameterListener(WIDTH_ID, this);
+    parameters.addParameterListener(COLOR_ID, this);
+    parameters.addParameterListener(MIX_ID, this);
     lastEngineIndex = getCurrentEngineColorIndex();
 }
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
     parameters.removeParameterListener(ENGINE_COLOR_ID, this);
+    parameters.removeParameterListener(RATE_ID, this);
+    parameters.removeParameterListener(DEPTH_ID, this);
+    parameters.removeParameterListener(OFFSET_ID, this);
+    parameters.removeParameterListener(WIDTH_ID, this);
+    parameters.removeParameterListener(COLOR_ID, this);
+    parameters.removeParameterListener(MIX_ID, this);
 }
 
 //==============================================================================
@@ -647,6 +734,26 @@ float ChoroborosAudioProcessor::mapTunedValue(float rawValue, float baseMin, flo
     return tunedMin + (tunedMax - tunedMin) * shaped;
 }
 
+float ChoroborosAudioProcessor::unmapTunedValue(float mappedValue, float baseMin, float baseMax, const ParamTuning& tuningParam) const
+{
+    if (baseMax <= baseMin)
+        return mappedValue;
+
+    float tunedMin = tuningParam.min.load();
+    float tunedMax = tuningParam.max.load();
+    if (tunedMax < tunedMin)
+        std::swap(tunedMax, tunedMin);
+
+    const float tunedSpan = tunedMax - tunedMin;
+    if (tunedSpan <= 1.0e-6f)
+        return baseMin;
+
+    const float shaped = juce::jlimit(0.0f, 1.0f, (mappedValue - tunedMin) / tunedSpan);
+    const float curve = juce::jmax(0.001f, tuningParam.curve.load());
+    const float normalised = std::pow(shaped, 1.0f / curve);
+    return baseMin + (baseMax - baseMin) * normalised;
+}
+
 float ChoroborosAudioProcessor::mapParameterValue(const juce::String& paramId, float rawValue) const
 {
     if (paramId == RATE_ID)
@@ -663,6 +770,24 @@ float ChoroborosAudioProcessor::mapParameterValue(const juce::String& paramId, f
         return mapTunedValue(rawValue, MIX_MIN, MIX_MAX, tuning.mix);
 
     return rawValue;
+}
+
+float ChoroborosAudioProcessor::unmapParameterValue(const juce::String& paramId, float mappedValue) const
+{
+    if (paramId == RATE_ID)
+        return unmapTunedValue(mappedValue, RATE_MIN, RATE_MAX, tuning.rate);
+    if (paramId == DEPTH_ID)
+        return unmapTunedValue(mappedValue, DEPTH_MIN, DEPTH_MAX, tuning.depth);
+    if (paramId == OFFSET_ID)
+        return unmapTunedValue(mappedValue, OFFSET_MIN, OFFSET_MAX, tuning.offset);
+    if (paramId == WIDTH_ID)
+        return unmapTunedValue(mappedValue, WIDTH_MIN, WIDTH_MAX, tuning.width);
+    if (paramId == COLOR_ID)
+        return unmapTunedValue(mappedValue, COLOR_MIN, COLOR_MAX, tuning.color);
+    if (paramId == MIX_ID)
+        return unmapTunedValue(mappedValue, MIX_MIN, MIX_MAX, tuning.mix);
+
+    return mappedValue;
 }
 
 void ChoroborosAudioProcessor::updateDSPParameters()
@@ -691,6 +816,7 @@ void ChoroborosAudioProcessor::updateDSPParameters()
         restoreEngineInternalsToDsp(colorIndex, hqEnabled);
         activeInternalsEngine = colorIndex;
         activeInternalsHQ = hqEnabled;
+        startTimer(0);
     }
 
     chorusDSP->setEngineColor(colorIndex);
@@ -740,6 +866,7 @@ void ChoroborosAudioProcessor::initializeEngineInternalProfiles()
         copyRuntimeTuningValues(chorusDSP->getRuntimeTuning(), engineInternals[color][0]);
         copyRuntimeTuningValues(chorusDSP->getRuntimeTuning(), engineInternals[color][1]);
     }
+    setRedNQDefaults(engineInternals[2][0]);
     activeInternalsEngine = getCurrentEngineColorIndex();
     activeInternalsHQ = isHqEnabled();
     restoreEngineInternalsToDsp(activeInternalsEngine, activeInternalsHQ);
@@ -794,17 +921,31 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
 
 void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    if (parameterID != ENGINE_COLOR_ID)
-        return;
-    const int newEngine = juce::jlimit(0, 4, static_cast<int>(newValue));
     if (presetLoadInProgress || stateLoadInProgress)
     {
-        lastEngineIndex = newEngine;
+        if (parameterID == ENGINE_COLOR_ID)
+            lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
         return;
     }
-    saveCurrentParamsToEngineProfile(lastEngineIndex);
-    lastEngineIndex = newEngine;
-    applyEngineParamProfile(newEngine);
+
+    if (parameterID == ENGINE_COLOR_ID)
+    {
+        const int newEngine = juce::jlimit(0, 4, static_cast<int>(newValue));
+        saveCurrentParamsToEngineProfile(lastEngineIndex);
+        lastEngineIndex = newEngine;
+        applyEngineParamProfile(newEngine);
+        return;
+    }
+
+    if (parameterID == RATE_ID
+        || parameterID == DEPTH_ID
+        || parameterID == OFFSET_ID
+        || parameterID == WIDTH_ID
+        || parameterID == COLOR_ID
+        || parameterID == MIX_ID)
+    {
+        saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
+    }
 }
 
 void ChoroborosAudioProcessor::saveCurrentParamsToEngineProfile(int engineIndex)
@@ -813,13 +954,13 @@ void ChoroborosAudioProcessor::saveCurrentParamsToEngineProfile(int engineIndex)
         return;
     auto& p = engineParamProfiles[engineIndex];
     if (auto* r = parameters.getRawParameterValue(RATE_ID))
-        p.rate = parameters.getParameterRange(RATE_ID).convertFrom0to1(r->load());
+        p.rate = r->load();
     if (auto* d = parameters.getRawParameterValue(DEPTH_ID))
-        p.depth = parameters.getParameterRange(DEPTH_ID).convertFrom0to1(d->load());
+        p.depth = d->load();
     if (auto* o = parameters.getRawParameterValue(OFFSET_ID))
-        p.offset = parameters.getParameterRange(OFFSET_ID).convertFrom0to1(o->load());
+        p.offset = o->load();
     if (auto* w = parameters.getRawParameterValue(WIDTH_ID))
-        p.width = parameters.getParameterRange(WIDTH_ID).convertFrom0to1(w->load());
+        p.width = w->load();
     if (auto* m = parameters.getRawParameterValue(MIX_ID))
         p.mix = m->load();
     if (auto* c = parameters.getRawParameterValue(COLOR_ID))
@@ -829,6 +970,9 @@ void ChoroborosAudioProcessor::saveCurrentParamsToEngineProfile(int engineIndex)
 
 void ChoroborosAudioProcessor::applyEngineParamProfile(int engineIndex)
 {
+    if (engineIndex < 0 || engineIndex >= 5)
+        return;
+
     const EngineParamProfile& prof = engineParamProfiles[engineIndex].valid
         ? engineParamProfiles[engineIndex]
         : getEngineDefaults(engineIndex);
@@ -841,9 +985,9 @@ void ChoroborosAudioProcessor::applyEngineParamProfile(int engineIndex)
     if (auto* param = parameters.getParameter(WIDTH_ID))
         param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(prof.width));
     if (auto* param = parameters.getParameter(MIX_ID))
-        param->setValueNotifyingHost(prof.mix);
+        param->setValueNotifyingHost(parameters.getParameterRange(MIX_ID).convertTo0to1(prof.mix));
     if (auto* param = parameters.getParameter(COLOR_ID))
-        param->setValueNotifyingHost(prof.color);
+        param->setValueNotifyingHost(parameters.getParameterRange(COLOR_ID).convertTo0to1(prof.color));
 }
 
 void ChoroborosAudioProcessor::loadEngineParamProfilesFromVar(const juce::var& profilesVar)
@@ -927,7 +1071,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChoroborosAudioProcessor::cr
         1.0f
     ));
     
-    // Color: 0% → 100% (tone/saturation parameter)
+    // Color: 0% → 100% (engine-specific character control)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         COLOR_ID, "Color",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),

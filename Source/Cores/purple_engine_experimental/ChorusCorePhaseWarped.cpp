@@ -25,7 +25,7 @@ ChorusCorePhaseWarped::ChorusCorePhaseWarped()
 {
 }
 
-void ChorusCorePhaseWarped::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCorePhaseWarped::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
     

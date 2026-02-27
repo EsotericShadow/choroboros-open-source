@@ -46,6 +46,8 @@ public:
 
         std::atomic<float> hpfCutoffHz { 30.0f };
         std::atomic<float> hpfQ { 0.707f };
+        std::atomic<float> lpfCutoffHz { 20000.0f };
+        std::atomic<float> lpfQ { 0.707f };
         std::atomic<float> preEmphasisFreqHz { 3000.0f };
         std::atomic<float> preEmphasisQ { 0.707f };
         std::atomic<float> preEmphasisGain { 1.2f };
@@ -71,6 +73,8 @@ public:
         std::atomic<float> bbdFilterCutoffScale { 0.45f };
         std::atomic<float> bbdClockMinHz { 2000.0f };
         std::atomic<float> bbdClockMaxRatio { 0.9f };
+        std::atomic<float> bbdStages { 1024.0f };
+        std::atomic<float> bbdFilterMaxRatio { 0.22f };
 
         std::atomic<float> tapeDelaySmoothingMs { 180.0f };
         std::atomic<float> tapeCentreBaseMs { 16.0f };
@@ -108,7 +112,7 @@ public:
     void setDepth(float depth); // 0.0 to 1.0
     void setOffset(float offsetDegrees); // 0 to 180
     void setWidth(float width); // 0.0 to 2.0
-    void setColor(float color); // 0.0 to 1.0 (tone/saturation parameter)
+    void setColor(float color); // 0.0 to 1.0 (engine-specific character control)
     void setEngineColor(int colorIndex); // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     void setQualityEnabled(bool enabled); // false=Normal, true=HQ
     void setMix(float mix); // 0.0 to 1.0 (dry/wet mix)
@@ -149,6 +153,8 @@ private:
 
         float hpfCutoffHz = 30.0f;
         float hpfQ = 0.707f;
+        float lpfCutoffHz = 20000.0f;
+        float lpfQ = 0.707f;
         float preEmphasisFreqHz = 3000.0f;
         float preEmphasisQ = 0.707f;
         float preEmphasisGain = 1.2f;
@@ -174,6 +180,8 @@ private:
         float bbdFilterCutoffScale = 0.45f;
         float bbdClockMinHz = 2000.0f;
         float bbdClockMaxRatio = 0.9f;
+        float bbdStages = 1024.0f;
+        float bbdFilterMaxRatio = 0.22f;
 
         float tapeDelaySmoothingMs = 180.0f;
         float tapeCentreBaseMs = 16.0f;
@@ -210,6 +218,7 @@ private:
     // Current chorus core (swappable at runtime)
     ChorusCore* currentCore = nullptr;
     ChorusCore* previousCore = nullptr;
+    ChorusCore* pendingCore = nullptr;
     std::array<std::unique_ptr<ChorusCore>, kNumEngineVariants> coreVariants;
     
     // Engine selection state
@@ -218,6 +227,8 @@ private:
     bool coreSwitchCrossfadeActive = false;
     int coreSwitchCrossfadeSamplesRemaining = 0;
     int coreSwitchCrossfadeTotalSamples = 0;
+    int coreSwitchWarmupSamplesRemaining = 0;
+    int coreSwitchWarmupTotalSamples = 0;
     
     // Create and switch to a new core based on color and quality
     void switchCore(int colorIndex, bool hq);
@@ -242,7 +253,8 @@ private:
     // Additional processing stages
     juce::dsp::IIR::Filter<float> hpf;  // High pass filter
     juce::dsp::IIR::Coefficients<float>::Ptr hpfCoeffs;
-    
+    juce::dsp::IIR::Filter<float> lpf;  // Low pass filter (tame highs, e.g. BBD aliasing)
+    juce::dsp::IIR::Coefficients<float>::Ptr lpfCoeffs;
     juce::dsp::IIR::Filter<float> preEmphasis;  // Pre-emphasis filter
     juce::dsp::IIR::Coefficients<float>::Ptr preEmphasisCoeffs;
     float inputLevel = 0.0f;  // Input level tracking
@@ -275,6 +287,8 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedCentreDelay;  // Centre delay smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedColor;  // Color smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedWidth;  // Width smoothing
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOffset;  // Offset smoothing
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedMix;  // Mix smoothing
     
     // Target parameters
     float rateHz = 0.5f;  // Rate - Default: 0.5 Hz
@@ -282,6 +296,7 @@ private:
     float offsetDegrees = 90.0f;  // Offset - Default: 90°
     float width = 1.0f;  // Width - Default: 100%
     float color = 0.5f;  // Color - Default: 50%
+    float mix = 0.5f;  // Mix - Default: 50%
     
     // Helper functions
     float applySaturation(float sample, float colorValue);  // Saturation

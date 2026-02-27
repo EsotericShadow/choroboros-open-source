@@ -1,0 +1,17 @@
+
+This Avid product contains software licensed under the terms of the GNU Lesser General 
+Public License.  A copy of that license is included with the product.  For three years 
+from the date you received the product, Avid will provide you with the source code 
+corresponding to the LGPL licensed software included with the product.  
+To request the source code, please contact:
+
+
+                                Avid
+                                Attn: General Counsel, Source Code Request
+                                75 Network Drive
+                                Burlington, MA 01803
+ 
+
+Charges may apply for media, shipping, and handling.
+
+

@@ -32,7 +32,8 @@ public:
     virtual ~ChorusCore() = default;
     
     // Prepare the delay line with the given spec
-    virtual void prepare(const juce::dsp::ProcessSpec& spec) = 0;
+    // dsp: Optional pointer for cores that need tuning (e.g. BBD reads bbdStages)
+    virtual void prepare(const juce::dsp::ProcessSpec& spec, ChorusDSP* dsp = nullptr) = 0;
     
     // Reset the delay line
     virtual void reset() = 0;

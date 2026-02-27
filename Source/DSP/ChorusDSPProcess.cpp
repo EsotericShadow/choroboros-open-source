@@ -19,9 +19,14 @@
 #include "ChorusDSPProcess.h"
 #include "ChorusDSP.h"
 #include "../Cores/ChorusCore.h"
+#include <cmath>
 
 void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
+    // Red NQ: skip pre-emphasis - it boosts highs before BBD, which aliase and cause downsampled drone
+    if (chorusDSP.currentColorIndex == 2 && !chorusDSP.currentQualityHQ)
+        return;
+
     float rmsLevel = 0.0f;
     const int blockSize = static_cast<int>(block.getNumSamples());
     for (int ch = 0; ch < block.getNumChannels(); ++ch)
@@ -62,12 +67,26 @@ void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::Audio
     }
 }
 
-void ChorusDSPProcess::processSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
+void ChorusDSPProcess::processPreChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
+    // No pre-chorus saturation: adds harmonics that aliase in BBD (Red NQ drone).
+    // Saturation is applied post-chorus for the engines that use Color as drive.
+    (void) chorusDSP;
+    (void) block;
+}
+
+void ChorusDSPProcess::processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
+{
+    // Color-driven post saturation for engines that use Color as drive:
+    // Green, Blue, and Red NQ. Other engines map Color to core-specific behavior.
+    const int engine = chorusDSP.currentColorIndex;
+    const bool usesPostSaturation = (engine == 0 || engine == 1 || (engine == 2 && !chorusDSP.currentQualityHQ));
+    if (!usesPostSaturation)
+        return;
+
     const int numSamples = static_cast<int>(block.getNumSamples());
-    float currentColor = chorusDSP.smoothedColor.getNextValue();
-    chorusDSP.smoothedColor.skip(numSamples - 1);
-    
+    const float currentColor = chorusDSP.smoothedColor.getCurrentValue();
+
     for (int i = 0; i < numSamples; ++i)
     {
         for (int ch = 0; ch < block.getNumChannels(); ++ch)
@@ -96,6 +115,21 @@ void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNu
     
     currentRate = chorusDSP.smoothedRate.getNextValue();
     chorusDSP.smoothedRate.skip(blockNumSamples - 1);
+
+    // Smooth stereo phase offset to avoid hard LFO phase jumps when switching engines.
+    const float currentOffset = chorusDSP.smoothedOffset.getNextValue();
+    chorusDSP.smoothedOffset.skip(blockNumSamples - 1);
+    chorusDSP.lfoPhaseOffset = currentOffset;
+
+    // Smooth wet mix to avoid zipper/pops during engine/profile transitions.
+    const float currentMix = chorusDSP.smoothedMix.getNextValue();
+    chorusDSP.smoothedMix.skip(blockNumSamples - 1);
+    chorusDSP.dryWet.setWetMixProportion(currentMix);
+
+    // Advance Color smoothing once per block for all engines.
+    // Some cores (e.g. Red HQ Tape) read smoothedColor directly in processDelay.
+    chorusDSP.smoothedColor.getNextValue();
+    chorusDSP.smoothedColor.skip(blockNumSamples - 1);
     
     float centreDelayMs = chorusDSP.calculateCentreDelay(currentDepth);
     chorusDSP.smoothedCentreDelay.setTargetValue(centreDelayMs);
@@ -155,6 +189,29 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     
     chorusDSP.dryWet.pushDrySamples(block);
 
+    bool pendingCoreReady = false;
+    if (chorusDSP.pendingCore != nullptr)
+    {
+        jassert(blockNumSamples <= chorusDSP.maxBlockSize);
+        jassert(numChannels <= static_cast<int>(chorusDSP.coreCrossfadeBufferA.getNumChannels()));
+
+        for (int ch = 0; ch < numChannels; ++ch)
+        {
+            auto* src = block.getChannelPointer(ch);
+            chorusDSP.coreCrossfadeBufferA.copyFrom(ch, 0, src, blockNumSamples);
+        }
+
+        auto wetPending = juce::dsp::AudioBlock<float>(chorusDSP.coreCrossfadeBufferA.getArrayOfWritePointers(),
+                                                       static_cast<size_t>(numChannels),
+                                                       static_cast<size_t>(blockNumSamples));
+        chorusDSP.pendingCore->processDelay(chorusDSP, wetPending, currentCentreDelayMs);
+
+        if (chorusDSP.coreSwitchWarmupSamplesRemaining > 0)
+            chorusDSP.coreSwitchWarmupSamplesRemaining = juce::jmax(0, chorusDSP.coreSwitchWarmupSamplesRemaining - blockNumSamples);
+
+        pendingCoreReady = (chorusDSP.coreSwitchWarmupSamplesRemaining <= 0);
+    }
+
     if (chorusDSP.coreSwitchCrossfadeActive && chorusDSP.previousCore != nullptr)
     {
         jassert(blockNumSamples <= chorusDSP.maxBlockSize);
@@ -184,13 +241,27 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            const float newGain = 1.0f - (static_cast<float>(juce::jmax(remaining, 0)) / static_cast<float>(totalSamples));
-            const float oldGain = 1.0f - newGain;
+            const float progress = 1.0f - (static_cast<float>(juce::jmax(remaining, 0)) / static_cast<float>(totalSamples));
+            // Bias the transition toward the old core during early samples so stale-state transients
+            // in the new core stay masked while its delay memory settles.
+            constexpr float crossfadeCurveExp = 1.8f;
+            const float shapedProgress = std::pow(progress, crossfadeCurveExp);
+            const float newGain = std::sin(shapedProgress * juce::MathConstants<float>::halfPi);
+            const float oldGain = std::cos(shapedProgress * juce::MathConstants<float>::halfPi);
+            // Extra edge de-click treatment: short attenuation at transition start/end
+            // suppresses single-sample discontinuities when switching core states.
+            constexpr float edgeWindow = 0.08f; // 8% of crossfade length
+            const float edgeIn = juce::jlimit(0.0f, 1.0f, progress / edgeWindow);
+            const float edgeOut = juce::jlimit(0.0f, 1.0f, (1.0f - progress) / edgeWindow);
+            const float edgeBlend = juce::jmin(edgeIn, edgeOut);
+            const float edgeDuckGain = 0.82f + 0.18f * edgeBlend;
+            const float midDuckGain = 1.0f - 0.08f * std::sin(progress * juce::MathConstants<float>::pi);
+            const float duckGain = edgeDuckGain * midDuckGain;
             for (int ch = 0; ch < numChannels; ++ch)
             {
                 const float wetNew = chorusDSP.coreCrossfadeBufferA.getSample(ch, i);
                 const float wetOld = chorusDSP.coreCrossfadeBufferB.getSample(ch, i);
-                block.setSample(ch, i, wetOld * oldGain + wetNew * newGain);
+                block.setSample(ch, i, (wetOld * oldGain + wetNew * newGain) * duckGain);
             }
             remaining = juce::jmax(remaining - 1, 0);
         }
@@ -209,5 +280,30 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
         processChorusDelay(chorusDSP, block, currentCentreDelayMs);
     }
 
+    if (!chorusDSP.coreSwitchCrossfadeActive && pendingCoreReady && chorusDSP.pendingCore != nullptr)
+    {
+        chorusDSP.previousCore = chorusDSP.currentCore;
+        chorusDSP.currentCore = chorusDSP.pendingCore;
+        chorusDSP.pendingCore = nullptr;
+        chorusDSP.coreSwitchWarmupSamplesRemaining = 0;
+        chorusDSP.coreSwitchWarmupTotalSamples = 0;
+
+        if (chorusDSP.previousCore != nullptr && chorusDSP.spec.sampleRate > 0.0)
+        {
+            chorusDSP.coreSwitchCrossfadeTotalSamples = juce::jmax(1, static_cast<int>(std::round(chorusDSP.spec.sampleRate * 0.04))); // 40 ms
+            chorusDSP.coreSwitchCrossfadeSamplesRemaining = chorusDSP.coreSwitchCrossfadeTotalSamples;
+            chorusDSP.coreSwitchCrossfadeActive = true;
+        }
+        else
+        {
+            chorusDSP.previousCore = nullptr;
+            chorusDSP.coreSwitchCrossfadeActive = false;
+            chorusDSP.coreSwitchCrossfadeSamplesRemaining = 0;
+            chorusDSP.coreSwitchCrossfadeTotalSamples = 0;
+        }
+    }
+
+    // Apply color-driven saturation on wet signal only, before dry/wet mix.
+    processPostChorusSaturation(chorusDSP, block);
     chorusDSP.dryWet.mixWetSamples(block);
 }

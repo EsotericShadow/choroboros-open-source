@@ -43,51 +43,84 @@ FeedbackDialog::FeedbackDialog(FeedbackCollector& collector)
     : feedbackCollector(collector)
 {
     setSize(500, 440);
+
+    const auto accent = juce::Colour(0xff9dbd78);
+    const auto bodyText = juce::Colour(0xffe8ecf1);
+    const auto mutedText = juce::Colour(0xffa0acba);
     
     titleLabel.setText("Choroboros Beta - Feedback", juce::dontSendNotification);
     titleLabel.setFont(makeRetroFont(20.0f, true));
     titleLabel.setJustificationType(juce::Justification::centred);
+    titleLabel.setColour(juce::Label::textColourId, accent);
     addAndMakeVisible(titleLabel);
     
-    infoLabel.setText("Help us improve! Share your thoughts, bug reports, or feature requests.\n"
-                      "Usage statistics will be included automatically.\n\n"
+    infoLabel.setText("Help us improve! Use the feedback form to share your thoughts, bug reports, or feature requests.\n"
+                      "You can save usage statistics to a file and paste them into the form.\n\n"
                       "Not yet a beta tester? Sign up:",
                       juce::dontSendNotification);
     infoLabel.setFont(makeRetroFont(14.0f, false));
     infoLabel.setJustificationType(juce::Justification::centred);
-    infoLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+    infoLabel.setColour(juce::Label::textColourId, mutedText);
     addAndMakeVisible(infoLabel);
     
     feedbackText.setMultiLine(true, true);
     feedbackText.setReturnKeyStartsNewLine(true);
     feedbackText.setFont(makeRetroFont(14.0f, false));
+    feedbackText.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff11161b));
+    feedbackText.setColour(juce::TextEditor::textColourId, bodyText);
+    feedbackText.setColour(juce::TextEditor::outlineColourId, accent.withAlpha(0.65f));
+    feedbackText.setColour(juce::TextEditor::focusedOutlineColourId, accent);
+    feedbackText.setColour(juce::CaretComponent::caretColourId, accent.brighter(0.25f));
     // Note: setPlaceholderText may not be available in all JUCE versions
     // feedbackText.setPlaceholderText("Enter your feedback here...");
     addAndMakeVisible(feedbackText);
     
     saveButton.setButtonText("Save to File");
+    saveButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1f2f23));
+    saveButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff2a4130));
+    saveButton.setColour(juce::TextButton::textColourOffId, accent.brighter(0.18f));
+    saveButton.setColour(juce::TextButton::textColourOnId, accent.brighter(0.18f));
     saveButton.addListener(this);
     addAndMakeVisible(saveButton);
     
-    emailButton.setButtonText("Open Email");
-    emailButton.addListener(this);
-    addAndMakeVisible(emailButton);
+    formButton.setButtonText("Open Feedback Form");
+    formButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff243138));
+    formButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff31424c));
+    formButton.setColour(juce::TextButton::textColourOffId, bodyText);
+    formButton.setColour(juce::TextButton::textColourOnId, bodyText);
+    formButton.addListener(this);
+    addAndMakeVisible(formButton);
     
     cancelButton.setButtonText("Cancel");
+    cancelButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2a3138));
+    cancelButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff3a444d));
+    cancelButton.setColour(juce::TextButton::textColourOffId, bodyText);
+    cancelButton.setColour(juce::TextButton::textColourOnId, bodyText);
     cancelButton.addListener(this);
     addAndMakeVisible(cancelButton);
 
     betaSignUpLink.setButtonText("Choroboros v2.01 Beta Test Sign-up");
-    betaSignUpLink.setURL(juce::URL("https://docs.google.com/forms/d/e/1FAIpQLSekP3STx1XL63JRam5p9bdKY7h667w_V4ZSVr0U_x4OAjZW9g/viewform"));
+    betaSignUpLink.setURL(juce::URL("https://docs.google.com/forms/d/e/1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform"));
     betaSignUpLink.setFont(makeRetroFont(12.0f, false), false);
+    betaSignUpLink.setColour(juce::HyperlinkButton::textColourId, accent.brighter(0.18f));
     addAndMakeVisible(betaSignUpLink);
 }
 
 void FeedbackDialog::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff2a2a2a));
-    g.setColour(juce::Colours::white);
-    g.drawRect(getLocalBounds(), 1);
+    const auto accent = juce::Colour(0xff9dbd78);
+    const auto bounds = getLocalBounds().toFloat();
+
+    g.fillAll(juce::Colour(0xff090b0d));
+    juce::ColourGradient bg(juce::Colour(0xff151a1f), 0.0f, 0.0f,
+                            juce::Colour(0xff11161b), 0.0f, bounds.getBottom(), false);
+    g.setGradientFill(bg);
+    g.fillRoundedRectangle(bounds.reduced(8.0f), 10.0f);
+
+    g.setColour(accent.withAlpha(0.78f));
+    g.drawRoundedRectangle(bounds.reduced(8.5f), 10.0f, 1.2f);
+    g.setColour(accent.withAlpha(0.18f));
+    g.drawRoundedRectangle(bounds.reduced(12.0f), 8.0f, 1.0f);
 }
 
 void FeedbackDialog::resized()
@@ -106,9 +139,9 @@ void FeedbackDialog::resized()
     area.removeFromTop(20);
     
     auto buttonArea = area.removeFromTop(30);
-    saveButton.setBounds(buttonArea.removeFromLeft(120));
+    saveButton.setBounds(buttonArea.removeFromLeft(140));
     buttonArea.removeFromLeft(10);
-    emailButton.setBounds(buttonArea.removeFromLeft(120));
+    formButton.setBounds(buttonArea.removeFromLeft(160));
     buttonArea.removeFromLeft(10);
     cancelButton.setBounds(buttonArea.removeFromLeft(120));
 }
@@ -119,9 +152,9 @@ void FeedbackDialog::buttonClicked(juce::Button* button)
     {
         saveFeedback();
     }
-    else if (button == &emailButton)
+    else if (button == &formButton)
     {
-        openEmail();
+        openFeedbackForm();
     }
     else if (button == &cancelButton)
     {
@@ -148,18 +181,9 @@ void FeedbackDialog::saveFeedback()
     // If save failed, dialog stays open so user can try again
 }
 
-void FeedbackDialog::openEmail()
+void FeedbackDialog::openFeedbackForm()
 {
-    juce::String emailBody;
-    emailBody << "Choroboros Beta Feedback\n\n";
-    emailBody << feedbackCollector.getUsageSummary() << "\n";
-    emailBody << "User Feedback:\n";
-    emailBody << feedbackText.getText() << "\n";
-    
-    juce::String emailLink = "mailto:info@kaizenstrategic.ai?subject=Choroboros%20Beta%20Feedback&body=";
-    emailLink += juce::URL::addEscapeChars(emailBody, false);
-    
-    juce::URL(emailLink).launchInDefaultBrowser();
+    juce::URL("https://docs.google.com/forms/d/e/1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform").launchInDefaultBrowser();
     
     if (auto* parent = getParentComponent())
     {

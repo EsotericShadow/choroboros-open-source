@@ -6,7 +6,7 @@ set -e
 
 echo "=========================================="
 echo "  Choroboros Plugin Installer"
-echo "  Version 1.0.1"
+echo "  Version 2.01-beta"
 echo "=========================================="
 echo ""
 
@@ -139,6 +139,6 @@ echo "- Make sure you rescanned plugins in your DAW"
 echo "- Some DAWs require a full restart"
 echo "- Check System Preferences > Security & Privacy if macOS blocks it"
 echo ""
-echo "For help: info@kaizenstrategic.ai"
+echo "For help: Greenalderson@gmail.com"
 echo ""
 read -p "Press Enter to exit..."

@@ -25,7 +25,7 @@ ChorusCoreCubic::ChorusCoreCubic()
 {
 }
 
-void ChorusCoreCubic::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCoreCubic::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
 

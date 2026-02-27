@@ -20,7 +20,7 @@
 #include "../../DSP/ChorusDSP.h"
 #include <cmath>
 
-void ChorusCoreLinear::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCoreLinear::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
 
@@ -59,7 +59,7 @@ void ChorusCoreLinear::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
 
     const float colour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
     const float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
-    // In Black normal mode, Color increases modulation depth and movement.
+    // In Black normal mode, Color controls modulation intensity.
     const float depthScale = 0.6f + 1.0f * colour; // 60% -> 160%
     const float depthSamples = maximumDelayModulation * depthScale * spec.sampleRate / 1000.0f;
 

@@ -119,7 +119,7 @@ For more information about JUCE licensing, visit: https://juce.com/legal/juce-8-
 ## Support & Contact
 
 For issues, questions, or licensing inquiries:
-- **Email:** info@kaizenstrategic.ai
+- **Email:** Greenalderson@gmail.com
 - **Company:** Kaizen Strategic AI Inc.
 - **DBA:** Green DSP
 - **Location:** British Columbia, Canada

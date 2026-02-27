@@ -23,7 +23,7 @@
 
 ChorusCoreTape::ChorusCoreTape() {}
 
-void ChorusCoreTape::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCoreTape::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
 

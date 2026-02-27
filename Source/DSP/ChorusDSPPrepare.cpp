@@ -41,7 +41,11 @@ void ChorusDSPPrepare::prepareFilters(ChorusDSP& chorusDSP, const juce::dsp::Pro
     chorusDSP.hpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 30.0f, 0.707f);
     chorusDSP.hpf.coefficients = chorusDSP.hpfCoeffs;
     chorusDSP.hpf.prepare(spec);
-    
+
+    chorusDSP.lpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 20000.0f, 0.707f);
+    chorusDSP.lpf.coefficients = chorusDSP.lpfCoeffs;
+    chorusDSP.lpf.prepare(spec);
+
     chorusDSP.preEmphasisCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter(spec.sampleRate, 3000.0f, 0.707f, 1.2f);
     chorusDSP.preEmphasis.coefficients = chorusDSP.preEmphasisCoeffs;
     chorusDSP.preEmphasis.prepare(spec);

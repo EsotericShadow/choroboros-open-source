@@ -9,6 +9,12 @@ EASIEST METHOD (Recommended):
 4. Rescan plugins in your DAW
 5. Done!
 
+If macOS blocks the installer ("could not verify... free of malware"):
+   - Right-click "Install Choroboros.command" and choose Open (instead of double-clicking)
+   - Or open Terminal, cd to this folder, and run:
+     xattr -d com.apple.quarantine "Install Choroboros.command"
+     Then double-click the installer.
+
 MANUAL METHOD:
 --------------
 1. Download and unzip the package
@@ -62,7 +68,7 @@ TROUBLESHOOTING:
 ----------------
 - Plugin not appearing? Make sure you copied it to the correct location and rescanned plugins in your DAW
 - macOS blocking it? Go to System Preferences > Security & Privacy and allow it
-- Need help? Email: info@kaizenstrategic.ai
+- Need help? Email: Greenalderson@gmail.com
 
 ---
 

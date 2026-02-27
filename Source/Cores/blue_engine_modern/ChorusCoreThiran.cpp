@@ -25,7 +25,7 @@ ChorusCoreThiran::ChorusCoreThiran()
 {
 }
 
-void ChorusCoreThiran::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCoreThiran::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
 

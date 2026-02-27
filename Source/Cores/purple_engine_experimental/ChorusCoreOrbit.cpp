@@ -25,7 +25,7 @@ ChorusCoreOrbit::ChorusCoreOrbit()
 {
 }
 
-void ChorusCoreOrbit::prepare(const juce::dsp::ProcessSpec& processSpec)
+void ChorusCoreOrbit::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
     

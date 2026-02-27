@@ -47,6 +47,19 @@ public:
                      int buttonX, int buttonY, int buttonW, int buttonH,
                      juce::ComboBox& box) override;
     juce::Font getComboBoxFont(juce::ComboBox& box) override;
+    void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override;
+    void drawPopupMenuBackground(juce::Graphics& g, int width, int height) override;
+    void drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area,
+                           bool isSeparator, bool isActive, bool isHighlighted, bool isTicked, bool hasSubMenu,
+                           const juce::String& text, const juce::String& shortcutKeyText,
+                           const juce::Drawable* icon, const juce::Colour* textColourToUse) override;
+    void drawPopupMenuSectionHeader(juce::Graphics& g, const juce::Rectangle<int>& area,
+                                    const juce::String& sectionName) override;
+    void getIdealPopupMenuItemSize(const juce::String& text, bool isSeparator, int standardMenuItemHeight,
+                                   int& idealWidth, int& idealHeight) override;
+    void drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) override;
+    void drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g,
+                                  const juce::Path& path, juce::Image& cachedImage) override;
     juce::Font getPopupMenuFont() override;
     juce::Font getTextButtonFont(juce::TextButton&, int buttonHeight) override;
     juce::Font getLabelFont(juce::Label&) override;
@@ -71,6 +84,9 @@ private:
     int currentColorIndex = 0; // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     
     void loadImages(int colorIndex);
+    juce::Colour getThemeAccentColour() const;
+    juce::Colour getThemePanelColour() const;
+    juce::Colour getThemePanelOutlineColour() const;
     
     // Helper methods for loadImages
     void getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,

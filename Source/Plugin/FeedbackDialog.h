@@ -38,12 +38,12 @@ private:
     FeedbackCollector& feedbackCollector;
     juce::TextEditor feedbackText;
     juce::TextButton saveButton;
-    juce::TextButton emailButton;
+    juce::TextButton formButton;
     juce::TextButton cancelButton;
     juce::Label titleLabel;
     juce::Label infoLabel;
     juce::HyperlinkButton betaSignUpLink;
     
     void saveFeedback();
-    void openEmail();
+    void openFeedbackForm();
 };
