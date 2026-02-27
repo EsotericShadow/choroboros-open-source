@@ -35,3 +35,7 @@ dmg_temp/
 
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+# Large third-party docs (Pro Tools, Avid, etc.)
+Documentation/*.pdf
+Documentation/*.url
