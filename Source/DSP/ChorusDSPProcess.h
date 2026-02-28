@@ -26,6 +26,7 @@ class ChorusDSPProcess
 public:
     static void processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     static void processPreChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
+    static void processWetCharacter(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     static void processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     static void processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     

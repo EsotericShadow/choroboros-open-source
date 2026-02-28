@@ -277,6 +277,20 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     maxBlockSize = static_cast<int>(spec.maximumBlockSize);
     coreCrossfadeBufferA.setSize(static_cast<int>(spec.numChannels), maxBlockSize, false, false, true);
     coreCrossfadeBufferB.setSize(static_cast<int>(spec.numChannels), maxBlockSize, false, false, true);
+
+    const size_t channelCount = static_cast<size_t>(juce::jmax(0, static_cast<int>(spec.numChannels)));
+    greenWetLPState.assign(channelCount, 0.0f);
+    blueWetHPState.assign(channelCount, 0.0f);
+    blueWetLPState.assign(channelCount, 0.0f);
+    bluePresenceState.assign(channelCount, BiquadState{});
+    bluePresenceB0 = 1.0f;
+    bluePresenceB1 = 0.0f;
+    bluePresenceB2 = 0.0f;
+    bluePresenceA1 = 0.0f;
+    bluePresenceA2 = 0.0f;
+    bluePresenceCachedFreqHz = -1.0f;
+    bluePresenceCachedQ = -1.0f;
+    bluePresenceCachedGainDb = -1000.0f;
     
     // Initialize parameter smoothers
     // CRITICAL: Smooth ALL delay-related parameters to prevent read pointer discontinuities
@@ -290,6 +304,7 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     smoothedRate.setCurrentAndTargetValue(rateHz);
     smoothedCentreDelay.setCurrentAndTargetValue(calculateCentreDelay(depth));
     smoothedColor.setCurrentAndTargetValue(color);
+    colorBlockValue = smoothedColor.getCurrentValue();
     smoothedWidth.setCurrentAndTargetValue(width);
     smoothedOffset.reset(spec.sampleRate, 0.06);
     smoothedOffset.setCurrentAndTargetValue(offsetDegrees);
@@ -337,6 +352,16 @@ void ChorusDSP::reset()
     coreSwitchWarmupTotalSamples = 0;
     previousCore = nullptr;
     pendingCore = nullptr;
+
+    std::fill(greenWetLPState.begin(), greenWetLPState.end(), 0.0f);
+    std::fill(blueWetHPState.begin(), blueWetHPState.end(), 0.0f);
+    std::fill(blueWetLPState.begin(), blueWetLPState.end(), 0.0f);
+    for (auto& state : bluePresenceState)
+        state = {};
+    bluePresenceCachedFreqHz = -1.0f;
+    bluePresenceCachedQ = -1.0f;
+    bluePresenceCachedGainDb = -1000.0f;
+    colorBlockValue = smoothedColor.getCurrentValue();
     
     // Reset smoothed depth and rate-limited target to current value (mapped to engine range)
     smoothedDepthValue = mapDepthToEngineRange(depth);
@@ -354,12 +379,12 @@ float ChorusDSP::mapColorToEngineRange(float normalizedColor) const
     // Each engine interprets color differently
     switch (currentColorIndex)
     {
-        case 0: // Green - post-chorus drive
-            // Direct mapping: 0-1 stays 0-1 (used in post-chorus saturation)
+        case 0: // Green - Bloom macro (wet-only)
+            // Direct mapping: 0-1 stays 0-1 (interpreted in processGreenBloomWet)
             return normalizedColor;
             
-        case 1: // Blue - post-chorus drive
-            // Direct mapping: 0-1 stays 0-1 (used in post-chorus saturation)
+        case 1: // Blue - Focus macro (wet-only)
+            // Direct mapping: 0-1 stays 0-1 (interpreted in processBlueFocusWet)
             return normalizedColor;
             
         case 2: // Red - NQ: post-chorus drive, HQ: tape tone + drive
@@ -409,6 +434,136 @@ float ChorusDSP::applySaturation(float sample, float colorValue)
     float saturated = std::tanh(sample * drive);
     // Normalize to maintain level (tanh compresses, so we scale back)
     return saturated / drive;
+}
+
+void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float colorValue)
+{
+    if (block.getNumSamples() == 0 || spec.sampleRate <= 0.0)
+        return;
+
+    const int numChannels = static_cast<int>(block.getNumChannels());
+    if (numChannels <= 0)
+        return;
+
+    const float color = juce::jlimit(0.0f, 1.0f, colorValue);
+    const float bloom = std::pow(color, 1.6f);
+    if (bloom <= 1.0e-4f)
+        return;
+
+    const float fs = static_cast<float>(spec.sampleRate);
+    const float cutoffHz = juce::jmap(bloom, 0.0f, 1.0f, 18000.0f, 2600.0f);
+    const float onePole = std::exp(-2.0f * juce::MathConstants<float>::pi * cutoffHz / fs);
+    const float wetBlend = 0.48f * bloom;
+    const float bloomGain = 1.0f + 0.10f * bloom;
+    const int numSamples = static_cast<int>(block.getNumSamples());
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto* data = block.getChannelPointer(ch);
+        float lpState = greenWetLPState[static_cast<size_t>(ch)];
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float input = data[i];
+            lpState = (1.0f - onePole) * input + onePole * lpState;
+            const float bloomed = input + wetBlend * (lpState - input);
+            data[i] = bloomed * bloomGain;
+        }
+
+        greenWetLPState[static_cast<size_t>(ch)] = lpState;
+    }
+}
+
+void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float colorValue)
+{
+    if (block.getNumSamples() == 0 || spec.sampleRate <= 0.0)
+        return;
+
+    const int numChannels = static_cast<int>(block.getNumChannels());
+    if (numChannels <= 0)
+        return;
+
+    const float color = juce::jlimit(0.0f, 1.0f, colorValue);
+    const float focus = std::pow(color, 1.35f);
+    if (focus <= 1.0e-4f)
+        return;
+
+    const float fs = static_cast<float>(spec.sampleRate);
+    const float hpCutoffHz = juce::jmap(focus, 0.0f, 1.0f, 70.0f, 520.0f);
+    const float lpCutoffHz = juce::jmap(focus, 0.0f, 1.0f, 18000.0f, 7200.0f);
+    const float hpAlpha = std::exp(-2.0f * juce::MathConstants<float>::pi * hpCutoffHz / fs);
+    const float lpAlpha = std::exp(-2.0f * juce::MathConstants<float>::pi * lpCutoffHz / fs);
+
+    const float presenceFreqHz = juce::jmap(focus, 0.0f, 1.0f, 2200.0f, 3600.0f);
+    const float presenceQ = juce::jmap(focus, 0.0f, 1.0f, 0.75f, 1.10f);
+    const float presenceGainDb = juce::jmap(focus, 0.0f, 1.0f, 0.0f, 4.8f);
+    const bool needsCoeffUpdate =
+        std::abs(presenceFreqHz - bluePresenceCachedFreqHz) > 1.0f
+        || std::abs(presenceQ - bluePresenceCachedQ) > 0.005f
+        || std::abs(presenceGainDb - bluePresenceCachedGainDb) > 0.02f;
+
+    if (needsCoeffUpdate)
+    {
+        const float A = std::pow(10.0f, presenceGainDb / 40.0f);
+        const float w0 = 2.0f * juce::MathConstants<float>::pi * (presenceFreqHz / fs);
+        const float cosW0 = std::cos(w0);
+        const float sinW0 = std::sin(w0);
+        const float alpha = sinW0 / (2.0f * juce::jmax(0.1f, presenceQ));
+
+        const float b0 = 1.0f + alpha * A;
+        const float b1 = -2.0f * cosW0;
+        const float b2 = 1.0f - alpha * A;
+        const float a0 = 1.0f + alpha / A;
+        const float a1 = -2.0f * cosW0;
+        const float a2 = 1.0f - alpha / A;
+        const float invA0 = 1.0f / a0;
+
+        bluePresenceB0 = b0 * invA0;
+        bluePresenceB1 = b1 * invA0;
+        bluePresenceB2 = b2 * invA0;
+        bluePresenceA1 = a1 * invA0;
+        bluePresenceA2 = a2 * invA0;
+        bluePresenceCachedFreqHz = presenceFreqHz;
+        bluePresenceCachedQ = presenceQ;
+        bluePresenceCachedGainDb = presenceGainDb;
+    }
+
+    const float wetBlend = 0.68f * focus;
+    const float outputGain = 1.0f + 0.08f * focus;
+    const int numSamples = static_cast<int>(block.getNumSamples());
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto* data = block.getChannelPointer(ch);
+        float hpState = blueWetHPState[static_cast<size_t>(ch)];
+        float lpState = blueWetLPState[static_cast<size_t>(ch)];
+        BiquadState& presenceState = bluePresenceState[static_cast<size_t>(ch)];
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float input = data[i];
+            hpState = (1.0f - hpAlpha) * input + hpAlpha * hpState;
+            const float highPassed = input - hpState;
+            lpState = (1.0f - lpAlpha) * highPassed + lpAlpha * lpState;
+
+            const float peqOut =
+                bluePresenceB0 * lpState
+                + bluePresenceB1 * presenceState.x1
+                + bluePresenceB2 * presenceState.x2
+                - bluePresenceA1 * presenceState.y1
+                - bluePresenceA2 * presenceState.y2;
+            presenceState.x2 = presenceState.x1;
+            presenceState.x1 = lpState;
+            presenceState.y2 = presenceState.y1;
+            presenceState.y1 = peqOut;
+
+            const float focused = input + wetBlend * (peqOut - input);
+            data[i] = focused * outputGain;
+        }
+
+        blueWetHPState[static_cast<size_t>(ch)] = hpState;
+        blueWetLPState[static_cast<size_t>(ch)] = lpState;
+    }
 }
 
 void ChorusDSP::processWidth(juce::dsp::AudioBlock<float>& block)

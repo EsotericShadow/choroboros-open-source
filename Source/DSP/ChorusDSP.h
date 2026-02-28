@@ -23,6 +23,7 @@
 #include <atomic>
 #include <array>
 #include <memory>
+#include <vector>
 
 // Forward declarations
 class ChorusCore;
@@ -300,6 +301,8 @@ private:
     
     // Helper functions
     float applySaturation(float sample, float colorValue);  // Saturation
+    void processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float colorValue);
+    void processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float colorValue);
     void processWidth(juce::dsp::AudioBlock<float>& block);  // Width processing
     float calculateCentreDelay(float depthValue);  // Centre delay calculation
     
@@ -308,6 +311,33 @@ private:
     float mapColorToEngineRange(float normalizedColor) const;  // Maps color based on current engine
     float mapRateToEngineRange(float normalizedRate) const;   // Maps rate based on current engine
     float mapDepthToEngineRange(float normalizedDepth) const; // Maps depth based on current engine
+
+    struct BiquadState
+    {
+        float x1 = 0.0f;
+        float x2 = 0.0f;
+        float y1 = 0.0f;
+        float y2 = 0.0f;
+    };
+
+    // Wet-character processing state for Green/Blue color macros.
+    std::vector<float> greenWetLPState;
+    std::vector<float> blueWetHPState;
+    std::vector<float> blueWetLPState;
+    std::vector<BiquadState> bluePresenceState;
+
+    // Blue Focus peaking filter coefficients (Direct Form I, normalized).
+    float bluePresenceB0 = 1.0f;
+    float bluePresenceB1 = 0.0f;
+    float bluePresenceB2 = 0.0f;
+    float bluePresenceA1 = 0.0f;
+    float bluePresenceA2 = 0.0f;
+    float bluePresenceCachedFreqHz = -1.0f;
+    float bluePresenceCachedQ = -1.0f;
+    float bluePresenceCachedGainDb = -1000.0f;
+
+    // Block-constant smoothed color value advanced in processChorusParameters.
+    float colorBlockValue = 0.5f;
 
     RuntimeTuning runtimeTuning;
     RuntimeTuningSnapshot runtimeTuningSnapshot;

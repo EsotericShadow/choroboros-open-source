@@ -99,7 +99,7 @@ FeedbackDialog::FeedbackDialog(FeedbackCollector& collector)
     cancelButton.addListener(this);
     addAndMakeVisible(cancelButton);
 
-    betaSignUpLink.setButtonText("Choroboros v2.01 Beta Test Sign-up");
+    betaSignUpLink.setButtonText("Choroboros v2.02 Beta Test Sign-up");
     betaSignUpLink.setURL(juce::URL("https://docs.google.com/forms/d/e/1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform"));
     betaSignUpLink.setFont(makeRetroFont(12.0f, false), false);
     betaSignUpLink.setColour(juce::HyperlinkButton::textColourId, accent.brighter(0.18f));

@@ -75,7 +75,7 @@ After installation, rescan plugins in your DAW.
 
 ## Technical Details
 
-- **Version:** 2.01-beta
+- **Version:** 2.02-beta
 - **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12

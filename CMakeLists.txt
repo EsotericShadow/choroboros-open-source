@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Choroboros VERSION 2.0.1)
 
-# Beta version string for feedback/reports (change to "2.01" for release)
-set(CHOROBOROS_VERSION_STRING "2.01-beta" CACHE STRING "Version string for feedback and display")
+# Beta version string for feedback/reports (change to "2.02" for release)
+set(CHOROBOROS_VERSION_STRING "2.02-beta" CACHE STRING "Version string for feedback and display")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

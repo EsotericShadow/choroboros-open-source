@@ -56,7 +56,7 @@ AboutDialog::AboutDialog()
 #ifdef CHOROBOROS_VERSION_STRING
     versionLabel.setText(juce::String("Version ") + juce::String(CHOROBOROS_VERSION_STRING), juce::dontSendNotification);
 #else
-    versionLabel.setText("Version 2.01-beta", juce::dontSendNotification);
+    versionLabel.setText("Version 2.02-beta", juce::dontSendNotification);
 #endif
     versionLabel.setFont(makeRetroFont(14.0f, false));
     versionLabel.setJustificationType(juce::Justification::centred);

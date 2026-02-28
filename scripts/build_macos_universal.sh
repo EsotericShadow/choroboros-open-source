@@ -8,7 +8,7 @@ echo "=================================================="
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf Build Universal-Build Release/Choroboros-v2.01-beta-macOS-Universal.zip
+rm -rf Build Universal-Build Release/Choroboros-v2.02-beta-macOS-Universal.zip
 
 # Configure CMake for universal build
 echo "⚙️  Configuring CMake for universal build..."
@@ -49,18 +49,18 @@ echo "📦 Packaging universal build..."
 mkdir -p Release
 
 cd Universal-Build/Choroboros_artefacts/Release
-zip -r ../../../Release/Choroboros-v2.01-beta-macOS-Universal.zip \
+zip -r ../../../Release/Choroboros-v2.02-beta-macOS-Universal.zip \
     VST3 AU Standalone
 
 cd ../../..
 
 # Add documentation and installer scripts
 cd Release
-unzip -q Choroboros-v2.01-beta-macOS-Universal.zip || true
+unzip -q Choroboros-v2.02-beta-macOS-Universal.zip || true
 cp ../README.md ../DISTRIBUTION.md ../INSTALL.txt ../LICENSE ../COPYING ../SOURCE_LINK.txt . 2>/dev/null || true
 cp ../install.sh ../"Install Choroboros.command" . 2>/dev/null || true
 chmod +x install.sh "Install Choroboros.command" 2>/dev/null || true
-zip -r Choroboros-v2.01-beta-macOS-Universal.zip \
+zip -r Choroboros-v2.02-beta-macOS-Universal.zip \
     README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt \
     install.sh "Install Choroboros.command" 2>/dev/null || true
 rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt install.sh "Install Choroboros.command"
@@ -68,9 +68,9 @@ cd ..
 
 # Generate checksum
 echo "🔐 Generating SHA256 checksum..."
-shasum -a 256 Release/Choroboros-v2.01-beta-macOS-Universal.zip > Release/Choroboros-v2.01-beta-macOS-Universal.zip.sha256
+shasum -a 256 Release/Choroboros-v2.02-beta-macOS-Universal.zip > Release/Choroboros-v2.02-beta-macOS-Universal.zip.sha256
 
 echo ""
 echo "✅ macOS Universal build complete!"
-echo "📦 Package: Release/Choroboros-v2.01-beta-macOS-Universal.zip"
-echo "📊 Size: $(du -h Release/Choroboros-v2.01-beta-macOS-Universal.zip | cut -f1)"
+echo "📦 Package: Release/Choroboros-v2.02-beta-macOS-Universal.zip"
+echo "📊 Size: $(du -h Release/Choroboros-v2.02-beta-macOS-Universal.zip | cut -f1)"

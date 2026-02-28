@@ -75,17 +75,34 @@ void ChorusDSPProcess::processPreChorusSaturation(ChorusDSP& chorusDSP, juce::ds
     (void) block;
 }
 
+void ChorusDSPProcess::processWetCharacter(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
+{
+    // Color drives wet-only character macros:
+    // Green => Bloom, Blue => Focus, others => handled elsewhere.
+    const float currentColor = juce::jlimit(0.0f, 1.0f, chorusDSP.colorBlockValue);
+    if (chorusDSP.currentColorIndex == 0)
+    {
+        chorusDSP.processGreenBloomWet(block, currentColor);
+        return;
+    }
+
+    if (chorusDSP.currentColorIndex == 1)
+    {
+        chorusDSP.processBlueFocusWet(block, currentColor);
+        return;
+    }
+}
+
 void ChorusDSPProcess::processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
-    // Color-driven post saturation for engines that use Color as drive:
-    // Green, Blue, and Red NQ. Other engines map Color to core-specific behavior.
+    // Red NQ is the only engine where Color is post-chorus saturation.
     const int engine = chorusDSP.currentColorIndex;
-    const bool usesPostSaturation = (engine == 0 || engine == 1 || (engine == 2 && !chorusDSP.currentQualityHQ));
+    const bool usesPostSaturation = (engine == 2 && !chorusDSP.currentQualityHQ);
     if (!usesPostSaturation)
         return;
 
     const int numSamples = static_cast<int>(block.getNumSamples());
-    const float currentColor = chorusDSP.smoothedColor.getCurrentValue();
+    const float currentColor = juce::jlimit(0.0f, 1.0f, chorusDSP.colorBlockValue);
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -126,12 +143,25 @@ void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNu
     chorusDSP.smoothedMix.skip(blockNumSamples - 1);
     chorusDSP.dryWet.setWetMixProportion(currentMix);
 
-    // Advance Color smoothing once per block for all engines.
+    // Advance Color smoothing once per block for all engines and use block-constant value.
     // Some cores (e.g. Red HQ Tape) read smoothedColor directly in processDelay.
-    chorusDSP.smoothedColor.getNextValue();
+    const float currentColor = chorusDSP.smoothedColor.getNextValue();
     chorusDSP.smoothedColor.skip(blockNumSamples - 1);
+    chorusDSP.colorBlockValue = currentColor;
+
+    // Green "Bloom": Color thickens motion and offsets centre delay slightly.
+    if (chorusDSP.currentColorIndex == 0)
+    {
+        const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, currentColor), 1.6f);
+        currentDepth *= (1.0f + 0.12f * bloom);
+    }
     
     float centreDelayMs = chorusDSP.calculateCentreDelay(currentDepth);
+    if (chorusDSP.currentColorIndex == 0)
+    {
+        const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, currentColor), 1.6f);
+        centreDelayMs += 0.60f * bloom;
+    }
     chorusDSP.smoothedCentreDelay.setTargetValue(centreDelayMs);
     currentCentreDelayMs = chorusDSP.smoothedCentreDelay.getNextValue();
     chorusDSP.smoothedCentreDelay.skip(blockNumSamples - 1);
@@ -303,7 +333,8 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
         }
     }
 
-    // Apply color-driven saturation on wet signal only, before dry/wet mix.
+    // Apply wet-character (Green/Blue) and Red NQ saturation before dry/wet mix.
+    processWetCharacter(chorusDSP, block);
     processPostChorusSaturation(chorusDSP, block);
     chorusDSP.dryWet.mixWetSamples(block);
 }

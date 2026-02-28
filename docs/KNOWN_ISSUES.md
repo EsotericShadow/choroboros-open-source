@@ -1,6 +1,6 @@
 # Known Issues (Beta)
 
-Issues known for Choroboros 2.01-beta. Please report additional issues via the Feedback button.
+Issues known for Choroboros 2.02-beta. Please report additional issues via the Feedback button.
 
 ## Beta Testers
 

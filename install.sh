@@ -6,7 +6,7 @@ set -e
 
 echo "=========================================="
 echo "  Choroboros Plugin Installer"
-echo "  Version 2.01-beta"
+echo "  Version 2.02-beta"
 echo "=========================================="
 echo ""
 

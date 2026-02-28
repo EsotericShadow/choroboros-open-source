@@ -79,7 +79,7 @@ juce::String FeedbackCollector::getUsageSummary() const
 #ifdef CHOROBOROS_VERSION_STRING
     summary << "Version: " << juce::String(CHOROBOROS_VERSION_STRING) << " (Beta)\n";
 #else
-    summary << "Version: 2.01 (Beta)\n";
+    summary << "Version: 2.02 (Beta)\n";
 #endif
     summary << "Date: " << juce::Time::getCurrentTime().toString(true, true) << "\n";
 #if defined(__APPLE__) && defined(__arm64__)

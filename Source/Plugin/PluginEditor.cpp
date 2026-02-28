@@ -883,7 +883,7 @@ void ChoroborosPluginEditor::setupSlider(juce::Slider& slider, LabelWithContaine
     else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
         slider.setTooltip("Stereo Width: Controls the stereo spread from 0% (mono) to 200% (wide). Adjusts the phase relationship between left and right channels.");
     else if (paramId == ChoroborosAudioProcessor::COLOR_ID)
-        slider.setTooltip("Tone/Character: Engine-specific parameter. Green/Blue/Red NQ=post-chorus drive, Red HQ=tape tone+drive, Purple=warp/orbit shape, Black=modulation intensity/ensemble spread.");
+        slider.setTooltip("Tone/Character: Engine-specific parameter. Green=bloom (wet body/softness), Blue=focus (wet clarity/presence), Red NQ=post-chorus drive, Red HQ=tape tone+drive, Purple=warp/orbit shape, Black=modulation intensity/ensemble spread.");
     else if (paramId == ChoroborosAudioProcessor::MIX_ID)
         slider.setTooltip("Dry/Wet Mix: Blends the original signal (0%) with the processed signal (100%). 50% = equal blend.");
 

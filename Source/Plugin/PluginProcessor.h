@@ -157,7 +157,7 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void applyEngineParamProfile(int engineIndex);
     void saveCurrentParamsToEngineProfile(int engineIndex);
-    static EngineParamProfile getEngineDefaults(int engineIndex);
+    EngineParamProfile getEngineDefaults(int engineIndex) const;
     void initializeEngineInternalProfiles();
     void persistActiveEngineInternalsFromDsp();
     void restoreEngineInternalsToDsp(int colorIndex, bool hqEnabled);
