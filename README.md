@@ -74,6 +74,8 @@ Copy `Choroboros.app` to `/Applications/` or any location you prefer.
 
 After installation, rescan plugins in your DAW.
 
+**Beta site:** [https://choro-beta-site.vercel.app/](https://choro-beta-site.vercel.app/) — join the beta, roadmap, whitepaper, feedback.
+
 **Beta testers:** See [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for known issues and how to report feedback.
 
 ## System Requirements
