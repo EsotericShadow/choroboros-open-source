@@ -1,54 +1,58 @@
 # Choroboros
 
-**A chorus that eats its own tail - Five colors, ten algorithms**
+**A chorus that eats its own tail — Five colors, ten algorithms**
 
-Choroboros is a multi-engine chorus plugin featuring five distinct engines, each with two unique algorithms. Switch between engines to explore classic, modern, vintage, experimental, and linear chorus sounds.
+Choroboros is a multi-engine chorus plugin with five distinct engines, each offering two algorithms (Normal/HQ). Each engine has its own color semantics: Green adds bloom (thickness/damping), Blue adds focus (clarity/presence), Red NQ adds saturation, Red HQ adds tape tone, Purple warps phase, and Black modulates ensemble spread.
 
 ## Features
 
 ### Five Engine Colors
 
-- **🟢 Green (Classic):** Smooth, musical chorus with Lagrange interpolation
+- **🟢 Green (Classic):** Bloom — thickness and gentle vintage softening (no saturation)
   - Normal: 3rd order Lagrange
   - HQ: 5th order Lagrange
 
-- **🔵 Blue (Modern):** Clean, transparent chorus with advanced interpolation
+- **🔵 Blue (Modern):** Focus — clarity and definition (no saturation)
   - Normal: Cubic interpolation
   - HQ: Thiran allpass interpolation
 
-- **🔴 Red (Vintage):** Warm, characterful chorus with analog emulation
-  - Normal: BBD (Bucket Brigade Delay) emulation
-  - HQ: Tape-style chorus
+- **🔴 Red (Vintage):** Analog character
+  - Normal: BBD (Bucket Brigade Delay) emulation with 5th-order cascade filtering — saturation only
+  - HQ: Tape-style chorus — tone + drive
 
-- **🟣 Purple (Experimental):** Unique, psychedelic chorus algorithms
+- **🟣 Purple (Experimental):** Warp and orbit — psychedelic phase modulation
   - Normal: Phase-Warped Chorus (non-uniform phase modulation)
   - HQ: Orbit Chorus (2D rotating modulation)
 
-- **⬛ Black (Linear):** Transparent, CPU-efficient chorus with linear interpolation
+- **⬛ Black (Core/Linear):** Modulation intensity and ensemble spread
   - Normal: Linear interpolation
   - HQ: Linear Ensemble (multi-voice)
 
 ### Parameters
 
-- **Rate:** LFO speed (0.01 - 20 Hz)
-- **Depth:** Modulation depth (0-100%, engine-specific scaling)
-- **Offset:** LFO phase offset (0-180°)
-- **Width:** Stereo width (0-200%)
-- **Color:** Engine-specific parameter (varies by engine)
-- **Mix:** Dry/wet mix (0-100%)
-- **HQ:** High-quality mode toggle (varies by engine)
+- **Rate:** LFO speed (0.01–20 Hz); right-click for musical quantize (Straight/Triplet/Dotted, cap 20 Hz)
+- **Depth:** Modulation depth (0–100%, engine-specific scaling)
+- **Offset:** LFO phase offset (0–180°)
+- **Width:** Stereo width (0–200%)
+- **Color:** Engine-specific (Bloom / Focus / Saturation / Tape / Warp / Mod intensity)
+- **Mix:** Dry/wet mix (0–100%)
+- **HQ:** High-quality mode toggle
 
 ### Presets
 
-1. **Classic (Green)** - NQ, R=1.2Hz, D=21%, O=33°, W=153%, M=33%, C=16%
-2. **Vintage (Red)** - HQ, R=0.62Hz, D=21%, O=56°, W=125%, M=50%, C=50%
-3. **Modern (Blue)** - HQ, R=0.26Hz, D=53%, O=59°, W=100%, M=50%, C=41%
-4. **Psychedelic (Purple)** - NQ, R=0.12Hz, D=52%, O=22°, W=200%, M=69%, C=13%
-5. **Core (Black)** - HQ, R=1.4Hz, D=35%, O=41°, W=159%, M=50%, C=28%
-6. **Duck** - Purple HQ, fast modulation
-7. **Ouroboros** - Blue HQ, medium modulation
+1. **Classic (Green)** — R=1.2 Hz, D=21%, O=33°, W=150%, M=50%, C=16%
+2. **Modern (Blue)** — R=0.26 Hz, D=53%, O=59°, W=100%, M=50%, C=41%
+3. **Vintage (Red)** — R=0.62 Hz, D=21%, O=56°, W=150%, M=50%, C=50%
+4. **Psychedelic (Purple)** — R=0.12 Hz, D=52%, O=52°, W=200%, M=69%, C=13%
+5. **Core (Black)** — R=1.2 Hz, D=35%, O=41°, W=159%, M=50%, C=28%
+6. **Duck** — Purple HQ, fast modulation
+7. **Ouroboros** — Blue HQ, medium modulation
+
+Per-engine parameter memory: switching engines via dropdown restores your last values for that engine.
 
 ## Installation
+
+Download the macOS Universal package (`Choroboros-v2.02-beta-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
 
 ### VST3
 Copy `Choroboros.vst3` to:
@@ -59,6 +63,11 @@ Copy `Choroboros.vst3` to:
 Copy `Choroboros.component` to:
 - `/Library/Audio/Plug-Ins/Components/` (system-wide)
 - `~/Library/Audio/Plug-Ins/Components/` (user-specific)
+
+### AAX (Pro Tools)
+Copy `Choroboros.aaxplugin` to:
+- `~/Library/Application Support/Avid/Audio/Plug-Ins/` (user)
+- `/Library/Application Support/Avid/Audio/Plug-Ins/` (system)
 
 ### Standalone
 Copy `Choroboros.app` to `/Applications/` or any location you prefer.
@@ -80,7 +89,8 @@ After installation, rescan plugins in your DAW.
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
 - **Sample Rate:** Up to 192 kHz
-- **Formats:** VST3, AU, Standalone
+- **Formats:** VST3, AU, AAX, Standalone
+- **macOS:** Universal binary (arm64 + x86_64)
 
 ## License
 

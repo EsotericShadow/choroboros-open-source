@@ -48,6 +48,12 @@
 
 4. **Rescan plugins in your DAW** (same as VST3 above)
 
+### AAX (Pro Tools) Plugin
+
+1. **Locate the plugin file:** Find `Choroboros.aaxplugin` in the distribution package
+2. **Install:** Copy to `~/Library/Application Support/Avid/Audio/Plug-Ins/` (user) or `/Library/Application Support/Avid/Audio/Plug-Ins/` (system)
+3. **Rescan plugins** in Pro Tools
+
 ### Standalone Application
 
 1. **Locate the application:**
@@ -80,6 +86,7 @@
 ### Supported Plugin Formats
 - **VST3:** Universal format supported by most DAWs
 - **AU (Audio Unit):** Native macOS format, required for Logic Pro
+- **AAX:** Avid format for Pro Tools
 - **Standalone:** Runs independently without a DAW
 
 ## Troubleshooting
@@ -236,5 +243,5 @@ This software is licensed, not sold. By installing or using Choroboros, you agre
 
 ---
 
-**Version:** 1.0.1  
-**Last Updated:** January 2026
+**Version:** 2.02-beta  
+**Last Updated:** February 2026
