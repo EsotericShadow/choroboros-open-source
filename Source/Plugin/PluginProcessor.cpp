@@ -60,6 +60,47 @@ void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeT
     internals.compressorThresholdDb.store(static_cast<float>(getNumberOrDefault(internalsVar, "compressorThresholdDb", internals.compressorThresholdDb.load())));
     internals.compressorRatio.store(static_cast<float>(getNumberOrDefault(internalsVar, "compressorRatio", internals.compressorRatio.load())));
     internals.saturationDriveScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "saturationDriveScale", internals.saturationDriveScale.load())));
+    internals.greenBloomExponent.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomExponent", internals.greenBloomExponent.load())));
+    internals.greenBloomDepthScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomDepthScale", internals.greenBloomDepthScale.load())));
+    internals.greenBloomCentreOffsetMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomCentreOffsetMs", internals.greenBloomCentreOffsetMs.load())));
+    internals.greenBloomCutoffMaxHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomCutoffMaxHz", internals.greenBloomCutoffMaxHz.load())));
+    internals.greenBloomCutoffMinHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomCutoffMinHz", internals.greenBloomCutoffMinHz.load())));
+    internals.greenBloomWetBlend.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomWetBlend", internals.greenBloomWetBlend.load())));
+    internals.greenBloomGain.store(static_cast<float>(getNumberOrDefault(internalsVar, "greenBloomGain", internals.greenBloomGain.load())));
+    internals.blueFocusExponent.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusExponent", internals.blueFocusExponent.load())));
+    internals.blueFocusHpMinHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusHpMinHz", internals.blueFocusHpMinHz.load())));
+    internals.blueFocusHpMaxHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusHpMaxHz", internals.blueFocusHpMaxHz.load())));
+    internals.blueFocusLpMaxHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusLpMaxHz", internals.blueFocusLpMaxHz.load())));
+    internals.blueFocusLpMinHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusLpMinHz", internals.blueFocusLpMinHz.load())));
+    internals.bluePresenceFreqMinHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "bluePresenceFreqMinHz", internals.bluePresenceFreqMinHz.load())));
+    internals.bluePresenceFreqMaxHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "bluePresenceFreqMaxHz", internals.bluePresenceFreqMaxHz.load())));
+    internals.bluePresenceQMin.store(static_cast<float>(getNumberOrDefault(internalsVar, "bluePresenceQMin", internals.bluePresenceQMin.load())));
+    internals.bluePresenceQMax.store(static_cast<float>(getNumberOrDefault(internalsVar, "bluePresenceQMax", internals.bluePresenceQMax.load())));
+    internals.bluePresenceGainMaxDb.store(static_cast<float>(getNumberOrDefault(internalsVar, "bluePresenceGainMaxDb", internals.bluePresenceGainMaxDb.load())));
+    internals.blueFocusWetBlend.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusWetBlend", internals.blueFocusWetBlend.load())));
+    internals.blueFocusOutputGain.store(static_cast<float>(getNumberOrDefault(internalsVar, "blueFocusOutputGain", internals.blueFocusOutputGain.load())));
+    internals.purpleWarpA.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleWarpA", internals.purpleWarpA.load())));
+    internals.purpleWarpB.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleWarpB", internals.purpleWarpB.load())));
+    internals.purpleWarpKBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleWarpKBase", internals.purpleWarpKBase.load())));
+    internals.purpleWarpKScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleWarpKScale", internals.purpleWarpKScale.load())));
+    internals.purpleWarpDelaySmoothingMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleWarpDelaySmoothingMs", internals.purpleWarpDelaySmoothingMs.load())));
+    internals.purpleOrbitEccentricity.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitEccentricity", internals.purpleOrbitEccentricity.load())));
+    internals.purpleOrbitThetaRateBaseHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitThetaRateBaseHz", internals.purpleOrbitThetaRateBaseHz.load())));
+    internals.purpleOrbitThetaRateScaleHz.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitThetaRateScaleHz", internals.purpleOrbitThetaRateScaleHz.load())));
+    internals.purpleOrbitThetaRate2Ratio.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitThetaRate2Ratio", internals.purpleOrbitThetaRate2Ratio.load())));
+    internals.purpleOrbitEccentricity2Ratio.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitEccentricity2Ratio", internals.purpleOrbitEccentricity2Ratio.load())));
+    internals.purpleOrbitMix1.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitMix1", internals.purpleOrbitMix1.load())));
+    internals.purpleOrbitStereoThetaOffset.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitStereoThetaOffset", internals.purpleOrbitStereoThetaOffset.load())));
+    internals.purpleOrbitDelaySmoothingMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "purpleOrbitDelaySmoothingMs", internals.purpleOrbitDelaySmoothingMs.load())));
+    internals.blackNqDepthBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackNqDepthBase", internals.blackNqDepthBase.load())));
+    internals.blackNqDepthScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackNqDepthScale", internals.blackNqDepthScale.load())));
+    internals.blackNqDelayGlideMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackNqDelayGlideMs", internals.blackNqDelayGlideMs.load())));
+    internals.blackHqTap2MixBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackHqTap2MixBase", internals.blackHqTap2MixBase.load())));
+    internals.blackHqTap2MixScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackHqTap2MixScale", internals.blackHqTap2MixScale.load())));
+    internals.blackHqSecondTapDepthBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackHqSecondTapDepthBase", internals.blackHqSecondTapDepthBase.load())));
+    internals.blackHqSecondTapDepthScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackHqSecondTapDepthScale", internals.blackHqSecondTapDepthScale.load())));
+    internals.blackHqSecondTapDelayOffsetBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackHqSecondTapDelayOffsetBase", internals.blackHqSecondTapDelayOffsetBase.load())));
+    internals.blackHqSecondTapDelayOffsetScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "blackHqSecondTapDelayOffsetScale", internals.blackHqSecondTapDelayOffsetScale.load())));
     internals.bbdDelaySmoothingMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdDelaySmoothingMs", internals.bbdDelaySmoothingMs.load())));
     internals.bbdDelayMinMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdDelayMinMs", internals.bbdDelayMinMs.load())));
     internals.bbdDelayMaxMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "bbdDelayMaxMs", internals.bbdDelayMaxMs.load())));
@@ -112,8 +153,8 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.widthSmoothingMs.store(98.7f);
     r.hpfCutoffHz.store(82.2f);
     r.hpfQ.store(1.184f);
-    r.lpfCutoffHz.store(12956.0f);
-    r.lpfQ.store(1.28f);
+    r.lpfCutoffHz.store(17000.0f);
+    r.lpfQ.store(0.95f);
     r.preEmphasisFreqHz.store(1502.0f);
     r.preEmphasisQ.store(1.706f);
     r.preEmphasisGain.store(1.343f);
@@ -122,9 +163,9 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.preEmphasisMaxAmount.store(0.961f);
     r.compressorAttackMs.store(19.4f);
     r.compressorReleaseMs.store(141.9f);
-    r.compressorThresholdDb.store(-18.0f);
-    r.compressorRatio.store(3.82f);
-    r.saturationDriveScale.store(1.93f);
+    r.compressorThresholdDb.store(-12.0f);
+    r.compressorRatio.store(2.8f);
+    r.saturationDriveScale.store(1.65f);
     r.bbdDelaySmoothingMs.store(52.2f);
     r.bbdDelayMinMs.store(5.9f);
     r.bbdDelayMaxMs.store(86.9f);
@@ -133,13 +174,13 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.bbdDepthMs.store(13.2f);
     r.bbdClockSmoothingMs.store(41.7f);
     r.bbdFilterSmoothingMs.store(46.7f);
-    r.bbdFilterCutoffMinHz.store(469.0f);
-    r.bbdFilterCutoffMaxHz.store(12176.0f);
-    r.bbdFilterCutoffScale.store(0.531f);
-    r.bbdClockMinHz.store(750.0f);
+    r.bbdFilterCutoffMinHz.store(900.0f);
+    r.bbdFilterCutoffMaxHz.store(16000.0f);
+    r.bbdFilterCutoffScale.store(0.62f);
+    r.bbdClockMinHz.store(1200.0f);
     r.bbdClockMaxRatio.store(1.0f);
     r.bbdStages.store(1024.0f);
-    r.bbdFilterMaxRatio.store(0.35f);
+    r.bbdFilterMaxRatio.store(0.42f);
     r.tapeDelaySmoothingMs.store(180.0f);
     r.tapeCentreBaseMs.store(16.0f);
     r.tapeCentreScale.store(2.0f);
@@ -163,6 +204,82 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.tapeRatioMax.store(1.04f);
     r.tapeWetGain.store(1.15f);
     r.tapeHermiteTension.store(0.75f);
+}
+
+void setRedHQDefaults(ChorusDSP::RuntimeTuning& r)
+{
+    r.rateSmoothingMs.store(23.1f);
+    r.depthSmoothingMs.store(43.2f);
+    r.depthRateLimit.store(5.0f);
+    r.centreDelaySmoothingMs.store(152.4f);
+    r.centreDelayBaseMs.store(9.3f);
+    r.centreDelayScale.store(1.6f);
+    r.colorSmoothingMs.store(110.0f);
+    r.widthSmoothingMs.store(90.0f);
+    r.hpfCutoffHz.store(45.0f);
+    r.hpfQ.store(0.9f);
+    r.lpfCutoffHz.store(19500.0f);
+    r.lpfQ.store(0.8f);
+    r.preEmphasisFreqHz.store(3200.0f);
+    r.preEmphasisQ.store(0.8f);
+    r.preEmphasisGain.store(1.15f);
+    r.preEmphasisLevelSmoothing.store(0.9f);
+    r.preEmphasisQuietThreshold.store(0.2f);
+    r.preEmphasisMaxAmount.store(0.35f);
+    r.compressorAttackMs.store(18.0f);
+    r.compressorReleaseMs.store(160.0f);
+    r.compressorThresholdDb.store(-10.0f);
+    r.compressorRatio.store(2.4f);
+    r.saturationDriveScale.store(1.65f);
+    r.bbdDelaySmoothingMs.store(52.2f);
+    r.bbdDelayMinMs.store(5.9f);
+    r.bbdDelayMaxMs.store(86.9f);
+    r.bbdCentreBaseMs.store(14.7f);
+    r.bbdCentreScale.store(3.28f);
+    r.bbdDepthMs.store(13.2f);
+    r.bbdClockSmoothingMs.store(41.7f);
+    r.bbdFilterSmoothingMs.store(46.7f);
+    r.bbdFilterCutoffMinHz.store(900.0f);
+    r.bbdFilterCutoffMaxHz.store(16000.0f);
+    r.bbdFilterCutoffScale.store(0.62f);
+    r.bbdClockMinHz.store(1200.0f);
+    r.bbdClockMaxRatio.store(1.0f);
+    r.bbdStages.store(1024.0f);
+    r.bbdFilterMaxRatio.store(0.42f);
+    r.tapeDelaySmoothingMs.store(140.0f);
+    r.tapeCentreBaseMs.store(15.0f);
+    r.tapeCentreScale.store(2.6f);
+    r.tapeToneMaxHz.store(20000.0f);
+    r.tapeToneMinHz.store(14000.0f);
+    r.tapeToneSmoothingCoeff.store(0.06f);
+    r.tapeDriveScale.store(0.22f);
+    r.tapeLfoRatioScale.store(0.045f);
+    r.tapeLfoModSmoothingCoeff.store(0.0015f);
+    r.tapeRatioSmoothingCoeff.store(0.004f);
+    r.tapePhaseDamping.store(1.0f);
+    r.tapeWowFreqBase.store(0.33f);
+    r.tapeWowFreqSpread.store(0.03f);
+    r.tapeFlutterFreqBase.store(5.8f);
+    r.tapeFlutterFreqSpread.store(0.2f);
+    r.tapeWowDepthBase.store(0.0022f);
+    r.tapeWowDepthSpread.store(0.0002f);
+    r.tapeFlutterDepthBase.store(0.0011f);
+    r.tapeFlutterDepthSpread.store(0.0001f);
+    r.tapeRatioMin.store(0.97f);
+    r.tapeRatioMax.store(1.03f);
+    r.tapeWetGain.store(1.08f);
+    r.tapeHermiteTension.store(0.75f);
+}
+
+bool isKnownBadRedNQProfile(const ChorusDSP::RuntimeTuning& r)
+{
+    // Detect the previously reported broken Red NQ/BBD profile shape:
+    // zero BBD depth + max stages + very low clock min + oversized delay window.
+    return r.bbdDepthMs.load() <= 0.01f
+        && r.bbdStages.load() >= 2048.0f
+        && r.bbdClockMinHz.load() <= 250.0f
+        && r.bbdDelayMaxMs.load() >= 120.0f
+        && r.bbdDelaySmoothingMs.load() >= 150.0f;
 }
 
 void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::RuntimeTuning& dst)
@@ -190,6 +307,47 @@ void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::Run
     dst.compressorThresholdDb.store(src.compressorThresholdDb.load());
     dst.compressorRatio.store(src.compressorRatio.load());
     dst.saturationDriveScale.store(src.saturationDriveScale.load());
+    dst.greenBloomExponent.store(src.greenBloomExponent.load());
+    dst.greenBloomDepthScale.store(src.greenBloomDepthScale.load());
+    dst.greenBloomCentreOffsetMs.store(src.greenBloomCentreOffsetMs.load());
+    dst.greenBloomCutoffMaxHz.store(src.greenBloomCutoffMaxHz.load());
+    dst.greenBloomCutoffMinHz.store(src.greenBloomCutoffMinHz.load());
+    dst.greenBloomWetBlend.store(src.greenBloomWetBlend.load());
+    dst.greenBloomGain.store(src.greenBloomGain.load());
+    dst.blueFocusExponent.store(src.blueFocusExponent.load());
+    dst.blueFocusHpMinHz.store(src.blueFocusHpMinHz.load());
+    dst.blueFocusHpMaxHz.store(src.blueFocusHpMaxHz.load());
+    dst.blueFocusLpMaxHz.store(src.blueFocusLpMaxHz.load());
+    dst.blueFocusLpMinHz.store(src.blueFocusLpMinHz.load());
+    dst.bluePresenceFreqMinHz.store(src.bluePresenceFreqMinHz.load());
+    dst.bluePresenceFreqMaxHz.store(src.bluePresenceFreqMaxHz.load());
+    dst.bluePresenceQMin.store(src.bluePresenceQMin.load());
+    dst.bluePresenceQMax.store(src.bluePresenceQMax.load());
+    dst.bluePresenceGainMaxDb.store(src.bluePresenceGainMaxDb.load());
+    dst.blueFocusWetBlend.store(src.blueFocusWetBlend.load());
+    dst.blueFocusOutputGain.store(src.blueFocusOutputGain.load());
+    dst.purpleWarpA.store(src.purpleWarpA.load());
+    dst.purpleWarpB.store(src.purpleWarpB.load());
+    dst.purpleWarpKBase.store(src.purpleWarpKBase.load());
+    dst.purpleWarpKScale.store(src.purpleWarpKScale.load());
+    dst.purpleWarpDelaySmoothingMs.store(src.purpleWarpDelaySmoothingMs.load());
+    dst.purpleOrbitEccentricity.store(src.purpleOrbitEccentricity.load());
+    dst.purpleOrbitThetaRateBaseHz.store(src.purpleOrbitThetaRateBaseHz.load());
+    dst.purpleOrbitThetaRateScaleHz.store(src.purpleOrbitThetaRateScaleHz.load());
+    dst.purpleOrbitThetaRate2Ratio.store(src.purpleOrbitThetaRate2Ratio.load());
+    dst.purpleOrbitEccentricity2Ratio.store(src.purpleOrbitEccentricity2Ratio.load());
+    dst.purpleOrbitMix1.store(src.purpleOrbitMix1.load());
+    dst.purpleOrbitStereoThetaOffset.store(src.purpleOrbitStereoThetaOffset.load());
+    dst.purpleOrbitDelaySmoothingMs.store(src.purpleOrbitDelaySmoothingMs.load());
+    dst.blackNqDepthBase.store(src.blackNqDepthBase.load());
+    dst.blackNqDepthScale.store(src.blackNqDepthScale.load());
+    dst.blackNqDelayGlideMs.store(src.blackNqDelayGlideMs.load());
+    dst.blackHqTap2MixBase.store(src.blackHqTap2MixBase.load());
+    dst.blackHqTap2MixScale.store(src.blackHqTap2MixScale.load());
+    dst.blackHqSecondTapDepthBase.store(src.blackHqSecondTapDepthBase.load());
+    dst.blackHqSecondTapDepthScale.store(src.blackHqSecondTapDepthScale.load());
+    dst.blackHqSecondTapDelayOffsetBase.store(src.blackHqSecondTapDelayOffsetBase.load());
+    dst.blackHqSecondTapDelayOffsetScale.store(src.blackHqSecondTapDelayOffsetScale.load());
     dst.bbdDelaySmoothingMs.store(src.bbdDelaySmoothingMs.load());
     dst.bbdDelayMinMs.store(src.bbdDelayMinMs.load());
     dst.bbdDelayMaxMs.store(src.bbdDelayMaxMs.load());
@@ -282,7 +440,8 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
         }
     }
 
-    bool loadedAnyVariantInternals = false;
+    bool loadedRedNqVariantInternals = false;
+    bool loadedRedHqVariantInternals = false;
 
     if (root->hasProperty("internals"))
     {
@@ -302,7 +461,10 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
         if (!root->hasProperty(key))
             return;
         loadRuntimeTuningFromVar(root->getProperty(key), processor.getEngineDspInternals(colorIndex, hqEnabled));
-        loadedAnyVariantInternals = true;
+        if (colorIndex == 2 && !hqEnabled)
+            loadedRedNqVariantInternals = true;
+        if (colorIndex == 2 && hqEnabled)
+            loadedRedHqVariantInternals = true;
     };
 
     loadVariant("internalsGreen", 0, false);
@@ -317,12 +479,18 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
     loadVariant("internalsPurpleHQ", 3, true);
     loadVariant("internalsBlackHQ", 4, true);
 
-    if (loadedAnyVariantInternals)
-    {
-        const int activeEngine = processor.getCurrentEngineColorIndex();
-        const bool activeHQ = processor.isHqEnabled();
-        processor.syncEngineInternalsToActiveDsp(activeEngine, activeHQ);
-    }
+    // If red variants were never explicitly stored, restore tuned factory red profiles
+    // instead of inheriting a legacy "internals" blob that can make both modes too dark.
+    if (!loadedRedNqVariantInternals)
+        setRedNQDefaults(processor.getEngineDspInternals(2, false));
+    if (!loadedRedHqVariantInternals)
+        setRedHQDefaults(processor.getEngineDspInternals(2, true));
+    if (isKnownBadRedNQProfile(processor.getEngineDspInternals(2, false)))
+        setRedNQDefaults(processor.getEngineDspInternals(2, false));
+
+    const int activeEngine = processor.getCurrentEngineColorIndex();
+    const bool activeHQ = processor.isHqEnabled();
+    processor.syncEngineInternalsToActiveDsp(activeEngine, activeHQ);
 
     // Engine parameter profiles are runtime skin-state memory and should boot from
     // factory engine defaults each plugin load. Do not import persisted defaults
@@ -775,6 +943,11 @@ float ChoroborosAudioProcessor::unmapParameterValue(const juce::String& paramId,
 
 void ChoroborosAudioProcessor::updateDSPParameters()
 {
+    // Avoid exposing partial/transactional APVTS states to DSP while a preset/state/profile
+    // write is in progress on another thread. Apply once after the transaction completes.
+    if (presetLoadInProgress || stateLoadInProgress || engineProfileApplyInProgress)
+        return;
+
     auto rateParam = parameters.getRawParameterValue(RATE_ID);
     auto depthParam = parameters.getRawParameterValue(DEPTH_ID);
     auto offsetParam = parameters.getRawParameterValue(OFFSET_ID);
@@ -850,6 +1023,7 @@ void ChoroborosAudioProcessor::initializeEngineInternalProfiles()
         copyRuntimeTuningValues(chorusDSP->getRuntimeTuning(), engineInternals[color][1]);
     }
     setRedNQDefaults(engineInternals[2][0]);
+    setRedHQDefaults(engineInternals[2][1]);
     activeInternalsEngine = getCurrentEngineColorIndex();
     activeInternalsHQ = isHqEnabled();
     restoreEngineInternalsToDsp(activeInternalsEngine, activeInternalsHQ);
@@ -904,7 +1078,7 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
 
 void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    if (presetLoadInProgress || stateLoadInProgress)
+    if (presetLoadInProgress || stateLoadInProgress || engineProfileApplyInProgress)
     {
         if (parameterID == ENGINE_COLOR_ID)
             lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
@@ -913,6 +1087,13 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
 
     if (parameterID == ENGINE_COLOR_ID)
     {
+        struct ScopedFlag
+        {
+            std::atomic<bool>& flagRef;
+            explicit ScopedFlag(std::atomic<bool>& flag) : flagRef(flag) { flagRef.store(true); }
+            ~ScopedFlag() { flagRef.store(false); }
+        } scopedApplyFlag(engineProfileApplyInProgress);
+
         const int newEngine = juce::jlimit(0, 4, static_cast<int>(newValue));
         saveCurrentParamsToEngineProfile(lastEngineIndex);
         lastEngineIndex = newEngine;

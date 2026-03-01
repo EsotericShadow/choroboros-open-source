@@ -174,6 +174,7 @@ private:
     int lastEngineIndex = 0;
     std::atomic<bool> presetLoadInProgress { false };
     std::atomic<bool> stateLoadInProgress { false };
+    std::atomic<bool> engineProfileApplyInProgress { false };
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChoroborosAudioProcessor)
 };

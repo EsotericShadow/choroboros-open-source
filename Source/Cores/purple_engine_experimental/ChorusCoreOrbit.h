@@ -61,6 +61,7 @@ private:
     // Delay smoothing (10-30ms ramp) - one per tap
     std::vector<juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>> delaySmoothers1;
     std::vector<juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>> delaySmoothers2;
+    float lastDelaySmoothingMs = -1.0f;
     
     // Cubic interpolation read (same as Blue Normal)
     float readCubic(int channel, float delaySamples) const;

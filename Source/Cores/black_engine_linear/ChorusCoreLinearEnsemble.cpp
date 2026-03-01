@@ -66,12 +66,16 @@ void ChorusCoreLinearEnsemble::processDelay(ChorusDSP& dsp, juce::dsp::AudioBloc
     auto* lfoLeft = dsp.lfoBuffer.getReadPointer(0);
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
 
+    const auto& tuning = dsp.runtimeTuningSnapshot;
     const float colour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
     // In Black HQ mode, Color controls modulation intensity and ensemble spread.
-    const float tap2Mix = 0.18f + 0.32f * colour;                 // 18% -> 50%
+    const float tap2Mix = juce::jlimit(0.0f, 1.0f,
+        tuning.blackHqTap2MixBase + tuning.blackHqTap2MixScale * colour);
     const float tap1Mix = 1.0f - tap2Mix;
-    const float secondTapDepthScale = 0.55f + 0.7f * colour;      // 55% -> 125%
-    const float secondTapDelayOffsetSamples = 0.2f + 2.0f * colour; // 0.2 -> 2.2 samples
+    const float secondTapDepthScale = juce::jmax(0.0f,
+        tuning.blackHqSecondTapDepthBase + tuning.blackHqSecondTapDepthScale * colour);
+    const float secondTapDelayOffsetSamples = juce::jmax(0.0f,
+        tuning.blackHqSecondTapDelayOffsetBase + tuning.blackHqSecondTapDelayOffsetScale * colour);
 
     for (int ch = 0; ch < numChannels; ++ch)
     {

@@ -216,6 +216,562 @@ private:
     bool locked = true;
 };
 
+class ReadOnlyDiagnosticPropertyComponent : public juce::PropertyComponent
+{
+public:
+    ReadOnlyDiagnosticPropertyComponent(const juce::String& name,
+                                        std::function<juce::String()> valueProviderIn,
+                                        const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          valueProvider(std::move(valueProviderIn))
+    {
+        setTooltip(tooltipText);
+        valueLabel.setTooltip(tooltipText);
+        valueLabel.setJustificationType(juce::Justification::centredRight);
+        valueLabel.setColour(juce::Label::textColourId, juce::Colour(0xffd8d8d8));
+        valueLabel.setFont(makeRetroFont(12.0f, false));
+        addAndMakeVisible(valueLabel);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        valueLabel.setText(valueProvider(), juce::dontSendNotification);
+    }
+
+    void resized() override
+    {
+        valueLabel.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    std::function<juce::String()> valueProvider;
+    juce::Label valueLabel;
+};
+
+class MultiLineReadOnlyPropertyComponent : public juce::PropertyComponent
+{
+public:
+    MultiLineReadOnlyPropertyComponent(const juce::String& name,
+                                       std::function<juce::String()> valueProviderIn,
+                                       const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          valueProvider(std::move(valueProviderIn))
+    {
+        setTooltip(tooltipText);
+        valueLabel.setTooltip(tooltipText);
+        valueLabel.setJustificationType(juce::Justification::topLeft);
+        valueLabel.setColour(juce::Label::textColourId, juce::Colour(0xffd8d8d8));
+        valueLabel.setFont(makeRetroFont(11.0f, false));
+        valueLabel.setMinimumHorizontalScale(1.0f);
+        addAndMakeVisible(valueLabel);
+        setPreferredHeight(94);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        valueLabel.setText(valueProvider(), juce::dontSendNotification);
+    }
+
+    void resized() override
+    {
+        valueLabel.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    std::function<juce::String()> valueProvider;
+    juce::Label valueLabel;
+};
+
+class SparklinePropertyComponent : public juce::PropertyComponent
+{
+public:
+    SparklinePropertyComponent(const juce::String& name,
+                               std::function<std::vector<float>()> valueProviderIn,
+                               const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          valueProvider(std::move(valueProviderIn))
+    {
+        setTooltip(tooltipText);
+        addAndMakeVisible(plot);
+        setPreferredHeight(96);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        plot.values = valueProvider();
+        plot.repaint();
+    }
+
+    void resized() override
+    {
+        plot.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    struct Plot final : juce::Component
+    {
+        std::vector<float> values;
+
+        void paint(juce::Graphics& g) override
+        {
+            auto area = getLocalBounds().toFloat();
+            g.fillAll(juce::Colour(0xff151515));
+            g.setColour(juce::Colour(0xff3a3a3a));
+            g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
+
+            if (values.size() < 2)
+                return;
+
+            float minV = values.front();
+            float maxV = values.front();
+            for (float v : values)
+            {
+                minV = juce::jmin(minV, v);
+                maxV = juce::jmax(maxV, v);
+            }
+            const float span = juce::jmax(1.0e-6f, maxV - minV);
+
+            juce::Path path;
+            for (size_t i = 0; i < values.size(); ++i)
+            {
+                const float x = juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(values.size() - 1),
+                                           area.getX() + 2.0f, area.getRight() - 2.0f);
+                const float norm = (values[i] - minV) / span;
+                const float y = juce::jmap(norm, 0.0f, 1.0f, area.getBottom() - 2.0f, area.getY() + 2.0f);
+                if (i == 0)
+                    path.startNewSubPath(x, y);
+                else
+                    path.lineTo(x, y);
+            }
+
+            g.setColour(juce::Colour(0xfff4a640));
+            g.strokePath(path, juce::PathStrokeType(1.75f));
+        }
+    };
+
+    std::function<std::vector<float>()> valueProvider;
+    Plot plot;
+};
+
+class TransferCurvePropertyComponent : public juce::PropertyComponent
+{
+public:
+    TransferCurvePropertyComponent(const juce::String& name,
+                                   std::function<float()> driveProviderIn,
+                                   const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          driveProvider(std::move(driveProviderIn))
+    {
+        setTooltip(tooltipText);
+        addAndMakeVisible(plot);
+        setPreferredHeight(110);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        plot.drive = juce::jmax(1.0f, driveProvider());
+        plot.repaint();
+    }
+
+    void resized() override
+    {
+        plot.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    struct Plot final : public juce::Component
+    {
+        float drive = 1.0f;
+
+        void paint(juce::Graphics& g) override
+        {
+            auto area = getLocalBounds().toFloat();
+            g.fillAll(juce::Colour(0xff151515));
+            g.setColour(juce::Colour(0xff3a3a3a));
+            g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
+
+            // Linear reference
+            g.setColour(juce::Colour(0xff6f6f6f));
+            g.drawLine(area.getX() + 2.0f, area.getBottom() - 2.0f,
+                       area.getRight() - 2.0f, area.getY() + 2.0f, 1.0f);
+
+            // Nonlinear curve
+            juce::Path curve;
+            constexpr int points = 180;
+            for (int i = 0; i < points; ++i)
+            {
+                const float xn = juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(points - 1), -1.0f, 1.0f);
+                const float yn = std::tanh(xn * drive) / std::tanh(drive);
+                const float x = juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(points - 1),
+                                           area.getX() + 2.0f, area.getRight() - 2.0f);
+                const float y = juce::jmap(yn, -1.0f, 1.0f, area.getBottom() - 2.0f, area.getY() + 2.0f);
+                if (i == 0)
+                    curve.startNewSubPath(x, y);
+                else
+                    curve.lineTo(x, y);
+            }
+
+            g.setColour(juce::Colour(0xfff4a640));
+            g.strokePath(curve, juce::PathStrokeType(1.75f));
+        }
+    };
+
+    std::function<float()> driveProvider;
+    Plot plot;
+};
+
+class SpectrumOverlayPropertyComponent : public juce::PropertyComponent
+{
+public:
+    struct State
+    {
+        float hpfHz = 30.0f;
+        float lpfHz = 18000.0f;
+        float preEmphasisGain = 1.0f;
+    };
+
+    SpectrumOverlayPropertyComponent(const juce::String& name,
+                                     std::function<State()> stateProviderIn,
+                                     const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          stateProvider(std::move(stateProviderIn))
+    {
+        setTooltip(tooltipText);
+        addAndMakeVisible(plot);
+        setPreferredHeight(110);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        plot.state = stateProvider();
+        plot.repaint();
+    }
+
+    void resized() override
+    {
+        plot.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    struct Plot final : public juce::Component
+    {
+        State state;
+
+        static float logNormHz(float hz)
+        {
+            const float clamped = juce::jlimit(20.0f, 20000.0f, hz);
+            return (std::log10(clamped) - std::log10(20.0f)) / (std::log10(20000.0f) - std::log10(20.0f));
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            auto area = getLocalBounds().toFloat();
+            g.fillAll(juce::Colour(0xff151515));
+            g.setColour(juce::Colour(0xff3a3a3a));
+            g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
+
+            // Lightweight pseudo-spectrum baseline.
+            juce::Path spectrum;
+            constexpr int points = 180;
+            for (int i = 0; i < points; ++i)
+            {
+                const float xNorm = static_cast<float>(i) / static_cast<float>(points - 1);
+                const float pseudo = 0.35f + 0.42f * std::exp(-xNorm * 2.2f)
+                                     + 0.03f * std::sin(xNorm * 40.0f);
+                const float x = juce::jmap(xNorm, 0.0f, 1.0f, area.getX() + 2.0f, area.getRight() - 2.0f);
+                const float y = juce::jmap(pseudo, 0.0f, 1.0f, area.getBottom() - 2.0f, area.getY() + 2.0f);
+                if (i == 0)
+                    spectrum.startNewSubPath(x, y);
+                else
+                    spectrum.lineTo(x, y);
+            }
+            g.setColour(juce::Colour(0xff86c7ff));
+            g.strokePath(spectrum, juce::PathStrokeType(1.25f));
+
+            const float hpfX = juce::jmap(logNormHz(state.hpfHz), 0.0f, 1.0f, area.getX() + 2.0f, area.getRight() - 2.0f);
+            const float lpfX = juce::jmap(logNormHz(state.lpfHz), 0.0f, 1.0f, area.getX() + 2.0f, area.getRight() - 2.0f);
+
+            g.setColour(juce::Colour(0xff63d287));
+            g.drawLine(hpfX, area.getY() + 2.0f, hpfX, area.getBottom() - 2.0f, 1.2f);
+            g.setColour(juce::Colour(0xfff4a640));
+            g.drawLine(lpfX, area.getY() + 2.0f, lpfX, area.getBottom() - 2.0f, 1.2f);
+
+            // Simple pre-emphasis marker.
+            const float emphNorm = juce::jlimit(0.0f, 1.0f, (state.preEmphasisGain - 0.5f) / 3.5f);
+            const float emphY = juce::jmap(emphNorm, 0.0f, 1.0f, area.getBottom() - 5.0f, area.getY() + 5.0f);
+            g.setColour(juce::Colour(0xffd0d0d0));
+            g.drawLine(area.getX() + 6.0f, emphY, area.getX() + 40.0f, emphY, 1.0f);
+        }
+    };
+
+    std::function<State()> stateProvider;
+    Plot plot;
+};
+
+class SignalFlowPropertyComponent : public juce::PropertyComponent
+{
+public:
+    struct Stage
+    {
+        juce::String label;
+        juce::String detail;
+        bool active = true;
+    };
+
+    struct State
+    {
+        juce::String modeLabel;
+        std::array<Stage, 7> stages;
+        float preLevel = 0.0f;
+        float wetLevel = 0.0f;
+        float postLevel = 0.0f;
+    };
+
+    SignalFlowPropertyComponent(const juce::String& name,
+                                std::function<State()> stateProviderIn,
+                                const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          stateProvider(std::move(stateProviderIn))
+    {
+        setTooltip(tooltipText);
+        addAndMakeVisible(plot);
+        setPreferredHeight(180);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        plot.state = stateProvider();
+        plot.repaint();
+    }
+
+    void resized() override
+    {
+        plot.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    struct Plot final : public juce::Component
+    {
+        State state;
+
+        static void drawMeter(juce::Graphics& g, juce::Rectangle<float> area, const juce::String& name, float value, juce::Colour fill)
+        {
+            const float clamped = juce::jlimit(0.0f, 1.0f, value);
+            auto labelArea = area.removeFromTop(11.0f);
+            g.setColour(juce::Colour(0xff9c9c9c));
+            g.setFont(makeRetroFont(9.0f, false));
+            g.drawText(name, labelArea, juce::Justification::centredLeft, false);
+
+            const auto barArea = area.reduced(0.0f, 1.0f);
+            g.setColour(juce::Colour(0xff232323));
+            g.fillRoundedRectangle(barArea, 2.0f);
+            g.setColour(juce::Colour(0xff3c3c3c));
+            g.drawRoundedRectangle(barArea, 2.0f, 1.0f);
+
+            auto fillArea = barArea.reduced(1.0f);
+            fillArea.setWidth(fillArea.getWidth() * clamped);
+            g.setColour(fill);
+            g.fillRoundedRectangle(fillArea, 1.5f);
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            auto area = getLocalBounds().toFloat();
+            g.fillAll(juce::Colour(0xff151515));
+            g.setColour(juce::Colour(0xff3a3a3a));
+            g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
+
+            auto content = area.reduced(5.0f);
+            auto header = content.removeFromTop(16.0f);
+            g.setColour(juce::Colour(0xffd8d8d8));
+            g.setFont(makeRetroFont(10.0f, true));
+            g.drawText("Flow: " + state.modeLabel, header, juce::Justification::centredLeft, false);
+
+            auto meterArea = content.removeFromBottom(24.0f);
+            content.removeFromBottom(2.0f);
+
+            constexpr float arrowGap = 10.0f;
+            const int stageCount = static_cast<int>(state.stages.size());
+            const float stageWidth = (content.getWidth() - arrowGap * static_cast<float>(stageCount - 1)) / static_cast<float>(stageCount);
+
+            for (int i = 0; i < stageCount; ++i)
+            {
+                const auto& stage = state.stages[static_cast<size_t>(i)];
+                auto box = juce::Rectangle<float>(content.getX() + i * (stageWidth + arrowGap), content.getY(), stageWidth, content.getHeight());
+                const auto fill = stage.active ? juce::Colour(0xff1f2b21) : juce::Colour(0xff1d1d1d);
+                const auto border = stage.active ? juce::Colour(0xff63d287) : juce::Colour(0xff4a4a4a);
+                const auto text = stage.active ? juce::Colour(0xffe1f2e4) : juce::Colour(0xff8a8a8a);
+
+                g.setColour(fill);
+                g.fillRoundedRectangle(box, 2.5f);
+                g.setColour(border);
+                g.drawRoundedRectangle(box, 2.5f, 1.0f);
+
+                auto labelArea = box.reduced(3.0f);
+                auto titleArea = labelArea.removeFromTop(12.0f);
+                g.setColour(text);
+                g.setFont(makeRetroFont(8.5f, true));
+                g.drawFittedText(stage.label, titleArea.toNearestInt(), juce::Justification::centred, 1);
+
+                g.setFont(makeRetroFont(7.8f, false));
+                g.setColour(stage.active ? juce::Colour(0xffc5d6c8) : juce::Colour(0xff7f7f7f));
+                g.drawFittedText(stage.detail, labelArea.toNearestInt(), juce::Justification::centred, 2);
+
+                if (i < stageCount - 1)
+                {
+                    const float arrowX = box.getRight() + 2.0f;
+                    const float midY = box.getCentreY();
+                    g.setColour(juce::Colour(0xff9f9f9f));
+                    g.drawLine(arrowX, midY, arrowX + 6.0f, midY, 1.0f);
+                    juce::Path head;
+                    head.startNewSubPath(arrowX + 6.0f, midY);
+                    head.lineTo(arrowX + 3.8f, midY - 2.0f);
+                    head.lineTo(arrowX + 3.8f, midY + 2.0f);
+                    head.closeSubPath();
+                    g.fillPath(head);
+                }
+            }
+
+            auto meterWidth = meterArea.getWidth() / 3.0f;
+            drawMeter(g, juce::Rectangle<float>(meterArea.getX(), meterArea.getY(), meterWidth - 2.0f, meterArea.getHeight()),
+                      "Pre", state.preLevel, juce::Colour(0xff63d287));
+            drawMeter(g, juce::Rectangle<float>(meterArea.getX() + meterWidth, meterArea.getY(), meterWidth - 2.0f, meterArea.getHeight()),
+                      "Wet", state.wetLevel, juce::Colour(0xff86c7ff));
+            drawMeter(g, juce::Rectangle<float>(meterArea.getX() + meterWidth * 2.0f, meterArea.getY(), meterWidth - 2.0f, meterArea.getHeight()),
+                      "Post", state.postLevel, juce::Colour(0xfff4a640));
+        }
+    };
+
+    std::function<State()> stateProvider;
+    Plot plot;
+};
+
+class ValidationTraceMatrixPropertyComponent : public juce::PropertyComponent
+{
+public:
+    struct Row
+    {
+        juce::String control;
+        float uiRaw = 0.0f;
+        float mapped = 0.0f;
+        float snapshotRaw = 0.0f;
+        float snapshotMapped = 0.0f;
+        juce::String effective;
+        bool profileValid = true;
+        bool inSync = true;
+    };
+
+    struct State
+    {
+        juce::String snapshotSource;
+        std::vector<Row> rows;
+    };
+
+    ValidationTraceMatrixPropertyComponent(const juce::String& name,
+                                           std::function<State()> stateProviderIn,
+                                           const juce::String& tooltipText)
+        : juce::PropertyComponent(name),
+          stateProvider(std::move(stateProviderIn))
+    {
+        setTooltip(tooltipText);
+        addAndMakeVisible(plot);
+        setPreferredHeight(220);
+        refresh();
+    }
+
+    void refresh() override
+    {
+        plot.state = stateProvider();
+        plot.repaint();
+    }
+
+    void resized() override
+    {
+        plot.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
+    }
+
+private:
+    struct Plot final : public juce::Component
+    {
+        State state;
+
+        void paint(juce::Graphics& g) override
+        {
+            auto area = getLocalBounds().toFloat();
+            g.fillAll(juce::Colour(0xff151515));
+            g.setColour(juce::Colour(0xff3a3a3a));
+            g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
+
+            auto content = area.reduced(5.0f);
+            auto top = content.removeFromTop(16.0f);
+            g.setFont(makeRetroFont(9.5f, false));
+            g.setColour(juce::Colour(0xffa0a0a0));
+            g.drawText("Snapshot source: " + state.snapshotSource, top, juce::Justification::centredLeft, false);
+
+            auto header = content.removeFromTop(14.0f);
+            const float w = content.getWidth();
+            const float xControl = content.getX() + 2.0f;
+            const float xUi = content.getX() + w * 0.16f;
+            const float xMapped = content.getX() + w * 0.30f;
+            const float xSnapshot = content.getX() + w * 0.46f;
+            const float xEffective = content.getX() + w * 0.64f;
+            const float xStatus = content.getRight() - 34.0f;
+
+            g.setFont(makeRetroFont(9.0f, true));
+            g.setColour(juce::Colour(0xffd8d8d8));
+            g.drawText("Ctl", juce::Rectangle<float>(xControl, header.getY(), xUi - xControl - 2.0f, header.getHeight()), juce::Justification::centredLeft, false);
+            g.drawText("UI Raw", juce::Rectangle<float>(xUi, header.getY(), xMapped - xUi - 2.0f, header.getHeight()), juce::Justification::centredLeft, false);
+            g.drawText("Mapped", juce::Rectangle<float>(xMapped, header.getY(), xSnapshot - xMapped - 2.0f, header.getHeight()), juce::Justification::centredLeft, false);
+            g.drawText("Snapshot", juce::Rectangle<float>(xSnapshot, header.getY(), xEffective - xSnapshot - 2.0f, header.getHeight()), juce::Justification::centredLeft, false);
+            g.drawText("Effective", juce::Rectangle<float>(xEffective, header.getY(), xStatus - xEffective - 2.0f, header.getHeight()), juce::Justification::centredLeft, false);
+            g.drawText("OK", juce::Rectangle<float>(xStatus, header.getY(), 30.0f, header.getHeight()), juce::Justification::centredRight, false);
+
+            g.setColour(juce::Colour(0xff3a3a3a));
+            g.drawLine(content.getX(), header.getBottom(), content.getRight(), header.getBottom(), 1.0f);
+
+            const float rowHeight = 22.0f;
+            float y = header.getBottom() + 1.0f;
+            g.setFont(makeRetroFont(8.6f, false));
+            for (size_t i = 0; i < state.rows.size(); ++i)
+            {
+                const auto& row = state.rows[i];
+                const auto rowArea = juce::Rectangle<float>(content.getX(), y, content.getWidth(), rowHeight);
+                if ((i % 2) != 0)
+                {
+                    g.setColour(juce::Colour(0xff1b1b1b));
+                    g.fillRect(rowArea);
+                }
+
+                const juce::Colour rowColour = !row.profileValid ? juce::Colour(0xfff4a640)
+                                           : (row.inSync ? juce::Colour(0xffcfe9d5) : juce::Colour(0xffffb56b));
+                g.setColour(rowColour);
+
+                g.drawText(row.control, juce::Rectangle<float>(xControl, y, xUi - xControl - 2.0f, rowHeight), juce::Justification::centredLeft, false);
+                g.drawText(juce::String(row.uiRaw, 3), juce::Rectangle<float>(xUi, y, xMapped - xUi - 2.0f, rowHeight), juce::Justification::centredLeft, false);
+                g.drawText(juce::String(row.mapped, 3), juce::Rectangle<float>(xMapped, y, xSnapshot - xMapped - 2.0f, rowHeight), juce::Justification::centredLeft, false);
+                const juce::String snapshotText = row.profileValid
+                    ? (juce::String(row.snapshotRaw, 3) + " -> " + juce::String(row.snapshotMapped, 3))
+                    : "n/a";
+                g.drawText(snapshotText, juce::Rectangle<float>(xSnapshot, y, xEffective - xSnapshot - 2.0f, rowHeight), juce::Justification::centredLeft, false);
+                g.drawText(row.effective, juce::Rectangle<float>(xEffective, y, xStatus - xEffective - 2.0f, rowHeight), juce::Justification::centredLeft, false);
+                g.drawText(row.profileValid && row.inSync ? "Y" : "N",
+                           juce::Rectangle<float>(xStatus, y, 30.0f, rowHeight),
+                           juce::Justification::centredRight, false);
+                y += rowHeight;
+            }
+        }
+    };
+
+    std::function<State()> stateProvider;
+    Plot plot;
+};
+
 void styleTitle(juce::Label& label, const juce::String& text)
 {
     label.setText(text, juce::dontSendNotification);
@@ -242,7 +798,7 @@ void addPanelSection(juce::PropertyPanel& panel, const juce::String& name,
                      juce::Array<juce::PropertyComponent*>& props, bool shouldBeOpen)
 {
     for (auto* prop : props)
-        prop->setPreferredHeight(30);
+        prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), 30));
     panel.addSection(name, props, shouldBeOpen);
     stylePanel(panel);
 }
@@ -285,10 +841,77 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     fxPresetMediumButton.setTooltip("Applies a medium-strength value FX preset.");
     fxPresetMediumButton.onClick = [this] { applyValueFxPreset(2); };
 
+    auto configureTabButton = [this](juce::TextButton& button, const juce::String& name, int tabIndex)
+    {
+        button.setButtonText(name);
+        button.setClickingTogglesState(true);
+        button.setRadioGroupId(0x445650); // "DVP"
+        button.onClick = [this, tabIndex]
+        {
+            selectedRightTab = tabIndex;
+            updateRightTabVisibility();
+            resized();
+        };
+        content.addAndMakeVisible(button);
+    };
+    configureTabButton(tabOverviewButton, "Overview", 0);
+    configureTabButton(tabInternalsButton, "Mod", 1);
+    configureTabButton(tabBbdButton, "Tone", 2);
+    configureTabButton(tabTapeButton, "Engine", 3);
+    configureTabButton(tabValidationButton, "Validate", 4);
+    tabOverviewButton.setToggleState(true, juce::dontSendNotification);
+
+    engineFilterLabel.setText("Filter", juce::dontSendNotification);
+    engineFilterLabel.setFont(makeRetroFont(11.0f, false));
+    engineFilterLabel.setColour(juce::Label::textColourId, juce::Colour(0xff9f9f9f));
+    engineFilterLabel.setJustificationType(juce::Justification::centredLeft);
+    content.addAndMakeVisible(engineFilterLabel);
+
+    engineFilterEditor.setTooltip("Filter engine internals sections by name.");
+    engineFilterEditor.setTextToShowWhenEmpty("timing / compressor / bloom / tape", juce::Colour(0xff666666));
+    engineFilterEditor.setFont(makeRetroFont(11.0f, false));
+    engineFilterEditor.onTextChange = [this]
+    {
+        updateEngineSectionVisibility();
+        resized();
+    };
+    content.addAndMakeVisible(engineFilterEditor);
+
+    engineFilterClearButton.setButtonText("Clear");
+    engineFilterClearButton.setTooltip("Clear engine section filter.");
+    engineFilterClearButton.onClick = [this]
+    {
+        engineFilterEditor.clear();
+        updateEngineSectionVisibility();
+        resized();
+    };
+    content.addAndMakeVisible(engineFilterClearButton);
+
+    engineShowAdvancedToggle.setButtonText("Show Advanced");
+    engineShowAdvancedToggle.setTooltip("Show engine-specific advanced internals in addition to core timing/filter/compressor.");
+    engineShowAdvancedToggle.onClick = [this]
+    {
+        engineShowAdvanced = engineShowAdvancedToggle.getToggleState();
+        updateEngineSectionVisibility();
+        resized();
+    };
+    engineShowAdvancedToggle.setToggleState(engineShowAdvanced, juce::dontSendNotification);
+    content.addAndMakeVisible(engineShowAdvancedToggle);
+
     styleTitle(mappingTitle, "Parameter Mapping");
     styleDescription(mappingDescription, "Map UI values into DSP ranges (min/max/curve).");
     styleTitle(uiTitle, "UI Response");
     styleDescription(uiDescription, "Change slider feel without touching DSP.");
+    styleTitle(overviewTitle, "Audio Overview");
+    styleDescription(overviewDescription, "Live derived state for the active engine/mode.");
+    styleTitle(modulationTitle, "Modulation");
+    styleDescription(modulationDescription, "LFO phase and delay trajectory instrumentation.");
+    styleTitle(toneTitle, "Tone / Dynamics");
+    styleDescription(toneDescription, "Spectrum overlays and nonlinear transfer behavior.");
+    styleTitle(engineTitle, "Engine");
+    styleDescription(engineDescription, "Engine-relevant internals with core/advanced disclosure and filtering.");
+    styleTitle(validationTitle, "Validation");
+    styleDescription(validationDescription, "Quick wiring checks: UI raw -> mapped -> snapshot -> DSP effective.");
     styleTitle(internalsTitle, "DSP Internals (Per Engine + HQ)");
     styleDescription(internalsDescription, "Independent profiles for each engine in Normal and HQ modes.");
     styleTitle(bbdTitle, "BBD Profiles (Red NQ)");
@@ -305,6 +928,16 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(mappingDescription);
     content.addAndMakeVisible(uiTitle);
     content.addAndMakeVisible(uiDescription);
+    content.addAndMakeVisible(overviewTitle);
+    content.addAndMakeVisible(overviewDescription);
+    content.addAndMakeVisible(modulationTitle);
+    content.addAndMakeVisible(modulationDescription);
+    content.addAndMakeVisible(toneTitle);
+    content.addAndMakeVisible(toneDescription);
+    content.addAndMakeVisible(engineTitle);
+    content.addAndMakeVisible(engineDescription);
+    content.addAndMakeVisible(validationTitle);
+    content.addAndMakeVisible(validationDescription);
     content.addAndMakeVisible(internalsTitle);
     content.addAndMakeVisible(internalsDescription);
     content.addAndMakeVisible(bbdTitle);
@@ -317,6 +950,11 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
 
     content.addAndMakeVisible(mappingPanel);
     content.addAndMakeVisible(uiPanel);
+    content.addAndMakeVisible(overviewPanel);
+    content.addAndMakeVisible(modulationPanel);
+    content.addAndMakeVisible(tonePanel);
+    content.addAndMakeVisible(enginePanel);
+    content.addAndMakeVisible(validationPanel);
     content.addAndMakeVisible(internalsPanel);
     content.addAndMakeVisible(bbdPanel);
     content.addAndMakeVisible(tapePanel);
@@ -337,6 +975,16 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             return "Used only in Red NQ (BBD core). BBD emulates analog bucket-brigade delay behavior. Slower clock and lower cutoff sound darker and grainier; faster clock and higher cutoff sound cleaner and brighter.";
         if (n.contains("tape"))
             return "Used only in Red HQ (Tape core). Tape controls shape wow/flutter pitch drift, tone rolloff, and nonlinear drive. Small moves can be musical; big moves can sound unstable or lo-fi.";
+        if (n.contains("bloom"))
+            return "Green engine wet-character macro. Controls body, softness, and modulation bloom as Color increases.";
+        if (n.contains("focus") || n.contains("presence"))
+            return "Blue engine wet-character macro. Controls clarity shaping, presence lift, and transient focus as Color increases.";
+        if (n.contains("warp"))
+            return "Purple NQ shape parameters for phase-warp motion. Higher values create more complex, nonlinear modulation paths.";
+        if (n.contains("orbit"))
+            return "Purple HQ orbit parameters for dual-tap spatial motion. Affects eccentricity, rotation rates, and tap balance.";
+        if (n.contains("ensemble"))
+            return "Black HQ ensemble spread controls for second-tap blend, depth, and spacing.";
 
         if (n.contains(" min"))
             return "Sets the lowest allowed value. Think of this as the floor for this control's mapped range.";
@@ -508,6 +1156,793 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     addPanelSection(uiPanel, "Color", uiResponseColor, false);
     addPanelSection(uiPanel, "Mix", uiResponseMix, false);
 
+    auto readRawParam = [this](const char* paramId) -> float
+    {
+        if (auto* p = processor.getValueTreeState().getRawParameterValue(paramId))
+            return p->load();
+        return 0.0f;
+    };
+    auto getActiveProfileRaw = [this, readRawParam](const char* paramId, bool& profileValid) -> float
+    {
+        const auto& profiles = processor.getEngineParamProfiles();
+        const int engineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const auto& profile = profiles[static_cast<size_t>(engineIndex)];
+        if (!profile.valid)
+        {
+            profileValid = false;
+            return readRawParam(paramId);
+        }
+
+        profileValid = true;
+        if (juce::String(paramId) == ChoroborosAudioProcessor::RATE_ID)
+            return profile.rate;
+        if (juce::String(paramId) == ChoroborosAudioProcessor::DEPTH_ID)
+            return profile.depth;
+        if (juce::String(paramId) == ChoroborosAudioProcessor::OFFSET_ID)
+            return profile.offset;
+        if (juce::String(paramId) == ChoroborosAudioProcessor::WIDTH_ID)
+            return profile.width;
+        if (juce::String(paramId) == ChoroborosAudioProcessor::COLOR_ID)
+            return profile.color;
+        if (juce::String(paramId) == ChoroborosAudioProcessor::MIX_ID)
+            return profile.mix;
+        return readRawParam(paramId);
+    };
+
+    auto makeReadOnly = [this, &makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
+    {
+        auto* prop = new ReadOnlyDiagnosticPropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+    auto makeMultiLineReadOnly = [this, &makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
+    {
+        auto* prop = new MultiLineReadOnlyPropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+    auto makeSparkline = [this, &makeTooltipForControl](const juce::String& name, std::function<std::vector<float>()> valueProvider)
+    {
+        auto* prop = new SparklinePropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+    auto makeTransferCurve = [this, &makeTooltipForControl](const juce::String& name, std::function<float()> driveProvider)
+    {
+        auto* prop = new TransferCurvePropertyComponent(name, std::move(driveProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+    auto makeSpectrumOverlay = [this, &makeTooltipForControl](const juce::String& name,
+                                                              std::function<SpectrumOverlayPropertyComponent::State()> stateProvider)
+    {
+        auto* prop = new SpectrumOverlayPropertyComponent(name, std::move(stateProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+    auto makeSignalFlow = [this, &makeTooltipForControl](const juce::String& name,
+                                                         std::function<SignalFlowPropertyComponent::State()> stateProvider)
+    {
+        auto* prop = new SignalFlowPropertyComponent(name, std::move(stateProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+    auto makeTraceMatrix = [this, &makeTooltipForControl](const juce::String& name,
+                                                          std::function<ValidationTraceMatrixPropertyComponent::State()> stateProvider)
+    {
+        auto* prop = new ValidationTraceMatrixPropertyComponent(name, std::move(stateProvider), makeTooltipForControl(name));
+        liveReadoutProperties.add(prop);
+        return prop;
+    };
+
+    juce::Array<juce::PropertyComponent*> overviewActiveParams;
+    overviewActiveParams.add(makeReadOnly("Engine + Mode", [this]() -> juce::String
+    {
+        static const juce::String names[] { "Green", "Blue", "Red", "Purple", "Black" };
+        const int idx = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        return names[idx] + (processor.isHqEnabled() ? " HQ" : " NQ");
+    }));
+    overviewActiveParams.add(makeReadOnly("Rate (raw -> mapped)", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::RATE_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3) + " Hz";
+    }));
+    overviewActiveParams.add(makeReadOnly("Depth (raw -> mapped)", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::DEPTH_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped * 100.0f, 1) + " %";
+    }));
+    overviewActiveParams.add(makeReadOnly("Offset (raw -> mapped)", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::OFFSET_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 2) + " deg";
+    }));
+    overviewActiveParams.add(makeReadOnly("Width (raw -> mapped)", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::WIDTH_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3) + " x";
+    }));
+    overviewActiveParams.add(makeReadOnly("Color (raw -> mapped)", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::COLOR_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3);
+    }));
+    overviewActiveParams.add(makeReadOnly("Mix (raw -> mapped)", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::MIX_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::MIX_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped * 100.0f, 1) + " %";
+    }));
+    addPanelSection(overviewPanel, "Active Parameters", overviewActiveParams, true);
+
+    juce::Array<juce::PropertyComponent*> overviewDerivedState;
+    overviewDerivedState.add(makeReadOnly("HPF Effective", [this]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        return juce::String(rt.hpfCutoffHz.load(), 1) + " Hz (Q " + juce::String(rt.hpfQ.load(), 3) + ")";
+    }));
+    overviewDerivedState.add(makeReadOnly("LPF Effective", [this]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        return juce::String(rt.lpfCutoffHz.load(), 1) + " Hz (Q " + juce::String(rt.lpfQ.load(), 3) + ")";
+    }));
+    overviewDerivedState.add(makeReadOnly("Centre Delay (base + scale*depth)", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const float depthMapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                              readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        const float centreMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * depthMapped;
+        return juce::String(centreMs, 3) + " ms";
+    }));
+    overviewDerivedState.add(makeReadOnly("Red NQ BBD Min Delay @ Max Clock", [this]() -> juce::String
+    {
+        const bool isRedNQ = processor.getCurrentEngineColorIndex() == 2 && !processor.isHqEnabled();
+        if (!isRedNQ)
+            return "n/a (active only in Red NQ)";
+
+        const auto& rt = processor.getDspInternals();
+        const double fs = processor.getSampleRate() > 1.0 ? processor.getSampleRate() : 48000.0;
+        const float stages = juce::jmax(1.0f, rt.bbdStages.load());
+        const float maxClockRatio = juce::jlimit(0.01f, 1.0f, rt.bbdClockMaxRatio.load());
+        const float maxClockHz = static_cast<float>(fs * maxClockRatio);
+        const float minDelayMs = (stages / juce::jmax(1.0f, maxClockHz)) * 1000.0f;
+        return juce::String(minDelayMs, 3) + " ms @ " + juce::String(maxClockHz, 1) + " Hz";
+    }));
+    overviewDerivedState.add(makeReadOnly("Red Saturation Drive Target", [this, readRawParam]() -> juce::String
+    {
+        if (processor.getCurrentEngineColorIndex() != 2)
+            return "n/a (Red only)";
+
+        const auto& rt = processor.getDspInternals();
+        const float colorMapped = juce::jlimit(0.0f, 1.0f,
+                                               processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                                           readRawParam(ChoroborosAudioProcessor::COLOR_ID)));
+        const float drive = 1.0f + rt.saturationDriveScale.load() * colorMapped;
+        if (colorMapped <= 0.0f)
+            return "x1.000 (exact bypass)";
+        return "x" + juce::String(drive, 3);
+    }));
+    addPanelSection(overviewPanel, "Derived State", overviewDerivedState, false);
+
+    juce::Array<juce::PropertyComponent*> overviewSignalFlow;
+    overviewSignalFlow.add(makeSignalFlow("Signal Chain", [this, readRawParam]() -> SignalFlowPropertyComponent::State
+    {
+        SignalFlowPropertyComponent::State state;
+        static const juce::String engineNames[] { "Green", "Blue", "Red", "Purple", "Black" };
+
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+        const bool isRedNQ = engine == 2 && !hq;
+        const bool isRedHQ = engine == 2 && hq;
+        const auto& rt = processor.getDspInternals();
+
+        const float rateMapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                             readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        const float depthMapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                              readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        const float colorMapped = juce::jlimit(0.0f, 1.0f,
+                                               processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                                           readRawParam(ChoroborosAudioProcessor::COLOR_ID)));
+        const float mixMapped = juce::jlimit(0.0f, 1.0f,
+                                             processor.mapParameterValue(ChoroborosAudioProcessor::MIX_ID,
+                                                                         readRawParam(ChoroborosAudioProcessor::MIX_ID)));
+
+        state.modeLabel = engineNames[engine] + (hq ? " HQ" : " NQ");
+        state.preLevel = juce::jlimit(0.0f, 1.0f, 0.25f + depthMapped * 0.65f);
+        state.wetLevel = mixMapped;
+        state.postLevel = juce::jlimit(0.0f, 1.0f, 0.20f + mixMapped * 0.60f + colorMapped * 0.20f);
+
+        state.stages[0] = { "Input", juce::String(rateMapped, 2) + " Hz", true };
+        state.stages[1] = {
+            "PreEmph",
+            isRedNQ ? "Bypassed"
+                    : (juce::String(rt.preEmphasisFreqHz.load(), 0) + " Hz"),
+            !isRedNQ
+        };
+        state.stages[2] = {
+            "HP/LP",
+            juce::String(rt.hpfCutoffHz.load(), 0) + " / " + juce::String(rt.lpfCutoffHz.load(), 0),
+            true
+        };
+
+        juce::String coreName = "Chorus Core";
+        if (engine == 0) coreName = "Bloom Core";
+        if (engine == 1) coreName = "Focus Core";
+        if (engine == 2) coreName = hq ? "Tape Core" : "BBD Core";
+        if (engine == 3) coreName = hq ? "Orbit Core" : "Warp Core";
+        if (engine == 4) coreName = hq ? "Ensemble Core" : "Intensity Core";
+        state.stages[3] = { "Core", coreName, true };
+
+        state.stages[4] = {
+            "Color",
+            juce::String(colorMapped, 3),
+            true
+        };
+
+        const float redDrive = 1.0f + rt.saturationDriveScale.load() * colorMapped;
+        const float tapeDrive = 1.0f + rt.tapeDriveScale.load() * colorMapped;
+        state.stages[5] = {
+            "Saturate",
+            isRedNQ ? ("x" + juce::String(redDrive, 2))
+                    : (isRedHQ ? ("Tape x" + juce::String(tapeDrive, 2)) : "Inactive"),
+            isRedNQ || isRedHQ
+        };
+        state.stages[6] = {
+            "Output",
+            juce::String(mixMapped * 100.0f, 1) + "% wet",
+            true
+        };
+
+        return state;
+    }));
+    addPanelSection(overviewPanel, "Signal Flow", overviewSignalFlow, true);
+
+    juce::Array<juce::PropertyComponent*> overviewVisuals;
+    overviewVisuals.add(makeSparkline("Delay Trajectory (ms)", [this, readRawParam]() -> std::vector<float>
+    {
+        std::vector<float> values;
+        constexpr int pointCount = 128;
+        values.reserve(pointCount);
+
+        const auto& rt = processor.getDspInternals();
+        const float depthMapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                              readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        const float rateMapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                             readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        const float centreMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * depthMapped;
+        const bool isRedNQ = processor.getCurrentEngineColorIndex() == 2 && !processor.isHqEnabled();
+
+        float modDepthMs = juce::jmax(0.05f, rt.centreDelayScale.load() * depthMapped * 0.18f);
+        float minDelayMs = 0.0f;
+        float maxDelayMs = 0.0f;
+        if (isRedNQ)
+        {
+            modDepthMs = juce::jmax(0.05f, rt.bbdDepthMs.load() * depthMapped);
+            minDelayMs = rt.bbdDelayMinMs.load();
+            maxDelayMs = rt.bbdDelayMaxMs.load();
+        }
+
+        const float phaseSpeed = juce::jlimit(0.05f, 10.0f, rateMapped) * juce::MathConstants<float>::twoPi;
+        for (int i = 0; i < pointCount; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(pointCount - 1);
+            float delayMs = centreMs + std::sin(phaseSpeed * t) * modDepthMs;
+            if (isRedNQ)
+                delayMs = juce::jlimit(minDelayMs, maxDelayMs, delayMs);
+            values.push_back(delayMs);
+        }
+
+        return values;
+    }));
+    addPanelSection(overviewPanel, "Visual Feedback", overviewVisuals, false);
+
+    juce::Array<juce::PropertyComponent*> modulationReadouts;
+    modulationReadouts.add(makeReadOnly("LFO Rate", [this, readRawParam]() -> juce::String
+    {
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                         readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        return juce::String(mapped, 3) + " Hz";
+    }));
+    modulationReadouts.add(makeReadOnly("Stereo Offset", [this, readRawParam]() -> juce::String
+    {
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
+                                                         readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
+        return juce::String(mapped, 2) + " deg";
+    }));
+    modulationReadouts.add(makeReadOnly("Depth", [this, readRawParam]() -> juce::String
+    {
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                         readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        return juce::String(mapped * 100.0f, 1) + " %";
+    }));
+    modulationReadouts.add(makeReadOnly("Stereo Correlation (est.)", [this, readRawParam]() -> juce::String
+    {
+        const float offsetDeg = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
+                                                            readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
+        const float width = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID,
+                                                        readRawParam(ChoroborosAudioProcessor::WIDTH_ID));
+        const float correlation = juce::jlimit(-1.0f, 1.0f,
+                                               std::cos(juce::degreesToRadians(offsetDeg))
+                                               * juce::jlimit(0.0f, 2.0f, width));
+        return juce::String(correlation, 3);
+    }));
+    addPanelSection(modulationPanel, "LFO Readouts", modulationReadouts, true);
+
+    juce::Array<juce::PropertyComponent*> modulationVisuals;
+    modulationVisuals.add(makeSparkline("LFO Left", [this, readRawParam]() -> std::vector<float>
+    {
+        std::vector<float> values;
+        constexpr int pointCount = 128;
+        values.reserve(pointCount);
+
+        const float rateMapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                             readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        const float depthMapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                              readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        const float amp = juce::jmax(0.05f, depthMapped);
+        const float phaseSpeed = juce::jlimit(0.05f, 10.0f, rateMapped) * juce::MathConstants<float>::twoPi;
+
+        for (int i = 0; i < pointCount; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(pointCount - 1);
+            values.push_back(std::sin(phaseSpeed * t) * amp);
+        }
+        return values;
+    }));
+    modulationVisuals.add(makeSparkline("LFO Right", [this, readRawParam]() -> std::vector<float>
+    {
+        std::vector<float> values;
+        constexpr int pointCount = 128;
+        values.reserve(pointCount);
+
+        const float rateMapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                             readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        const float depthMapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                              readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        const float offsetMappedDeg = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
+                                                                  readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
+        const float phaseOffset = juce::degreesToRadians(offsetMappedDeg);
+        const float amp = juce::jmax(0.05f, depthMapped);
+        const float phaseSpeed = juce::jlimit(0.05f, 10.0f, rateMapped) * juce::MathConstants<float>::twoPi;
+
+        for (int i = 0; i < pointCount; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(pointCount - 1);
+            values.push_back(std::sin(phaseSpeed * t + phaseOffset) * amp);
+        }
+        return values;
+    }));
+    modulationVisuals.add(makeSparkline("Delay Trajectory", [this, readRawParam]() -> std::vector<float>
+    {
+        std::vector<float> values;
+        constexpr int pointCount = 128;
+        values.reserve(pointCount);
+
+        const auto& rt = processor.getDspInternals();
+        const float depthMapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                              readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
+        const float rateMapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                             readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        const float centreMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * depthMapped;
+        const float modDepthMs = juce::jmax(0.05f, rt.centreDelayScale.load() * depthMapped * 0.25f);
+        const float phaseSpeed = juce::jlimit(0.05f, 10.0f, rateMapped) * juce::MathConstants<float>::twoPi;
+
+        for (int i = 0; i < pointCount; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(pointCount - 1);
+            values.push_back(centreMs + std::sin(phaseSpeed * t) * modDepthMs);
+        }
+        return values;
+    }));
+    addPanelSection(modulationPanel, "Motion Visuals", modulationVisuals, false);
+
+    juce::Array<juce::PropertyComponent*> toneReadouts;
+    toneReadouts.add(makeReadOnly("HPF / LPF", [this]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        return juce::String(rt.hpfCutoffHz.load(), 1) + " Hz / "
+               + juce::String(rt.lpfCutoffHz.load(), 1) + " Hz";
+    }));
+    toneReadouts.add(makeReadOnly("Pre-Emphasis Gain", [this]() -> juce::String
+    {
+        return juce::String(processor.getDspInternals().preEmphasisGain.load(), 3) + " x";
+    }));
+    toneReadouts.add(makeReadOnly("Compressor", [this]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        return "T " + juce::String(rt.compressorThresholdDb.load(), 1) + " dB, R "
+               + juce::String(rt.compressorRatio.load(), 2);
+    }));
+    toneReadouts.add(makeReadOnly("Tonal Tilt (est.)", [this]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const float tilt = juce::Decibels::gainToDecibels(juce::jmax(0.01f, rt.preEmphasisGain.load()));
+        return juce::String(tilt, 2) + " dB";
+    }));
+    addPanelSection(tonePanel, "Tone Readouts", toneReadouts, true);
+
+    juce::Array<juce::PropertyComponent*> toneVisuals;
+    toneVisuals.add(makeSpectrumOverlay("Spectrum + HP/LP Overlay", [this]() -> SpectrumOverlayPropertyComponent::State
+    {
+        const auto& rt = processor.getDspInternals();
+        SpectrumOverlayPropertyComponent::State s;
+        s.hpfHz = rt.hpfCutoffHz.load();
+        s.lpfHz = rt.lpfCutoffHz.load();
+        s.preEmphasisGain = rt.preEmphasisGain.load();
+        return s;
+    }));
+    toneVisuals.add(makeTransferCurve("Saturation Transfer Curve", [this, readRawParam]() -> float
+    {
+        if (processor.getCurrentEngineColorIndex() != 2)
+            return 1.0f;
+        const auto& rt = processor.getDspInternals();
+        const float colorMapped = juce::jlimit(0.0f, 1.0f,
+                                               processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                                           readRawParam(ChoroborosAudioProcessor::COLOR_ID)));
+        return 1.0f + rt.saturationDriveScale.load() * colorMapped;
+    }));
+    addPanelSection(tonePanel, "Tone Visuals", toneVisuals, false);
+
+    juce::Array<juce::PropertyComponent*> engineReadouts;
+    engineReadouts.add(makeReadOnly("Engine Character", [this]() -> juce::String
+    {
+        static const juce::String names[] { "Green Bloom", "Blue Focus", "Red Vintage", "Purple Warp/Orbit", "Black Intensity/Ensemble" };
+        const int idx = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        return names[idx] + (processor.isHqEnabled() ? " (HQ)" : " (NQ)");
+    }));
+    engineReadouts.add(makeReadOnly("Color Semantics", [this]() -> juce::String
+    {
+        switch (processor.getCurrentEngineColorIndex())
+        {
+            case 0: return "Bloom amount + tonal bloom.";
+            case 1: return "Focus amount + presence shaping.";
+            case 2: return processor.isHqEnabled() ? "Tape tone + drive." : "BBD/tape coloration + saturation.";
+            case 3: return processor.isHqEnabled() ? "Orbit eccentricity + rate." : "Warp intensity.";
+            case 4: return processor.isHqEnabled() ? "Ensemble tap behavior." : "Intensity depth/glide.";
+            default: return "Unknown.";
+        }
+    }));
+    engineReadouts.add(makeReadOnly("Applicability", [this]() -> juce::String
+    {
+        const bool isRedNQ = processor.getCurrentEngineColorIndex() == 2 && !processor.isHqEnabled();
+        const bool isRedHQ = processor.getCurrentEngineColorIndex() == 2 && processor.isHqEnabled();
+        if (isRedNQ)
+            return "BBD active, Tape inactive.";
+        if (isRedHQ)
+            return "Tape active, BBD inactive.";
+        return "Engine-specific non-Red core active.";
+    }));
+    addPanelSection(enginePanel, "Active Engine", engineReadouts, true);
+
+    juce::Array<juce::PropertyComponent*> engineMacroDerived;
+    engineMacroDerived.add(makeReadOnly("Macro A", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+        const float color = juce::jlimit(0.0f, 1.0f,
+                                         processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                                     readRawParam(ChoroborosAudioProcessor::COLOR_ID)));
+        if (engine == 0)
+        {
+            const float norm = std::pow(color, juce::jmax(0.1f, rt.greenBloomExponent.load()));
+            const float cutoff = juce::jmap(norm, 0.0f, 1.0f, rt.greenBloomCutoffMaxHz.load(), rt.greenBloomCutoffMinHz.load());
+            return "Bloom LPF " + juce::String(cutoff, 1) + " Hz";
+        }
+        if (engine == 1)
+        {
+            const float norm = std::pow(color, juce::jmax(0.1f, rt.blueFocusExponent.load()));
+            const float hp = juce::jmap(norm, 0.0f, 1.0f, rt.blueFocusHpMinHz.load(), rt.blueFocusHpMaxHz.load());
+            return "Focus HP " + juce::String(hp, 1) + " Hz";
+        }
+        if (engine == 2 && !hq)
+        {
+            const float drive = 1.0f + rt.saturationDriveScale.load() * color;
+            return "Red Drive x" + juce::String(drive, 3);
+        }
+        if (engine == 2 && hq)
+        {
+            const float tone = juce::jmap(color, 0.0f, 1.0f, rt.tapeToneMaxHz.load(), rt.tapeToneMinHz.load());
+            return "Tape Tone " + juce::String(tone, 1) + " Hz";
+        }
+        if (engine == 3 && !hq)
+        {
+            const float k = rt.purpleWarpKBase.load() + rt.purpleWarpKScale.load() * color;
+            return "Warp K " + juce::String(k, 3);
+        }
+        if (engine == 3 && hq)
+        {
+            const float thetaRate = rt.purpleOrbitThetaRateBaseHz.load() + rt.purpleOrbitThetaRateScaleHz.load() * color;
+            return "Orbit Theta " + juce::String(thetaRate, 3) + " Hz";
+        }
+        if (engine == 4 && !hq)
+        {
+            const float intensity = rt.blackNqDepthBase.load() + rt.blackNqDepthScale.load() * color;
+            return "Intensity " + juce::String(intensity, 3);
+        }
+        const float tapMix = rt.blackHqTap2MixBase.load() + rt.blackHqTap2MixScale.load() * color;
+        return "Tap2 Mix " + juce::String(tapMix, 3);
+    }));
+    engineMacroDerived.add(makeReadOnly("Macro B", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+        const float color = juce::jlimit(0.0f, 1.0f,
+                                         processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                                     readRawParam(ChoroborosAudioProcessor::COLOR_ID)));
+        if (engine == 0)
+        {
+            const float wet = rt.greenBloomWetBlend.load() * color;
+            return "Bloom Wet " + juce::String(wet * 100.0f, 1) + "%";
+        }
+        if (engine == 1)
+        {
+            const float norm = std::pow(color, juce::jmax(0.1f, rt.blueFocusExponent.load()));
+            const float lp = juce::jmap(norm, 0.0f, 1.0f, rt.blueFocusLpMaxHz.load(), rt.blueFocusLpMinHz.load());
+            return "Focus LP " + juce::String(lp, 1) + " Hz";
+        }
+        if (engine == 2 && !hq)
+        {
+            const float bbdDepth = rt.bbdDepthMs.load() * color;
+            return "BBD Mod " + juce::String(bbdDepth, 3) + " ms";
+        }
+        if (engine == 2 && hq)
+        {
+            const float drive = 1.0f + rt.tapeDriveScale.load() * color;
+            return "Tape Drive x" + juce::String(drive, 3);
+        }
+        if (engine == 3 && !hq)
+        {
+            return "Warp A/B " + juce::String(rt.purpleWarpA.load(), 3) + " / " + juce::String(rt.purpleWarpB.load(), 3);
+        }
+        if (engine == 3 && hq)
+        {
+            const float ecc = rt.purpleOrbitEccentricity.load()
+                              * (1.0f + color * (rt.purpleOrbitEccentricity2Ratio.load() - 1.0f));
+            return "Orbit Ecc " + juce::String(ecc, 3);
+        }
+        if (engine == 4 && !hq)
+            return "Glide " + juce::String(rt.blackNqDelayGlideMs.load(), 3) + " ms";
+
+        const float secondTapDepth = rt.blackHqSecondTapDepthBase.load()
+                                     + rt.blackHqSecondTapDepthScale.load() * color;
+        return "Tap2 Depth " + juce::String(secondTapDepth, 3);
+    }));
+    engineMacroDerived.add(makeReadOnly("Macro C", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+        const float color = juce::jlimit(0.0f, 1.0f,
+                                         processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                                     readRawParam(ChoroborosAudioProcessor::COLOR_ID)));
+        if (engine == 2 && !hq)
+        {
+            const float fs = static_cast<float>(processor.getSampleRate() > 1.0 ? processor.getSampleRate() : 48000.0);
+            const float clockMin = rt.bbdClockMinHz.load();
+            const float clockMax = juce::jmax(clockMin, fs * juce::jlimit(0.01f, 1.0f, rt.bbdClockMaxRatio.load()));
+            const float clock = juce::jmap(color, 0.0f, 1.0f, clockMin, clockMax);
+            return "BBD Clock " + juce::String(clock, 1) + " Hz";
+        }
+        if (engine == 2 && hq)
+        {
+            const float wow = rt.tapeWowDepthBase.load() + rt.tapeWowDepthSpread.load() * color;
+            return "Wow Depth " + juce::String(wow, 5);
+        }
+        if (engine == 4 && hq)
+        {
+            const float offset = rt.blackHqSecondTapDelayOffsetBase.load()
+                                 + rt.blackHqSecondTapDelayOffsetScale.load() * color;
+            return "Tap2 Offset " + juce::String(offset, 3) + " ms";
+        }
+        return "n/a";
+    }));
+    addPanelSection(enginePanel, "Engine Macro Derived", engineMacroDerived, false);
+
+    juce::Array<juce::PropertyComponent*> validationWiring;
+    validationWiring.add(makeReadOnly("Color Zero -> Saturation Gate", [this, readRawParam]() -> juce::String
+    {
+        if (processor.getCurrentEngineColorIndex() != 2)
+            return "INFO: Red-only check";
+
+        const float raw = readRawParam(ChoroborosAudioProcessor::COLOR_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID, raw);
+        if (raw <= 1.0e-5f && mapped <= 1.0e-5f)
+            return "OK: raw 0 maps to 0 saturation";
+        if (raw <= 1.0e-5f && mapped > 1.0e-5f)
+            return "WARN: raw 0 maps above 0 (check Color min mapping)";
+        return "OK: saturation follows color";
+    }));
+    validationWiring.add(makeReadOnly("Profile -> Active Runtime Sync", [this]() -> juce::String
+    {
+        const int engine = processor.getCurrentEngineColorIndex();
+        const bool hq = processor.isHqEnabled();
+        const auto& profile = processor.getEngineDspInternals(engine, hq);
+        const auto& active = processor.getDspInternals();
+        const auto closeEnough = [](float a, float b)
+        {
+            return std::abs(a - b) <= 1.0e-4f;
+        };
+
+        const bool synced =
+            closeEnough(profile.hpfCutoffHz.load(), active.hpfCutoffHz.load()) &&
+            closeEnough(profile.lpfCutoffHz.load(), active.lpfCutoffHz.load()) &&
+            closeEnough(profile.centreDelayBaseMs.load(), active.centreDelayBaseMs.load()) &&
+            closeEnough(profile.centreDelayScale.load(), active.centreDelayScale.load()) &&
+            closeEnough(profile.saturationDriveScale.load(), active.saturationDriveScale.load());
+
+        return synced ? "OK: active runtime matches selected profile"
+                      : "WARN: profile drift vs active runtime";
+    }));
+    validationWiring.add(makeReadOnly("BBD Delay Feasibility (Red NQ)", [this]() -> juce::String
+    {
+        const bool isRedNQ = processor.getCurrentEngineColorIndex() == 2 && !processor.isHqEnabled();
+        if (!isRedNQ)
+            return "INFO: not active outside Red NQ";
+
+        const auto& rt = processor.getDspInternals();
+        const double fs = processor.getSampleRate() > 1.0 ? processor.getSampleRate() : 48000.0;
+        const float stages = juce::jmax(1.0f, rt.bbdStages.load());
+        const float maxClockHz = static_cast<float>(fs * juce::jlimit(0.01f, 1.0f, rt.bbdClockMaxRatio.load()));
+        const float minDelayMs = (stages / juce::jmax(1.0f, maxClockHz)) * 1000.0f;
+        const float configuredMaxMs = rt.bbdDelayMaxMs.load();
+        if (minDelayMs > configuredMaxMs + 1.0e-3f)
+            return "WARN: min achievable delay exceeds configured BBD max";
+        return "OK: configured delay range is achievable";
+    }));
+    validationWiring.add(makeReadOnly("Engine Applicability Guard", [this]() -> juce::String
+    {
+        const bool isRedNQ = processor.getCurrentEngineColorIndex() == 2 && !processor.isHqEnabled();
+        const bool isRedHQ = processor.getCurrentEngineColorIndex() == 2 && processor.isHqEnabled();
+        if (isRedNQ)
+            return "OK: BBD internals active, Tape internals inactive";
+        if (isRedHQ)
+            return "OK: Tape internals active, BBD internals inactive";
+        return "OK: non-Red engines (BBD/Tape internals should be hidden)";
+    }));
+    addPanelSection(validationPanel, "Wiring Checks", validationWiring, true);
+
+    juce::Array<juce::PropertyComponent*> validationTrace;
+    validationTrace.add(makeReadOnly("Rate Trace", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const float raw = readRawParam(ChoroborosAudioProcessor::RATE_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3) + " Hz -> smooth "
+               + juce::String(rt.rateSmoothingMs.load(), 1) + " ms";
+    }));
+    validationTrace.add(makeReadOnly("Depth Trace", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const float raw = readRawParam(ChoroborosAudioProcessor::DEPTH_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID, raw);
+        const float centreMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * mapped;
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3) + " -> centre "
+               + juce::String(centreMs, 3) + " ms";
+    }));
+    validationTrace.add(makeReadOnly("Offset Trace", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::OFFSET_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 2) + " deg";
+    }));
+    validationTrace.add(makeReadOnly("Width Trace", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const float raw = readRawParam(ChoroborosAudioProcessor::WIDTH_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3) + " x -> smooth "
+               + juce::String(rt.widthSmoothingMs.load(), 1) + " ms";
+    }));
+    validationTrace.add(makeReadOnly("Color Trace", [this, readRawParam]() -> juce::String
+    {
+        const auto& rt = processor.getDspInternals();
+        const float raw = readRawParam(ChoroborosAudioProcessor::COLOR_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID, raw);
+        const float drive = 1.0f + rt.saturationDriveScale.load() * juce::jlimit(0.0f, 1.0f, mapped);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3) + " -> drive x"
+               + juce::String(drive, 3);
+    }));
+    validationTrace.add(makeReadOnly("Mix Trace", [this, readRawParam]() -> juce::String
+    {
+        const float raw = readRawParam(ChoroborosAudioProcessor::MIX_ID);
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::MIX_ID, raw);
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 3);
+    }));
+    addPanelSection(validationPanel, "UI -> Mapped -> Runtime", validationTrace, false);
+
+    juce::Array<juce::PropertyComponent*> validationMatrix;
+    validationMatrix.add(makeTraceMatrix("Trace Matrix", [this, readRawParam, getActiveProfileRaw]() -> ValidationTraceMatrixPropertyComponent::State
+    {
+        ValidationTraceMatrixPropertyComponent::State state;
+        state.snapshotSource = "active engine param profile (raw)";
+        const auto& rt = processor.getDspInternals();
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+
+        auto addRow = [&](const juce::String& control, const char* paramId,
+                          std::function<juce::String(float)> effectiveProvider)
+        {
+            ValidationTraceMatrixPropertyComponent::Row row;
+            row.control = control;
+            row.uiRaw = readRawParam(paramId);
+            row.mapped = processor.mapParameterValue(paramId, row.uiRaw);
+            row.snapshotRaw = getActiveProfileRaw(paramId, row.profileValid);
+            row.snapshotMapped = processor.mapParameterValue(paramId, row.snapshotRaw);
+            row.inSync = row.profileValid && std::abs(row.uiRaw - row.snapshotRaw) <= 1.0e-4f;
+            row.effective = effectiveProvider(row.mapped);
+            state.rows.push_back(std::move(row));
+        };
+
+        addRow("Rate", ChoroborosAudioProcessor::RATE_ID, [&rt](float mapped) -> juce::String
+        {
+            return juce::String(mapped, 3) + " Hz (" + juce::String(rt.rateSmoothingMs.load(), 1) + " ms)";
+        });
+        addRow("Depth", ChoroborosAudioProcessor::DEPTH_ID, [&rt](float mapped) -> juce::String
+        {
+            const float centreMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * mapped;
+            return "Centre " + juce::String(centreMs, 3) + " ms";
+        });
+        addRow("Offset", ChoroborosAudioProcessor::OFFSET_ID, [](float mapped) -> juce::String
+        {
+            return juce::String(mapped, 2) + " deg";
+        });
+        addRow("Width", ChoroborosAudioProcessor::WIDTH_ID, [&rt](float mapped) -> juce::String
+        {
+            return juce::String(mapped, 3) + "x (" + juce::String(rt.widthSmoothingMs.load(), 1) + " ms)";
+        });
+        addRow("Color", ChoroborosAudioProcessor::COLOR_ID, [engine, hq, &rt](float mapped) -> juce::String
+        {
+            const float normalized = juce::jlimit(0.0f, 1.0f, mapped);
+            if (engine == 2 && !hq)
+            {
+                const float drive = 1.0f + rt.saturationDriveScale.load() * normalized;
+                return "Drive x" + juce::String(drive, 3);
+            }
+            if (engine == 2 && hq)
+            {
+                const float drive = 1.0f + rt.tapeDriveScale.load() * normalized;
+                return "Tape x" + juce::String(drive, 3);
+            }
+            if (engine == 0) return "Bloom " + juce::String(normalized, 3);
+            if (engine == 1) return "Focus " + juce::String(normalized, 3);
+            if (engine == 3) return hq ? ("Orbit " + juce::String(normalized, 3)) : ("Warp " + juce::String(normalized, 3));
+            if (engine == 4) return hq ? ("Ensemble " + juce::String(normalized, 3)) : ("Intensity " + juce::String(normalized, 3));
+            return juce::String(normalized, 3);
+        });
+        addRow("Mix", ChoroborosAudioProcessor::MIX_ID, [](float mapped) -> juce::String
+        {
+            return juce::String(juce::jlimit(0.0f, 1.0f, mapped) * 100.0f, 1) + "% wet";
+        });
+
+        return state;
+    }));
+    addPanelSection(validationPanel, "UI -> Mapped -> Snapshot -> Effective", validationMatrix, false);
+
+    juce::Array<juce::PropertyComponent*> validationRecent;
+    validationRecent.add(makeMultiLineReadOnly("Recent Touches", [this]() -> juce::String
+    {
+        if (recentTouchHistory.isEmpty())
+            return "No recent changes yet.";
+
+        juce::String joined;
+        const int maxLines = juce::jmin(6, recentTouchHistory.size());
+        for (int i = 0; i < maxLines; ++i)
+        {
+            if (i > 0)
+                joined << "\n";
+            joined << recentTouchHistory[i];
+        }
+        return joined;
+    }));
+    addPanelSection(validationPanel, "Recent Activity", validationRecent, false);
+
     auto addInternal = [&](int engineIndex, bool hqEnabled, const juce::String& name, std::atomic<float>& target,
                            double min, double max, double step, double skew = 1.0)
     {
@@ -528,7 +1963,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         const juce::String profileName = engineName + (hqEnabled ? " HQ" : " NQ");
         const bool isRedNQ = (engineIndex == 2 && !hqEnabled);
         const bool usesPreEmphasis = !isRedNQ;
-        const bool usesSaturation = (engineIndex == 0 || engineIndex == 1 || isRedNQ);
+        // saturationDriveScale is only used by Red NQ post-chorus drive.
+        const bool usesSaturation = isRedNQ;
         juce::Array<juce::PropertyComponent*> dspTimingAndMotion;
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Rate Smooth (ms)", engineTuning.rateSmoothingMs, 0.0, 200.0, 0.1, 1.0));
         dspTimingAndMotion.add(addInternal(engineIndex, hqEnabled, "Depth Smooth (ms)", engineTuning.depthSmoothingMs, 0.0, 500.0, 0.1, 1.0));
@@ -568,6 +2004,83 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             juce::Array<juce::PropertyComponent*> dspSaturation;
             dspSaturation.add(addInternal(engineIndex, hqEnabled, "Saturation Drive Scale", engineTuning.saturationDriveScale, 0.0, 6.0, 0.01, 1.0));
             addPanelSection(internalsPanel, profileName + " - Saturation", dspSaturation, false);
+        }
+
+        if (engineIndex == 0)
+        {
+            juce::Array<juce::PropertyComponent*> greenBloom;
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Exponent", engineTuning.greenBloomExponent, 0.1, 4.0, 0.01, 1.0));
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Depth Scale", engineTuning.greenBloomDepthScale, 0.0, 2.0, 0.01, 1.0));
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Centre Offset (ms)", engineTuning.greenBloomCentreOffsetMs, 0.0, 8.0, 0.01, 1.0));
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Cutoff Max (Hz)", engineTuning.greenBloomCutoffMaxHz, 1000.0, 20000.0, 1.0, 1.0));
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Cutoff Min (Hz)", engineTuning.greenBloomCutoffMinHz, 100.0, 10000.0, 1.0, 1.0));
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Wet Blend", engineTuning.greenBloomWetBlend, 0.0, 1.0, 0.001, 1.0));
+            greenBloom.add(addInternal(engineIndex, hqEnabled, "Green Bloom Gain", engineTuning.greenBloomGain, 0.0, 1.0, 0.001, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Green Bloom", greenBloom, false);
+        }
+
+        if (engineIndex == 1)
+        {
+            juce::Array<juce::PropertyComponent*> blueFocus;
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus Exponent", engineTuning.blueFocusExponent, 0.1, 4.0, 0.01, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus HP Min (Hz)", engineTuning.blueFocusHpMinHz, 20.0, 2000.0, 1.0, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus HP Max (Hz)", engineTuning.blueFocusHpMaxHz, 20.0, 6000.0, 1.0, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus LP Max (Hz)", engineTuning.blueFocusLpMaxHz, 2000.0, 20000.0, 1.0, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus LP Min (Hz)", engineTuning.blueFocusLpMinHz, 500.0, 20000.0, 1.0, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Presence Freq Min (Hz)", engineTuning.bluePresenceFreqMinHz, 200.0, 10000.0, 1.0, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Presence Freq Max (Hz)", engineTuning.bluePresenceFreqMaxHz, 200.0, 12000.0, 1.0, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Presence Q Min", engineTuning.bluePresenceQMin, 0.1, 4.0, 0.001, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Presence Q Max", engineTuning.bluePresenceQMax, 0.1, 6.0, 0.001, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Presence Gain Max (dB)", engineTuning.bluePresenceGainMaxDb, 0.0, 18.0, 0.01, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus Wet Blend", engineTuning.blueFocusWetBlend, 0.0, 1.0, 0.001, 1.0));
+            blueFocus.add(addInternal(engineIndex, hqEnabled, "Blue Focus Output Gain", engineTuning.blueFocusOutputGain, 0.0, 1.0, 0.001, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Blue Focus", blueFocus, false);
+        }
+
+        if (engineIndex == 3 && !hqEnabled)
+        {
+            juce::Array<juce::PropertyComponent*> purpleWarp;
+            purpleWarp.add(addInternal(engineIndex, hqEnabled, "Purple Warp A", engineTuning.purpleWarpA, 0.0, 1.5, 0.001, 1.0));
+            purpleWarp.add(addInternal(engineIndex, hqEnabled, "Purple Warp B", engineTuning.purpleWarpB, 0.0, 1.5, 0.001, 1.0));
+            purpleWarp.add(addInternal(engineIndex, hqEnabled, "Purple Warp K Base", engineTuning.purpleWarpKBase, 0.1, 6.0, 0.001, 1.0));
+            purpleWarp.add(addInternal(engineIndex, hqEnabled, "Purple Warp K Scale", engineTuning.purpleWarpKScale, 0.0, 6.0, 0.001, 1.0));
+            purpleWarp.add(addInternal(engineIndex, hqEnabled, "Purple Warp Delay Smooth (ms)", engineTuning.purpleWarpDelaySmoothingMs, 0.0, 500.0, 0.1, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Purple Warp", purpleWarp, false);
+        }
+
+        if (engineIndex == 3 && hqEnabled)
+        {
+            juce::Array<juce::PropertyComponent*> purpleOrbit;
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Eccentricity", engineTuning.purpleOrbitEccentricity, 0.0, 1.5, 0.001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Theta Base (Hz)", engineTuning.purpleOrbitThetaRateBaseHz, 0.0, 0.5, 0.0001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Theta Scale (Hz)", engineTuning.purpleOrbitThetaRateScaleHz, 0.0, 0.5, 0.0001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Theta2 Ratio", engineTuning.purpleOrbitThetaRate2Ratio, 0.1, 3.0, 0.001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Eccentricity2 Ratio", engineTuning.purpleOrbitEccentricity2Ratio, 0.0, 3.0, 0.001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Mix1", engineTuning.purpleOrbitMix1, 0.0, 1.0, 0.001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Stereo Theta Offset", engineTuning.purpleOrbitStereoThetaOffset, -1.0, 1.0, 0.001, 1.0));
+            purpleOrbit.add(addInternal(engineIndex, hqEnabled, "Purple Orbit Delay Smooth (ms)", engineTuning.purpleOrbitDelaySmoothingMs, 0.0, 500.0, 0.1, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Purple Orbit", purpleOrbit, false);
+        }
+
+        if (engineIndex == 4 && !hqEnabled)
+        {
+            juce::Array<juce::PropertyComponent*> blackNq;
+            blackNq.add(addInternal(engineIndex, hqEnabled, "Black NQ Depth Base", engineTuning.blackNqDepthBase, 0.0, 3.0, 0.001, 1.0));
+            blackNq.add(addInternal(engineIndex, hqEnabled, "Black NQ Depth Scale", engineTuning.blackNqDepthScale, 0.0, 3.0, 0.001, 1.0));
+            blackNq.add(addInternal(engineIndex, hqEnabled, "Black NQ Delay Glide (ms)", engineTuning.blackNqDelayGlideMs, 0.0, 100.0, 0.01, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Black Intensity", blackNq, false);
+        }
+
+        if (engineIndex == 4 && hqEnabled)
+        {
+            juce::Array<juce::PropertyComponent*> blackHq;
+            blackHq.add(addInternal(engineIndex, hqEnabled, "Black HQ Tap2 Mix Base", engineTuning.blackHqTap2MixBase, 0.0, 1.0, 0.001, 1.0));
+            blackHq.add(addInternal(engineIndex, hqEnabled, "Black HQ Tap2 Mix Scale", engineTuning.blackHqTap2MixScale, 0.0, 1.0, 0.001, 1.0));
+            blackHq.add(addInternal(engineIndex, hqEnabled, "Black HQ Tap2 Depth Base", engineTuning.blackHqSecondTapDepthBase, 0.0, 3.0, 0.001, 1.0));
+            blackHq.add(addInternal(engineIndex, hqEnabled, "Black HQ Tap2 Depth Scale", engineTuning.blackHqSecondTapDepthScale, 0.0, 3.0, 0.001, 1.0));
+            blackHq.add(addInternal(engineIndex, hqEnabled, "Black HQ Tap2 Delay Offset Base", engineTuning.blackHqSecondTapDelayOffsetBase, 0.0, 12.0, 0.001, 1.0));
+            blackHq.add(addInternal(engineIndex, hqEnabled, "Black HQ Tap2 Delay Offset Scale", engineTuning.blackHqSecondTapDelayOffsetScale, 0.0, 12.0, 0.001, 1.0));
+            addPanelSection(internalsPanel, profileName + " - Black Ensemble", blackHq, false);
         }
 
         // BBD internals are only used by Red NQ (engine 2, HQ off).
@@ -893,6 +2406,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     addPanelSection(layoutPanel, "Global Knob Response", layoutGlobalKnobResponseProps, false);
     setEditingLocked(true);
     updateActiveProfileLabel();
+    updateRightTabVisibility();
     startTimerHz(10);
 }
 
@@ -939,12 +2453,67 @@ void DevPanel::resized()
     layoutSection(leftX, leftY, uiTitle, uiDescription, uiPanel);
     layoutSection(leftX, leftY, layoutTitle, layoutDescription, layoutPanel);
 
+    const int tabHeight = 24;
+    const int tabGap = 6;
+    const int tabButtonWidth = (columnWidth - (tabGap * 4)) / 5;
+    int tabX = rightX;
+    tabOverviewButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
+    tabX += tabButtonWidth + tabGap;
+    tabInternalsButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
+    tabX += tabButtonWidth + tabGap;
+    tabBbdButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
+    tabX += tabButtonWidth + tabGap;
+    tabTapeButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
+    tabX += tabButtonWidth + tabGap;
+    tabValidationButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
+    rightY += tabHeight + 8;
+
     const int activeProfileH = 18;
     activeProfileLabel.setBounds(rightX, rightY, columnWidth, activeProfileH);
     rightY += activeProfileH + 8;
-    layoutSection(rightX, rightY, internalsTitle, internalsDescription, internalsPanel);
-    layoutSection(rightX, rightY, bbdTitle, bbdDescription, bbdPanel);
-    layoutSection(rightX, rightY, tapeTitle, tapeDescription, tapePanel);
+    if (selectedRightTab == 3)
+    {
+        const int toolsH = 22;
+        const int labelW = 36;
+        const int toggleW = 124;
+        const int clearW = 54;
+        const int gap = 6;
+
+        engineFilterLabel.setBounds(rightX, rightY + 2, labelW, toolsH - 2);
+        const int toggleX = rightX + columnWidth - toggleW;
+        engineShowAdvancedToggle.setBounds(toggleX, rightY, toggleW, toolsH);
+        const int clearX = toggleX - gap - clearW;
+        engineFilterClearButton.setBounds(clearX, rightY, clearW, toolsH);
+        const int filterX = rightX + labelW + gap;
+        const int filterW = juce::jmax(80, clearX - gap - filterX);
+        engineFilterEditor.setBounds(filterX, rightY, filterW, toolsH);
+        rightY += toolsH + 8;
+    }
+    if (selectedRightTab == 0)
+    {
+        layoutSection(rightX, rightY, overviewTitle, overviewDescription, overviewPanel);
+    }
+    else if (selectedRightTab == 1)
+    {
+        layoutSection(rightX, rightY, modulationTitle, modulationDescription, modulationPanel);
+    }
+    else if (selectedRightTab == 2)
+    {
+        layoutSection(rightX, rightY, toneTitle, toneDescription, tonePanel);
+    }
+    else if (selectedRightTab == 3)
+    {
+        layoutSection(rightX, rightY, engineTitle, engineDescription, enginePanel);
+        layoutSection(rightX, rightY, internalsTitle, internalsDescription, internalsPanel);
+        if (bbdPanel.isVisible())
+            layoutSection(rightX, rightY, bbdTitle, bbdDescription, bbdPanel);
+        if (tapePanel.isVisible())
+            layoutSection(rightX, rightY, tapeTitle, tapeDescription, tapePanel);
+    }
+    else
+    {
+        layoutSection(rightX, rightY, validationTitle, validationDescription, validationPanel);
+    }
 
     const int contentHeight = std::max(leftY, rightY);
     content.setBounds(0, 0, contentWidth, contentHeight);
@@ -959,9 +2528,171 @@ void DevPanel::updateActiveProfileLabel()
                                juce::dontSendNotification);
 }
 
+void DevPanel::updateEngineSectionVisibility()
+{
+    static const juce::String engineNames[] { "Green", "Blue", "Red", "Purple", "Black" };
+    const int colorIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+    const bool hqEnabled = processor.isHqEnabled();
+    const juce::String activeProfilePrefix = engineNames[colorIndex] + (hqEnabled ? " HQ" : " NQ") + " -";
+    const juce::String filter = engineFilterEditor.getText().trim().toLowerCase();
+
+    const bool showEngine = selectedRightTab == 3;
+    const bool isRedNQ = colorIndex == 2 && !hqEnabled;
+    const bool isRedHQ = colorIndex == 2 && hqEnabled;
+    bbdPanel.setVisible(showEngine && engineShowAdvanced && isRedNQ);
+    tapePanel.setVisible(showEngine && engineShowAdvanced && isRedHQ);
+
+    const auto sectionNames = internalsPanel.getSectionNames();
+    for (int i = 0; i < sectionNames.size(); ++i)
+    {
+        const auto& name = sectionNames[i];
+        const bool isActive = name.startsWith(activeProfilePrefix);
+        const bool matchesFilter = filter.isEmpty() || name.toLowerCase().contains(filter);
+        const bool isCoreSection = name.containsIgnoreCase("Timing + Motion")
+                                   || name.containsIgnoreCase("Filtering")
+                                   || name.containsIgnoreCase("Compressor");
+        const bool allowedByDisclosure = engineShowAdvanced || isCoreSection;
+        const bool shouldShow = isActive && matchesFilter && allowedByDisclosure;
+        internalsPanel.setSectionEnabled(i, shouldShow);
+        if (!showEngine)
+            internalsPanel.setSectionOpen(i, false);
+        else if (shouldShow)
+            internalsPanel.setSectionOpen(i, filter.isNotEmpty() || name.containsIgnoreCase("timing"));
+        else
+            internalsPanel.setSectionOpen(i, false);
+    }
+}
+
+void DevPanel::updateRightTabVisibility()
+{
+    const bool showOverview = selectedRightTab == 0;
+    const bool showModulation = selectedRightTab == 1;
+    const bool showTone = selectedRightTab == 2;
+    const bool showEngine = selectedRightTab == 3;
+    const bool showValidation = selectedRightTab == 4;
+
+    overviewTitle.setVisible(showOverview);
+    overviewDescription.setVisible(showOverview);
+    overviewPanel.setVisible(showOverview);
+    modulationTitle.setVisible(showModulation);
+    modulationDescription.setVisible(showModulation);
+    modulationPanel.setVisible(showModulation);
+    toneTitle.setVisible(showTone);
+    toneDescription.setVisible(showTone);
+    tonePanel.setVisible(showTone);
+    engineTitle.setVisible(showEngine);
+    engineDescription.setVisible(showEngine);
+    enginePanel.setVisible(showEngine);
+    engineFilterLabel.setVisible(showEngine);
+    engineFilterEditor.setVisible(showEngine);
+    engineFilterClearButton.setVisible(showEngine);
+    engineShowAdvancedToggle.setVisible(showEngine);
+    validationTitle.setVisible(showValidation);
+    validationDescription.setVisible(showValidation);
+    validationPanel.setVisible(showValidation);
+
+    internalsTitle.setVisible(showEngine);
+    internalsDescription.setVisible(showEngine);
+    internalsPanel.setVisible(showEngine);
+
+    updateEngineSectionVisibility();
+    bbdTitle.setVisible(showEngine && bbdPanel.isVisible());
+    bbdDescription.setVisible(showEngine && bbdPanel.isVisible());
+    tapeTitle.setVisible(showEngine && tapePanel.isVisible());
+    tapeDescription.setVisible(showEngine && tapePanel.isVisible());
+
+    tabOverviewButton.setToggleState(showOverview, juce::dontSendNotification);
+    tabInternalsButton.setToggleState(showModulation, juce::dontSendNotification);
+    tabBbdButton.setToggleState(showTone, juce::dontSendNotification);
+    tabTapeButton.setToggleState(showEngine, juce::dontSendNotification);
+    tabValidationButton.setToggleState(showValidation, juce::dontSendNotification);
+}
+
 void DevPanel::timerCallback()
 {
+    auto readRaw = [this](const char* paramId) -> float
+    {
+        if (auto* p = processor.getValueTreeState().getRawParameterValue(paramId))
+            return p->load();
+        return 0.0f;
+    };
+
+    const float currentRateRaw = readRaw(ChoroborosAudioProcessor::RATE_ID);
+    const float currentDepthRaw = readRaw(ChoroborosAudioProcessor::DEPTH_ID);
+    const float currentOffsetRaw = readRaw(ChoroborosAudioProcessor::OFFSET_ID);
+    const float currentWidthRaw = readRaw(ChoroborosAudioProcessor::WIDTH_ID);
+    const float currentColorRaw = readRaw(ChoroborosAudioProcessor::COLOR_ID);
+    const float currentMixRaw = readRaw(ChoroborosAudioProcessor::MIX_ID);
+
+    if (!macroTouchHistoryPrimed)
+    {
+        lastRateRaw = currentRateRaw;
+        lastDepthRaw = currentDepthRaw;
+        lastOffsetRaw = currentOffsetRaw;
+        lastWidthRaw = currentWidthRaw;
+        lastColorRaw = currentColorRaw;
+        lastMixRaw = currentMixRaw;
+        macroTouchHistoryPrimed = true;
+    }
+    else
+    {
+        const juce::String timestamp = juce::Time::getCurrentTime().formatted("%H:%M:%S");
+        auto pushTouch = [this, &timestamp](const juce::String& label, const juce::String& valueText)
+        {
+            const juce::String prefix = label + ":";
+            for (int i = recentTouchHistory.size() - 1; i >= 0; --i)
+            {
+                if (recentTouchHistory[i].startsWithIgnoreCase(prefix))
+                    recentTouchHistory.remove(i);
+            }
+            recentTouchHistory.insert(0, prefix + " " + valueText + " @ " + timestamp);
+            while (recentTouchHistory.size() > 10)
+                recentTouchHistory.remove(recentTouchHistory.size() - 1);
+        };
+
+        if (std::abs(currentRateRaw - lastRateRaw) > 1.0e-4f)
+        {
+            const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, currentRateRaw);
+            pushTouch("Rate", juce::String(mapped, 3) + " Hz");
+            lastRateRaw = currentRateRaw;
+        }
+        if (std::abs(currentDepthRaw - lastDepthRaw) > 1.0e-4f)
+        {
+            const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID, currentDepthRaw);
+            pushTouch("Depth", juce::String(mapped * 100.0f, 1) + " %");
+            lastDepthRaw = currentDepthRaw;
+        }
+        if (std::abs(currentOffsetRaw - lastOffsetRaw) > 1.0e-4f)
+        {
+            const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID, currentOffsetRaw);
+            pushTouch("Offset", juce::String(mapped, 2) + " deg");
+            lastOffsetRaw = currentOffsetRaw;
+        }
+        if (std::abs(currentWidthRaw - lastWidthRaw) > 1.0e-4f)
+        {
+            const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID, currentWidthRaw);
+            pushTouch("Width", juce::String(mapped, 3) + " x");
+            lastWidthRaw = currentWidthRaw;
+        }
+        if (std::abs(currentColorRaw - lastColorRaw) > 1.0e-4f)
+        {
+            const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID, currentColorRaw);
+            pushTouch("Color", juce::String(mapped, 3));
+            lastColorRaw = currentColorRaw;
+        }
+        if (std::abs(currentMixRaw - lastMixRaw) > 1.0e-4f)
+        {
+            const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::MIX_ID, currentMixRaw);
+            pushTouch("Mix", juce::String(mapped * 100.0f, 1) + " %");
+            lastMixRaw = currentMixRaw;
+        }
+    }
+
     updateActiveProfileLabel();
+    updateRightTabVisibility();
+    for (auto* property : liveReadoutProperties)
+        property->refresh();
+
     if (saveButtonResetCountdownTicks > 0)
     {
         --saveButtonResetCountdownTicks;
@@ -1024,6 +2755,47 @@ juce::String DevPanel::buildJson() const
         json << "    \"compressorThresholdDb\": " << formatFloat(internals.compressorThresholdDb.load()) << ",\n";
         json << "    \"compressorRatio\": " << formatFloat(internals.compressorRatio.load()) << ",\n";
         json << "    \"saturationDriveScale\": " << formatFloat(internals.saturationDriveScale.load()) << ",\n";
+        json << "    \"greenBloomExponent\": " << formatFloat(internals.greenBloomExponent.load()) << ",\n";
+        json << "    \"greenBloomDepthScale\": " << formatFloat(internals.greenBloomDepthScale.load()) << ",\n";
+        json << "    \"greenBloomCentreOffsetMs\": " << formatFloat(internals.greenBloomCentreOffsetMs.load()) << ",\n";
+        json << "    \"greenBloomCutoffMaxHz\": " << formatFloat(internals.greenBloomCutoffMaxHz.load()) << ",\n";
+        json << "    \"greenBloomCutoffMinHz\": " << formatFloat(internals.greenBloomCutoffMinHz.load()) << ",\n";
+        json << "    \"greenBloomWetBlend\": " << formatFloat(internals.greenBloomWetBlend.load()) << ",\n";
+        json << "    \"greenBloomGain\": " << formatFloat(internals.greenBloomGain.load()) << ",\n";
+        json << "    \"blueFocusExponent\": " << formatFloat(internals.blueFocusExponent.load()) << ",\n";
+        json << "    \"blueFocusHpMinHz\": " << formatFloat(internals.blueFocusHpMinHz.load()) << ",\n";
+        json << "    \"blueFocusHpMaxHz\": " << formatFloat(internals.blueFocusHpMaxHz.load()) << ",\n";
+        json << "    \"blueFocusLpMaxHz\": " << formatFloat(internals.blueFocusLpMaxHz.load()) << ",\n";
+        json << "    \"blueFocusLpMinHz\": " << formatFloat(internals.blueFocusLpMinHz.load()) << ",\n";
+        json << "    \"bluePresenceFreqMinHz\": " << formatFloat(internals.bluePresenceFreqMinHz.load()) << ",\n";
+        json << "    \"bluePresenceFreqMaxHz\": " << formatFloat(internals.bluePresenceFreqMaxHz.load()) << ",\n";
+        json << "    \"bluePresenceQMin\": " << formatFloat(internals.bluePresenceQMin.load()) << ",\n";
+        json << "    \"bluePresenceQMax\": " << formatFloat(internals.bluePresenceQMax.load()) << ",\n";
+        json << "    \"bluePresenceGainMaxDb\": " << formatFloat(internals.bluePresenceGainMaxDb.load()) << ",\n";
+        json << "    \"blueFocusWetBlend\": " << formatFloat(internals.blueFocusWetBlend.load()) << ",\n";
+        json << "    \"blueFocusOutputGain\": " << formatFloat(internals.blueFocusOutputGain.load()) << ",\n";
+        json << "    \"purpleWarpA\": " << formatFloat(internals.purpleWarpA.load()) << ",\n";
+        json << "    \"purpleWarpB\": " << formatFloat(internals.purpleWarpB.load()) << ",\n";
+        json << "    \"purpleWarpKBase\": " << formatFloat(internals.purpleWarpKBase.load()) << ",\n";
+        json << "    \"purpleWarpKScale\": " << formatFloat(internals.purpleWarpKScale.load()) << ",\n";
+        json << "    \"purpleWarpDelaySmoothingMs\": " << formatFloat(internals.purpleWarpDelaySmoothingMs.load()) << ",\n";
+        json << "    \"purpleOrbitEccentricity\": " << formatFloat(internals.purpleOrbitEccentricity.load()) << ",\n";
+        json << "    \"purpleOrbitThetaRateBaseHz\": " << formatFloat(internals.purpleOrbitThetaRateBaseHz.load()) << ",\n";
+        json << "    \"purpleOrbitThetaRateScaleHz\": " << formatFloat(internals.purpleOrbitThetaRateScaleHz.load()) << ",\n";
+        json << "    \"purpleOrbitThetaRate2Ratio\": " << formatFloat(internals.purpleOrbitThetaRate2Ratio.load()) << ",\n";
+        json << "    \"purpleOrbitEccentricity2Ratio\": " << formatFloat(internals.purpleOrbitEccentricity2Ratio.load()) << ",\n";
+        json << "    \"purpleOrbitMix1\": " << formatFloat(internals.purpleOrbitMix1.load()) << ",\n";
+        json << "    \"purpleOrbitStereoThetaOffset\": " << formatFloat(internals.purpleOrbitStereoThetaOffset.load()) << ",\n";
+        json << "    \"purpleOrbitDelaySmoothingMs\": " << formatFloat(internals.purpleOrbitDelaySmoothingMs.load()) << ",\n";
+        json << "    \"blackNqDepthBase\": " << formatFloat(internals.blackNqDepthBase.load()) << ",\n";
+        json << "    \"blackNqDepthScale\": " << formatFloat(internals.blackNqDepthScale.load()) << ",\n";
+        json << "    \"blackNqDelayGlideMs\": " << formatFloat(internals.blackNqDelayGlideMs.load()) << ",\n";
+        json << "    \"blackHqTap2MixBase\": " << formatFloat(internals.blackHqTap2MixBase.load()) << ",\n";
+        json << "    \"blackHqTap2MixScale\": " << formatFloat(internals.blackHqTap2MixScale.load()) << ",\n";
+        json << "    \"blackHqSecondTapDepthBase\": " << formatFloat(internals.blackHqSecondTapDepthBase.load()) << ",\n";
+        json << "    \"blackHqSecondTapDepthScale\": " << formatFloat(internals.blackHqSecondTapDepthScale.load()) << ",\n";
+        json << "    \"blackHqSecondTapDelayOffsetBase\": " << formatFloat(internals.blackHqSecondTapDelayOffsetBase.load()) << ",\n";
+        json << "    \"blackHqSecondTapDelayOffsetScale\": " << formatFloat(internals.blackHqSecondTapDelayOffsetScale.load()) << ",\n";
         json << "    \"bbdDelaySmoothingMs\": " << formatFloat(internals.bbdDelaySmoothingMs.load()) << ",\n";
         json << "    \"bbdDelayMinMs\": " << formatFloat(internals.bbdDelayMinMs.load()) << ",\n";
         json << "    \"bbdDelayMaxMs\": " << formatFloat(internals.bbdDelayMaxMs.load()) << ",\n";

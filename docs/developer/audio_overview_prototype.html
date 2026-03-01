@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choroboros Dev Panel - Audio Overview Prototype</title>
+  <style>
+    :root {
+      --bg: #111719;
+      --bg-2: #162025;
+      --card: #1b2a31;
+      --card-2: #22343d;
+      --text: #e8eef0;
+      --muted: #9fb0b7;
+      --accent: #ff7a2f;
+      --accent-2: #ffb33f;
+      --ok: #5fd18a;
+      --warn: #ffd166;
+      --bad: #f86d6d;
+      --line: #2f4a56;
+      --radius: 14px;
+      --gap: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Avenir Next", "Segoe UI Variable", "Gill Sans", sans-serif;
+      background:
+        radial-gradient(1100px 600px at 85% -10%, #27424d 0%, transparent 55%),
+        radial-gradient(700px 400px at -10% 110%, #304930 0%, transparent 50%),
+        linear-gradient(180deg, var(--bg) 0%, #0d1316 100%);
+      min-height: 100vh;
+    }
+
+    .shell {
+      width: min(1200px, 100% - 24px);
+      margin: 12px auto 24px;
+      display: grid;
+      gap: var(--gap);
+    }
+
+    .topbar {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: end;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--card) 0%, #17252b 100%);
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0.02em;
+    }
+
+    .title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .control-label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    select,
+    input[type="number"] {
+      width: 100%;
+      background: var(--bg-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg-2);
+      user-select: none;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #1c1209;
+      border-color: transparent;
+    }
+
+    .panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: linear-gradient(180deg, var(--card) 0%, #16252c 100%);
+      gap: var(--gap);
+    }
+
+    .panel.active { display: grid; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--gap);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--gap);
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: linear-gradient(180deg, var(--card-2) 0%, #1a2b32 100%);
+      padding: 10px;
+      min-height: 80px;
+    }
+
+    .card h3 {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .metric {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .signal-flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(110px, 1fr));
+      gap: 8px;
+    }
+
+    .flow-stage {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(14, 25, 30, 0.55);
+      position: relative;
+    }
+
+    .flow-stage::after {
+      content: ">";
+      position: absolute;
+      right: -7px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      opacity: 0.8;
+    }
+
+    .flow-stage:last-child::after { display: none; }
+
+    .stage-name {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .stage-value {
+      margin-top: 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 6px;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #072017;
+      background: var(--ok);
+    }
+
+    .meter {
+      height: 12px;
+      border-radius: 999px;
+      background: #0b1418;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .meter > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #5fd18a, #ffd166, #ff7a2f);
+      width: 0%;
+      transition: width 120ms linear;
+    }
+
+    .control-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 170px 1fr 90px;
+      gap: 10px;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(159, 176, 183, 0.15);
+    }
+
+    .control-row:last-child { border-bottom: 0; }
+
+    .control-row label {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .units {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    canvas {
+      width: 100%;
+      height: 180px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0d171b;
+      display: block;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid rgba(159, 176, 183, 0.2);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+    }
+
+    .status-ok { color: var(--ok); font-weight: 700; }
+    .status-warn { color: var(--warn); font-weight: 700; }
+    .status-bad { color: var(--bad); font-weight: 700; }
+
+    .timeline {
+      display: grid;
+      gap: 8px;
+    }
+
+    .timeline-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(15, 27, 33, 0.65);
+    }
+
+    .timeline-item strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 960px) {
+      .topbar {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+
+      .grid-2, .grid-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .signal-flow {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-stage::after { display: none; }
+
+      .control-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="title">
+        <h1>Choroboros Dev Panel - Audio Overview Prototype</h1>
+        <p>Contract-driven mockup for third-party review. Focus: derived state, engine relevance, validation trace.</p>
+      </div>
+      <div>
+        <label class="control-label" for="engineSelect">Engine</label>
+        <select id="engineSelect">
+          <option>Green</option>
+          <option>Blue</option>
+          <option selected>Red</option>
+          <option>Purple</option>
+          <option>Black</option>
+        </select>
+      </div>
+      <div>
+        <label class="control-label" for="modeSelect">Mode</label>
+        <select id="modeSelect">
+          <option value="NQ" selected>NQ</option>
+          <option value="HQ">HQ</option>
+        </select>
+      </div>
+      <label class="toggle"><input id="advancedToggle" type="checkbox"> Show Advanced</label>
+    </header>
+
+    <nav class="tabs" aria-label="Dev panel tabs">
+      <button class="tab-btn active" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="modulation">Modulation</button>
+      <button class="tab-btn" data-tab="tone">Tone / Dynamics</button>
+      <button class="tab-btn" data-tab="engine">Engine</button>
+      <button class="tab-btn" data-tab="validation">Validation</button>
+      <button class="tab-btn" data-tab="timeline">Timeline</button>
+    </nav>
+
+    <section id="overview" class="panel active">
+      <div class="card">
+        <h3>Signal Flow</h3>
+        <div class="signal-flow" id="signalFlow"></div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <h3>Pre Meter</h3>
+          <div class="metric" id="preDb">-12.0 dB</div>
+          <div class="meter"><span id="preMeter"></span></div>
+        </div>
+        <div class="card">
+          <h3>Wet Meter</h3>
+          <div class="metric" id="wetDb">-12.0 dB</div>
+          <div class="meter"><span id="wetMeter"></span></div>
+        </div>
+        <div class="card">
+          <h3>Post Meter</h3>
+          <div class="metric" id="postDb">-12.0 dB</div>
+          <div class="meter"><span id="postMeter"></span></div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <h3>Derived Delay</h3>
+          <div class="metric" id="delayMetric">0.00 ms</div>
+          <div class="hint" id="delaySamples">0 samples</div>
+        </div>
+        <div class="card">
+          <h3>BBD Clock</h3>
+          <div class="metric" id="clockMetric">0.0 kHz</div>
+          <div class="hint" id="swellRisk">Stable trajectory</div>
+        </div>
+        <div class="card">
+          <h3>Saturation</h3>
+          <div class="metric" id="satMetric">0.00 dB</div>
+          <div class="hint">Red engine rule: color=0 means 0 saturation.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="modulation" class="panel">
+      <div class="grid-2">
+        <div class="card">
+          <h3>LFO Scope (L/R)</h3>
+          <canvas id="lfoCanvas" width="720" height="180"></canvas>
+          <div class="hint" id="lfoReadout">Rate 0.62 Hz, phase offset 180 deg</div>
+        </div>
+        <div class="card">
+          <h3>Delay Trajectory (ms)</h3>
+          <canvas id="delayCanvas" width="720" height="180"></canvas>
+          <div class="hint">This view is intended to expose cyclical swell/drop behavior.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tone" class="panel">
+      <div class="grid-2">
+        <div class="card">
+          <h3>Spectrum + Filter Overlays (mock)</h3>
+          <canvas id="spectrumCanvas" width="720" height="180"></canvas>
+          <div class="hint" id="filterReadout">HPF 35 Hz, LPF 9.8 kHz, pre-emphasis +1.2 dB</div>
+        </div>
+        <div class="card">
+          <h3>Nonlinear Transfer Curve</h3>
+          <canvas id="transferCanvas" width="720" height="180"></canvas>
+          <div class="hint">As color rises, curve bends. At color=0 in Red engine, line is linear.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="engine" class="panel">
+      <div class="grid-2">
+        <div class="card">
+          <h3>Engine Macro</h3>
+          <div class="metric" id="macroLabel">Red: Color = Tape Tone + Saturation</div>
+          <div class="hint" id="macroHint">Applies derived behavior to tone and drive with explicit color gating.</div>
+        </div>
+        <div class="card">
+          <h3>Diagnostics Toggles</h3>
+          <label class="toggle"><input id="simulateNoop" type="checkbox"> Simulate no-op binding for one control</label>
+          <label class="toggle"><input id="simulateStale" type="checkbox"> Simulate stale snapshot drift</label>
+          <p class="footnote">For review only. These flags intentionally create warnings in Validation.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Core + Advanced Controls (engine-aware)</h3>
+        <div id="controlList" class="control-grid"></div>
+      </div>
+    </section>
+
+    <section id="validation" class="panel">
+      <div class="card">
+        <h3>Wiring Inspector</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Control</th>
+              <th>UI Raw</th>
+              <th>Mapped</th>
+              <th>Snapshot</th>
+              <th>DSP Effective</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="validationBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="timeline" class="panel">
+      <div class="timeline">
+        <div class="timeline-item">
+          <strong>Phase 0 (March 2-6, 2026): Contract freeze</strong>
+          Finalize parameter metadata fields (`id`, `stage`, `appliesTo`, `derivedHook`, `visibility`) and agree bitmask encoding.
+        </div>
+        <div class="timeline-item">
+          <strong>Phase 1 (March 9-20, 2026): Dev Panel IA refactor</strong>
+          Add tab shell, engine-aware visibility, and core/advanced disclosure without visual scopes yet.
+        </div>
+        <div class="timeline-item">
+          <strong>Phase 2 (March 23-April 3, 2026): Tier-1 visuals</strong>
+          Implement delay trajectory, transfer curve, signal-flow badges with derived readouts.
+        </div>
+        <div class="timeline-item">
+          <strong>Phase 3 (April 6-17, 2026): Validation tab</strong>
+          Wire UI→mapped→snapshot→DSP inspector, include stale/no-op detection and debug alerts.
+        </div>
+        <div class="timeline-item">
+          <strong>Phase 4 (April 20-24, 2026): Review and hardening</strong>
+          Capture expert review, apply fixes, and freeze acceptance tests for per-engine semantics.
+        </div>
+      </div>
+      <p class="footnote">Use this page to collect third-party comments directly against visible behavior, not only static docs.</p>
+    </section>
+  </div>
+
+  <script>
+    const controls = [
+      { id: "rateHz", label: "Rate", units: "Hz", min: 0.05, max: 5.0, step: 0.01, visibility: "core", stage: "modulation", appliesTo: ["Green", "Blue", "Red", "Purple", "Black"] },
+      { id: "depthPct", label: "Depth", units: "%", min: 0, max: 100, step: 1, visibility: "core", stage: "modulation", appliesTo: ["Green", "Blue", "Red", "Purple", "Black"] },
+      { id: "offsetDeg", label: "Offset", units: "deg", min: 0, max: 180, step: 1, visibility: "core", stage: "modulation", appliesTo: ["Green", "Blue", "Red", "Purple", "Black"] },
+      { id: "colorPct", label: "Color", units: "%", min: 0, max: 100, step: 1, visibility: "core", stage: "engine", appliesTo: ["Green", "Blue", "Red", "Purple", "Black"] },
+      { id: "mixPct", label: "Mix", units: "%", min: 0, max: 100, step: 1, visibility: "core", stage: "output", appliesTo: ["Green", "Blue", "Red", "Purple", "Black"] },
+      { id: "bbdStages", label: "BBD Stages", units: "samples", min: 256, max: 2048, step: 1, visibility: "advanced", stage: "engine", appliesTo: ["Red"] },
+      { id: "tapeToneKhz", label: "Tape Tone", units: "kHz", min: 4, max: 14, step: 0.1, visibility: "advanced", stage: "tone", appliesTo: ["Red"] },
+      { id: "bloomDrive", label: "Bloom Drive", units: "dB", min: 0, max: 12, step: 0.1, visibility: "advanced", stage: "engine", appliesTo: ["Green"] },
+      { id: "focusTiltDb", label: "Focus Tilt", units: "dB", min: -6, max: 6, step: 0.1, visibility: "advanced", stage: "tone", appliesTo: ["Blue"] },
+      { id: "warpAmount", label: "Warp Amount", units: "%", min: 0, max: 100, step: 1, visibility: "advanced", stage: "engine", appliesTo: ["Purple"] },
+      { id: "ensembleDensity", label: "Ensemble Density", units: "voices", min: 2, max: 16, step: 1, visibility: "advanced", stage: "engine", appliesTo: ["Black"] }
+    ];
+
+    const engineMacro = {
+      Green: { label: "Green: Color = Bloom", hint: "Emphasis on harmonic bloom and high shelf shape." },
+      Blue: { label: "Blue: Color = Focus", hint: "Color steers spectral tilt and phase focus." },
+      Red: { label: "Red: Color = Tape Tone + Saturation", hint: "Saturation must stay zero at color=0." },
+      Purple: { label: "Purple: Color = Warp", hint: "Color increases warp depth and orbit spread." },
+      Black: { label: "Black: Color = Intensity", hint: "Color raises ensemble density and glue." }
+    };
+
+    const state = {
+      engine: "Red",
+      mode: "NQ",
+      showAdvanced: false,
+      simulateNoop: false,
+      simulateStale: false,
+      rateHz: 0.62,
+      depthPct: 21,
+      offsetDeg: 120,
+      colorPct: 28,
+      mixPct: 42,
+      bbdStages: 1024,
+      tapeToneKhz: 8.5,
+      bloomDrive: 3.4,
+      focusTiltDb: 0.8,
+      warpAmount: 35,
+      ensembleDensity: 8
+    };
+
+    const signalStages = [
+      { id: "input", label: "Input" },
+      { id: "condition", label: "Pre-Emphasis" },
+      { id: "filter", label: "HP/LP" },
+      { id: "core", label: "Chorus Core" },
+      { id: "nonlinear", label: "Color / Sat" }
+    ];
+
+    const tabs = document.querySelectorAll(".tab-btn");
+    const panels = document.querySelectorAll(".panel");
+    const signalFlow = document.getElementById("signalFlow");
+    const controlList = document.getElementById("controlList");
+    const validationBody = document.getElementById("validationBody");
+
+    const engineSelect = document.getElementById("engineSelect");
+    const modeSelect = document.getElementById("modeSelect");
+    const advancedToggle = document.getElementById("advancedToggle");
+    const simulateNoop = document.getElementById("simulateNoop");
+    const simulateStale = document.getElementById("simulateStale");
+
+    const lfoCanvas = document.getElementById("lfoCanvas");
+    const delayCanvas = document.getElementById("delayCanvas");
+    const spectrumCanvas = document.getElementById("spectrumCanvas");
+    const transferCanvas = document.getElementById("transferCanvas");
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function normalized(control, value) {
+      return (value - control.min) / (control.max - control.min);
+    }
+
+    function isApplicable(control) {
+      return control.appliesTo.includes(state.engine);
+    }
+
+    function mapControl(control, value) {
+      const n = clamp(normalized(control, value), 0, 1);
+      switch (control.id) {
+        case "rateHz":
+          return 0.05 * Math.pow(100, n);
+        case "depthPct":
+          return n * 1.0;
+        case "colorPct":
+          return n;
+        default:
+          return value;
+      }
+    }
+
+    function computeDerived(tSec) {
+      const colorNorm = state.colorPct / 100;
+      const depthNorm = state.depthPct / 100;
+      const modeBoost = state.mode === "HQ" ? 1.12 : 1.0;
+      const bbdClockKhz = (state.mode === "HQ" ? 48 : 42) + (state.rateHz * 2.1) + (colorNorm * 16);
+      const minDelayMs = state.engine === "Red" ? (state.bbdStages / (bbdClockKhz * 1000)) * 1000 : 1.2;
+      const lfo = Math.sin((tSec * state.rateHz * Math.PI * 2) + (state.offsetDeg * Math.PI / 180));
+      const delayMs = Math.max(minDelayMs, 4.2 + depthNorm * 7.0 + lfo * depthNorm * 2.2);
+
+      const satDb = state.engine === "Red"
+        ? (colorNorm <= 0 ? 0 : Math.pow(colorNorm, 1.7) * 18)
+        : Math.pow(colorNorm, 1.2) * 8;
+
+      const hpfHz = 22 + (depthNorm * 35) + (state.engine === "Blue" ? 25 : 0);
+      const lpfHz = state.engine === "Red"
+        ? ((state.mode === "HQ" ? 7200 : 6400) + colorNorm * 4200)
+        : (9000 + colorNorm * 6500);
+      const preDb = -12 + Math.sin(tSec * 1.2) * 2.5;
+      const wetDb = preDb + (state.mixPct / 100) * 7 - 1.5;
+      const postDb = wetDb - (satDb * 0.08);
+      const coreName = state.engine === "Red"
+        ? (state.mode === "HQ" ? "Tape" : "BBD")
+        : state.engine;
+      const risk = state.engine === "Red" && state.mode === "NQ" && state.depthPct > 70 && bbdClockKhz < 46;
+
+      return {
+        colorNorm,
+        delayMs,
+        delaySamples: delayMs * 48,
+        satDb,
+        bbdClockKhz,
+        hpfHz,
+        lpfHz,
+        preDb,
+        wetDb,
+        postDb,
+        coreName,
+        risk,
+        lfo
+      };
+    }
+
+    function renderSignalFlow(d) {
+      const blocks = [
+        { name: "Input", value: `${d.preDb.toFixed(1)} dB`, badge: "ON" },
+        { name: "Pre-Emphasis", value: `${(1 + d.colorNorm * 2.4).toFixed(2)} dB`, badge: "ON" },
+        { name: "HP/LP", value: `${Math.round(d.hpfHz)} Hz / ${(d.lpfHz / 1000).toFixed(1)} kHz`, badge: "ON" },
+        { name: "Core", value: `${d.coreName}  ${state.rateHz.toFixed(2)} Hz`, badge: "ON" },
+        { name: "Color Stage", value: `${d.satDb.toFixed(2)} dB sat`, badge: d.satDb > 0 ? "ACTIVE" : "BYPASS" }
+      ];
+
+      signalFlow.innerHTML = blocks.map((b) => (
+        `<article class="flow-stage">
+          <div class="stage-name">${b.name}</div>
+          <div class="stage-value">${b.value}</div>
+          <div class="badge">${b.badge}</div>
+        </article>`
+      )).join("");
+    }
+
+    function meterPercent(db) {
+      return clamp((db + 24) / 24, 0, 1) * 100;
+    }
+
+    function controlTemplate(c) {
+      const value = state[c.id];
+      return `<div class="control-row" data-control="${c.id}">
+        <label for="ctrl-${c.id}">
+          ${c.label}
+          <span class="units">${c.units}</span>
+        </label>
+        <input id="ctrl-${c.id}" type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${value}">
+        <input id="num-${c.id}" type="number" min="${c.min}" max="${c.max}" step="${c.step}" value="${value}">
+      </div>`;
+    }
+
+    function renderControls() {
+      const visible = controls.filter((c) => isApplicable(c) && (state.showAdvanced || c.visibility === "core"));
+      controlList.innerHTML = visible.map(controlTemplate).join("");
+
+      visible.forEach((c) => {
+        const slider = document.getElementById(`ctrl-${c.id}`);
+        const number = document.getElementById(`num-${c.id}`);
+        const sync = (v) => {
+          state[c.id] = Number(v);
+          slider.value = v;
+          number.value = v;
+          render();
+        };
+        slider.addEventListener("input", () => sync(slider.value));
+        number.addEventListener("input", () => sync(number.value));
+      });
+    }
+
+    function formatValue(control, value) {
+      const precision = control.step < 1 ? 2 : 0;
+      return `${Number(value).toFixed(precision)} ${control.units}`;
+    }
+
+    function renderValidation(d) {
+      const rows = controls.filter(isApplicable).map((control, index) => {
+        const uiRaw = clamp(normalized(control, state[control.id]), 0, 1);
+        const mapped = mapControl(control, state[control.id]);
+        const staleBias = state.simulateStale ? (index === 1 ? 0.03 : 0) : 0;
+        const snapshot = mapped + staleBias;
+        let dspEffective = snapshot;
+
+        if (control.id === "colorPct") dspEffective = d.colorNorm;
+        if (control.id === "rateHz") dspEffective = state.rateHz;
+        if (control.id === "depthPct") dspEffective = state.depthPct / 100;
+        if (control.id === "colorPct" && state.engine === "Red") dspEffective = d.satDb;
+
+        let status = "OK";
+        let className = "status-ok";
+        if (state.simulateNoop && index === controls.findIndex((c) => c.id === "mixPct")) {
+          status = "NO-OP";
+          className = "status-bad";
+          dspEffective = 0;
+        } else if (Math.abs(snapshot - mapped) > 0.01) {
+          status = "STALE";
+          className = "status-warn";
+        }
+
+        const mappedText = (control.id === "colorPct" && state.engine === "Red")
+          ? `${(mapped * 100).toFixed(1)}% -> sat target`
+          : formatValue(control, mapped);
+        const snapshotText = (typeof snapshot === "number") ? snapshot.toFixed(4) : String(snapshot);
+        const dspText = (control.id === "colorPct" && state.engine === "Red")
+          ? `${dspEffective.toFixed(3)} dB`
+          : (typeof dspEffective === "number" ? dspEffective.toFixed(4) : String(dspEffective));
+
+        return `<tr>
+          <td>${control.label}</td>
+          <td>${uiRaw.toFixed(3)}</td>
+          <td>${mappedText}</td>
+          <td>${snapshotText}</td>
+          <td>${dspText}</td>
+          <td class="${className}">${status}</td>
+        </tr>`;
+      });
+
+      validationBody.innerHTML = rows.join("");
+    }
+
+    function drawGrid(ctx, w, h) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = "#23363f";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 6; i++) {
+        const y = (h / 6) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      for (let i = 1; i < 10; i++) {
+        const x = (w / 10) * i;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+    }
+
+    function drawLfoScope(tSec) {
+      const ctx = lfoCanvas.getContext("2d");
+      const w = lfoCanvas.width;
+      const h = lfoCanvas.height;
+      drawGrid(ctx, w, h);
+
+      const amp = h * (0.25 + (state.depthPct / 100) * 0.35);
+      const center = h / 2;
+      const omega = state.rateHz * Math.PI * 2;
+      const phase = state.offsetDeg * Math.PI / 180;
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#5fd18a";
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const tt = (x / w) * 2.5;
+        const y = center + Math.sin((tSec + tt) * omega) * amp;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = "#ff7a2f";
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const tt = (x / w) * 2.5;
+        const y = center + Math.sin((tSec + tt) * omega + phase) * amp;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function drawDelayTrajectory(tSec, d) {
+      const ctx = delayCanvas.getContext("2d");
+      const w = delayCanvas.width;
+      const h = delayCanvas.height;
+      drawGrid(ctx, w, h);
+
+      const depth = state.depthPct / 100;
+      const base = d.delayMs;
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const tt = (x / w) * 5;
+        const v = base + Math.sin((tSec + tt) * state.rateHz * Math.PI * 2) * (depth * 2.8);
+        const y = h - clamp((v / 16) * h, 0, h);
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function drawSpectrum(d) {
+      const ctx = spectrumCanvas.getContext("2d");
+      const w = spectrumCanvas.width;
+      const h = spectrumCanvas.height;
+      drawGrid(ctx, w, h);
+
+      ctx.strokeStyle = "#8cc7ff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const f = x / w;
+        const noise = (Math.sin(f * 45) + Math.sin(f * 120)) * 0.03;
+        const rolloff = Math.exp(-f * 2.5);
+        const shape = 0.25 + rolloff * 0.55 + noise;
+        const y = h - shape * h;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      const hpX = clamp((Math.log10(d.hpfHz) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20)), 0, 1) * w;
+      const lpX = clamp((Math.log10(d.lpfHz) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20)), 0, 1) * w;
+      ctx.strokeStyle = "#5fd18a";
+      ctx.beginPath();
+      ctx.moveTo(hpX, 0);
+      ctx.lineTo(hpX, h);
+      ctx.stroke();
+      ctx.strokeStyle = "#ff7a2f";
+      ctx.beginPath();
+      ctx.moveTo(lpX, 0);
+      ctx.lineTo(lpX, h);
+      ctx.stroke();
+    }
+
+    function drawTransfer(d) {
+      const ctx = transferCanvas.getContext("2d");
+      const w = transferCanvas.width;
+      const h = transferCanvas.height;
+      drawGrid(ctx, w, h);
+
+      const satNorm = clamp(d.satDb / 18, 0, 1);
+      const drive = 1 + satNorm * 5;
+
+      ctx.strokeStyle = "#5fd18a";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      ctx.lineTo(w, 0);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#ffb33f";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const xn = (x / (w - 1)) * 2 - 1;
+        const yn = Math.tanh(xn * drive) / Math.tanh(drive);
+        const y = ((1 - (yn + 1) * 0.5) * h);
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function render(tSec = performance.now() * 0.001) {
+      const d = computeDerived(tSec);
+      const macro = engineMacro[state.engine];
+      document.getElementById("macroLabel").textContent = macro.label;
+      document.getElementById("macroHint").textContent = macro.hint;
+
+      renderSignalFlow(d);
+      document.getElementById("preDb").textContent = `${d.preDb.toFixed(1)} dB`;
+      document.getElementById("wetDb").textContent = `${d.wetDb.toFixed(1)} dB`;
+      document.getElementById("postDb").textContent = `${d.postDb.toFixed(1)} dB`;
+      document.getElementById("preMeter").style.width = `${meterPercent(d.preDb)}%`;
+      document.getElementById("wetMeter").style.width = `${meterPercent(d.wetDb)}%`;
+      document.getElementById("postMeter").style.width = `${meterPercent(d.postDb)}%`;
+
+      document.getElementById("delayMetric").textContent = `${d.delayMs.toFixed(2)} ms`;
+      document.getElementById("delaySamples").textContent = `${Math.round(d.delaySamples)} samples @ 48 kHz`;
+      document.getElementById("clockMetric").textContent = `${d.bbdClockKhz.toFixed(1)} kHz`;
+      document.getElementById("swellRisk").textContent = d.risk ? "Risk: cyclical swell/drop (check depth/clock bounds)" : "Stable trajectory";
+      document.getElementById("satMetric").textContent = `${d.satDb.toFixed(2)} dB`;
+
+      document.getElementById("lfoReadout").textContent =
+        `Rate ${state.rateHz.toFixed(2)} Hz, phase offset ${state.offsetDeg.toFixed(0)} deg`;
+      document.getElementById("filterReadout").textContent =
+        `HPF ${Math.round(d.hpfHz)} Hz, LPF ${(d.lpfHz / 1000).toFixed(1)} kHz, pre-emphasis ${(1 + d.colorNorm * 2.4).toFixed(2)} dB`;
+
+      renderValidation(d);
+      drawLfoScope(tSec);
+      drawDelayTrajectory(tSec, d);
+      drawSpectrum(d);
+      drawTransfer(d);
+    }
+
+    tabs.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        tabs.forEach((b) => b.classList.remove("active"));
+        panels.forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(btn.dataset.tab).classList.add("active");
+      });
+    });
+
+    engineSelect.addEventListener("change", () => {
+      state.engine = engineSelect.value;
+      renderControls();
+      render();
+    });
+    modeSelect.addEventListener("change", () => {
+      state.mode = modeSelect.value;
+      render();
+    });
+    advancedToggle.addEventListener("change", () => {
+      state.showAdvanced = advancedToggle.checked;
+      renderControls();
+      render();
+    });
+    simulateNoop.addEventListener("change", () => {
+      state.simulateNoop = simulateNoop.checked;
+      render();
+    });
+    simulateStale.addEventListener("change", () => {
+      state.simulateStale = simulateStale.checked;
+      render();
+    });
+
+    function frame() {
+      render();
+      requestAnimationFrame(frame);
+    }
+
+    renderControls();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

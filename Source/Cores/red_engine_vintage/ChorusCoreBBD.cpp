@@ -172,9 +172,14 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
 
     const float fs = static_cast<float>(spec.sampleRate);
-    const float nyquistSafeClock = 0.45f * fs;
+    // BBD clock is explicitly capped at sample rate (not an extra 0.45*fs ceiling),
+    // matching the intended model and avoiding hidden modulation clipping.
+    const float nyquistSafeClock = fs;
     const float ratioClockLimit = fs * clockMaxRatio;
     const float maxClockFreq = juce::jmax(clockMinHz + 1.0f, juce::jmin(nyquistSafeClock, ratioClockLimit));
+    const float effectiveMinDelayMs = (static_cast<float>(effectiveStages) / (2.0f * maxClockFreq)) * 1000.0f;
+    const float delayMinMs = juce::jmax(tuning.bbdDelayMinMs, effectiveMinDelayMs);
+    const float delayMaxMs = juce::jmax(delayMinMs, tuning.bbdDelayMaxMs);
 
     const float filterMinHz = juce::jmax(20.0f, tuning.bbdFilterCutoffMinHz);
     const float filterMaxHz = juce::jmax(filterMinHz, tuning.bbdFilterCutoffMaxHz);
@@ -182,7 +187,7 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
     const float filterMaxByRatioHz = fs * filterMaxRatio;
     const float effectiveFilterMaxHz = juce::jmax(filterMinHz, juce::jmin(filterMaxHz, filterMaxByRatioHz));
     const float filterScale = juce::jmax(0.0f, tuning.bbdFilterCutoffScale);
-    const float centreDelayMsForFilter = juce::jlimit(tuning.bbdDelayMinMs, tuning.bbdDelayMaxMs, remappedCentreDelayMs);
+    const float centreDelayMsForFilter = juce::jlimit(delayMinMs, delayMaxMs, remappedCentreDelayMs);
     const float centreDelaySecForFilter = juce::jmax(0.001f, centreDelayMsForFilter * 0.001f);
     float approxClockHz = static_cast<float>(effectiveStages) / (2.0f * centreDelaySecForFilter);
     approxClockHz = juce::jmin(approxClockHz, fs);
@@ -223,7 +228,7 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
         for (int i = 0; i < blockNumSamples; ++i)
         {
             float targetDelayMs = remappedCentreDelayMs + depthMs * channelLfo[i];
-            targetDelayMs = juce::jlimit(tuning.bbdDelayMinMs, tuning.bbdDelayMaxMs, targetDelayMs);
+            targetDelayMs = juce::jlimit(delayMinMs, delayMaxMs, targetDelayMs);
 
             chan.smoothedDelayMs.setTargetValue(targetDelayMs);
             float delayMs = chan.smoothedDelayMs.getNextValue();

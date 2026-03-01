@@ -243,5 +243,5 @@ This software is licensed, not sold. By installing or using Choroboros, you agre
 
 ---
 
-**Version:** 2.02-beta  
+**Version:** 2.03-beta  
 **Last Updated:** February 2026

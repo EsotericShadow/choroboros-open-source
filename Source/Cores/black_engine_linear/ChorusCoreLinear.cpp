@@ -18,6 +18,7 @@
 
 #include "ChorusCoreLinear.h"
 #include "../../DSP/ChorusDSP.h"
+#include <algorithm>
 #include <cmath>
 
 void ChorusCoreLinear::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
@@ -36,11 +37,25 @@ void ChorusCoreLinear::prepare(const juce::dsp::ProcessSpec& processSpec, Chorus
 
     delayLine.setMaximumDelayInSamples(maxDelaySamples);
     delayLine.prepare(spec);
+
+    const float delayGlideMs = 2.5f;
+    if (spec.sampleRate > 0.0 && delayGlideMs > 0.0f)
+        delaySmoothingAlpha = 1.0f - std::exp(-1.0f / (delayGlideMs * 0.001f * static_cast<float>(spec.sampleRate)));
+    else
+        delaySmoothingAlpha = 1.0f;
+    lastDelayGlideMs = delayGlideMs;
+
+    const auto numChannels = static_cast<size_t>(spec.numChannels);
+    smoothedDelaySamplesByChannel.assign(numChannels, 0.0f);
+    smoothedDelayInitializedByChannel.assign(numChannels, false);
 }
 
 void ChorusCoreLinear::reset()
 {
     delayLine.reset();
+    std::fill(smoothedDelaySamplesByChannel.begin(), smoothedDelaySamplesByChannel.end(), 0.0f);
+    std::fill(smoothedDelayInitializedByChannel.begin(), smoothedDelayInitializedByChannel.end(), false);
+    lastDelayGlideMs = -1.0f;
 }
 
 float ChorusCoreLinear::getMaxDelaySamples() const
@@ -57,11 +72,23 @@ void ChorusCoreLinear::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
     const float maxDelay = getMaxDelaySamples();
     constexpr float maximumDelayModulation = 20.0f;
 
+    const auto& tuning = dsp.runtimeTuningSnapshot;
     const float colour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
     const float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
     // In Black normal mode, Color controls modulation intensity.
-    const float depthScale = 0.6f + 1.0f * colour; // 60% -> 160%
+    const float depthScale = juce::jmax(0.0f, tuning.blackNqDepthBase)
+                           + juce::jmax(0.0f, tuning.blackNqDepthScale) * colour;
     const float depthSamples = maximumDelayModulation * depthScale * spec.sampleRate / 1000.0f;
+
+    const float delayGlideMs = juce::jmax(0.0f, tuning.blackNqDelayGlideMs);
+    if (std::abs(delayGlideMs - lastDelayGlideMs) > 1.0e-3f)
+    {
+        if (spec.sampleRate > 0.0 && delayGlideMs > 0.0f)
+            delaySmoothingAlpha = 1.0f - std::exp(-1.0f / (delayGlideMs * 0.001f * static_cast<float>(spec.sampleRate)));
+        else
+            delaySmoothingAlpha = 1.0f;
+        lastDelayGlideMs = delayGlideMs;
+    }
 
     auto* lfoLeft = dsp.lfoBuffer.getReadPointer(0);
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
@@ -77,6 +104,20 @@ void ChorusCoreLinear::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
             delayLine.pushSample(ch, in);
 
             float delaySamp = centreDelaySamples + depthSamples * channelLfo[i];
+            if (static_cast<size_t>(ch) < smoothedDelaySamplesByChannel.size())
+            {
+                if (!smoothedDelayInitializedByChannel[static_cast<size_t>(ch)])
+                {
+                    smoothedDelaySamplesByChannel[static_cast<size_t>(ch)] = delaySamp;
+                    smoothedDelayInitializedByChannel[static_cast<size_t>(ch)] = true;
+                }
+                else
+                {
+                    const float previous = smoothedDelaySamplesByChannel[static_cast<size_t>(ch)];
+                    smoothedDelaySamplesByChannel[static_cast<size_t>(ch)] = previous + delaySmoothingAlpha * (delaySamp - previous);
+                }
+                delaySamp = smoothedDelaySamplesByChannel[static_cast<size_t>(ch)];
+            }
             delaySamp = juce::jlimit(guardSamples, maxDelay, delaySamp);
             channelSamples[i] = delayLine.popSample(ch, delaySamp, true);
         }

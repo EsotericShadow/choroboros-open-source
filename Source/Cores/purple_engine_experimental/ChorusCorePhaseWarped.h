@@ -56,11 +56,12 @@ private:
     
     // Delay smoothing (10-30ms ramp)
     std::vector<juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>> delaySmoothers;
+    float lastDelaySmoothingMs = -1.0f;
     
     // Cubic interpolation read (same as Blue Normal)
     float readCubic(int channel, float delaySamples) const;
     
     // Compute warped phase modulation
     // Returns modulation signal m in range [-1, 1]
-    float computeWarpedModulation(float phase, float warpAmount) const;
+    float computeWarpedModulation(float phase, float a, float b, float k) const;
 };

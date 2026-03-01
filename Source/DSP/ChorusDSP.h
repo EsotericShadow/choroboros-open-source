@@ -61,6 +61,59 @@ public:
         std::atomic<float> compressorRatio { 4.0f };
         std::atomic<float> saturationDriveScale { 3.0f };
 
+        // Green (Bloom) wet-character internals.
+        std::atomic<float> greenBloomExponent { 1.6f };
+        std::atomic<float> greenBloomDepthScale { 0.12f };
+        std::atomic<float> greenBloomCentreOffsetMs { 0.60f };
+        std::atomic<float> greenBloomCutoffMaxHz { 18000.0f };
+        std::atomic<float> greenBloomCutoffMinHz { 2600.0f };
+        std::atomic<float> greenBloomWetBlend { 0.48f };
+        std::atomic<float> greenBloomGain { 0.10f };
+
+        // Blue (Focus) wet-character internals.
+        std::atomic<float> blueFocusExponent { 1.35f };
+        std::atomic<float> blueFocusHpMinHz { 70.0f };
+        std::atomic<float> blueFocusHpMaxHz { 520.0f };
+        std::atomic<float> blueFocusLpMaxHz { 18000.0f };
+        std::atomic<float> blueFocusLpMinHz { 7200.0f };
+        std::atomic<float> bluePresenceFreqMinHz { 2200.0f };
+        std::atomic<float> bluePresenceFreqMaxHz { 3600.0f };
+        std::atomic<float> bluePresenceQMin { 0.75f };
+        std::atomic<float> bluePresenceQMax { 1.10f };
+        std::atomic<float> bluePresenceGainMaxDb { 4.8f };
+        std::atomic<float> blueFocusWetBlend { 0.68f };
+        std::atomic<float> blueFocusOutputGain { 0.08f };
+
+        // Purple NQ (Phase Warped) character internals.
+        std::atomic<float> purpleWarpA { 0.35f };
+        std::atomic<float> purpleWarpB { 0.18f };
+        std::atomic<float> purpleWarpKBase { 2.0f };
+        std::atomic<float> purpleWarpKScale { 1.0f };
+        std::atomic<float> purpleWarpDelaySmoothingMs { 20.0f };
+
+        // Purple HQ (Orbit) character internals.
+        std::atomic<float> purpleOrbitEccentricity { 0.6f };
+        std::atomic<float> purpleOrbitThetaRateBaseHz { 0.01f };
+        std::atomic<float> purpleOrbitThetaRateScaleHz { 0.09f };
+        std::atomic<float> purpleOrbitThetaRate2Ratio { 1.3f };
+        std::atomic<float> purpleOrbitEccentricity2Ratio { 0.8f };
+        std::atomic<float> purpleOrbitMix1 { 0.6f };
+        std::atomic<float> purpleOrbitStereoThetaOffset { 0.25f };
+        std::atomic<float> purpleOrbitDelaySmoothingMs { 20.0f };
+
+        // Black NQ (Linear) character internals.
+        std::atomic<float> blackNqDepthBase { 0.6f };
+        std::atomic<float> blackNqDepthScale { 1.0f };
+        std::atomic<float> blackNqDelayGlideMs { 2.5f };
+
+        // Black HQ (Linear Ensemble) character internals.
+        std::atomic<float> blackHqTap2MixBase { 0.18f };
+        std::atomic<float> blackHqTap2MixScale { 0.32f };
+        std::atomic<float> blackHqSecondTapDepthBase { 0.55f };
+        std::atomic<float> blackHqSecondTapDepthScale { 0.7f };
+        std::atomic<float> blackHqSecondTapDelayOffsetBase { 0.2f };
+        std::atomic<float> blackHqSecondTapDelayOffsetScale { 2.0f };
+
         std::atomic<float> bbdDelaySmoothingMs { 20.0f };
         std::atomic<float> bbdDelayMinMs { 8.0f };
         std::atomic<float> bbdDelayMaxMs { 100.0f };
@@ -168,6 +221,53 @@ private:
         float compressorRatio = 4.0f;
         float saturationDriveScale = 3.0f;
 
+        float greenBloomExponent = 1.6f;
+        float greenBloomDepthScale = 0.12f;
+        float greenBloomCentreOffsetMs = 0.60f;
+        float greenBloomCutoffMaxHz = 18000.0f;
+        float greenBloomCutoffMinHz = 2600.0f;
+        float greenBloomWetBlend = 0.48f;
+        float greenBloomGain = 0.10f;
+
+        float blueFocusExponent = 1.35f;
+        float blueFocusHpMinHz = 70.0f;
+        float blueFocusHpMaxHz = 520.0f;
+        float blueFocusLpMaxHz = 18000.0f;
+        float blueFocusLpMinHz = 7200.0f;
+        float bluePresenceFreqMinHz = 2200.0f;
+        float bluePresenceFreqMaxHz = 3600.0f;
+        float bluePresenceQMin = 0.75f;
+        float bluePresenceQMax = 1.10f;
+        float bluePresenceGainMaxDb = 4.8f;
+        float blueFocusWetBlend = 0.68f;
+        float blueFocusOutputGain = 0.08f;
+
+        float purpleWarpA = 0.35f;
+        float purpleWarpB = 0.18f;
+        float purpleWarpKBase = 2.0f;
+        float purpleWarpKScale = 1.0f;
+        float purpleWarpDelaySmoothingMs = 20.0f;
+
+        float purpleOrbitEccentricity = 0.6f;
+        float purpleOrbitThetaRateBaseHz = 0.01f;
+        float purpleOrbitThetaRateScaleHz = 0.09f;
+        float purpleOrbitThetaRate2Ratio = 1.3f;
+        float purpleOrbitEccentricity2Ratio = 0.8f;
+        float purpleOrbitMix1 = 0.6f;
+        float purpleOrbitStereoThetaOffset = 0.25f;
+        float purpleOrbitDelaySmoothingMs = 20.0f;
+
+        float blackNqDepthBase = 0.6f;
+        float blackNqDepthScale = 1.0f;
+        float blackNqDelayGlideMs = 2.5f;
+
+        float blackHqTap2MixBase = 0.18f;
+        float blackHqTap2MixScale = 0.32f;
+        float blackHqSecondTapDepthBase = 0.55f;
+        float blackHqSecondTapDepthScale = 0.7f;
+        float blackHqSecondTapDelayOffsetBase = 0.2f;
+        float blackHqSecondTapDelayOffsetScale = 2.0f;
+
         float bbdDelaySmoothingMs = 20.0f;
         float bbdDelayMinMs = 8.0f;
         float bbdDelayMaxMs = 100.0f;
@@ -228,8 +328,19 @@ private:
     bool coreSwitchCrossfadeActive = false;
     int coreSwitchCrossfadeSamplesRemaining = 0;
     int coreSwitchCrossfadeTotalSamples = 0;
+    int coreSwitchTargetCrossfadeSamples = 0;
     int coreSwitchWarmupSamplesRemaining = 0;
     int coreSwitchWarmupTotalSamples = 0;
+    bool coreSwitchOldParamsSnapshotValid = false;
+    float coreSwitchOldRateHz = 0.5f;
+    float coreSwitchOldDepth = 0.5f;
+    float coreSwitchOldCentreDelayMs = 8.0f;
+    float coreSwitchOldColor = 0.5f;
+    float coreSwitchOldOffsetDegrees = 90.0f;
+    float coreSwitchOldBasePhaseRad = 0.0f;
+    float coreSwitchOldLfoAmplitude = 0.0f;
+    float lastBaseLfoPhaseRad = 0.0f;
+    float lastLfoAmplitude = 0.0f;
     
     // Create and switch to a new core based on color and quality
     void switchCore(int colorIndex, bool hq);

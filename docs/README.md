@@ -5,6 +5,8 @@
 - **archive/** - Historical and redundant docs (archive-first policy; no deletes)
 - **user/** - User-facing guides (install, troubleshooting)
 - **developer/** - Build and development docs
+  - `developer/audio_overview_prototype.html` - Interactive Dev Panel v2 visual mock (engine-aware + validation chain)
+  - `developer/DEV_PANEL_V2_EXECUTION_TIMELINE.md` - Dated rollout plan, gates, and review prompts
 
 ## Root Docs (operational)
 

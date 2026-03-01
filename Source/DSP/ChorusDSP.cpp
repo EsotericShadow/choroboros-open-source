@@ -96,6 +96,53 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningSnapshot.compressorRatio = juce::jmax(1.0f, runtimeTuning.compressorRatio.load());
     runtimeTuningSnapshot.saturationDriveScale = juce::jmax(0.0f, runtimeTuning.saturationDriveScale.load());
 
+    runtimeTuningSnapshot.greenBloomExponent = juce::jlimit(0.1f, 4.0f, runtimeTuning.greenBloomExponent.load());
+    runtimeTuningSnapshot.greenBloomDepthScale = juce::jmax(0.0f, runtimeTuning.greenBloomDepthScale.load());
+    runtimeTuningSnapshot.greenBloomCentreOffsetMs = juce::jmax(0.0f, runtimeTuning.greenBloomCentreOffsetMs.load());
+    runtimeTuningSnapshot.greenBloomCutoffMaxHz = juce::jmax(20.0f, runtimeTuning.greenBloomCutoffMaxHz.load());
+    runtimeTuningSnapshot.greenBloomCutoffMinHz = juce::jlimit(20.0f, runtimeTuningSnapshot.greenBloomCutoffMaxHz, runtimeTuning.greenBloomCutoffMinHz.load());
+    runtimeTuningSnapshot.greenBloomWetBlend = juce::jlimit(0.0f, 1.0f, runtimeTuning.greenBloomWetBlend.load());
+    runtimeTuningSnapshot.greenBloomGain = juce::jmax(0.0f, runtimeTuning.greenBloomGain.load());
+
+    runtimeTuningSnapshot.blueFocusExponent = juce::jlimit(0.1f, 4.0f, runtimeTuning.blueFocusExponent.load());
+    runtimeTuningSnapshot.blueFocusHpMinHz = juce::jmax(20.0f, runtimeTuning.blueFocusHpMinHz.load());
+    runtimeTuningSnapshot.blueFocusHpMaxHz = juce::jmax(runtimeTuningSnapshot.blueFocusHpMinHz, runtimeTuning.blueFocusHpMaxHz.load());
+    runtimeTuningSnapshot.blueFocusLpMaxHz = juce::jmax(20.0f, runtimeTuning.blueFocusLpMaxHz.load());
+    runtimeTuningSnapshot.blueFocusLpMinHz = juce::jlimit(20.0f, runtimeTuningSnapshot.blueFocusLpMaxHz, runtimeTuning.blueFocusLpMinHz.load());
+    runtimeTuningSnapshot.bluePresenceFreqMinHz = juce::jmax(20.0f, runtimeTuning.bluePresenceFreqMinHz.load());
+    runtimeTuningSnapshot.bluePresenceFreqMaxHz = juce::jmax(runtimeTuningSnapshot.bluePresenceFreqMinHz, runtimeTuning.bluePresenceFreqMaxHz.load());
+    runtimeTuningSnapshot.bluePresenceQMin = juce::jmax(0.1f, runtimeTuning.bluePresenceQMin.load());
+    runtimeTuningSnapshot.bluePresenceQMax = juce::jmax(runtimeTuningSnapshot.bluePresenceQMin, runtimeTuning.bluePresenceQMax.load());
+    runtimeTuningSnapshot.bluePresenceGainMaxDb = juce::jmax(0.0f, runtimeTuning.bluePresenceGainMaxDb.load());
+    runtimeTuningSnapshot.blueFocusWetBlend = juce::jlimit(0.0f, 1.0f, runtimeTuning.blueFocusWetBlend.load());
+    runtimeTuningSnapshot.blueFocusOutputGain = juce::jmax(0.0f, runtimeTuning.blueFocusOutputGain.load());
+
+    runtimeTuningSnapshot.purpleWarpA = juce::jmax(0.0f, runtimeTuning.purpleWarpA.load());
+    runtimeTuningSnapshot.purpleWarpB = juce::jmax(0.0f, runtimeTuning.purpleWarpB.load());
+    runtimeTuningSnapshot.purpleWarpKBase = juce::jmax(0.1f, runtimeTuning.purpleWarpKBase.load());
+    runtimeTuningSnapshot.purpleWarpKScale = juce::jmax(0.0f, runtimeTuning.purpleWarpKScale.load());
+    runtimeTuningSnapshot.purpleWarpDelaySmoothingMs = clampMs(runtimeTuning.purpleWarpDelaySmoothingMs.load(), 0.0f, 2000.0f);
+
+    runtimeTuningSnapshot.purpleOrbitEccentricity = juce::jmax(0.0f, runtimeTuning.purpleOrbitEccentricity.load());
+    runtimeTuningSnapshot.purpleOrbitThetaRateBaseHz = juce::jmax(0.0f, runtimeTuning.purpleOrbitThetaRateBaseHz.load());
+    runtimeTuningSnapshot.purpleOrbitThetaRateScaleHz = juce::jmax(0.0f, runtimeTuning.purpleOrbitThetaRateScaleHz.load());
+    runtimeTuningSnapshot.purpleOrbitThetaRate2Ratio = juce::jmax(0.1f, runtimeTuning.purpleOrbitThetaRate2Ratio.load());
+    runtimeTuningSnapshot.purpleOrbitEccentricity2Ratio = juce::jmax(0.0f, runtimeTuning.purpleOrbitEccentricity2Ratio.load());
+    runtimeTuningSnapshot.purpleOrbitMix1 = juce::jlimit(0.0f, 1.0f, runtimeTuning.purpleOrbitMix1.load());
+    runtimeTuningSnapshot.purpleOrbitStereoThetaOffset = runtimeTuning.purpleOrbitStereoThetaOffset.load();
+    runtimeTuningSnapshot.purpleOrbitDelaySmoothingMs = clampMs(runtimeTuning.purpleOrbitDelaySmoothingMs.load(), 0.0f, 2000.0f);
+
+    runtimeTuningSnapshot.blackNqDepthBase = juce::jmax(0.0f, runtimeTuning.blackNqDepthBase.load());
+    runtimeTuningSnapshot.blackNqDepthScale = juce::jmax(0.0f, runtimeTuning.blackNqDepthScale.load());
+    runtimeTuningSnapshot.blackNqDelayGlideMs = clampMs(runtimeTuning.blackNqDelayGlideMs.load(), 0.0f, 2000.0f);
+
+    runtimeTuningSnapshot.blackHqTap2MixBase = juce::jlimit(0.0f, 1.0f, runtimeTuning.blackHqTap2MixBase.load());
+    runtimeTuningSnapshot.blackHqTap2MixScale = juce::jmax(0.0f, runtimeTuning.blackHqTap2MixScale.load());
+    runtimeTuningSnapshot.blackHqSecondTapDepthBase = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDepthBase.load());
+    runtimeTuningSnapshot.blackHqSecondTapDepthScale = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDepthScale.load());
+    runtimeTuningSnapshot.blackHqSecondTapDelayOffsetBase = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDelayOffsetBase.load());
+    runtimeTuningSnapshot.blackHqSecondTapDelayOffsetScale = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDelayOffsetScale.load());
+
     runtimeTuningSnapshot.bbdDelaySmoothingMs = clampMs(runtimeTuning.bbdDelaySmoothingMs.load(), 0.0f, 2000.0f);
     runtimeTuningSnapshot.bbdDelayMinMs = juce::jmax(0.0f, runtimeTuning.bbdDelayMinMs.load());
     runtimeTuningSnapshot.bbdDelayMaxMs = juce::jmax(runtimeTuningSnapshot.bbdDelayMinMs, runtimeTuning.bbdDelayMaxMs.load());
@@ -348,8 +395,19 @@ void ChorusDSP::reset()
     coreSwitchCrossfadeActive = false;
     coreSwitchCrossfadeSamplesRemaining = 0;
     coreSwitchCrossfadeTotalSamples = 0;
+    coreSwitchTargetCrossfadeSamples = 0;
     coreSwitchWarmupSamplesRemaining = 0;
     coreSwitchWarmupTotalSamples = 0;
+    coreSwitchOldParamsSnapshotValid = false;
+    coreSwitchOldRateHz = smoothedRate.getCurrentValue();
+    coreSwitchOldDepth = smoothedDepthValue;
+    coreSwitchOldCentreDelayMs = smoothedCentreDelay.getCurrentValue();
+    coreSwitchOldColor = smoothedColor.getCurrentValue();
+    coreSwitchOldOffsetDegrees = lfoPhaseOffset;
+    coreSwitchOldBasePhaseRad = 0.0f;
+    coreSwitchOldLfoAmplitude = 0.0f;
+    lastBaseLfoPhaseRad = 0.0f;
+    lastLfoAmplitude = 0.0f;
     previousCore = nullptr;
     pendingCore = nullptr;
 
@@ -426,14 +484,15 @@ float ChorusDSP::mapDepthToEngineRange(float normalizedDepth) const
 
 float ChorusDSP::applySaturation(float sample, float colorValue)
 {
-    // Soft clip using tanh
-    // At color = 0%, no saturation (drive = 1.0, output = input)
-    // At color = 100%, maximum saturation (drive = 3.0)
-    // Make it more audible by using stronger drive curve
-    float drive = 1.0f + runtimeTuningSnapshot.saturationDriveScale * colorValue;
-    float saturated = std::tanh(sample * drive);
-    // Normalize to maintain level (tanh compresses, so we scale back)
-    return saturated / drive;
+    const float color = juce::jlimit(0.0f, 1.0f, colorValue);
+    if (color <= 0.0f)
+        return sample;
+
+    // Red NQ color controls wet-only saturation amount.
+    // Drive increases with color, and color crossfades dry->saturated so 0 is exact bypass.
+    const float drive = 1.0f + runtimeTuningSnapshot.saturationDriveScale * color;
+    const float saturated = std::tanh(sample * drive);
+    return sample + color * (saturated - sample);
 }
 
 void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float colorValue)
@@ -445,16 +504,20 @@ void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float 
     if (numChannels <= 0)
         return;
 
+    const auto& tuning = runtimeTuningSnapshot;
+    const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
     const float color = juce::jlimit(0.0f, 1.0f, colorValue);
-    const float bloom = std::pow(color, 1.6f);
+    const float bloom = std::pow(color, bloomExp);
     if (bloom <= 1.0e-4f)
         return;
 
     const float fs = static_cast<float>(spec.sampleRate);
-    const float cutoffHz = juce::jmap(bloom, 0.0f, 1.0f, 18000.0f, 2600.0f);
+    const float cutoffMaxHz = juce::jmax(20.0f, tuning.greenBloomCutoffMaxHz);
+    const float cutoffMinHz = juce::jlimit(20.0f, cutoffMaxHz, tuning.greenBloomCutoffMinHz);
+    const float cutoffHz = juce::jmap(bloom, 0.0f, 1.0f, cutoffMaxHz, cutoffMinHz);
     const float onePole = std::exp(-2.0f * juce::MathConstants<float>::pi * cutoffHz / fs);
-    const float wetBlend = 0.48f * bloom;
-    const float bloomGain = 1.0f + 0.10f * bloom;
+    const float wetBlend = juce::jlimit(0.0f, 1.0f, tuning.greenBloomWetBlend) * bloom;
+    const float bloomGain = 1.0f + juce::jmax(0.0f, tuning.greenBloomGain) * bloom;
     const int numSamples = static_cast<int>(block.getNumSamples());
 
     for (int ch = 0; ch < numChannels; ++ch)
@@ -483,20 +546,31 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
     if (numChannels <= 0)
         return;
 
+    const auto& tuning = runtimeTuningSnapshot;
+    const float focusExp = juce::jmax(0.1f, tuning.blueFocusExponent);
     const float color = juce::jlimit(0.0f, 1.0f, colorValue);
-    const float focus = std::pow(color, 1.35f);
+    const float focus = std::pow(color, focusExp);
     if (focus <= 1.0e-4f)
         return;
 
     const float fs = static_cast<float>(spec.sampleRate);
-    const float hpCutoffHz = juce::jmap(focus, 0.0f, 1.0f, 70.0f, 520.0f);
-    const float lpCutoffHz = juce::jmap(focus, 0.0f, 1.0f, 18000.0f, 7200.0f);
+    const float hpMinHz = juce::jmax(20.0f, tuning.blueFocusHpMinHz);
+    const float hpMaxHz = juce::jmax(hpMinHz, tuning.blueFocusHpMaxHz);
+    const float lpMaxHz = juce::jmax(20.0f, tuning.blueFocusLpMaxHz);
+    const float lpMinHz = juce::jlimit(20.0f, lpMaxHz, tuning.blueFocusLpMinHz);
+    const float hpCutoffHz = juce::jmap(focus, 0.0f, 1.0f, hpMinHz, hpMaxHz);
+    const float lpCutoffHz = juce::jmap(focus, 0.0f, 1.0f, lpMaxHz, lpMinHz);
     const float hpAlpha = std::exp(-2.0f * juce::MathConstants<float>::pi * hpCutoffHz / fs);
     const float lpAlpha = std::exp(-2.0f * juce::MathConstants<float>::pi * lpCutoffHz / fs);
 
-    const float presenceFreqHz = juce::jmap(focus, 0.0f, 1.0f, 2200.0f, 3600.0f);
-    const float presenceQ = juce::jmap(focus, 0.0f, 1.0f, 0.75f, 1.10f);
-    const float presenceGainDb = juce::jmap(focus, 0.0f, 1.0f, 0.0f, 4.8f);
+    const float presenceFreqMinHz = juce::jmax(20.0f, tuning.bluePresenceFreqMinHz);
+    const float presenceFreqMaxHz = juce::jmax(presenceFreqMinHz, tuning.bluePresenceFreqMaxHz);
+    const float presenceQMin = juce::jmax(0.1f, tuning.bluePresenceQMin);
+    const float presenceQMax = juce::jmax(presenceQMin, tuning.bluePresenceQMax);
+    const float presenceGainMaxDb = juce::jmax(0.0f, tuning.bluePresenceGainMaxDb);
+    const float presenceFreqHz = juce::jmap(focus, 0.0f, 1.0f, presenceFreqMinHz, presenceFreqMaxHz);
+    const float presenceQ = juce::jmap(focus, 0.0f, 1.0f, presenceQMin, presenceQMax);
+    const float presenceGainDb = juce::jmap(focus, 0.0f, 1.0f, 0.0f, presenceGainMaxDb);
     const bool needsCoeffUpdate =
         std::abs(presenceFreqHz - bluePresenceCachedFreqHz) > 1.0f
         || std::abs(presenceQ - bluePresenceCachedQ) > 0.005f
@@ -528,8 +602,8 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
         bluePresenceCachedGainDb = presenceGainDb;
     }
 
-    const float wetBlend = 0.68f * focus;
-    const float outputGain = 1.0f + 0.08f * focus;
+    const float wetBlend = juce::jlimit(0.0f, 1.0f, tuning.blueFocusWetBlend) * focus;
+    const float outputGain = 1.0f + juce::jmax(0.0f, tuning.blueFocusOutputGain) * focus;
     const int numSamples = static_cast<int>(block.getNumSamples());
 
     for (int ch = 0; ch < numChannels; ++ch)
@@ -692,20 +766,76 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     if (newCore == currentCore)
     {
         pendingCore = nullptr;
+        coreSwitchTargetCrossfadeSamples = 0;
         coreSwitchWarmupSamplesRemaining = 0;
         coreSwitchWarmupTotalSamples = 0;
+        coreSwitchOldParamsSnapshotValid = false;
         return;
     }
     if (newCore == pendingCore)
         return;
 
+    const auto variantForCore = [this](const ChorusCore* corePtr) -> int
+    {
+        if (corePtr == nullptr)
+            return -1;
+        for (int i = 0; i < kNumEngineVariants; ++i)
+        {
+            if (coreVariants[static_cast<size_t>(i)].get() == corePtr)
+                return i;
+        }
+        return -1;
+    };
+
+    const int currentVariantIndex = variantForCore(currentCore);
+    const bool engineFamilySwitch = (currentVariantIndex >= 0) && ((currentVariantIndex / 2) != (variantIndex / 2));
+    const bool qualityToggleOnly = (currentVariantIndex >= 0) && ((currentVariantIndex / 2) == (variantIndex / 2))
+                                   && ((currentVariantIndex % 2) != (variantIndex % 2));
+
+    const float rateJumpNorm = juce::jlimit(0.0f, 1.0f,
+        std::abs(smoothedRate.getTargetValue() - smoothedRate.getCurrentValue()) / 20.0f);
+    const float depthJumpNorm = juce::jlimit(0.0f, 1.0f,
+        std::abs(currentDepthTarget - smoothedDepthValue));
+    const float offsetJumpNorm = juce::jlimit(0.0f, 1.0f,
+        std::abs(smoothedOffset.getTargetValue() - smoothedOffset.getCurrentValue()) / 180.0f);
+    const float mixJumpNorm = juce::jlimit(0.0f, 1.0f,
+        std::abs(smoothedMix.getTargetValue() - smoothedMix.getCurrentValue()));
+    const float colorJumpNorm = juce::jlimit(0.0f, 1.0f,
+        std::abs(smoothedColor.getTargetValue() - smoothedColor.getCurrentValue()));
+    const float centreDelayJumpNorm = juce::jlimit(0.0f, 1.0f,
+        std::abs(smoothedCentreDelay.getTargetValue() - smoothedCentreDelay.getCurrentValue()) / 20.0f);
+
+    float switchSeverity =
+        0.26f * rateJumpNorm
+        + 0.22f * depthJumpNorm
+        + 0.17f * offsetJumpNorm
+        + 0.12f * mixJumpNorm
+        + 0.11f * colorJumpNorm
+        + 0.12f * centreDelayJumpNorm;
+    if (engineFamilySwitch)
+        switchSeverity = juce::jmax(switchSeverity, 0.55f);
+    else if (qualityToggleOnly)
+        switchSeverity = juce::jmax(switchSeverity, 0.40f);
+    switchSeverity = juce::jlimit(0.0f, 1.0f, switchSeverity);
+
     // Warm up the target core silently before audible crossfade to avoid residual-state zippering
     // when revisiting a previously used engine.
+    coreSwitchOldParamsSnapshotValid = true;
+    coreSwitchOldRateHz = smoothedRate.getCurrentValue();
+    coreSwitchOldDepth = smoothedDepthValue;
+    coreSwitchOldCentreDelayMs = smoothedCentreDelay.getCurrentValue();
+    coreSwitchOldColor = smoothedColor.getCurrentValue();
+    coreSwitchOldOffsetDegrees = lfoPhaseOffset;
+    coreSwitchOldBasePhaseRad = lastBaseLfoPhaseRad;
+    coreSwitchOldLfoAmplitude = lastLfoAmplitude;
     pendingCore = newCore;
 
     if (spec.sampleRate > 0.0)
     {
-        coreSwitchWarmupTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * 0.02))); // 20 ms
+        const float warmupMs = juce::jmap(switchSeverity, 22.0f, 95.0f);
+        const float crossfadeMs = juce::jmap(switchSeverity, 45.0f, 170.0f);
+        coreSwitchWarmupTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * warmupMs * 0.001f)));
+        coreSwitchTargetCrossfadeSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * crossfadeMs * 0.001f)));
         coreSwitchWarmupSamplesRemaining = coreSwitchWarmupTotalSamples;
     }
     else
@@ -714,9 +844,11 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
         pendingCore = nullptr;
         coreSwitchCrossfadeTotalSamples = 0;
         coreSwitchCrossfadeSamplesRemaining = 0;
+        coreSwitchTargetCrossfadeSamples = 0;
         coreSwitchCrossfadeActive = false;
         coreSwitchWarmupTotalSamples = 0;
         coreSwitchWarmupSamplesRemaining = 0;
+        coreSwitchOldParamsSnapshotValid = false;
         previousCore = nullptr;
     }
 }

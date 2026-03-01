@@ -133,11 +133,6 @@ void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNu
     currentRate = chorusDSP.smoothedRate.getNextValue();
     chorusDSP.smoothedRate.skip(blockNumSamples - 1);
 
-    // Smooth stereo phase offset to avoid hard LFO phase jumps when switching engines.
-    const float currentOffset = chorusDSP.smoothedOffset.getNextValue();
-    chorusDSP.smoothedOffset.skip(blockNumSamples - 1);
-    chorusDSP.lfoPhaseOffset = currentOffset;
-
     // Smooth wet mix to avoid zipper/pops during engine/profile transitions.
     const float currentMix = chorusDSP.smoothedMix.getNextValue();
     chorusDSP.smoothedMix.skip(blockNumSamples - 1);
@@ -152,15 +147,19 @@ void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNu
     // Green "Bloom": Color thickens motion and offsets centre delay slightly.
     if (chorusDSP.currentColorIndex == 0)
     {
-        const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, currentColor), 1.6f);
-        currentDepth *= (1.0f + 0.12f * bloom);
+        const auto& tuning = chorusDSP.runtimeTuningSnapshot;
+        const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
+        const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, currentColor), bloomExp);
+        currentDepth *= (1.0f + juce::jmax(0.0f, tuning.greenBloomDepthScale) * bloom);
     }
     
     float centreDelayMs = chorusDSP.calculateCentreDelay(currentDepth);
     if (chorusDSP.currentColorIndex == 0)
     {
-        const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, currentColor), 1.6f);
-        centreDelayMs += 0.60f * bloom;
+        const auto& tuning = chorusDSP.runtimeTuningSnapshot;
+        const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
+        const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, currentColor), bloomExp);
+        centreDelayMs += juce::jmax(0.0f, tuning.greenBloomCentreOffsetMs) * bloom;
     }
     chorusDSP.smoothedCentreDelay.setTargetValue(centreDelayMs);
     currentCentreDelayMs = chorusDSP.smoothedCentreDelay.getNextValue();
@@ -186,16 +185,40 @@ void ChorusDSPProcess::processChorusLFO(ChorusDSP& chorusDSP, int blockNumSample
         cosBlock.clear();
         chorusDSP.lfoCos.process(cosContext);
         cosBlock.multiplyBy(chorusDSP.oscVolume);
-        
-        float phaseOffsetRad = chorusDSP.lfoPhaseOffset * juce::MathConstants<float>::pi / 180.0f;
-        float cosOffset = std::cos(phaseOffsetRad);
-        float sinOffset = std::sin(phaseOffsetRad);
-        
+
+        if (blockNumSamples > 0)
+        {
+            const float lastSin = chorusDSP.lfoBuffer.getSample(0, blockNumSamples - 1);
+            const float lastCos = chorusDSP.cosBuffer.getSample(0, blockNumSamples - 1);
+            chorusDSP.lastBaseLfoPhaseRad = std::atan2(lastSin, lastCos);
+            chorusDSP.lastLfoAmplitude = std::sqrt(lastSin * lastSin + lastCos * lastCos);
+        }
+
         auto* lfoLeft = chorusDSP.lfoBuffer.getWritePointer(0);
         auto* cosSamples = chorusDSP.cosBuffer.getWritePointer(0);
         
         for (int i = 0; i < blockNumSamples; ++i)
+        {
+            // Consume offset smoother per-sample so phase offset transitions are truly continuous,
+            // eliminating residual block-step zippering on sensitive engines (e.g. Black NQ).
+            const float phaseOffsetDeg = chorusDSP.smoothedOffset.getNextValue();
+            const float phaseOffsetRad = phaseOffsetDeg * juce::MathConstants<float>::pi / 180.0f;
+            const float cosOffset = std::cos(phaseOffsetRad);
+            const float sinOffset = std::sin(phaseOffsetRad);
             cosSamples[i] = lfoLeft[i] * cosOffset + cosSamples[i] * sinOffset;
+            chorusDSP.lfoPhaseOffset = phaseOffsetDeg;
+        }
+    }
+    else if (blockNumSamples > 0)
+    {
+        const float currentOffset = chorusDSP.smoothedOffset.getNextValue();
+        chorusDSP.smoothedOffset.skip(blockNumSamples - 1);
+        chorusDSP.lfoPhaseOffset = currentOffset;
+        const float lastSin = chorusDSP.lfoBuffer.getSample(0, blockNumSamples - 1);
+        chorusDSP.lastBaseLfoPhaseRad = (lastSin >= 0.0f)
+            ? juce::MathConstants<float>::halfPi
+            : -juce::MathConstants<float>::halfPi;
+        chorusDSP.lastLfoAmplitude = std::abs(lastSin);
     }
 }
 
@@ -264,7 +287,53 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
 
         if (chorusDSP.currentCore != nullptr)
             chorusDSP.currentCore->processDelay(chorusDSP, wetCurrent, currentCentreDelayMs);
-        chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, currentCentreDelayMs);
+
+        if (chorusDSP.coreSwitchOldParamsSnapshotValid)
+        {
+            auto* oldLfo = chorusDSP.lfoBuffer.getWritePointer(0);
+            auto* oldCos = chorusDSP.cosBuffer.getWritePointer(0);
+            const float oldRate = juce::jmax(0.0f, chorusDSP.coreSwitchOldRateHz);
+            const float phaseInc = juce::MathConstants<float>::twoPi * oldRate
+                                   / static_cast<float>(juce::jmax(1.0, chorusDSP.spec.sampleRate));
+            float phase = chorusDSP.coreSwitchOldBasePhaseRad;
+            const float amp = chorusDSP.coreSwitchOldLfoAmplitude;
+            const float oldOffsetRad = chorusDSP.coreSwitchOldOffsetDegrees
+                                       * juce::MathConstants<float>::pi / 180.0f;
+            for (int i = 0; i < blockNumSamples; ++i)
+            {
+                phase += phaseInc;
+                if (phase >= juce::MathConstants<float>::twoPi)
+                    phase -= juce::MathConstants<float>::twoPi;
+                else if (phase < 0.0f)
+                    phase += juce::MathConstants<float>::twoPi;
+
+                oldLfo[i] = amp * std::sin(phase);
+                oldCos[i] = amp * std::sin(phase + oldOffsetRad);
+            }
+            chorusDSP.coreSwitchOldBasePhaseRad = phase;
+
+            const float savedRateCurrent = chorusDSP.smoothedRate.getCurrentValue();
+            const float savedRateTarget = chorusDSP.smoothedRate.getTargetValue();
+            const float savedColorCurrent = chorusDSP.smoothedColor.getCurrentValue();
+            const float savedColorTarget = chorusDSP.smoothedColor.getTargetValue();
+            const float savedColorBlock = chorusDSP.colorBlockValue;
+
+            chorusDSP.smoothedRate.setCurrentAndTargetValue(chorusDSP.coreSwitchOldRateHz);
+            chorusDSP.smoothedColor.setCurrentAndTargetValue(chorusDSP.coreSwitchOldColor);
+            chorusDSP.colorBlockValue = chorusDSP.coreSwitchOldColor;
+
+            chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, chorusDSP.coreSwitchOldCentreDelayMs);
+
+            chorusDSP.smoothedRate.setCurrentAndTargetValue(savedRateCurrent);
+            chorusDSP.smoothedRate.setTargetValue(savedRateTarget);
+            chorusDSP.smoothedColor.setCurrentAndTargetValue(savedColorCurrent);
+            chorusDSP.smoothedColor.setTargetValue(savedColorTarget);
+            chorusDSP.colorBlockValue = savedColorBlock;
+        }
+        else
+        {
+            chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, currentCentreDelayMs);
+        }
 
         const int totalSamples = juce::jmax(1, chorusDSP.coreSwitchCrossfadeTotalSamples);
         int remaining = chorusDSP.coreSwitchCrossfadeSamplesRemaining;
@@ -303,6 +372,8 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
             chorusDSP.previousCore = nullptr;
             chorusDSP.coreSwitchCrossfadeSamplesRemaining = 0;
             chorusDSP.coreSwitchCrossfadeTotalSamples = 0;
+            chorusDSP.coreSwitchTargetCrossfadeSamples = 0;
+            chorusDSP.coreSwitchOldParamsSnapshotValid = false;
         }
     }
     else
@@ -320,7 +391,8 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
 
         if (chorusDSP.previousCore != nullptr && chorusDSP.spec.sampleRate > 0.0)
         {
-            chorusDSP.coreSwitchCrossfadeTotalSamples = juce::jmax(1, static_cast<int>(std::round(chorusDSP.spec.sampleRate * 0.04))); // 40 ms
+            const int requestedCrossfade = juce::jmax(1, chorusDSP.coreSwitchTargetCrossfadeSamples);
+            chorusDSP.coreSwitchCrossfadeTotalSamples = requestedCrossfade;
             chorusDSP.coreSwitchCrossfadeSamplesRemaining = chorusDSP.coreSwitchCrossfadeTotalSamples;
             chorusDSP.coreSwitchCrossfadeActive = true;
         }
@@ -330,6 +402,8 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
             chorusDSP.coreSwitchCrossfadeActive = false;
             chorusDSP.coreSwitchCrossfadeSamplesRemaining = 0;
             chorusDSP.coreSwitchCrossfadeTotalSamples = 0;
+            chorusDSP.coreSwitchTargetCrossfadeSamples = 0;
+            chorusDSP.coreSwitchOldParamsSnapshotValid = false;
         }
     }
 

@@ -20,6 +20,7 @@
 
 #include "../ChorusCore.h"
 #include <juce_dsp/juce_dsp.h>
+#include <vector>
 
 // Black normal mode: linear interpolation.
 class ChorusCoreLinear : public ChorusCore
@@ -39,4 +40,8 @@ private:
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
     juce::dsp::ProcessSpec spec;
     int maxDelaySamples = 0;
+    float delaySmoothingAlpha = 1.0f;
+    float lastDelayGlideMs = -1.0f;
+    std::vector<float> smoothedDelaySamplesByChannel;
+    std::vector<bool> smoothedDelayInitializedByChannel;
 };

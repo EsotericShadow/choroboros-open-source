@@ -2,6 +2,21 @@
 
 All notable changes to Choroboros are documented here.
 
+## [2.03-beta] - 2026
+
+### Fixed
+
+- **Engine switch artifacts:** Transactional profile apply with guard to prevent partial-state feedback
+- **Engine switch artifacts:** Adaptive warmup and crossfade duration (severity-based instead of fixed 20 ms/40 ms)
+- **Engine switch artifacts:** Dual old/new rendering during crossfade—old core rendered with frozen old params
+- **Engine switch artifacts:** Old-path LFO phase continuation (natural decay instead of frozen sample hold)
+
+### Changed
+
+- DSP update skips during preset/state/profile transactions so audio thread won't consume intermediate parameter steps mid-switch
+
+---
+
 ## [2.02-beta] - 2026-02-28
 
 ### Changed

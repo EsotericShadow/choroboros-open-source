@@ -25,7 +25,7 @@ ChorusCorePhaseWarped::ChorusCorePhaseWarped()
 {
 }
 
-void ChorusCorePhaseWarped::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
+void ChorusCorePhaseWarped::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP* dsp)
 {
     spec = processSpec;
     
@@ -51,6 +51,12 @@ void ChorusCorePhaseWarped::prepare(const juce::dsp::ProcessSpec& processSpec, C
     writePositions.resize(static_cast<size_t>(spec.numChannels));
     phaseStates.resize(static_cast<size_t>(spec.numChannels));
     delaySmoothers.resize(static_cast<size_t>(spec.numChannels));
+
+    const float delaySmoothingMs = (dsp != nullptr)
+        ? juce::jmax(0.0f, dsp->getRuntimeTuning().purpleWarpDelaySmoothingMs.load())
+        : 20.0f;
+    const float delaySmoothingSec = delaySmoothingMs * 0.001f;
+    lastDelaySmoothingMs = delaySmoothingMs;
     
     for (size_t ch = 0; ch < delayBuffers.size(); ++ch)
     {
@@ -60,8 +66,7 @@ void ChorusCorePhaseWarped::prepare(const juce::dsp::ProcessSpec& processSpec, C
         phaseStates[ch].smoothedDelay = 0.0f;
         phaseStates[ch].initialized = false;
         
-        // 20ms smoothing for delay (snappy but safe)
-        delaySmoothers[ch].reset(spec.sampleRate, 0.02f);
+        delaySmoothers[ch].reset(spec.sampleRate, delaySmoothingSec);
         delaySmoothers[ch].setCurrentAndTargetValue(0.0f);
     }
 }
@@ -79,6 +84,7 @@ void ChorusCorePhaseWarped::reset()
         phaseStates[ch].initialized = false;
         delaySmoothers[ch].setCurrentAndTargetValue(0.0f);
     }
+    lastDelaySmoothingMs = -1.0f;
 }
 
 float ChorusCorePhaseWarped::getMaxDelaySamples() const
@@ -86,16 +92,8 @@ float ChorusCorePhaseWarped::getMaxDelaySamples() const
     return static_cast<float>(maxDelaySamples) - getGuardSamples();
 }
 
-float ChorusCorePhaseWarped::computeWarpedModulation(float phase, float warpAmount) const
+float ChorusCorePhaseWarped::computeWarpedModulation(float phase, float a, float b, float k) const
 {
-    // Warp amount maps to parameters:
-    // a (warp amount): 0 → 0.35
-    // b (secondary warp): 0 → 0.18
-    // k (warp ratio): 2.0 → 3.0
-    const float a = 0.35f * warpAmount;
-    const float b = 0.18f * warpAmount;
-    const float k = 2.0f + 1.0f * warpAmount; // 2.0 to 3.0
-    
     // Convert phase to radians (0..2π)
     const float phi = phase * juce::MathConstants<float>::twoPi;
     
@@ -165,8 +163,24 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
     // Phase increment per sample
     float phaseInc = currentRate / spec.sampleRate;
     
-    // Warp amount from color (0.0 to 1.0)
-    float warpAmount = currentColor;
+    const auto& tuning = dsp.runtimeTuningSnapshot;
+    const float warpAmount = juce::jlimit(0.0f, 1.0f, currentColor);
+    const float warpA = juce::jmax(0.0f, tuning.purpleWarpA) * warpAmount;
+    const float warpB = juce::jmax(0.0f, tuning.purpleWarpB) * warpAmount;
+    const float warpK = juce::jmax(0.1f, tuning.purpleWarpKBase + tuning.purpleWarpKScale * warpAmount);
+
+    const float delaySmoothingMs = juce::jmax(0.0f, tuning.purpleWarpDelaySmoothingMs);
+    if (std::abs(delaySmoothingMs - lastDelaySmoothingMs) > 1.0e-3f)
+    {
+        const float delaySmoothingSec = delaySmoothingMs * 0.001f;
+        for (size_t ch = 0; ch < delaySmoothers.size(); ++ch)
+        {
+            const float current = delaySmoothers[ch].getCurrentValue();
+            delaySmoothers[ch].reset(spec.sampleRate, delaySmoothingSec);
+            delaySmoothers[ch].setCurrentAndTargetValue(current);
+        }
+        lastDelaySmoothingMs = delaySmoothingMs;
+    }
     
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -180,7 +194,7 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
         // Initialize delay on first sample if needed
         if (!state.initialized)
         {
-            float initialMod = computeWarpedModulation(state.phase, warpAmount);
+            float initialMod = computeWarpedModulation(state.phase, warpA, warpB, warpK);
             float initialDelay = centreDelaySamples + depthSamples * initialMod;
             initialDelay = juce::jlimit(guardSamples, maxDelaySamples, initialDelay);
             state.smoothedDelay = initialDelay;
@@ -202,7 +216,7 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
                 state.phase -= 1.0f;
             
             // Compute warped modulation
-            float mod = computeWarpedModulation(state.phase, warpAmount);
+            float mod = computeWarpedModulation(state.phase, warpA, warpB, warpK);
             
             // Calculate target delay
             float targetDelay = centreDelaySamples + depthSamples * mod;

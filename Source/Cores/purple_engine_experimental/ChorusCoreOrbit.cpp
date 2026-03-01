@@ -25,7 +25,7 @@ ChorusCoreOrbit::ChorusCoreOrbit()
 {
 }
 
-void ChorusCoreOrbit::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
+void ChorusCoreOrbit::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP* dsp)
 {
     spec = processSpec;
     
@@ -52,6 +52,12 @@ void ChorusCoreOrbit::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusD
     orbitStates.resize(static_cast<size_t>(spec.numChannels));
     delaySmoothers1.resize(static_cast<size_t>(spec.numChannels));
     delaySmoothers2.resize(static_cast<size_t>(spec.numChannels));
+
+    const float delaySmoothingMs = (dsp != nullptr)
+        ? juce::jmax(0.0f, dsp->getRuntimeTuning().purpleOrbitDelaySmoothingMs.load())
+        : 20.0f;
+    const float delaySmoothingSec = delaySmoothingMs * 0.001f;
+    lastDelaySmoothingMs = delaySmoothingMs;
     
     for (size_t ch = 0; ch < delayBuffers.size(); ++ch)
     {
@@ -66,10 +72,9 @@ void ChorusCoreOrbit::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusD
         state.smoothedDelay2 = 0.0f;
         state.initialized = false;
         
-        // 20ms smoothing for delay (snappy but safe) - one per tap
-        delaySmoothers1[ch].reset(spec.sampleRate, 0.02f);
+        delaySmoothers1[ch].reset(spec.sampleRate, delaySmoothingSec);
         delaySmoothers1[ch].setCurrentAndTargetValue(0.0f);
-        delaySmoothers2[ch].reset(spec.sampleRate, 0.02f);
+        delaySmoothers2[ch].reset(spec.sampleRate, delaySmoothingSec);
         delaySmoothers2[ch].setCurrentAndTargetValue(0.0f);
     }
 }
@@ -92,6 +97,7 @@ void ChorusCoreOrbit::reset()
         delaySmoothers1[ch].setCurrentAndTargetValue(0.0f);
         delaySmoothers2[ch].setCurrentAndTargetValue(0.0f);
     }
+    lastDelaySmoothingMs = -1.0f;
 }
 
 float ChorusCoreOrbit::getMaxDelaySamples() const
@@ -174,21 +180,39 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
     // Phase increment per sample (fast, rate-controlled)
     float phaseInc = currentRate / spec.sampleRate;
     
-    // Orbit parameters from color:
-    // e (eccentricity): 0.0 → 0.6 (0 = circle, 0.6 = very elliptical)
-    // thetaRate: 0.01 → 0.1 Hz (ultra slow rotation)
-    const float eccentricity = 0.6f * currentColor;
-    const float thetaRate = 0.01f + 0.09f * currentColor; // 0.01 to 0.1 Hz
+    const auto& tuning = dsp.runtimeTuningSnapshot;
+    const float color = juce::jlimit(0.0f, 1.0f, currentColor);
+
+    // Orbit parameters from color.
+    const float eccentricity = juce::jmax(0.0f, tuning.purpleOrbitEccentricity) * color;
+    const float thetaRate = juce::jmax(0.0f, tuning.purpleOrbitThetaRateBaseHz)
+                          + juce::jmax(0.0f, tuning.purpleOrbitThetaRateScaleHz) * color;
     const float thetaInc = thetaRate / spec.sampleRate;
     
-    // Second tap parameters (slightly different for ensemble effect)
-    const float thetaRate2 = thetaRate * 1.3f; // 30% faster rotation
+    // Second tap parameters.
+    const float thetaRate2 = thetaRate * juce::jmax(0.1f, tuning.purpleOrbitThetaRate2Ratio);
     const float thetaInc2 = thetaRate2 / spec.sampleRate;
-    const float eccentricity2 = eccentricity * 0.8f; // Slightly less elliptical
+    const float eccentricity2 = eccentricity * juce::jmax(0.0f, tuning.purpleOrbitEccentricity2Ratio);
     
-    // Dual tap mix ratios (60/40 for ensemble density)
-    constexpr float mix1 = 0.6f;
-    constexpr float mix2 = 0.4f;
+    // Dual tap mix ratios for ensemble density.
+    const float mix1 = juce::jlimit(0.0f, 1.0f, tuning.purpleOrbitMix1);
+    const float mix2 = 1.0f - mix1;
+
+    const float delaySmoothingMs = juce::jmax(0.0f, tuning.purpleOrbitDelaySmoothingMs);
+    if (std::abs(delaySmoothingMs - lastDelaySmoothingMs) > 1.0e-3f)
+    {
+        const float delaySmoothingSec = delaySmoothingMs * 0.001f;
+        for (size_t ch = 0; ch < delaySmoothers1.size(); ++ch)
+        {
+            const float current1 = delaySmoothers1[ch].getCurrentValue();
+            const float current2 = delaySmoothers2[ch].getCurrentValue();
+            delaySmoothers1[ch].reset(spec.sampleRate, delaySmoothingSec);
+            delaySmoothers2[ch].reset(spec.sampleRate, delaySmoothingSec);
+            delaySmoothers1[ch].setCurrentAndTargetValue(current1);
+            delaySmoothers2[ch].setCurrentAndTargetValue(current2);
+        }
+        lastDelaySmoothingMs = delaySmoothingMs;
+    }
     
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -200,8 +224,8 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
         auto& delaySmoother1 = delaySmoothers1[static_cast<size_t>(ch)];
         auto& delaySmoother2 = delaySmoothers2[static_cast<size_t>(ch)];
         
-        // Slight stereo decorrelation: offset theta for right channel
-        float thetaOffset = (ch == 1) ? 0.25f : 0.0f; // 90° offset for right channel
+        // Slight stereo decorrelation: offset theta for right channel.
+        float thetaOffset = (ch == 1) ? tuning.purpleOrbitStereoThetaOffset : 0.0f;
         
         // Initialize delays on first sample if needed
         if (!state.initialized)

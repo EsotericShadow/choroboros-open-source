@@ -161,6 +161,7 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
         std::swap(toneMin, toneMax);
     const float targetToneCutoff = toneMax - (toneMax - toneMin) * color;
     smoothedToneCutoff += tuning.tapeToneSmoothingCoeff * (targetToneCutoff - smoothedToneCutoff);
+    const float toneAmount = juce::jlimit(0.0f, 1.0f, color);
 
     constexpr float cutoffRecomputeThresholdHz = 5.0f;
 
@@ -265,7 +266,9 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             const float g = toneState.cachedG;
             toneState.state1 = g * toneState.state1 + (1.0f - g) * wet;
             toneState.state2 = g * toneState.state2 + (1.0f - g) * toneState.state1;
-            wet = toneState.state2;
+            const float toned = toneState.state2;
+            // Keep Color at 0 as a neutral tape path and scale tone darkening with Color.
+            wet = wet + toneAmount * (toned - wet);
             
             // Mild makeup gain so tape modulation remains present at lower wet mixes.
             samples[i] = wet * tuning.tapeWetGain;
