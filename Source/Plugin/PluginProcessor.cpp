@@ -24,6 +24,23 @@
 
 namespace
 {
+class MetaEngineChoiceParameter final : public juce::AudioParameterChoice
+{
+public:
+    MetaEngineChoiceParameter(const juce::ParameterID& parameterID,
+                              const juce::String& parameterName,
+                              const juce::StringArray& choices,
+                              int defaultItemIndex)
+        : juce::AudioParameterChoice(parameterID, parameterName, choices, defaultItemIndex)
+    {
+    }
+
+    bool isMetaParameter() const override
+    {
+        return true;
+    }
+};
+
 double getNumberOrDefault(const juce::var& objectVar, const juce::Identifier& key, double fallback)
 {
     if (const auto* object = objectVar.getDynamicObject())
@@ -1252,7 +1269,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChoroborosAudioProcessor::cr
     ));
     
     // Engine Color: 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+    params.push_back(std::make_unique<MetaEngineChoiceParameter>(
         ENGINE_COLOR_ID, "Engine Color",
         juce::StringArray { "Green", "Blue", "Red", "Purple", "Black" },
         0 // Default: Green

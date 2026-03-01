@@ -10,10 +10,23 @@ All notable changes to Choroboros are documented here.
 - **Engine switch artifacts:** Adaptive warmup and crossfade duration (severity-based instead of fixed 20 ms/40 ms)
 - **Engine switch artifacts:** Dual old/new rendering during crossfade—old core rendered with frozen old params
 - **Engine switch artifacts:** Old-path LFO phase continuation (natural decay instead of frozen sample hold)
+- **AU validation (Logic Pro):** Engine selection parameter now reports `isMetaParameter() = true` (from 2.02.1)
 
 ### Changed
 
 - DSP update skips during preset/state/profile transactions so audio thread won't consume intermediate parameter steps mid-switch
+
+---
+
+## [2.02.1] - 2026-02-26
+
+### Fixed
+
+- **AU validation (Logic Pro):** Engine selection parameter now reports `isMetaParameter() = true`, fixing AU validation failure on macOS Tahoe.
+
+### Chore
+
+- Binary distribution moved to GitHub Releases (fixes 4MB Vercel Blob truncation for large zip).
 
 ---
 
