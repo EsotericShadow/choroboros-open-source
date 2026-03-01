@@ -2,6 +2,18 @@
 
 All notable changes to Choroboros are documented here.
 
+## [2.02.1] - 2026-02-26
+
+### Fixed
+
+- **AU validation (Logic Pro):** Engine selection parameter now reports `isMetaParameter() = true`, fixing AU validation failure on macOS Tahoe. The engine selector loads per-engine stored values when switched; Logic requires meta-parameters to be flagged when they change other parameter values.
+
+### Chore
+
+- Version bump for hotfix release; binary distribution moved to GitHub Releases (fixes 4MB Vercel Blob truncation for large zip).
+
+---
+
 ## [2.02-beta] - 2026-02-28
 
 ### Changed
