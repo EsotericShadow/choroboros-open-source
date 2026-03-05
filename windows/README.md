@@ -46,6 +46,12 @@ powershell -ExecutionPolicy Bypass -File .\windows\run_regression.ps1 -Config Re
 powershell -ExecutionPolicy Bypass -File .\windows\install_vst3_user.ps1
 ```
 
+7. Verify exactly which defaults JSON the runtime will use (and diff against repo source):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\trace_effective_defaults.ps1
+```
+
 ## Presets
 
 Root `CMakePresets.json` includes:
@@ -70,6 +76,7 @@ Build presets:
 - `build_windows_x86.ps1` - optional x86 build script
 - `run_regression.ps1` - regression execution helper
 - `install_vst3_user.ps1` - install built VST3 to user plugin folder
+- `trace_effective_defaults.ps1` - runtime-equivalent defaults source trace + flattened diff
 - `build_windows_x64.bat` / `build_windows_x86.bat` - wrappers for double-click flow
 
 ## Important Invariants
