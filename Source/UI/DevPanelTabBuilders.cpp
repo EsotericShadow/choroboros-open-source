@@ -24,6 +24,21 @@
 
 using namespace devpanel;
 
+namespace
+{
+juce::String engineCoreTypeLabel(const int engineIndex, const bool hqEnabled)
+{
+    switch (juce::jlimit(0, 4, engineIndex))
+    {
+        case 0: return hqEnabled ? "Lagrange 5th (HQ)" : "Lagrange 3rd (NQ)";
+        case 1: return hqEnabled ? "Thiran Allpass (HQ)" : "Cubic (NQ)";
+        case 2: return hqEnabled ? "Tape (HQ)" : "BBD (NQ)";
+        case 3: return hqEnabled ? "Orbit (HQ)" : "Phase Warp (NQ)";
+        case 4: default: return hqEnabled ? "Ensemble (HQ)" : "Linear (NQ)";
+    }
+}
+}
+
 void DevPanel::buildOverviewTab(DevPanelBuildContext& ctx)
 {
     const auto& makeReadOnly = ctx.makeReadOnly;
@@ -182,13 +197,7 @@ void DevPanel::buildOverviewTab(DevPanelBuildContext& ctx)
             true
         };
 
-        juce::String coreName = "Chorus Core";
-        if (engine == 0) coreName = "Bloom Core";
-        if (engine == 1) coreName = "Focus Core";
-        if (engine == 2) coreName = hq ? "Tape Core" : "BBD Core";
-        if (engine == 3) coreName = hq ? "Orbit Core" : "Warp Core";
-        if (engine == 4) coreName = hq ? "Ensemble Core" : "Intensity Core";
-        state.stages[3] = { "Core", coreName, true };
+        state.stages[3] = { "Core", engineCoreTypeLabel(engine, hq), true };
 
         state.stages[4] = {
             "Color",
@@ -1122,7 +1131,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         state.stages[0] = { "Input", "Audio In", true };
         state.stages[1] = { "Tone", juce::String(rt.preEmphasisFreqHz.load(), 0) + " Hz", true };
         state.stages[2] = { "Filters", juce::String(rt.hpfCutoffHz.load(), 0) + " / " + juce::String(rt.lpfCutoffHz.load(), 0), true };
-        state.stages[3] = { "Core", isRedNQ ? "BBD" : (isRedHQ ? "Tape" : "Chorus"), true };
+        state.stages[3] = { "Core", engineCoreTypeLabel(engine, hq), true };
         state.stages[4] = { "Color", juce::String(colorMapped, 3), true };
         state.stages[5] = { "Drive", isRedNQ || isRedHQ ? "Active" : "Bypass", isRedNQ || isRedHQ };
         state.stages[6] = { "Output", juce::String(mixMapped * 100.0f, 1) + "% wet", true };
