@@ -616,8 +616,8 @@ void seedPersistedDefaultsFromBundledWindowsFactory()
     if (!seedUser && !seedFactory)
         return;
 
-    int dataSize = 0;
-    const char* data = BinaryData::getNamedResource("windows_factory_defaults_json", dataSize);
+    const char* data = BinaryData::windows_factory_defaults_json;
+    const int dataSize = BinaryData::windows_factory_defaults_jsonSize;
     if (data == nullptr || dataSize <= 0)
         return;
 
