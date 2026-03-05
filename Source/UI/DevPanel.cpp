@@ -667,7 +667,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         return "Live DSP/UI tuning control. Use small moves, listen for tone/motion changes, then refine with A/B comparisons.";
     };
 
-    auto makeLockable = [this, &makeTooltipForControl](const juce::Value& valueToControl, const juce::String& name,
+    auto makeLockable = [this, makeTooltipForControl](const juce::Value& valueToControl, const juce::String& name,
                                double min, double max, double step, double skew) -> juce::PropertyComponent*
     {
         auto* prop = new LockableFloatPropertyComponent(valueToControl, name, min, max, step, skew, makeTooltipForControl(name));
@@ -676,7 +676,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         return prop;
     };
 
-    auto makeLiveMappedControl = [&](const juce::String& name, const char* paramId,
+    auto makeLiveMappedControl = [this, makeLockable](const juce::String& name, const char* paramId,
                                      float minDisplay, float maxDisplay,
                                      float stepDisplay, float skew,
                                      float displayScale = 1.0f) -> juce::PropertyComponent*
@@ -841,14 +841,14 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         metadataNoVisualCount = metadataControlCount - metadataVisualMappedCount;
     };
 
-    auto makeReadOnly = [this, &makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
+    auto makeReadOnly = [this, makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
     {
         auto* prop = new ReadOnlyDiagnosticPropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
         liveReadoutProperties.add(prop);
         registerControlMetadataFn(name, {}, "read_only", "derived_probe", "readout_only");
         return prop;
     };
-    auto makeMultiLineReadOnly = [this, &makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
+    auto makeMultiLineReadOnly = [this, makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
     {
         auto* prop = new MultiLineReadOnlyPropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
         liveReadoutProperties.add(prop);
@@ -856,7 +856,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         return prop;
     };
 
-    auto makeSparkline = [this, &makeTooltipForControl](const juce::String& name, std::function<std::vector<float>()> valueProvider, LinkGroup linkGroup = LinkGroup::none)
+    auto makeSparkline = [this, makeTooltipForControl](const juce::String& name, std::function<std::vector<float>()> valueProvider, LinkGroup linkGroup = LinkGroup::none)
     {
         auto* prop = new SparklinePropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name),
                                                     [this, linkGroup](bool active)
@@ -878,7 +878,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         registerControlMetadataFn(name, card, "analyzer_snapshot", "visualized", {});
         return prop;
     };
-    auto makeTransferCurve = [this, &makeTooltipForControl](const juce::String& name,
+    auto makeTransferCurve = [this, makeTooltipForControl](const juce::String& name,
                                                              std::function<TransferCurvePropertyComponent::State()> stateProvider,
                                                              LinkGroup linkGroup = LinkGroup::none)
     {
@@ -900,7 +900,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         registerControlMetadataFn(name, "transfer_curve", "raw->mapped->measured", "transfer_probe", {});
         return prop;
     };
-    auto makeSpectrumOverlay = [this, &makeTooltipForControl](const juce::String& name,
+    auto makeSpectrumOverlay = [this, makeTooltipForControl](const juce::String& name,
                                                               std::function<SpectrumOverlayPropertyComponent::State()> stateProvider,
                                                               LinkGroup linkGroup = LinkGroup::none)
     {
@@ -922,7 +922,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         registerControlMetadataFn(name, "spectrum_overlay", "raw->mapped", "spectrum_probe", {});
         return prop;
     };
-    auto makeSignalFlow = [this, &makeTooltipForControl](const juce::String& name,
+    auto makeSignalFlow = [this, makeTooltipForControl](const juce::String& name,
                                                          std::function<SignalFlowPropertyComponent::State()> stateProvider,
                                                          LinkGroup linkGroup = LinkGroup::none)
     {
@@ -945,7 +945,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         registerControlMetadataFn(name, "signal_flow", "runtime", "signal_path_probe", {});
         return prop;
     };
-    auto makeTraceMatrix = [this, &makeTooltipForControl](const juce::String& name,
+    auto makeTraceMatrix = [this, makeTooltipForControl](const juce::String& name,
                                                           std::function<ValidationTraceMatrixPropertyComponent::State()> stateProvider)
     {
         auto* prop = new ValidationTraceMatrixPropertyComponent(name, std::move(stateProvider), makeTooltipForControl(name));
