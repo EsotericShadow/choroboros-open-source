@@ -1669,9 +1669,9 @@ void ChoroborosAudioProcessor::runAnalyzerPass()
         }
     };
 
-    auto fillWaveform = [](const std::array<float, fftSize>& left,
-                           const std::array<float, fftSize>& right,
-                           std::array<float, waveformPoints>& destination)
+    auto fillWaveform = [fftSize, waveformPoints](const std::array<float, fftSize>& left,
+                                                  const std::array<float, fftSize>& right,
+                                                  std::array<float, waveformPoints>& destination)
     {
         for (int i = 0; i < waveformPoints; ++i)
         {
@@ -1680,7 +1680,7 @@ void ChoroborosAudioProcessor::runAnalyzerPass()
         }
     };
 
-    auto computePeakDb = [](const std::array<float, fftSize>& left, const std::array<float, fftSize>& right)
+    auto computePeakDb = [fftSize](const std::array<float, fftSize>& left, const std::array<float, fftSize>& right)
     {
         float peak = 0.0f;
         for (int i = 0; i < fftSize; ++i)

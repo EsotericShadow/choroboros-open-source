@@ -3351,7 +3351,7 @@ private:
                                                  traceMatrixCellFontSize + 8.0f,
                                                  idealRowHeight);
 
-            auto columnWidth = [](float xStart, float xEnd)
+            auto columnWidth = [traceMatrixCellGap](float xStart, float xEnd)
             {
                 return juce::jmax(20.0f, xEnd - xStart - traceMatrixCellGap);
             };
