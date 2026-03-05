@@ -1,0 +1,83 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-x64-release",
+      "displayName": "Windows x64 Release",
+      "description": "Primary Windows release configure preset (Visual Studio 2022, x64).",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build/windows-x64-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-x64-debug",
+      "displayName": "Windows x64 Debug",
+      "description": "Windows debug preset for local diagnostics.",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build/windows-x64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-x86-release",
+      "displayName": "Windows x86 Release",
+      "description": "Optional 32-bit build preset for legacy host checks only.",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "Win32",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build/windows-x86-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-windows-x64-release",
+      "displayName": "Build Windows x64 Release (VST3 + Standalone)",
+      "configurePreset": "windows-x64-release",
+      "configuration": "Release",
+      "targets": [
+        "Choroboros_VST3",
+        "Choroboros_Standalone"
+      ]
+    },
+    {
+      "name": "build-windows-x64-regression",
+      "displayName": "Build Windows x64 Regression Harness",
+      "configurePreset": "windows-x64-release",
+      "configuration": "Release",
+      "targets": [
+        "ChoroborosRegressionTests"
+      ]
+    },
+    {
+      "name": "build-windows-x86-release",
+      "displayName": "Build Windows x86 Release (VST3 + Standalone)",
+      "configurePreset": "windows-x86-release",
+      "configuration": "Release",
+      "targets": [
+        "Choroboros_VST3",
+        "Choroboros_Standalone"
+      ]
+    }
+  ]
+}

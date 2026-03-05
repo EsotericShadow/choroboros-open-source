@@ -489,8 +489,22 @@ static void testConsoleCommandLatencyUnderAudioLoad()
 
 int main(int argc, char** argv)
 {
-    (void)argc;
-    (void)argv;
+    bool runGuiSuite = true;
+    for (int i = 1; i < argc; ++i)
+    {
+        const juce::String arg(argv[i] != nullptr ? argv[i] : "");
+        if (arg == "--dsp-only")
+            runGuiSuite = false;
+        else if (arg == "--gui")
+            runGuiSuite = true;
+        else if (arg == "--help" || arg == "-h")
+        {
+            std::cout << "Usage: ChoroborosRegressionTests [--dsp-only] [--gui]\n";
+            std::cout << "  --dsp-only  Skip GUI-dependent regression suite (CI-safe on headless runners)\n";
+            std::cout << "  --gui       Force full suite (default)\n";
+            return 0;
+        }
+    }
 
     juce::ScopedJuceInitialiser_GUI init;
 
@@ -501,7 +515,10 @@ int main(int argc, char** argv)
     testEngineHQTorture();
     testStateRoundTrip();
     testMaxBlockChannels();
-    testConsoleCommandLatencyUnderAudioLoad();
+    if (runGuiSuite)
+        testConsoleCommandLatencyUnderAudioLoad();
+    else
+        std::cout << "Skipping GUI-dependent console latency suite (--dsp-only)\n";
 
     std::cout << "----------------------------\n";
     if (g_failCount == 0)
