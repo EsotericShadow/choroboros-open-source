@@ -21,6 +21,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <array>
+#include <cstdint>
+#include <vector>
 #include "../DSP/ChorusDSP.h"
 #include "FeedbackCollector.h"
 
@@ -44,6 +46,11 @@ class ChoroborosAudioProcessor  : public juce::AudioProcessor,
                                   private juce::AudioProcessorValueTreeState::Listener
 {
 public:
+    static constexpr int ANALYZER_FFT_ORDER = 11;
+    static constexpr int ANALYZER_FFT_SIZE = 1 << ANALYZER_FFT_ORDER;
+    static constexpr int ANALYZER_WAVEFORM_POINTS = 256;
+    static constexpr int ANALYZER_TRANSFER_POINTS = 96;
+
     //==============================================================================
     ChoroborosAudioProcessor();
     ~ChoroborosAudioProcessor() override;
@@ -115,6 +122,76 @@ public:
     void syncEngineInternalsToActiveDsp(int colorIndex, bool hqEnabled = false);
     float mapParameterValue(const juce::String& paramId, float rawValue) const;
     float unmapParameterValue(const juce::String& paramId, float mappedValue) const;
+
+    struct LiveTelemetry
+    {
+        std::atomic<float> inputPeakL { 0.0f };
+        std::atomic<float> inputPeakR { 0.0f };
+        std::atomic<float> outputPeakL { 0.0f };
+        std::atomic<float> outputPeakR { 0.0f };
+        std::atomic<float> lastProcessMs { 0.0f };
+        std::atomic<float> maxProcessMs { 0.0f };
+        std::atomic<std::uint64_t> processBlockCount { 0 };
+        std::atomic<std::uint64_t> parameterWriteCount { 0 };
+        std::atomic<std::uint64_t> engineSwitchCount { 0 };
+        std::atomic<std::uint64_t> hqToggleCount { 0 };
+    };
+
+    const LiveTelemetry& getLiveTelemetry() const { return liveTelemetry; }
+    void resetLiveTelemetryPeakHold();
+
+    struct DiagnosticFeatureFlags
+    {
+        std::atomic<bool> analyzersEnabled { true };
+        std::atomic<bool> spectrumCardEnabled { true };
+        std::atomic<bool> modulationCardEnabled { true };
+        std::atomic<bool> transferCardEnabled { true };
+        std::atomic<bool> telemetryCardEnabled { true };
+    };
+
+    struct AnalyzerRuntimeConfig
+    {
+        std::atomic<bool> freeze { false };
+        std::atomic<bool> peakHold { true };
+        std::atomic<int> refreshHz { 30 };
+    };
+
+    struct AnalyzerSnapshot
+    {
+        bool valid = false;
+        std::uint64_t sequence = 0;
+        double sampleRate = 0.0;
+        int blockSize = 0;
+        float centerDelayMs = 0.0f;
+        float modulationDepthMs = 0.0f;
+        float inputPeakDb = -100.0f;
+        float wetPeakDb = -100.0f;
+        float outputPeakDb = -100.0f;
+        std::array<float, ANALYZER_WAVEFORM_POINTS> inputWaveform {};
+        std::array<float, ANALYZER_WAVEFORM_POINTS> wetWaveform {};
+        std::array<float, ANALYZER_WAVEFORM_POINTS> outputWaveform {};
+        std::array<float, ANALYZER_WAVEFORM_POINTS> lfoLeft {};
+        std::array<float, ANALYZER_WAVEFORM_POINTS> lfoRight {};
+        std::array<float, ANALYZER_WAVEFORM_POINTS> delayTrajectoryMs {};
+        std::array<float, ANALYZER_FFT_SIZE / 2> inputSpectrum {};
+        std::array<float, ANALYZER_FFT_SIZE / 2> wetSpectrum {};
+        std::array<float, ANALYZER_FFT_SIZE / 2> outputSpectrum {};
+        std::array<float, ANALYZER_TRANSFER_POINTS> transferInput {};
+        std::array<float, ANALYZER_TRANSFER_POINTS> transferOutput {};
+    };
+
+    const DiagnosticFeatureFlags& getDiagnosticFeatureFlags() const { return diagnosticFeatureFlags; }
+    const AnalyzerRuntimeConfig& getAnalyzerRuntimeConfig() const { return analyzerRuntimeConfig; }
+    bool getAnalyzerSnapshot(AnalyzerSnapshot& outSnapshot) const;
+    void setAnalyzerFrozen(bool shouldFreeze);
+    bool isAnalyzerFrozen() const;
+    void setAnalyzerPeakHoldEnabled(bool shouldHold);
+    bool isAnalyzerPeakHoldEnabled() const;
+    void setAnalyzerRefreshHz(int hz);
+    int getAnalyzerRefreshHz() const;
+    void setAnalyzerCardDemand(bool modulationVisible, bool spectrumVisible,
+                               bool transferVisible, bool telemetryVisible);
+    void resetToFactoryDefaults();
     
     // Feedback collector (public for editor access)
     std::unique_ptr<FeedbackCollector> feedbackCollector;
@@ -161,6 +238,7 @@ private:
     void initializeEngineInternalProfiles();
     void persistActiveEngineInternalsFromDsp();
     void restoreEngineInternalsToDsp(int colorIndex, bool hqEnabled);
+    void runAnalyzerPass();
     
     juce::CriticalSection dspLock;
     std::unique_ptr<ChorusDSP> chorusDSP;
@@ -175,6 +253,32 @@ private:
     std::atomic<bool> presetLoadInProgress { false };
     std::atomic<bool> stateLoadInProgress { false };
     std::atomic<bool> engineProfileApplyInProgress { false };
+    LiveTelemetry liveTelemetry;
+
+    class AnalyzerWorker;
+    struct StereoTapRingBuffer
+    {
+        static constexpr std::uint32_t capacity = 1u << 16; // 65536 samples, power-of-two.
+        std::array<float, capacity> left {};
+        std::array<float, capacity> right {};
+        std::atomic<std::uint64_t> writeIndex { 0 };
+
+        void clear() noexcept;
+        void push(const float* leftIn, const float* rightIn, int numSamples) noexcept;
+        void copyLatest(float* leftOut, float* rightOut, int numSamples) const noexcept;
+    };
+
+    DiagnosticFeatureFlags diagnosticFeatureFlags;
+    AnalyzerRuntimeConfig analyzerRuntimeConfig;
+    StereoTapRingBuffer inputTapRing;
+    StereoTapRingBuffer wetTapRing;
+    StereoTapRingBuffer outputTapRing;
+    juce::AudioBuffer<float> dryTapBuffer;
+    juce::AudioBuffer<float> wetEstimateBuffer;
+    std::array<AnalyzerSnapshot, 2> analyzerSnapshots {};
+    std::atomic<int> activeAnalyzerSnapshotIndex { 0 };
+    std::atomic<std::uint64_t> analyzerSequenceCounter { 0 };
+    std::unique_ptr<AnalyzerWorker> analyzerWorker;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChoroborosAudioProcessor)
 };

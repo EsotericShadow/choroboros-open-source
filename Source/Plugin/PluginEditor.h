@@ -45,6 +45,7 @@ public:
     void applyLayout();
     void applyTuningToUI();
     void refreshValueLabels();
+    void resetLayoutToFactoryDefaults();
     float getUiScale() const { return kUiScale; }
     const LayoutTuning& getLayoutTuning() const { return layoutTuning; }
     LayoutTuning& getLayoutTuning() { return layoutTuning; }

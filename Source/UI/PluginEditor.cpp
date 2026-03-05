@@ -506,6 +506,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     devButton.setButtonText("DEV");
     devButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
     devButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
+    devButton.setTooltip("Dev Panel: Built-in diagnostic and tuning suite. Parameter mapping, DSP internals, live readouts, validation.");
     devButton.onClick = [this]
     {
         if (!devWindow)
@@ -517,7 +518,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             devWindow->toFront(true);
     };
     addAndMakeVisible(devButton);
-    devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(40), uiScaleInt(10));
+    devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(50), uiScaleInt(12));
     
     // Set fixed size
     setSize(uiScaleInt(700), uiScaleInt(363));

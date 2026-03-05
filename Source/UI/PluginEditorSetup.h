@@ -189,6 +189,8 @@ struct LayoutTuning
     int colorValueFontSize = 15;
     int mixValueFontSize = 11;
     int valueTextAlphaPct = 100;
+    int valueTextColourMode = 0; // 0 = engine semantic color, 1 = custom color below
+    int valueTextColour = static_cast<int>(0xffffffff);
 
     int topButtonsWidth = 45;
     int topButtonsHeight = 10;
@@ -221,6 +223,8 @@ struct LayoutTuning
     int offsetKnobVisualResponseMs = 100;
     int widthKnobVisualResponseMs = 100;
     int mixKnobVisualResponseMs = 100;
+    int knobDragSensitivityPct = 100;
+    int knobRollOffSpeedPct = 100;
     int knobSweepStartDeg = 0;
     int knobSweepEndDeg = 360;
     int knobFrameCount = 156;

@@ -54,7 +54,7 @@ void SmoothedSlider::mouseDrag(const juce::MouseEvent& e)
 {
     if (getSliderStyle() == juce::Slider::RotaryVerticalDrag)
     {
-        const double sensitivity = static_cast<double>(juce::jmax(1, getHeight()));
+        const double sensitivity = juce::jmax(1.0, static_cast<double>(getHeight()) / static_cast<double>(dragSensitivityScale));
         // Upward drag should increase value, downward drag should decrease value.
         const double proportionDelta = (verticalDragStartY - e.position.y) / sensitivity;
         double newProportion = valueToProportionOfLength(valueAtVerticalDragStart) + proportionDelta;
@@ -150,6 +150,11 @@ void SmoothedSlider::setUseExponential(bool useExp)
             visualValueLinear.setCurrentAndTargetValue(getValue());
         }
     }
+}
+
+void SmoothedSlider::setDragSensitivity(float sensitivityScale)
+{
+    dragSensitivityScale = juce::jmax(0.01f, sensitivityScale);
 }
 
 float SmoothedSlider::getVisualValue() const

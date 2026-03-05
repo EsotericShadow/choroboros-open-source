@@ -21,6 +21,9 @@
 #include "../DSP/ChorusDSP.h"
 #include "../Config/DefaultsPersistence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
+#include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -515,6 +518,88 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
 }
 } // namespace
 
+void ChoroborosAudioProcessor::StereoTapRingBuffer::clear() noexcept
+{
+    std::fill(left.begin(), left.end(), 0.0f);
+    std::fill(right.begin(), right.end(), 0.0f);
+    writeIndex.store(0, std::memory_order_relaxed);
+}
+
+void ChoroborosAudioProcessor::StereoTapRingBuffer::push(const float* leftIn, const float* rightIn, int numSamples) noexcept
+{
+    if (numSamples <= 0 || leftIn == nullptr)
+        return;
+
+    auto write = writeIndex.load(std::memory_order_relaxed);
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const std::uint32_t slot = static_cast<std::uint32_t>((write + static_cast<std::uint64_t>(i)) & (capacity - 1u));
+        left[slot] = leftIn[i];
+        right[slot] = (rightIn != nullptr) ? rightIn[i] : leftIn[i];
+    }
+    writeIndex.store(write + static_cast<std::uint64_t>(numSamples), std::memory_order_release);
+}
+
+void ChoroborosAudioProcessor::StereoTapRingBuffer::copyLatest(float* leftOut, float* rightOut, int numSamples) const noexcept
+{
+    if (numSamples <= 0 || leftOut == nullptr || rightOut == nullptr)
+        return;
+
+    const int clampedSamples = juce::jmin(numSamples, static_cast<int>(capacity));
+    const auto write = writeIndex.load(std::memory_order_acquire);
+    const int available = static_cast<int>(juce::jmin<std::uint64_t>(write, capacity));
+    const int toCopy = juce::jmin(clampedSamples, available);
+    const int zeroPrefix = clampedSamples - toCopy;
+
+    for (int i = 0; i < zeroPrefix; ++i)
+    {
+        leftOut[i] = 0.0f;
+        rightOut[i] = 0.0f;
+    }
+
+    const auto readStart = write - static_cast<std::uint64_t>(toCopy);
+    for (int i = 0; i < toCopy; ++i)
+    {
+        const std::uint32_t slot = static_cast<std::uint32_t>((readStart + static_cast<std::uint64_t>(i)) & (capacity - 1u));
+        leftOut[zeroPrefix + i] = left[slot];
+        rightOut[zeroPrefix + i] = right[slot];
+    }
+}
+
+class ChoroborosAudioProcessor::AnalyzerWorker final : public juce::Thread
+{
+public:
+    explicit AnalyzerWorker(ChoroborosAudioProcessor& ownerIn)
+        : juce::Thread("ChoroborosAnalyzer"),
+          owner(ownerIn)
+    {
+    }
+
+    void run() override
+    {
+        while (!threadShouldExit())
+        {
+            const auto& flags = owner.getDiagnosticFeatureFlags();
+            const bool anyDemand = flags.modulationCardEnabled.load(std::memory_order_relaxed)
+                                || flags.spectrumCardEnabled.load(std::memory_order_relaxed)
+                                || flags.transferCardEnabled.load(std::memory_order_relaxed)
+                                || flags.telemetryCardEnabled.load(std::memory_order_relaxed);
+
+            if (flags.analyzersEnabled.load(std::memory_order_relaxed) && anyDemand)
+                owner.runAnalyzerPass();
+
+            const int hz = owner.getAnalyzerRefreshHz();
+            const int sleepMs = anyDemand
+                ? juce::jmax(8, 1000 / juce::jlimit(5, 60, hz))
+                : 120;
+            wait(sleepMs);
+        }
+    }
+
+private:
+    ChoroborosAudioProcessor& owner;
+};
+
 //==============================================================================
 ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -542,18 +627,24 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     parameters.addParameterListener(OFFSET_ID, this);
     parameters.addParameterListener(WIDTH_ID, this);
     parameters.addParameterListener(COLOR_ID, this);
+    parameters.addParameterListener(HQ_ID, this);
     parameters.addParameterListener(MIX_ID, this);
     lastEngineIndex = getCurrentEngineColorIndex();
+    analyzerWorker = std::make_unique<AnalyzerWorker>(*this);
 }
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
+    if (analyzerWorker != nullptr)
+        analyzerWorker->stopThread(1500);
+
     parameters.removeParameterListener(ENGINE_COLOR_ID, this);
     parameters.removeParameterListener(RATE_ID, this);
     parameters.removeParameterListener(DEPTH_ID, this);
     parameters.removeParameterListener(OFFSET_ID, this);
     parameters.removeParameterListener(WIDTH_ID, this);
     parameters.removeParameterListener(COLOR_ID, this);
+    parameters.removeParameterListener(HQ_ID, this);
     parameters.removeParameterListener(MIX_ID, this);
 }
 
@@ -809,12 +900,29 @@ void ChoroborosAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
     
     chorusDSP->prepare(spec);
+    constexpr int diagnosticBufferCeiling = 8192;
+    const int diagnosticBufferSize = juce::jmax<int>(samplesPerBlock, diagnosticBufferCeiling);
+    dryTapBuffer.setSize(2, diagnosticBufferSize, false, true, true);
+    wetEstimateBuffer.setSize(2, diagnosticBufferSize, false, true, true);
+    inputTapRing.clear();
+    wetTapRing.clear();
+    outputTapRing.clear();
+    activeAnalyzerSnapshotIndex.store(0, std::memory_order_relaxed);
+    analyzerSnapshots[0] = {};
+    analyzerSnapshots[1] = {};
+    analyzerSequenceCounter.store(0, std::memory_order_relaxed);
+
+    if (analyzerWorker != nullptr && !analyzerWorker->isThreadRunning())
+        analyzerWorker->startThread(juce::Thread::Priority::low);
+
     startTimerHz(10);  // Apply runtime tuning on message thread, 10 Hz
 }
 
 void ChoroborosAudioProcessor::releaseResources()
 {
     stopTimer();
+    if (analyzerWorker != nullptr)
+        analyzerWorker->stopThread(1500);
     chorusDSP->reset();
 }
 
@@ -854,10 +962,37 @@ void ChoroborosAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+    const int numSamples = buffer.getNumSamples();
+    const int tapSamples = juce::jmin(numSamples, dryTapBuffer.getNumSamples());
+    const bool analyzerEnabled = diagnosticFeatureFlags.analyzersEnabled.load(std::memory_order_relaxed);
+    const bool needAnalyzerAudioTaps = analyzerEnabled
+        && (diagnosticFeatureFlags.spectrumCardEnabled.load(std::memory_order_relaxed)
+            || diagnosticFeatureFlags.transferCardEnabled.load(std::memory_order_relaxed)
+            || diagnosticFeatureFlags.telemetryCardEnabled.load(std::memory_order_relaxed));
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    if (needAnalyzerAudioTaps && tapSamples > 0)
+    {
+        const float* inL = (totalNumInputChannels > 0) ? buffer.getReadPointer(0) : nullptr;
+        const float* inR = (totalNumInputChannels > 1) ? buffer.getReadPointer(1) : inL;
+        auto* dryL = dryTapBuffer.getWritePointer(0);
+        auto* dryR = dryTapBuffer.getWritePointer(1);
+        for (int i = 0; i < tapSamples; ++i)
+        {
+            const float sampleL = (inL != nullptr) ? inL[i] : 0.0f;
+            const float sampleR = (inR != nullptr) ? inR[i] : sampleL;
+            dryL[i] = sampleL;
+            dryR[i] = sampleR;
+        }
+        inputTapRing.push(dryL, dryR, tapSamples);
+    }
+
+    const float inputPeakL = (totalNumInputChannels > 0) ? buffer.getMagnitude(0, 0, numSamples) : 0.0f;
+    const float inputPeakR = (totalNumInputChannels > 1) ? buffer.getMagnitude(1, 0, numSamples) : inputPeakL;
+
+    const auto startTicks = juce::Time::getHighResolutionTicks();
     updateDSPParameters();
 
     {
@@ -865,6 +1000,65 @@ void ChoroborosAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         juce::dsp::AudioBlock<float> block(buffer);
         chorusDSP->process(block);
     }
+
+    const auto elapsedTicks = juce::Time::getHighResolutionTicks() - startTicks;
+    const float processMs = static_cast<float>(juce::Time::highResolutionTicksToSeconds(elapsedTicks) * 1000.0);
+    const float outputPeakL = (totalNumOutputChannels > 0) ? buffer.getMagnitude(0, 0, numSamples) : 0.0f;
+    const float outputPeakR = (totalNumOutputChannels > 1) ? buffer.getMagnitude(1, 0, numSamples) : outputPeakL;
+
+    if (needAnalyzerAudioTaps && tapSamples > 0)
+    {
+        const float* outL = (totalNumOutputChannels > 0) ? buffer.getReadPointer(0) : nullptr;
+        const float* outR = (totalNumOutputChannels > 1) ? buffer.getReadPointer(1) : outL;
+        outputTapRing.push(outL, outR, tapSamples);
+
+        float mixMapped = 0.5f;
+        if (const auto* mixParam = parameters.getRawParameterValue(MIX_ID))
+            mixMapped = juce::jlimit(0.0f, 1.0f, mapParameterValue(MIX_ID, mixParam->load()));
+
+        auto* wetL = wetEstimateBuffer.getWritePointer(0);
+        auto* wetR = wetEstimateBuffer.getWritePointer(1);
+        const float* dryL = dryTapBuffer.getReadPointer(0);
+        const float* dryR = dryTapBuffer.getReadPointer(1);
+        const float invMix = (mixMapped > 1.0e-5f) ? (1.0f / mixMapped) : 0.0f;
+        const float dryScale = 1.0f - mixMapped;
+        for (int i = 0; i < tapSamples; ++i)
+        {
+            if (mixMapped <= 1.0e-5f)
+            {
+                wetL[i] = 0.0f;
+                wetR[i] = 0.0f;
+                continue;
+            }
+
+            const float outSampleL = (outL != nullptr) ? outL[i] : 0.0f;
+            const float outSampleR = (outR != nullptr) ? outR[i] : outSampleL;
+            wetL[i] = juce::jlimit(-2.0f, 2.0f, (outSampleL - dryL[i] * dryScale) * invMix);
+            wetR[i] = juce::jlimit(-2.0f, 2.0f, (outSampleR - dryR[i] * dryScale) * invMix);
+        }
+        wetTapRing.push(wetL, wetR, tapSamples);
+    }
+
+    auto updatePeakHold = [](std::atomic<float>& target, float measured)
+    {
+        const float previous = target.load(std::memory_order_relaxed);
+        const float held = juce::jmax(measured, previous * 0.96f);
+        target.store(held, std::memory_order_relaxed);
+    };
+
+    updatePeakHold(liveTelemetry.inputPeakL, inputPeakL);
+    updatePeakHold(liveTelemetry.inputPeakR, inputPeakR);
+    updatePeakHold(liveTelemetry.outputPeakL, outputPeakL);
+    updatePeakHold(liveTelemetry.outputPeakR, outputPeakR);
+    liveTelemetry.lastProcessMs.store(processMs, std::memory_order_relaxed);
+
+    float prevMax = liveTelemetry.maxProcessMs.load(std::memory_order_relaxed);
+    while (processMs > prevMax
+        && !liveTelemetry.maxProcessMs.compare_exchange_weak(prevMax, processMs, std::memory_order_relaxed))
+    {
+    }
+
+    liveTelemetry.processBlockCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 void ChoroborosAudioProcessor::initTuningDefaults()
@@ -1104,6 +1298,8 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
 
     if (parameterID == ENGINE_COLOR_ID)
     {
+        liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
+        liveTelemetry.engineSwitchCount.fetch_add(1, std::memory_order_relaxed);
         struct ScopedFlag
         {
             std::atomic<bool>& flagRef;
@@ -1118,6 +1314,13 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         return;
     }
 
+    if (parameterID == HQ_ID)
+    {
+        liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
+        liveTelemetry.hqToggleCount.fetch_add(1, std::memory_order_relaxed);
+        return;
+    }
+
     if (parameterID == RATE_ID
         || parameterID == DEPTH_ID
         || parameterID == OFFSET_ID
@@ -1125,8 +1328,304 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         || parameterID == COLOR_ID
         || parameterID == MIX_ID)
     {
+        liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
         saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
     }
+}
+
+void ChoroborosAudioProcessor::resetLiveTelemetryPeakHold()
+{
+    liveTelemetry.inputPeakL.store(0.0f, std::memory_order_relaxed);
+    liveTelemetry.inputPeakR.store(0.0f, std::memory_order_relaxed);
+    liveTelemetry.outputPeakL.store(0.0f, std::memory_order_relaxed);
+    liveTelemetry.outputPeakR.store(0.0f, std::memory_order_relaxed);
+    liveTelemetry.maxProcessMs.store(0.0f, std::memory_order_relaxed);
+}
+
+void ChoroborosAudioProcessor::resetToFactoryDefaults()
+{
+    stateLoadInProgress.store(true, std::memory_order_relaxed);
+
+    initTuningDefaults();
+    initializeEngineInternalProfiles();
+
+    for (int i = 0; i < 5; ++i)
+        engineParamProfiles[static_cast<size_t>(i)] = getEngineDefaults(i);
+
+    const auto setToDefault = [this](const juce::String& parameterId)
+    {
+        if (auto* param = parameters.getParameter(parameterId))
+            param->setValueNotifyingHost(param->getDefaultValue());
+    };
+
+    setToDefault(ENGINE_COLOR_ID);
+    setToDefault(HQ_ID);
+    setToDefault(RATE_ID);
+    setToDefault(DEPTH_ID);
+    setToDefault(OFFSET_ID);
+    setToDefault(WIDTH_ID);
+    setToDefault(COLOR_ID);
+    setToDefault(MIX_ID);
+
+    if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
+        lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
+    saveCurrentParamsToEngineProfile(lastEngineIndex);
+
+    syncEngineInternalsToActiveDsp(getCurrentEngineColorIndex(), isHqEnabled());
+    stateLoadInProgress.store(false, std::memory_order_relaxed);
+
+    updateDSPParameters();
+    resetLiveTelemetryPeakHold();
+}
+
+bool ChoroborosAudioProcessor::getAnalyzerSnapshot(AnalyzerSnapshot& outSnapshot) const
+{
+    const int idx = activeAnalyzerSnapshotIndex.load(std::memory_order_acquire);
+    outSnapshot = analyzerSnapshots[juce::jlimit(0, 1, idx)];
+    return outSnapshot.valid;
+}
+
+void ChoroborosAudioProcessor::setAnalyzerFrozen(bool shouldFreeze)
+{
+    analyzerRuntimeConfig.freeze.store(shouldFreeze, std::memory_order_relaxed);
+}
+
+bool ChoroborosAudioProcessor::isAnalyzerFrozen() const
+{
+    return analyzerRuntimeConfig.freeze.load(std::memory_order_relaxed);
+}
+
+void ChoroborosAudioProcessor::setAnalyzerPeakHoldEnabled(bool shouldHold)
+{
+    analyzerRuntimeConfig.peakHold.store(shouldHold, std::memory_order_relaxed);
+}
+
+bool ChoroborosAudioProcessor::isAnalyzerPeakHoldEnabled() const
+{
+    return analyzerRuntimeConfig.peakHold.load(std::memory_order_relaxed);
+}
+
+void ChoroborosAudioProcessor::setAnalyzerRefreshHz(int hz)
+{
+    analyzerRuntimeConfig.refreshHz.store(juce::jlimit(5, 60, hz), std::memory_order_relaxed);
+}
+
+int ChoroborosAudioProcessor::getAnalyzerRefreshHz() const
+{
+    return juce::jlimit(5, 60, analyzerRuntimeConfig.refreshHz.load(std::memory_order_relaxed));
+}
+
+void ChoroborosAudioProcessor::setAnalyzerCardDemand(bool modulationVisible, bool spectrumVisible,
+                                                     bool transferVisible, bool telemetryVisible)
+{
+    diagnosticFeatureFlags.modulationCardEnabled.store(modulationVisible, std::memory_order_relaxed);
+    diagnosticFeatureFlags.spectrumCardEnabled.store(spectrumVisible, std::memory_order_relaxed);
+    diagnosticFeatureFlags.transferCardEnabled.store(transferVisible, std::memory_order_relaxed);
+    diagnosticFeatureFlags.telemetryCardEnabled.store(telemetryVisible, std::memory_order_relaxed);
+}
+
+void ChoroborosAudioProcessor::runAnalyzerPass()
+{
+    if (analyzerRuntimeConfig.freeze.load(std::memory_order_relaxed))
+        return;
+
+    constexpr int fftSize = ANALYZER_FFT_SIZE;
+    constexpr int bins = ANALYZER_FFT_SIZE / 2;
+    constexpr int waveformPoints = ANALYZER_WAVEFORM_POINTS;
+    constexpr int transferPoints = ANALYZER_TRANSFER_POINTS;
+
+    const bool needModulation = diagnosticFeatureFlags.modulationCardEnabled.load(std::memory_order_relaxed);
+    const bool needSpectrum = diagnosticFeatureFlags.spectrumCardEnabled.load(std::memory_order_relaxed);
+    const bool needTransfer = diagnosticFeatureFlags.transferCardEnabled.load(std::memory_order_relaxed);
+    const bool needTelemetry = diagnosticFeatureFlags.telemetryCardEnabled.load(std::memory_order_relaxed);
+
+    if (!(needModulation || needSpectrum || needTransfer || needTelemetry))
+        return;
+
+    static thread_local juce::dsp::FFT fft(ANALYZER_FFT_ORDER);
+    static thread_local juce::dsp::WindowingFunction<float> window(fftSize, juce::dsp::WindowingFunction<float>::hann, true);
+    static thread_local std::array<float, fftSize * 2> fftData {};
+
+    const int currentFront = activeAnalyzerSnapshotIndex.load(std::memory_order_acquire);
+    const AnalyzerSnapshot previous = analyzerSnapshots[juce::jlimit(0, 1, currentFront)];
+    const bool peakHoldEnabled = analyzerRuntimeConfig.peakHold.load(std::memory_order_relaxed);
+    const bool needAudioTaps = needSpectrum || needTransfer || needTelemetry;
+
+    std::array<float, fftSize> inputL {};
+    std::array<float, fftSize> inputR {};
+    std::array<float, fftSize> wetL {};
+    std::array<float, fftSize> wetR {};
+    std::array<float, fftSize> outputL {};
+    std::array<float, fftSize> outputR {};
+
+    if (needAudioTaps)
+    {
+        inputTapRing.copyLatest(inputL.data(), inputR.data(), fftSize);
+        wetTapRing.copyLatest(wetL.data(), wetR.data(), fftSize);
+        outputTapRing.copyLatest(outputL.data(), outputR.data(), fftSize);
+    }
+
+    auto computeSpectrum = [&](const std::array<float, fftSize>& left,
+                               const std::array<float, fftSize>& right,
+                               std::array<float, bins>& destination,
+                               const std::array<float, bins>& previousSpectrum)
+    {
+        for (int i = 0; i < fftSize; ++i)
+            fftData[static_cast<size_t>(i)] = 0.5f * (left[static_cast<size_t>(i)] + right[static_cast<size_t>(i)]);
+        std::fill(fftData.begin() + fftSize, fftData.end(), 0.0f);
+        window.multiplyWithWindowingTable(fftData.data(), fftSize);
+        fft.performFrequencyOnlyForwardTransform(fftData.data());
+
+        for (int i = 0; i < bins; ++i)
+        {
+            const float gain = juce::jmax(1.0e-7f, fftData[static_cast<size_t>(i)] / static_cast<float>(fftSize));
+            const float db = juce::Decibels::gainToDecibels(gain, -100.0f);
+            float normalized = juce::jlimit(0.0f, 1.0f, (db + 100.0f) * 0.01f);
+            if (peakHoldEnabled && previous.valid)
+                normalized = juce::jmax(normalized, previousSpectrum[static_cast<size_t>(i)] * 0.985f);
+            destination[static_cast<size_t>(i)] = normalized;
+        }
+    };
+
+    auto fillWaveform = [](const std::array<float, fftSize>& left,
+                           const std::array<float, fftSize>& right,
+                           std::array<float, waveformPoints>& destination)
+    {
+        for (int i = 0; i < waveformPoints; ++i)
+        {
+            const int src = (i * (fftSize - 1)) / (waveformPoints - 1);
+            destination[static_cast<size_t>(i)] = 0.5f * (left[static_cast<size_t>(src)] + right[static_cast<size_t>(src)]);
+        }
+    };
+
+    auto computePeakDb = [](const std::array<float, fftSize>& left, const std::array<float, fftSize>& right)
+    {
+        float peak = 0.0f;
+        for (int i = 0; i < fftSize; ++i)
+        {
+            peak = juce::jmax(peak, std::abs(left[static_cast<size_t>(i)]));
+            peak = juce::jmax(peak, std::abs(right[static_cast<size_t>(i)]));
+        }
+        return juce::Decibels::gainToDecibels(juce::jmax(peak, 1.0e-6f));
+    };
+
+    const int nextIndex = 1 - currentFront;
+    auto& snapshot = analyzerSnapshots[nextIndex];
+    snapshot = previous;
+    snapshot.valid = true;
+    snapshot.sequence = analyzerSequenceCounter.fetch_add(1, std::memory_order_relaxed) + 1u;
+    snapshot.sampleRate = getSampleRate();
+    snapshot.blockSize = getBlockSize();
+
+    if (needAudioTaps)
+    {
+        fillWaveform(inputL, inputR, snapshot.inputWaveform);
+        fillWaveform(wetL, wetR, snapshot.wetWaveform);
+        fillWaveform(outputL, outputR, snapshot.outputWaveform);
+    }
+
+    if (needSpectrum)
+    {
+        computeSpectrum(inputL, inputR, snapshot.inputSpectrum, previous.inputSpectrum);
+        computeSpectrum(wetL, wetR, snapshot.wetSpectrum, previous.wetSpectrum);
+        computeSpectrum(outputL, outputR, snapshot.outputSpectrum, previous.outputSpectrum);
+    }
+
+    if (needTelemetry)
+    {
+        snapshot.inputPeakDb = computePeakDb(inputL, inputR);
+        snapshot.wetPeakDb = computePeakDb(wetL, wetR);
+        snapshot.outputPeakDb = computePeakDb(outputL, outputR);
+    }
+
+    auto readRaw = [this](const char* paramId) -> float
+    {
+        if (const auto* param = parameters.getRawParameterValue(paramId))
+            return param->load();
+        return 0.0f;
+    };
+
+    const float rateMapped = mapParameterValue(RATE_ID, readRaw(RATE_ID));
+    const float depthMapped = mapParameterValue(DEPTH_ID, readRaw(DEPTH_ID));
+    const float offsetDeg = mapParameterValue(OFFSET_ID, readRaw(OFFSET_ID));
+    const float offsetRad = juce::degreesToRadians(offsetDeg);
+    const auto& rt = getDspInternals();
+    const bool isRedNQ = getCurrentEngineColorIndex() == 2 && !isHqEnabled();
+
+    float centerDelayMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * depthMapped;
+    float modulationDepthMs = juce::jmax(0.02f, rt.centreDelayScale.load() * depthMapped * 0.25f);
+    float bbdMinMs = 0.0f;
+    float bbdMaxMs = 0.0f;
+    if (isRedNQ)
+    {
+        centerDelayMs = rt.bbdCentreBaseMs.load() + rt.bbdCentreScale.load() * depthMapped;
+        modulationDepthMs = juce::jmax(0.02f, rt.bbdDepthMs.load() * depthMapped);
+        bbdMinMs = rt.bbdDelayMinMs.load();
+        bbdMaxMs = rt.bbdDelayMaxMs.load();
+    }
+
+    if (needModulation || needTelemetry)
+    {
+        snapshot.centerDelayMs = centerDelayMs;
+        snapshot.modulationDepthMs = modulationDepthMs;
+    }
+
+    if (needModulation)
+    {
+        const float clampedRate = juce::jlimit(0.05f, 10.0f, rateMapped);
+        const float phaseScale = juce::MathConstants<float>::twoPi * clampedRate;
+        for (int i = 0; i < waveformPoints; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(waveformPoints - 1);
+            const float phase = phaseScale * t;
+            const float lfoL = std::sin(phase) * depthMapped;
+            const float lfoR = std::sin(phase + offsetRad) * depthMapped;
+            snapshot.lfoLeft[static_cast<size_t>(i)] = lfoL;
+            snapshot.lfoRight[static_cast<size_t>(i)] = lfoR;
+
+            float delayMs = centerDelayMs + lfoL * modulationDepthMs;
+            if (isRedNQ)
+                delayMs = juce::jlimit(bbdMinMs, bbdMaxMs, delayMs);
+            snapshot.delayTrajectoryMs[static_cast<size_t>(i)] = delayMs;
+        }
+    }
+
+    if (needTransfer)
+    {
+        std::array<float, transferPoints> transferSum {};
+        std::array<int, transferPoints> transferCount {};
+        for (int i = 0; i < fftSize; ++i)
+        {
+            const float x = juce::jlimit(-1.0f, 1.0f, 0.5f * (inputL[static_cast<size_t>(i)] + inputR[static_cast<size_t>(i)]));
+            const float y = juce::jlimit(-1.0f, 1.0f, 0.5f * (outputL[static_cast<size_t>(i)] + outputR[static_cast<size_t>(i)]));
+            const float xNorm = 0.5f * (x + 1.0f);
+            const int bin = juce::jlimit(0, transferPoints - 1, static_cast<int>(std::round(xNorm * static_cast<float>(transferPoints - 1))));
+            transferSum[static_cast<size_t>(bin)] += y;
+            transferCount[static_cast<size_t>(bin)] += 1;
+        }
+
+        for (int i = 0; i < transferPoints; ++i)
+        {
+            snapshot.transferInput[static_cast<size_t>(i)] =
+                juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(transferPoints - 1), -1.0f, 1.0f);
+
+            if (transferCount[static_cast<size_t>(i)] > 0)
+            {
+                snapshot.transferOutput[static_cast<size_t>(i)] =
+                    transferSum[static_cast<size_t>(i)] / static_cast<float>(transferCount[static_cast<size_t>(i)]);
+            }
+            else if (previous.valid)
+            {
+                snapshot.transferOutput[static_cast<size_t>(i)] = previous.transferOutput[static_cast<size_t>(i)] * 0.995f;
+            }
+            else
+            {
+                snapshot.transferOutput[static_cast<size_t>(i)] = snapshot.transferInput[static_cast<size_t>(i)];
+            }
+        }
+    }
+
+    activeAnalyzerSnapshotIndex.store(nextIndex, std::memory_order_release);
 }
 
 void ChoroborosAudioProcessor::saveCurrentParamsToEngineProfile(int engineIndex)

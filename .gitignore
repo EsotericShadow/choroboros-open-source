@@ -39,3 +39,6 @@ dmg_temp/
 # Large third-party docs (Pro Tools, Avid, etc.)
 Documentation/*.pdf
 Documentation/*.url
+
+# Beta tester feedback (names, emails, verbatim responses)
+feedback/

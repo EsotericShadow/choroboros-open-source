@@ -251,6 +251,8 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.colorValueFontSize = getIntOrDefault(layoutVar, "colorValueFontSize", layout.colorValueFontSize);
     layout.mixValueFontSize = getIntOrDefault(layoutVar, "mixValueFontSize", layout.mixValueFontSize);
     layout.valueTextAlphaPct = getIntOrDefault(layoutVar, "valueTextAlphaPct", layout.valueTextAlphaPct);
+    layout.valueTextColourMode = getIntOrDefault(layoutVar, "valueTextColourMode", layout.valueTextColourMode);
+    layout.valueTextColour = getIntOrDefault(layoutVar, "valueTextColour", layout.valueTextColour);
     layout.topButtonsWidth = getIntOrDefault(layoutVar, "topButtonsWidth", layout.topButtonsWidth);
     layout.topButtonsHeight = getIntOrDefault(layoutVar, "topButtonsHeight", layout.topButtonsHeight);
     layout.topButtonsGap = getIntOrDefault(layoutVar, "topButtonsGap", layout.topButtonsGap);
@@ -281,6 +283,8 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.offsetKnobVisualResponseMs = getIntOrDefault(layoutVar, "offsetKnobVisualResponseMs", layout.offsetKnobVisualResponseMs);
     layout.widthKnobVisualResponseMs = getIntOrDefault(layoutVar, "widthKnobVisualResponseMs", layout.widthKnobVisualResponseMs);
     layout.mixKnobVisualResponseMs = getIntOrDefault(layoutVar, "mixKnobVisualResponseMs", layout.mixKnobVisualResponseMs);
+    layout.knobDragSensitivityPct = getIntOrDefault(layoutVar, "knobDragSensitivityPct", layout.knobDragSensitivityPct);
+    layout.knobRollOffSpeedPct = getIntOrDefault(layoutVar, "knobRollOffSpeedPct", layout.knobRollOffSpeedPct);
     layout.knobSweepStartDeg = getIntOrDefault(layoutVar, "knobSweepStartDeg", layout.knobSweepStartDeg);
     layout.knobSweepEndDeg = getIntOrDefault(layoutVar, "knobSweepEndDeg", layout.knobSweepEndDeg);
     layout.knobFrameCount = getIntOrDefault(layoutVar, "knobFrameCount", layout.knobFrameCount);
@@ -506,6 +510,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     devButton.setButtonText("DEV");
     devButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
     devButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
+    devButton.setTooltip("Dev Panel: Built-in diagnostic and tuning suite. Parameter mapping, DSP internals, live readouts, validation.");
     devButton.onClick = [this]
     {
         if (!devWindow)
@@ -517,7 +522,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             devWindow->toFront(true);
     };
     addAndMakeVisible(devButton);
-    devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(40), uiScaleInt(10));
+    devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(50), uiScaleInt(12));
     
     // Listen for engine color changes (preset load or manual) to update value label colors
     audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
@@ -635,6 +640,13 @@ void ChoroborosPluginEditor::applyLayout()
     repaint();
 }
 
+void ChoroborosPluginEditor::resetLayoutToFactoryDefaults()
+{
+    layoutTuning = PluginEditorSetup::makeDefaultLayout();
+    applyLayout();
+    refreshValueLabels();
+}
+
 void ChoroborosPluginEditor::applyTuningToUI()
 {
     const auto& tuning = audioProcessor.getTuningState();
@@ -750,26 +762,33 @@ void ChoroborosPluginEditor::setupSliderValueChangeListeners()
 
 void ChoroborosPluginEditor::updateValueLabelColors(int colorIndex)
 {
-    // Color values for each engine:
-    // Green (0): #9dbd78
-    // Blue (1): #7fb8ff
-    // Red (2): #ff8d8b
-    // Purple (3): #b88dd8
-    // Black (4): #d4d4d4
     juce::Colour valueTextColor;
-    if (colorIndex == 0) // Green
-        valueTextColor = juce::Colour(0xff9dbd78);
-    else if (colorIndex == 1) // Blue
-        valueTextColor = juce::Colour(0xff7fb8ff);
-    else if (colorIndex == 2) // Red
-        valueTextColor = juce::Colour(0xffff8d8b);
-    else if (colorIndex == 3) // Purple
-        valueTextColor = juce::Colour(0xffb88dd8);
-    else // Black (colorIndex == 4)
-        valueTextColor = juce::Colour(0xffd4d4d4);
+    if (layoutTuning.valueTextColourMode != 0)
+    {
+        valueTextColor = juce::Colour(static_cast<juce::uint32>(layoutTuning.valueTextColour));
+    }
+    else
+    {
+        // Color values for each engine:
+        // Green (0): #9dbd78
+        // Blue (1): #7fb8ff
+        // Red (2): #ff8d8b
+        // Purple (3): #b88dd8
+        // Black (4): #d4d4d4
+        if (colorIndex == 0) // Green
+            valueTextColor = juce::Colour(0xff9dbd78);
+        else if (colorIndex == 1) // Blue
+            valueTextColor = juce::Colour(0xff7fb8ff);
+        else if (colorIndex == 2) // Red
+            valueTextColor = juce::Colour(0xffff8d8b);
+        else if (colorIndex == 3) // Purple
+            valueTextColor = juce::Colour(0xffb88dd8);
+        else // Black (colorIndex == 4)
+            valueTextColor = juce::Colour(0xffd4d4d4);
+    }
 
-    const float alpha = static_cast<float>(juce::jlimit(0, 100, layoutTuning.valueTextAlphaPct)) * 0.01f;
-    valueTextColor = valueTextColor.withAlpha(alpha);
+    const float alphaScale = static_cast<float>(juce::jlimit(0, 100, layoutTuning.valueTextAlphaPct)) * 0.01f;
+    valueTextColor = valueTextColor.withMultipliedAlpha(alphaScale);
     
     // Update all value label text colors
     rateValueLabel.setColour(juce::Label::textColourId, valueTextColor);

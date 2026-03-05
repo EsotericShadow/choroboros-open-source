@@ -352,11 +352,20 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     const int hqLabelWidth = editor.calculateLabelWidth("HQ", hqFont);
     editor.hqLabel.setBounds(hqCenterX - (hqLabelWidth / 2), hqCenterY + (hqSize / 2) + s(1), hqLabelWidth, s(18));
 
-    editor.rateSlider.setSmoothingTime(static_cast<float>(layout.rateKnobVisualResponseMs));
-    editor.depthSlider.setSmoothingTime(static_cast<float>(layout.depthKnobVisualResponseMs));
-    editor.offsetSlider.setSmoothingTime(static_cast<float>(layout.offsetKnobVisualResponseMs));
-    editor.widthSlider.setSmoothingTime(static_cast<float>(layout.widthKnobVisualResponseMs));
-    editor.mixSlider.setSmoothingTime(static_cast<float>(layout.mixKnobVisualResponseMs));
+    const float knobDragSensitivityScale = static_cast<float>(juce::jlimit(10, 400, layout.knobDragSensitivityPct)) * 0.01f;
+    const float knobRollOffSpeedScale = static_cast<float>(juce::jlimit(10, 400, layout.knobRollOffSpeedPct)) * 0.01f;
+    const auto applyKnobResponse = [knobDragSensitivityScale, knobRollOffSpeedScale](SmoothedSlider& knob, int baseResponseMs)
+    {
+        const float effectiveResponseMs = juce::jmax(1.0f, static_cast<float>(baseResponseMs) / knobRollOffSpeedScale);
+        knob.setSmoothingTime(effectiveResponseMs);
+        knob.setDragSensitivity(knobDragSensitivityScale);
+    };
+
+    applyKnobResponse(editor.rateSlider, layout.rateKnobVisualResponseMs);
+    applyKnobResponse(editor.depthSlider, layout.depthKnobVisualResponseMs);
+    applyKnobResponse(editor.offsetSlider, layout.offsetKnobVisualResponseMs);
+    applyKnobResponse(editor.widthSlider, layout.widthKnobVisualResponseMs);
+    applyKnobResponse(editor.mixSlider, layout.mixKnobVisualResponseMs);
 
     const auto setKnobSweepProps = [&layout](juce::Slider& knob)
     {

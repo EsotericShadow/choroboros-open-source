@@ -84,6 +84,11 @@ target_sources(Choroboros PRIVATE
     Source/UI/AnimatedToggleButton.h
     Source/UI/DevPanel.cpp
     Source/UI/DevPanel.h
+    Source/UI/DevPanelBuildContext.h
+    Source/UI/DevPanelRuntime.cpp
+    Source/UI/DevPanelTabBuilders.cpp
+    Source/UI/DevPanelPersistence.cpp
+    Source/UI/DevPanelSupport.h
     Source/UI/PluginEditorSetup.cpp
     Source/UI/PluginEditorSetup.h
 )
@@ -130,8 +135,15 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/black/black_mix_knob_spritesheet.png
         Assets/black/black__slider_thumb.png
         Assets/switch_a_spritesheet.png
+        Assets/gui_icons/lock.svg
+        Assets/gui_icons/unlock.svg
         Assets/fonts/Technology.ttf
         Assets/fonts/Retroica.ttf
+        Assets/fonts/labels/JetBrainsMonoNL-Thin.ttf
+        Assets/fonts/labels/JetBrainsMono-ThinItalic.ttf
+        Assets/fonts/titles/JetBrainsMono-ExtraBold.ttf
+        Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLight.ttf
+        Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLightItalic.ttf
         EULA.md
 )
 
@@ -165,7 +177,7 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
         COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.vst3 to user VST3 folder..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/Release/VST3/Choroboros.vst3" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:Choroboros_VST3>" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
         COMMENT "Copy Choroboros.vst3 to ~/Library/Audio/Plug-Ins/VST3 for Reaper")
     # After AAX build, copy to Avid Plug-Ins (Pro Tools Developer loads from user path if present)
     add_custom_command(TARGET Choroboros_AAX POST_BUILD

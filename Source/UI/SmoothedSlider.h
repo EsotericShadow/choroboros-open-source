@@ -42,6 +42,7 @@ public:
 
     void setSmoothingTime(float timeMs);
     void setUseExponential(bool useExp);
+    void setDragSensitivity(float sensitivityScale);
     float getVisualValue() const;
     std::function<void(const juce::MouseEvent&)> onMouseUpCallback;
     
@@ -59,6 +60,7 @@ private:
     float smoothingTimeMs = 60.0f;
     bool useExponential = false;
     bool needsRepaint = false;
+    float dragSensitivityScale = 1.0f;
     
     float getSampleRate() const { return 120.0f; } // 120 FPS for visual updates (smoother animation)
     void updateSmoothingCoeff();

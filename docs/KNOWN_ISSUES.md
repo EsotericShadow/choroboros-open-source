@@ -5,7 +5,7 @@ Issues known for Choroboros 2.03-beta. Please report additional issues via the F
 ## Beta Testers
 
 - **Platform:** macOS only (VST3, AU, Standalone). Windows and Linux builds not yet available.
-- **Dev Panel:** Developer panel is visible (About > Dev Panel or similar). Intended for power users; some controls may be experimental.
+- **Dev Panel:** Built-in diagnostic and tuning suite. Click the **DEV** button (top-left of the plugin) to open. Intended for power users; some controls may be experimental.
 
 ## Audio / DSP
 

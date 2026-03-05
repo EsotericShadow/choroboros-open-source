@@ -50,6 +50,10 @@ Choroboros is a multi-engine chorus plugin with five distinct engines, each offe
 
 Per-engine parameter memory: switching engines via dropdown restores your last values for that engine.
 
+### Dev Panel (Power Users)
+
+Built-in diagnostic and tuning suite. Click the **DEV** button (top-left) to open. Exposes parameter mapping, DSP internals per engine, live readouts, and validation. Intended for educators, sound designers, and power users who want to see under the hood.
+
 ## Installation
 
 Download the macOS Universal package (`Choroboros-v2.03-beta-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
