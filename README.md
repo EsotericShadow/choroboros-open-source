@@ -52,11 +52,17 @@ Per-engine parameter memory: switching engines via dropdown restores your last v
 
 ### Dev Panel (Power Users)
 
-Built-in diagnostic and tuning suite. Click the **DEV** button (top-left) to open. Exposes parameter mapping, DSP internals per engine, live readouts, and validation. Intended for educators, sound designers, and power users who want to see under the hood.
+Built-in diagnostic and tuning suite. Click the **DEV** button (top-left) to open. Features include:
+- **Interactive Console & Tutorials:** Type `help` to see 30+ power commands or `tutorial` for interactive, guided DSP walkthroughs.
+- **Deep Introspection:** Exposes parameter mapping, DSP internals per engine, and live readout telemetry.
+- **UI Customization:** A dedicated Settings panel allows for granular control over typography, themes, and accessibility options (color-vision assistance, reduced motion, hit targets).
+- **Validation:** Live DSP trace matrices to confirm signal-flow integrity.
+
+Intended for educators, sound designers, and power users who want to see under the hood.
 
 ## Installation
 
-Download the macOS Universal package (`Choroboros-v2.03-beta-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
+Download the macOS Universal package (`Choroboros-v2.02.2-beta-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
 
 ### VST3
 Copy `Choroboros.vst3` to:
@@ -90,7 +96,7 @@ After installation, rescan plugins in your DAW.
 
 ## Technical Details
 
-- **Version:** 2.03-beta
+- **Version:** 2.02.2-beta
 - **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12

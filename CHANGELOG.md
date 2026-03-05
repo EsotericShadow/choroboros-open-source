@@ -2,19 +2,28 @@
 
 All notable changes to Choroboros are documented here.
 
-## [2.03-beta] - 2026
+## [2.02.2-beta] - 2026-03-04
 
-### Fixed
-
-- **Engine switch artifacts:** Transactional profile apply with guard to prevent partial-state feedback
-- **Engine switch artifacts:** Adaptive warmup and crossfade duration (severity-based instead of fixed 20 ms/40 ms)
-- **Engine switch artifacts:** Dual old/new rendering during crossfade—old core rendered with frozen old params
-- **Engine switch artifacts:** Old-path LFO phase continuation (natural decay instead of frozen sample hold)
-- **AU validation (Logic Pro):** Engine selection parameter now reports `isMetaParameter() = true` (from 2.02.1)
+### Added
+- **Dev Panel Console:** Fully interactive command-line interface replacing static recent touches log.
+- **Console Interface:** 30+ power user commands including `engine`, `hq`, `set`, `get`, `add`, `sub`, `macro`, `toggle`, `sweep`, `undo`, `redo`, `history`, `solo`, `watch`, `dump`, `diff factory`, `list`, `stats`, and aliases.
+- **Interactive Tutorials:** Guided HUD overlay teaching analog DSP concepts (BBD whine, Tape wow/flutter, Phase Width) and dev panel validation workflows.
+- **UI Settings Panel:** Surgical Dev Panel preferences including scalable text, color-vision assistance modes, reduced motion, focus rings, custom accent overrides, and safe-reset toggles.
 
 ### Changed
+- **Dev Panel Layout:** Rebuilt Modulation layout into unified sections; reorganized Look & Feel engine groups; updated Tone tabs to "Engine Response"; simplified fixed-height inspectors.
+- **Repo Architecture:** Dropped JUCE submodule in favor of lightweight `FetchContent` to reduce repository bloat.
+- **DSP transactions:** Update skips during preset/state/profile transactions so audio thread won't consume intermediate parameter steps mid-switch.
+- **Visuals:** Overview and Engine signal-flow Core rows now display exact algorithm names (e.g. "Lagrange 5th", "Thiran Allpass", "Phase Warp").
 
-- DSP update skips during preset/state/profile transactions so audio thread won't consume intermediate parameter steps mid-switch
+### Fixed
+- **Engine switch artifacts:** Transactional profile apply with guard to prevent partial-state feedback.
+- **Engine switch artifacts:** Adaptive warmup and crossfade duration (severity-based).
+- **Engine switch artifacts:** Dual old/new rendering during crossfade—old core rendered with frozen old params.
+- **Engine switch artifacts:** Old-path LFO phase continuation.
+- **Manual Accent:** Manual accent color setting now properly overrides theme resolution rather than being neutralized.
+- **Console Sync:** Fixed value text inputs/readouts to follow active engine accent dynamically instead of hardcoded default.
+- **AU validation (Logic Pro):** Engine selection parameter now reports `isMetaParameter() = true` (from 2.02.1).
 
 ---
 
