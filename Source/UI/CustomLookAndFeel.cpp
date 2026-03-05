@@ -299,6 +299,10 @@ void CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wi
                                         float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                         juce::Slider& slider)
 {
+    // Downscaling large filmstrip frames (384/512px -> UI knob size) needs the best available
+    // filter on Windows to avoid visible stair-stepping on thin highlights.
+    g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+
     // Check if this is the mix knob (by component name)
     const bool isMixKnob = slider.getName() == "Mix" || slider.getComponentID() == "Mix";
 
@@ -636,6 +640,8 @@ void CustomLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wi
                                         float sliderPos, float minSliderPos, float maxSliderPos,
                                         const juce::Slider::SliderStyle style, juce::Slider& slider)
 {
+    g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+
     if (style == juce::Slider::LinearHorizontal)
     {
         // Track is built into the back panel; only draw the thumb.
