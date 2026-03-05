@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choroboros Official Manual</title>
+    <style>
+        :root {
+            --bg-color: #1a1b26;
+            --fg-color: #c0caf5;
+            --sidebar-bg: #16161e;
+            --header-bg: #1f202e;
+            --border-color: #3b4261;
+            --accent-color: #7aa2f7;
+            --accent-hover: #a9b1d6;
+            --code-bg: #24283b;
+            --pre-bg: #1e1e2c;
+            --h1-color: #89ddff;
+            --h2-color: #ff9e64;
+            --h3-color: #bb9af7;
+            --strong-color: #f7768e;
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            line-height: 1.6;
+            display: flex;
+        }
+        #sidebar {
+            width: 320px;
+            min-width: 320px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #sidebar h3 {
+            font-size: 1.2em;
+            color: var(--h1-color);
+            margin-top: 10px;
+            margin-bottom: 15px;
+        }
+        #sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #sidebar > ul > li > a {
+            font-weight: bold;
+            color: var(--h2-color);
+        }
+        #sidebar li a {
+            display: block;
+            color: var(--fg-color);
+            text-decoration: none;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        #sidebar li a:hover {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+        }
+        .nested-menu-l2 {
+            padding-left: 15px;
+            margin: 5px 0;
+            border-left: 1px solid var(--border-color);
+        }
+        .nested-menu-l2 > li > a {
+            font-size: 0.85em;
+            color: var(--accent-hover);
+            padding-left: 15px;
+        }
+        .nested-menu-l3 {
+            padding-left: 15px;
+            margin: 5px 0;
+            border-left: 1px solid #565f89;
+        }
+        .nested-menu-l3 > li > a {
+            font-size: 0.8em;
+            color: var(--fg-color);
+            padding-left: 15px;
+        }
+
+        #main-content {
+            margin-left: 320px;
+            padding: 20px 40px;
+            width: calc(100% - 320px);
+            box-sizing: border-box;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            margin-top: 2.5em;
+            margin-bottom: 1em;
+            color: var(--h1-color);
+            scroll-margin-top: 20px;
+        }
+        h1 { font-size: 2.5em; border-bottom: 2px solid var(--border-color); padding-bottom: 0.3em; margin-top: 0; }
+        h2 { font-size: 2em; color: var(--h2-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.2em; }
+        h3 { font-size: 1.5em; color: var(--h3-color); }
+        h4 { font-size: 1.2em; color: #e0af68; }
+        h5 { font-size: 1.1em; color: #9aa5ce; }
+        h6 { font-size: 1.0em; color: var(--accent-hover); font-weight: bold; }
+        p, ul, ol { margin-bottom: 1em; }
+        ul, ol { padding-left: 20px; }
+        code {
+            background-color: var(--code-bg);
+            color: var(--accent-hover);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: "Fira Code", "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: var(--pre-bg);
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        strong { color: var(--strong-color); font-weight: 600; }
+        em { font-style: italic; color: var(--accent-hover); }
+        hr { border: 0; border-top: 1px solid var(--border-color); margin: 3em 0; }
+        .version-info, .audience-info {
+            font-style: italic;
+            color: #a9b1d6;
+            font-size: 0.9em;
+            margin-bottom: 1em;
+        }
+        .slug-list, .command-list {
+            column-count: 2;
+            column-gap: 20px;
+        }
+        .slug-list ul, .command-list ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            -webkit-column-break-inside: avoid;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .slug-list li, .command-list li { padding: 2px 0; }
+        .command-list { column-count: 3; }
+        @media (max-width: 1200px) {
+            .slug-list, .command-list { column-count: 2; }
+        }
+        @media (max-width: 900px) {
+            body { flex-direction: column; }
+            #sidebar {
+                position: relative;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            #main-content { margin-left: 0; width: 100%; padding: 20px; }
+            .slug-list, .command-list { column-count: 1; }
+        }
+    </style>
+</head>
+<body>
+    <nav id="sidebar">
+        <h3>Choroboros Manual</h3>
+        <ul>
+            <li><a href="#user-manual-title">1. First Launch</a></li>
+            <li><a href="#user-manual-philosophy">2. Interface Philosophy</a></li>
+            <li><a href="#user-manual-knobs">3. The Six Master Knobs</a></li>
+            <li><a href="#user-manual-engines">4. The Engine Cores</a></li>
+            <li><a href="#user-manual-hq">5. The HQ Switch</a></li>
+            <li><a href="#user-manual-presets">6. Presets & Init</a></li>
+            <li>
+                <a href="#user-manual-dev-panel">7. The Hidden DEV Panel</a>
+                <ul class="nested-menu-l2">
+                    <li><a href="#dev-panel-title">Dev Panel Intro</a></li>
+                    <li><a href="#dev-panel-philosophy"> - Philosophy</a></li>
+                    <li><a href="#dev-panel-access"> - Accessing</a></li>
+                    <li><a href="#dev-panel-header"> - Master Header</a></li>
+                    <li><a href="#dev-panel-left-col"> - Left Column</a></li>
+                    <li><a href="#dev-panel-overview"> - Overview Deck</a></li>
+                    <li><a href="#dev-panel-mod"> - Modulation Deck</a></li>
+                    <li><a href="#dev-panel-tone"> - Tone Deck</a></li>
+                    <li><a href="#dev-panel-dsp"> - DSP Internals Deck</a></li>
+                    <li><a href="#dev-panel-layout"> - Layout Deck</a></li>
+                    <li>
+                        <a href="#dev-panel-validation"> - Validation Deck</a>
+                        <ul class="nested-menu-l3">
+                            <li><a href="#console-manual-title">Interactive Console</a></li>
+                            <li><a href="#console-glossary">Command Glossary</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#dev-panel-prefs"> - Preferences Deck</a></li>
+                    <li><a href="#dev-panel-glossary"> - Dev Glossary</a></li>
+                </ul>
+            </li>
+            <li><a href="#user-manual-glossary">8. Glossary</a></li>
+        </ul>
+    </nav>
+
+    <main id="main-content">
+        <h1 id="user-manual-title">Choroboros: The Official User Manual</h1>
+        <p class="version-info">Version: 2.02.2-beta</p>
+        <p class="audience-info">Audience: Musicians, Mixing Engineers, and Sound Designers.</p>
+        <p>Welcome to the official manual for <strong>Choroboros</strong>. Choroboros is far more than a standard digital chorus effect. It is a multi-modal, deep-architectural modulation suite. By wrapping ten entirely distinct mathematical chorus topologies into five color-coded "Engines," Choroboros allows you to traverse decades of audio hardware history—from the dark, noisy Bucket-Brigade delay chips of the 1970s to pristine, modern, 5th-order Lagrange-interpolated digital algorithms.</p>
+        <p>Despite the monumental complexity under the hood, the front-facing user interface is aggressively minimalist. You only need to touch six knobs to steer the beast. This manual explains exactly what those six knobs do, what those five colors represent, and how to harness the full potential of Choroboros.</p>
+        <hr>
+
+        <h2 id="user-manual-installation">1. Installation & First Launch</h2>
+        <p>Choroboros comes compiled as an AU, VST3, AAX, and Standalone application for macOS and Windows.</p>
+        <ol>
+            <li>Place the provided plugins in your operating system's default plugin directories (e.g., <code>/Library/Audio/Plug-Ins/VST3</code> on Mac, or <code>C:\Program Files\Common Files\VST3</code> on Windows).</li>
+            <li>Launch your DAW (Ableton Live, Logic Pro, FL Studio, REAPER, etc.) and perform a plugin scan.</li>
+            <li>Load Choroboros onto an audio track or software synthesizer.</li>
+        </ol>
+        <p>Upon first launch, you will see a sleek, dark interface with six primary controls and a bright colored orb in the top center. This orb dictates the "Engine Color." By default, it glows Green.</p>
+
+        <h2 id="user-manual-philosophy">2. The Interface Philosophy</h2>
+        <p>Most modern plugins paralyze users with choice. They display dozens of sliders for EQ, compression, LFO shapes, and delay times. Choroboros hides the math. The primary user interface is built for speed, musicality, and intuition.</p>
+        <ul>
+            <li>If you want the chorus to sound "darker," you don't need to tune a Low-Pass Biquad Filter to 800Hz with a Q of 0.7. You simply turn the <strong>Color</strong> knob down.</li>
+            <li>If you want the chorus to move "faster," you don't need to specify 4.2Hz. You turn the <strong>Rate</strong> knob right.</li>
+        </ul>
+        <p>Choroboros translates your physical macro gestures into complex, multi-variable changes behind the scenes. The UI is designed so that it is functionally impossible to make Choroboros sound "bad." Every constraint on the front panel has been meticulously tuned by DSP engineers to maintain sweet spots.</p>
+
+        <h2 id="user-manual-knobs">3. The Six Master Knobs</h2>
+        <p>These six controls dictate the behavior of the active audio algorithm. Note that because Choroboros contains 10 different internal architectures, turning the "Rate" knob on the Green engine might physically map to a different mathematical maximum than the "Rate" knob on the Blue engine. The controls are inherently adaptive.</p>
+        <h3>3.1 Rate (LFO Speed)</h3>
+        <p>The <strong>Rate</strong> knob controls the speed of the internal Low Frequency Oscillator (LFO). This invisible sweeping wave is what actively changes the delay time of the chorus, causing the signature pitch-wobble.</p>
+        <h3>3.2 Depth (Pitch & Delay Throw)</h3>
+        <p>The <strong>Depth</strong> knob controls the <em>amplitude</em> of the LFO. It determines exactly how far the delay line is stretched and compressed.</p>
+        <h3>3.3 Offset (Center Delay Target)</h3>
+        <p>The <strong>Offset</strong> knob is arguably the most important structural control in Choroboros. It dictates the base "Center Delay" time of the wet signal before the Depth modulation even begins.</p>
+        <h3>3.4 Width (Stereo Phase & Correlation)</h3>
+        <p>The <strong>Width</strong> knob controls the stereo spread and LFO phase correlation between your left and right speakers.</p>
+        <h3>3.5 Color (Spectral Filtering)</h3>
+        <p>The <strong>Color</strong> knob consolidates an entire rack of EQs, Pre-Emphasis filters, and transient shapers into one slider.</p>
+        <h3>3.6 Mix (Parallel Integration)</h3>
+        <p>The <strong>Mix</strong> knob dictates the parallel blend of the unprocessed (Dry) signal against the chorused (Wet) signal.</p>
+
+        <h2 id="user-manual-engines">4. The Engine Core Selector (The Five Colors)</h2>
+        <p>Clicking the glowing colored orb at the top center of the UI drops down the <strong>Engine Core Selector</strong>. This is the heart of Choroboros. Changing the Engine doesn't just change parameters; it completely unloads the current C++ algorithm from memory and hot-swaps in a totally different mathematical topology. Choroboros is effectively five plugins in one.</p>
+        <h3>4.1 The Green Engine: Classic & Envelopes</h3>
+        <p><strong>Vibe:</strong> Natural, dynamic, acoustic. <strong>Secret Weapon:</strong> An internal dynamic envelope follower that makes the chorus "breathe" with your playing.</p>
+        <h3>4.2 The Blue Engine: Modern & Focused</h3>
+        <p><strong>Vibe:</strong> Surgical, EDM, crystalline, aggressive. <strong>Secret Weapon:</strong> An aggressive parametric bell-curve EQ to cut through dense electronic mixes.</p>
+        <h3>4.3 The Red Engine: Vintage Analog & Tape</h3>
+        <p><strong>Vibe:</strong> Lo-Fi, noisy, warm, degraded hardware. <strong>Secret Weapon:</strong> Emulates both Bucket-Brigade Devices (BBD) and mechanical magnetic Tape loops.</p>
+        <h3>4.4 The Purple Engine: Experimental & Asynchronous</h3>
+        <p><strong>Vibe:</strong> Ambient, unpredictable, cinematic. <strong>Secret Weapon:</strong> Uses two asynchronous LFOs to create organic, non-repeating chorus movement.</p>
+        <h3>4.5 The Black Engine: Hard Linear & Ensemble</h3>
+        <p><strong>Vibe:</strong> 1990s Nu-Metal, harsh digital, comb-filtered. <strong>Secret Weapon:</strong> A multi-tap ensemble array for incredibly dense, metallic phase cancellation.</p>
+
+        <h2 id="user-manual-hq">5. The HQ Switch (High-Quality)</h2>
+        <p>Next to the main Engine drop-down is the <code>HQ</code> toggle. In Choroboros, this is a literal structural fork in the road, often loading a completely different execution algorithm for the selected color. For example, for the Red Engine, Normal mode is a BBD emulation, while HQ mode is a Tape Machine emulation. Whenever you want a different flavor of an existing color, try flipping the HQ switch.</p>
+
+        <h2 id="user-manual-presets">6. Presets & Initialization</h2>
+        <p>Choroboros saves its state with your DAW project. If you wish to set a new default startup state, you must use the hidden Dev Panel.</p>
+
+        <h2 id="user-manual-dev-panel">7. The Hidden "DEV" Panel</h2>
+        <p>If you are an advanced user, you can open the hood. Look at the very top left corner of the plugin. Hover your mouse over the tiny text reading <code>DEV</code>. Click it. The entire UI will slide right, revealing an immense secondary dashboard known as the <strong>Dev Panel</strong>. This exposes all 119 internal float parameters, allowing you to reprogram the plugin from the ground up.</p>
+        <hr>
+
+        <h2 id="dev-panel-title">Choroboros Dev Panel: UI & Architecture Manual</h2>
+
+<p><em>Version: 2.02.2-beta</em>
+<em>Audience: Advanced Sound Designers, DSP Developers, Audio Engineers, and the terminally curious.</em></p>
+<p>Welcome to the ultimate guide for the <strong>Choroboros Dev Panel</strong>. If the standard interface of Choroboros is the dashboard of a luxury sports car, the Dev Panel is the act of opening the hood, dismantling the engine block, and reprogramming the Electronic Control Unit while driving at 100 mph. </p>
+<p>This document explicitly covers the <strong>Visual UI, Inspector Columns, Tab Modules, and Mapping Architectures</strong> of the Dev Panel. </p>
+<p><em>(If you are looking for the Interactive C++ CLI commands, please see <code>DEV_PANEL_CONSOLE_MANUAL.md</code>).</em></p>
+<hr />
+<h2>Table of Contents</h2>
+<ol>
+<li><strong>Philosophy &amp; The "Why"</strong></li>
+<li><strong>Accessing the Panel</strong></li>
+<li><strong>The Master Control Header</strong></li>
+<li><strong>The Persistent Left Column: Mapping &amp; Interpolation</strong><ul>
+<li>4.1 Engine Architecture Hot-Swapping</li>
+<li>4.2 Parameter Limit Hardcapping</li>
+<li>4.3 Curve Skews and Polynomial Responses</li>
+<li>4.4 UI Drag Resistance</li>
+</ul>
+</li>
+<li><strong>Right Deck Tab 0: The Overview Canvas</strong><ul>
+<li>5.1 The Telemetry Hud</li>
+<li>5.2 The Dynamic Signal Router</li>
+</ul>
+</li>
+<li><strong>Right Deck Tab 1: Modulation &amp; Topology</strong><ul>
+<li>5.1 Oscilloscope Fundamentals</li>
+<li>5.2 Trajectory Plotting</li>
+</ul>
+</li>
+<li><strong>Right Deck Tab 2: Tone &amp; Transfer</strong><ul>
+<li>7.1 The Fast Fourier Transform Analyzer</li>
+<li>7.2 Nonlinear Saturation Curves</li>
+</ul>
+</li>
+<li><strong>Right Deck Tab 3: DSP Internals Matrix</strong><ul>
+<li>8.1 The Green "Bloom" Architecture</li>
+<li>8.2 The Blue "Focus" Architecture</li>
+<li>8.3 The Red "Analog Space" Architectures</li>
+<li>8.4 The Purple "Bi-Modulation" Architectures</li>
+<li>8.5 The Black "Hard Linear" Architectures</li>
+</ul>
+</li>
+<li><strong>Right Deck Tab 4: Vector Graphics Layout</strong></li>
+<li><strong>Right Deck Tab 5: Validation Inspector</strong></li>
+<li><strong>Right Deck Tab 6: Preferences &amp; Accessibility</strong></li>
+<li><strong>Glossary of Terms</strong></li>
+</ol>
+<hr />
+<h3 id="dev-panel-philosophy">1. Philosophy & The "Why"</h3>
+
+<p>Choroboros was designed to be a "Chorus that eats its own tail." It contains 10 totally distinct DSP chorus architectures grouped into 5 color-coded engines. However, standard plugins hide their math. If a chorus pedal has a "Depth" knob, you rarely know if 100% means a 2-millisecond stretch or a 30-millisecond stretch.</p>
+<p>The Dev Panel exists to completely destroy that black-box paradigm. It was built on the core belief that <strong>users deserve to see the math</strong>.</p>
+<p>Every single slider, knob, and pixel in the front-end C++ JUCE framework is bound to an APVTS (Audio Processor Value Tree State) atomic parameter. The Dev Panel hooks directly into this tree, allowing you to manipulate the raw floats before they hit the audio callback thread.</p>
+<hr />
+<h3 id="dev-panel-access">2. Accessing the Panel</h3>
+
+<p>Opening the Dev Panel is intentionally obfuscated to prevent beginner users from accidentally destroying a mix.</p>
+<ol>
+<li>Open Choroboros in your host DAW (Ableton, Logic, REAPER, FL Studio).</li>
+<li>Look to the top-left corner of the sleek minimalist UI.</li>
+<li>Hover your mouse precisely over the word <code>DEV</code>. A small tooltip will fade in confirming the hitbox.</li>
+<li>Click <code>DEV</code>.</li>
+<li>The UI will instantaneously expand horizontally, sliding open the complex Inspector and Data Decks.</li>
+</ol>
+<p><em>Note: The Dev Panel requires a minimum screen resolution width of 1200px to render comfortably without overlapping components.</em></p>
+<hr />
+<h3 id="dev-panel-header">3. The Master Control Header</h3>
+
+<p>Along the absolute top rim of the Dev Panel sits an array of administrative utility buttons. These functions execute entirely on the message thread and handle global payload delivery.</p>
+<h3>3.1 Copy JSON State</h3>
+<p>This button serializes the current state of every single parameter—all tuning floats, all layout coordinates, and all macro mappings—into a minified JSON object and writes it directly to your operating system's clipboard. 
+*   <strong>Use Case:</strong> Ideal for collaborating with other producers. Simply paste the JSON hash into an email or Discord, and they can inject your exact DSP architecture into their session.</p>
+<h3>3.2 Set Current As Defaults</h3>
+<p>Choroboros stores a lightweight <code>startup_prefs.xml</code> file in your application data directory. Clicking this button takes a snapshot of your current Dev Panel state and writes it to that XML.
+*   <strong>Use Case:</strong> If you believe the factory default for the "Black" engine is slightly too aggressive, you can pull down the <code>depth</code> mapping, hit this button, and forevermore every new instance of Choroboros will load with your tamed Black engine.</p>
+<h3>3.3 The Master Lock</h3>
+<p>A physical padlock icon that, when engaged, recursively iterates through all <code>LockableFloatPropertyComponent</code> UI elements in the Dev Panel and disables mouse interaction. 
+*   <strong>Use Case:</strong> You have spent 45 minutes perfectly tuning the specific Q-factor of a Thiran all-pass filter. You lock the panel so a stray trackpad swipe doesn't accidentally move the slider to maximum and blow out your monitors.</p>
+<h3>3.4 Glassmorphism FX Toggles (Off / Subtle / Medium)</h3>
+<p>Choroboros leans heavily into a modern UI aesthetic utilizing computationally expensive real-time drop shadows, gradients, and inner-glows (Glassmorphism). 
+These buttons instantly alter the <code>juce::DropShadow</code> and bounding-box opacity math. Turning them "Off" forces a flat-vector aesthetic that significantly reduces GPU rendering overhead.</p>
+<hr />
+<h3 id="dev-panel-left-col">4. The Persistent Left Column: Mapping & Interpolation</h3>
+
+<p>The left-most column is fixed. It acts as the "Babel Fish" translation layer between human interaction on the main UI and machine math in the DSP loop.</p>
+<h3>4.1 Engine Architecture Hot-Swapping</h3>
+<p>The very top dropdown determines WHICH mathematical formula is evaluating audio on the realtime thread.
+*   <strong>Dropdown:</strong> Selects the color matrix (<code>Green</code>, <code>Blue</code>, <code>Red</code>, <code>Purple</code>, <code>Black</code>).
+*   <strong>HQ Switch:</strong> A boolean toggle. In standard plugins, "Over-sampling" is usually a simple linear 2x up-sample to prevent aliasing. In Choroboros, "HQ" acts as a literal engine swap.
+    *   <em>Example:</em> Selecting <code>Red</code> + <code>HQ Off</code> loads the <code>ChorusCoreBBD.cpp</code> matrix.
+    *   <em>Example:</em> Selecting <code>Red</code> + <code>HQ On</code> unloads the BBD matrix and hot-swaps in the <code>ChorusCoreTape.cpp</code> matrix. The entire acoustic topology changes.
+*   <strong>Target Scope:</strong> Aesthetic changes (like shifting a knob X/Y coordinate) can be applied specifically to the active color, or broadcast to <code>ALL</code> colors.</p>
+<h3>4.2 Parameter Limit Hardcapping</h3>
+<p>Consider the front-facing <strong>Rate</strong> knob. It has a physical travel from 0 to 100%. But what does 100% mean?
+In this column, you will see <code>Min</code> and <code>Max</code> text entry boxes for the 6 primary macros: <code>Rate</code>, <code>Depth</code>, <code>Offset</code>, <code>Width</code>, <code>Color</code>, <code>Mix</code>.
+*   If you set the Rate <code>Min</code> to <code>0.1 Hz</code> and <code>Max</code> to <code>5.0 Hz</code>, tracing the front-side GUI knob maps linearly between those two floats.
+*   Moving the knob to 50% yields <code>2.55 Hz</code>. </p>
+<h3>4.3 Curve Skews and Polynomial Responses</h3>
+<p>Humans don't perceive audio linearly. A change in LFO speed from 0.1Hz to 1.0Hz feels massive. A change from 10Hz to 11Hz is almost imperceptible.
+The <code>Curve</code> text entry modifies the interpolation skew.
+*   <code>1.0</code>: Linear mapping.
+*   <code>&lt; 1.0</code>: The bottom half of the knob travel covers very little numerical ground, providing extreme fine-tuning. The top half of the knob accelerates rapidly.
+*   <code>&gt; 1.0</code>: The bottom half jumps aggressively, flattening out at the top.</p>
+<h3>4.4 UI Drag Resistance</h3>
+<p>Listed under "UI Response", these parameters do not change DSP math. They change OS mouse-pixel deltas.
+*   A <code>UI Skew</code> of <code>1.0</code> means moving your mouse 100 pixels up turns the knob 100%.
+*   Lowering the skew means you have to drag your mouse halfway across the monitor just to move the knob 10%. Excellent for users with high-DPI gaming mice who want stiff, resistant knobs.</p>
+<hr />
+<h3 id="dev-panel-overview">5. Right Deck Tab 0: The Overview Canvas</h3>
+
+<p>Clicking the <code>Overview</code> tab brings up the macro HUD. It is designed to be the "Dashboard" of your DSP engine.</p>
+<h3>5.1 The Telemetry HUD</h3>
+<p>Along the top are absolute readouts reflecting the exact state variables on the audio thread.
+*   <strong>True HPF/LPF Effective:</strong> If your <code>Color</code> macro knob is set to 42%, what exact frequency (<code>Hz</code>) is the internal Biquad filter currently blocking? This telemetry prints the exact float.
+*   <strong>Latency (Samples):</strong> Every chorus algorithm incurs inherent delay. Linear Phase EQs or complex Orbit paths might push latency to 1024 samples. Your DAW needs to know this for Plugin Delay Compensation (PDC). This tells you what Choroboros is reporting to the host.</p>
+<h3>5.2 The Dynamic Signal Router</h3>
+<p>A massive, horizontal block diagram. 
+*   <strong>Blocks:</strong> Visualizes <code>Input -&gt; Pre-Emphasis -&gt; Phase Topology -&gt; Chorus Modulator -&gt; Saturation Engine -&gt; Output</code>.
+*   <strong>Badges:</strong> Small rectangular chips sit beneath the blocks inside the diagram. If you pull the <code>Mix</code> knob to 0%, you will see the Chorus Modulator badge physically turn grey and read <code>[BYPASSED]</code>, proving to you visually that the DSP branch has shut down to save CPU.
+*   If you change an internal filter from 400Hz to 800Hz, the text inside the badge updates in real time.</p>
+<hr />
+<h3 id="dev-panel-mod">6. Right Deck Tab 1: Modulation & Topology</h3>
+
+<p>This tab visualizes Time and Phase. A chorus works by delaying an audio signal and then modulating that delay duration using an LFO (Low Frequency Oscillator).</p>
+<h3>6.1 Oscilloscope Fundamentals</h3>
+<p>The top graph is the <code>Phase Scope</code>.
+*   It traces two lines simultaneously: The <strong>Left Channel</strong> phase and the <strong>Right Channel</strong> phase over the last 1-second rolling window.
+*   When <code>Width</code> is at 0%, the lines overlap perfectly.
+*   As you increase the <code>Offset</code> tuning mapping, you will physically see the Right channel wave separate and lag behind the Left channel. When they are directly opposite (Anti-Phase, 180 degrees), the chorus will sound incredibly wide, almost wrapping behind your head in headphones.</p>
+<h3>6.2 Trajectory Plotting</h3>
+<p>The bottom graph is the <code>Delay Trajectory</code> sparkline. 
+*   The Phase Scope only shows the <em>multiplier</em> (-1.0 to 1.0). 
+*   The Trajectory plot shows the <em>actual delay time</em> in <code>ms</code>. 
+*   If you set the Center Delay base tuning to <code>15.0ms</code>, and the Depth to <code>5.0ms</code>, you will visually see the Trajectory graph oscillating like a sine wave between a floor of <code>10.0ms</code> and a ceiling of <code>20.0ms</code>. This proves that the math is bound correctly.</p>
+<hr />
+<h3 id="dev-panel-tone">7. Right Deck Tab 2: Tone & Transfer</h3>
+
+<p>This tab visualizes Frequency and Amplitude.</p>
+<h3>7.1 The Fast Fourier Transform Analyzer</h3>
+<p>The top window is a high-speed, perceptual FFT analyzer.
+*   <strong>Thread Safety:</strong> The analyzer never blocking the audio thread. The DSP pushes sample chunks into a lock-free circular FIFO buffer. A background GUI thread eats from this buffer, applies a Hann window, runs a high-performance FFT, and plots the magnitude log-scaled.
+*   <strong>Overlays:</strong> Overlaying the FFT data are thick vector lines representing your EQ shapes. As you turn down the <code>Color</code> knob to darken the chorus, you will see a solid Line (the Low-Pass filter) sweep down from the right side of the graph, visually "crushing" the high-frequency FFT chatter.</p>
+<h3>7.2 Nonlinear Saturation Curves</h3>
+<p>The bottom window is the <code>Transfer Curve</code>. 
+*   <strong>The X-Axis</strong> is an audio sample's amplitude coming IN to the saturation block (-1.0 to 1.0).
+*   <strong>The Y-Axis</strong> is the amplitude coming OUT.
+*   <strong>Digital Clean:</strong> A perfect diagonal line from bottom-left to top-right. Input perfectly equals Output.
+*   <strong>Soft Clipping (Tape):</strong> As you push the <code>Drive</code> tuning parameter up, you will see the top and bottom tips of the diagonal line start to round off smoothly. This is analog tube/tape behavior. It compresses the signal gently, generating warm even-order harmonics.
+*   <strong>Hard Clipping (Black):</strong> The diagonal line goes up, and then instantly snaps perfectly flat at a harsh angle. This is digital fuzz/distortion. It chops off audio peaks, generating aggressive odd-order harmonics that cut through an incredibly dense metal/rock mix.</p>
+<hr />
+<h3 id="dev-panel-dsp">8. Right Deck Tab 3: DSP Internals Matrix</h3>
+
+<p>This is the most dangerous, unstable, and rewarding tab. This is where you actually reprogram the C++ algorithms. The parameters visible here dynamically swap depending on which Engine you selected in the Left Column.</p>
+<p>Below is an exhaustive explanation of the architectural families you can tune here.</p>
+<h3>8.1 The Green "Bloom" Architecture</h3>
+<p><em>Target Demographic: Orchestral arrangers, dynamic jazz guitarists.</em>
+The Green engine utilizes an internal "Envelope Follower." It listens to how loud the incoming audio is (e.g. tracking the transient spike of a snare drum vs the tail ring).
+*   <strong>Detector Speeds (Attack/Release):</strong> Tune how fast the internal listener reacts to volume changes. A 5ms attack snaps instantly to transients. A 500ms release lets the internal state sink away glacially over half a second.
+*   <strong>Depth Scale/Gain:</strong> You can map the Envelope Follower's output directly to the Chorus Depth. As the player strums harder, the chorus becomes violently detuned. When the player picks softly, the chorus flattens out to a pristine delay line. 
+*   <strong>Cutoff Tracking:</strong> You can actually tell the high-pass filter to open and close dynamically with the volume envelope, essentially turning the chorus into an auto-wah envelope filter embedded within a modulation topography.</p>
+<h3>8.2 The Blue "Focus" Architecture</h3>
+<p><em>Target Demographic: EDM producers, surgical mix engineers.</em>
+The Blue engine is mathematically pristine. It utilizes 5th-order Lagrange interpolation to ensure crystalline, artifact-free high-frequency reproduction, and focuses heavily on aggressive phase-aligned spectral filtering.
+*   <strong>Presence EQs:</strong> Instead of a simple "tone" knob, the Blue engine exposes a parametric bell curve. You can dial an exact <code>Presence Frequency</code> (e.g. 5000Hz), apply an exact <code>Q</code> width (e.g. 0.707), and push a <code>Gain dB</code> spike.
+*   <strong>HP/LP Bricks:</strong> The cutoffs on Blue are sheer walls. Tuning the <code>HP Min/Max</code> here dictates the floor of the steep 8-pole IIR (Infinite Impulse Response) tracking filters.</p>
+<h3>8.3 The Red "Analog Space" Architectures</h3>
+<p><em>Target Demographic: Synthwave artists, vintage gear aficionados, Lo-Fi beatmakers.</em>
+Red completely abandons digital perfection for emulated hardware degradation.</p>
+<h4>Red NQ: The Bucket-Brigade (BBD) Device</h4>
+<p>An emulation of dark, noisy 1970s analog delay chips.
+*   <strong>BBD Stages:</strong> A physical BBD chip has a finite memory buffer (stages). You can manually tune this to 512, 1024, or 4096. 
+*   <strong>Clock Minimum Frequency:</strong> The slower you pass audio buckets, the longer the chorus delay. But pulling the clock speed too low causes horrific "Clock Whine" noise induction.
+*   <strong>Anti-Alias Filters:</strong> To hide the clock whine, you must aggressively tune steep Low Pass filters before the buffer to destroy highs, and steep Reconstruction filters after the buffer to smooth the jagged voltage drops. The Dev Panel lets you ruin those filters so the clock screech is audible for terrifying sound design.</p>
+<h4>Red HQ: The Magnetic Tape Machine</h4>
+<p>An emulation of the legendary Roland Space Echo loops.
+*   <strong>Wow Frequency &amp; Depth Space:</strong> "Wow" is the slow, seasick pitch-variation caused by warped, asymmetrical tape reels. You map exactly how fast the reel wobbles (Hz) and how much it drags the pitch (cents).
+*   <strong>Flutter Frequency:</strong> "Flutter" is the fast, rapid vibration caused by friction as magnetic tape scrapes against a dirty play-head. 
+*   <strong>Hermite Tension:</strong> Switches the math interpolation to Dark Hermite splines, artificially rounding off transients dynamically to create "tape warmth" independent of saturation curves.</p>
+<h3>8.4 The Purple "Bi-Modulation" Architectures</h3>
+<p><em>Target Demographic: Ambient soundscapers, cinematic drone designers.</em>
+Normal choruses use a boring, predictable sine wave that repeats exactly every cycle. Purple destroys predictability using dual asynchronous phase integrators.</p>
+<ul>
+<li><strong>Theta Rate Ratios:</strong> The purple engine runs <strong>two</strong> LFOs multiplied together. Here, you tune the exact mathematical ratio between LFO 1 and LFO 2. If you set them to prime-number asynchronous ratios (e.g. 1.0Hz and 0.37Hz), the wave cycles will not align for minutes at a time, creating an organic, non-repeating chorus motion.</li>
+<li><strong>Eccentricity:</strong> In "Orbit" mode, the dual LFOs map to an X/Y polar graph, like a planet orbiting a star. Tuning the <code>eccentricity</code> pushes the orbit from a perfect circle into an extreme elliptical smash, causing brief bursts of hyper-speed modulation followed by long swaths of stillness.</li>
+</ul>
+<h3>8.5 The Black "Hard Linear" Architectures</h3>
+<p><em>Target Demographic: Nu-Metal bassists, Industrial Techno producers.</em>
+Black is designed to be abrasive, phase-coherent, and comb-filtering heavily.</p>
+<ul>
+<li><strong>Ensemble Tap Ratios (HQ):</strong> Classic choruses only have one delay line per ear. Black HQ uses multiple play-heads tapped off the same delay line (Ensemble). </li>
+<li><strong>Tap2 Delay Offset Base:</strong> You can tune exactly how many milliseconds the second play-head sits behind the primary head, creating a thick, metallic comb-filter phase cancellation that makes heavy-distortion guitars sound gargantuan.</li>
+<li><strong>Delay Glide Smoothing:</strong> Black drops its interpolation fidelity to absolute basic Linear rendering, causing high-frequency aliasing hash. Tuning the glide forces hard mathematical snapping instead of smooth curving.</li>
+</ul>
+<hr />
+<h3 id="dev-panel-layout">9. Right Deck Tab 4: Vector Graphics Layout</h3>
+
+<p>The Layout tab is not for audio; it is purely a GUI designer space.</p>
+<p>Every primary knob on the front face of the plugin (Rate, Depth, Offset, Width, Color, Mix) has a fixed location per Engine.
+*   If you select <code>Purple</code> engine, you can edit the <code>X</code> and <code>Y</code> coordinate text boxes for the <code>Depth</code> knob. 
+*   As you type new numbers, the knob physically slides across the screen. 
+*   You can utilize this to build your own custom GUI configurations where the knobs sit in a straight line, a circle, or clumped chaotically in a corner.
+*   Hit <code>Set Current As Defaults</code> on the top bar to permanently save your custom visual arrangement.</p>
+<hr />
+<h3 id="dev-panel-validation">10. Right Deck Tab 5: Validation Inspector</h3>
+
+<p>This tab is primarily for the developers of the plugin to ensure that visual widgets are accurately mapping into the deep-threaded architecture.
+*   <strong>UI Value -&gt; Mapped Value -&gt; Snapshot Value -&gt; DSP Value:</strong> A massive tracking matrix. It literally takes the 0.0-1.0 float of the UI slider, runs it through your specified Curve Skew algorithm, prints the resulting <code>Mapped Float</code>, shows the atomic variable value stored in the thread-safe <code>APVTS</code> state tree, and then verifies that the active audio <code>processBlock()</code> is actually receiving that exact float.
+*   If any of these columns disagree, there is a thread-safety or interpolation bug in the Matrix.</p>
+<hr />
+<h3 id="dev-panel-prefs">11. Right Deck Tab 6: Preferences & Accessibility</h3>
+
+<p>The settings that dictate the usability of the Dev Panel itself.</p>
+<h3>11.1 Tutorial Launcher</h3>
+<p>A dropdown containing the 6 built-in C++ interactive script lessons.
+Selecting one and clicking "Run" will trigger a translucent HUD overlay that automatically flips the Dev Panel tabs, highlights UI elements with glowing borders, forces engine architectures, and provides paragraph explanations of what DSP phenomena you are looking at.</p>
+<h3>11.2 Theme Engines</h3>
+<ul>
+<li><strong>Engine Adaptive (Default):</strong> The Dev Panel's background colors, text tints, and slider fills all shift based on whether you are analyzing the Green, Blue, Red, Purple, or Black engine.</li>
+<li><strong>Classic Hacker:</strong> A sleek, minimal, low-emission Green-on-Pitch-Black terminal aesthetic.</li>
+<li><strong>High Contrast:</strong> Strips transparency algorithms, bumps font weights to maximum thickness, and uses pure black/white/yellow warning colors for visually impaired operators.</li>
+</ul>
+<h3>11.3 Vision Mode Correction</h3>
+<p>This shifts the base hue algorithms of the 5 main specific engines.
+If you suffer from Deuteranopia, standard Green and Red algorithms might become indistinguishable. These toggles shift the GUI render pipeline to scientifically color-blind safe palettes without altering the naming convention of the engines.</p>
+<h3>11.4 Animation &amp; Motion Guardrails</h3>
+<ul>
+<li><strong>Reduced Motion:</strong> Disables the smooth kinetic-scrolling equations on sliders, disables tab-sliding crossfades, and forces instantaneous UI rendering to prevent vestibular distress.</li>
+<li><strong>Large Hit Targets:</strong> Triples the invisible clickable bounding box radius around sliders and toggles for operators using trackballs or stylus interfaces.</li>
+<li><strong>Strong Focus Rings:</strong> Specifically for Screen Reader compliance. Forces a harsh 3-pixel bright yellow dashed border around whichever widget currently possesses keyboard focus tab-cycling.</li>
+</ul>
+<hr />
+<h3 id="dev-panel-glossary">12. Glossary of Dev Terms</h3>
+<ul>
+<li><strong>APVTS:</strong> Audio Processor Value Tree State. JUCE's thread-safe atomic data warehouse for VST/AU parameter syncing.</li>
+<li><strong>BBD:</strong> Bucket-Brigade Device. An analog chip that passes capacitance voltage down a chain sequentially to create delay lines.</li>
+<li><strong>LFO:</strong> Low Frequency Oscillator. A math wave (sine, triangle) running too slow to hear as pitch, used to automate other parameters.</li>
+<li><strong>IIR:</strong> Infinite Impulse Response. Filters that use recursive feedback, creating analog style phase-warping at the cutoff point.</li>
+<li><strong>HQ:</strong> High-Quality. A toggle switch in Choroboros that swaps entire codebase algorithms (e.g. BBD vs Tape).</li>
+</ul>
+<p><em>(End of Manual)</em></p>
+<hr>
+<h4 id="console-manual-title">Interactive Console Manual</h4>
+
+<p><em>Version: 2.02.2-beta</em>
+<em>Audience: Shell Enthusiasts, Headless Automated Testers, and Preset Designers.</em></p>
+<p>Welcome to the command-line documentation for the <strong>Choroboros Dev Panel</strong>. If the standard interface of Choroboros is a simple 6-knob pedal, and the Dev Panel UI is an aircraft cockpit, then the <strong>Interactive Console</strong> is raw access to the flight computer's C++ shell memory.</p>
+<p><em>(If you are looking for documentation regarding the visual graphs, mapping structures, and inspector panes, please see <code>DEV_PANEL_MANUAL.md</code>).</em></p>
+<hr />
+<h2>Table of Contents</h2>
+<ol>
+<li><strong>Architecture &amp; Parsing Mechanics</strong><ul>
+<li>1.1 The Lexer Pipeline</li>
+<li>1.2 Command Verification &amp; Aliasing</li>
+<li>1.3 Fuzzy Path Execution</li>
+</ul>
+</li>
+<li><strong>State Transactions (Macro Limits)</strong><ul>
+<li>2.1 <code>engine</code> &amp; <code>hq</code> hot swapping</li>
+<li>2.2 Bypassing UI Visuals (<code>view</code>)</li>
+</ul>
+</li>
+<li><strong>Property Tuning Commands</strong><ul>
+<li>3.1 The <code>set</code>, <code>add</code>, and <code>sub</code> triad</li>
+<li>3.2 <code>toggle</code> boundaries</li>
+<li>3.3 Background Automations (<code>sweep</code>)</li>
+<li>3.4 UI Locking</li>
+</ul>
+</li>
+<li><strong>Deep Introspection Utilities</strong><ul>
+<li>4.1 Readout parsing (<code>get</code>, <code>list</code>, <code>search</code>)</li>
+<li>4.2 <code>stats</code>: The Telemetry Matrix</li>
+<li>4.3 Visual <code>watch</code> HUD pinning</li>
+<li>4.4 The <code>dump</code> and <code>diff factory</code> engines</li>
+</ul>
+</li>
+<li><strong>History Transactions</strong><ul>
+<li>5.1 Atomic <code>undo</code> / <code>redo</code></li>
+<li>5.2 Command <code>history</code> memory buffer</li>
+</ul>
+</li>
+<li><strong>I/O Scripting (<code>.choroscript</code>)</strong><ul>
+<li>6.1 Serialization: <code>export script</code> and <code>cp json</code></li>
+<li>6.2 Instantiation: <code>import script</code> and <code>save defaults</code></li>
+</ul>
+</li>
+<li><strong>The Interactive Tutorial Engine</strong><ul>
+<li>7.1 Running sequential HUD layers</li>
+<li>7.2 Granular Topic Indexes</li>
+</ul>
+</li>
+<li><strong>The Master Index: All Parameter Slugs</strong><ul>
+<li>8.1 Globals</li>
+<li>8.2 Engine Specific Architectures (BBD, Tape, Orbit, Fast-Fourier Transforms)</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h5 id="console-arch">1. Architecture & Parsing Mechanics</h5>
+
+<p>The Interactive Console sits at the literal bottom of the <code>Validation</code> tab window. You can focus it by clicking the black text box directly above the parameter slug definitions. </p>
+<h3>1.1 The Lexer Pipeline</h3>
+<p>The interactive console evaluates commands space-separated inputs. It relies heavily on standard parsing: 
+1. The user presses <code>Enter</code>.
+2. The UI pushes the input string to the central C++ message thread.
+3. The parser tokenizes the string by whitespaces (<code>" "</code>, <code>"\t"</code>).
+4. The FIRST argument (<code>tokens[0]</code>) is the <strong>Action</strong>.
+5. Following arguments are interpreted based on the designated Action signature.</p>
+<h3>1.2 Command Verification &amp; Aliasing</h3>
+<p>Before parsing Actions, the system runs an Alias check up to 8 levels deep.
+If you type <code>alias wipe reset all</code>, the system maps the string <code>wipe</code> to the execution queue <code>reset all</code>.
+To protect the app from recursive crash loops (e.g. <code>alias wipe destroy</code>, <code>alias destroy wipe</code>), the parser tracks visited aliases and instantly aborts execution if a loop detects it is consuming its own tail.</p>
+<h3>1.3 Slugification &amp; Fuzzy Matching</h3>
+<p>Every single text-slider and parameter toggle in the Dev Panel memory block has a "Target Slug."
+The C++ system strips the human-readable text <code>Black HQ Tap2 Delay Offset Base (ms)</code> through a regex filter converting spaces to underscores and dropping units, generating <code>black_hq_tap2_delay_offset_base</code>.
+When you target this slider, you must use this exact syntax. However, the system utilizes fuzzy memory matching; if you misspell a slug slightly, or only type part of the string, it will scan through all 90 parameters and attempt to find a single valid conclusion before rejecting the operation as ambiguous.</p>
+<hr />
+<h5 id="console-state">2. State Transactions (Macro Limits)</h5>
+
+<p>These tools manipulate the bounds of the global plugin algorithm.</p>
+<h3>2.1 Engine &amp; HQ</h3>
+<p><code>engine &lt;color&gt;</code>
+<strong>Parameters:</strong> <code>green</code>, <code>blue</code>, <code>red</code>, <code>purple</code>, <code>black</code>.
+Instantly purges the running chorus iteration from memory, calculates parameter crossfades to prevent auditory pops, and loads the entire DSP memory structure of the new array.
+*   <em>Example:</em> <code>engine blue</code> -&gt; Swaps from the default green bloom to the Blue Focus filter algorithm.</p>
+<p><code>hq &lt;on/off&gt;</code>
+<strong>Parameters:</strong> <code>on</code>, <code>off</code>, <code>true</code>, <code>false</code>, <code>1</code>, <code>0</code>.
+Dictates the internal precision. In most cases, this drastically alters the backend algorithm.
+*   <em>Example:</em> <code>hq on</code> while in <code>engine red</code> removes the Bucket-Brigade algorithm entirely and mounts the magnetic Tape module.</p>
+<h3>2.2 Routing</h3>
+<p><code>bypass &lt;on/off&gt;</code>
+Disengages the plugin instantly. Perfect for A/B critical listening during mix sessions where latency matching is imperative to preventing perception bias.</p>
+<p><code>solo &lt;node&gt;</code>
+<strong>Parameters:</strong> String routing destinations (e.g. <code>bbd_left</code>, <code>tape_input</code>, <code>black_tap2_mix</code>).
+Useful for DSP debugging. Cuts audio to all matrices except the specific requested node. Type <code>unsolo</code> to revert.</p>
+<p><code>view &lt;tab_name&gt;</code>
+Forces the UI to instantly render a specific graphical section. Useful for macro building. (e.g. <code>view modulation</code>, <code>view validation</code>, <code>view tape</code>).</p>
+<hr />
+<h5 id="console-props">3. Property Tuning Commands</h5>
+
+<p>These functions manipulate exact internal memory values of defined parameters.</p>
+<h3>3.1 The Value Triad (<code>set</code>, <code>add</code>, <code>sub</code>)</h3>
+<p><code>set &lt;slug&gt; &lt;value&gt;</code>
+Bypasses the UI completely, ignoring whatever limits are arbitrarily set by the <code>Min</code> and <code>Max</code> GUI boundaries in the Left Inspector. It forces the true float directly into the AudioProcessor state.
+*   <em>Example:</em> <code>set pre_emphasis_gain 24.5</code> will push the high-end EQ transient punch to absurd levels.</p>
+<p><code>add &lt;slug&gt; &lt;value&gt;</code> / <code>sub &lt;slug&gt; &lt;value&gt;</code>
+Relative mathematical shifting. Reads the active value dynamically and performs standard addition or subtraction.
+*   <em>Example:</em> If <code>lpf_cutoff_hz</code> is currently <code>1000.0</code>, running <code>add lpf_cutoff_hz 500</code> will smoothly update the active state to <code>1500.0</code>.</p>
+<h3>3.2 Toggles Boundaries</h3>
+<p><code>toggle &lt;slug&gt;</code>
+Locates any parameter that operates within a strictly boolean 0 or 1 range, reads it, and instantly flips the bit in memory. </p>
+<h3>3.3 Background Automations</h3>
+<p><code>sweep &lt;slug&gt; &lt;start_val&gt; &lt;end_val&gt; &lt;duration_in_ms&gt;</code>
+Executes an asynchronous interpolation sequence. Over the specified milliseconds, it pulls the target slider from Start to End while updating the UI GUI 30 times a second to represent the live sweep.
+*   <em>Caveat:</em> If you manually drag a slider or trigger a new <code>set</code> command while a <code>sweep</code> is running, the interpolation process aborts instantly to respect physical input hierarchy.</p>
+<p><code>macro &lt;master_knob_name&gt; &lt;percent(0-100)&gt;</code>
+Simulates a human physically touching the front visual UI. E.g. <code>macro depth 75</code> is identical to spinning the Depth knob to 3 o'clock.</p>
+<h3>3.4 UI Locking</h3>
+<p><code>lock &lt;slug&gt;</code> / <code>unlock &lt;slug&gt;</code>
+Flags the targeted UI Component as read-only. Standard users will not be able to interact with the slider via mouse inputs. Commands like <code>set</code> and <code>sweep</code> still perfectly modify the internal values regardless of physical view locks.</p>
+<hr />
+<h5 id="console-intro">4. Deep Introspection Utilities</h5>
+
+<p>These tools do not interact with audio parameters. They read back engine state mapping variables to understand memory context.</p>
+<h3>4.1 Readout Tools</h3>
+<p><code>get &lt;slug&gt;</code>
+Returns the exact float payload that the variable possesses at this static millisecond, but it ALSO prints whatever the previous value was, giving context to exactly how far a parameter moved during the last interpolation sequence.</p>
+<p><code>search &lt;substring&gt;</code> 
+A heavily optimized fuzzy scan matching against both the slugified name AND the formatted "human readable UI label". It prints out all possible conclusions.</p>
+<p><code>list &lt;engine_target&gt;</code>
+Accepts <code>green</code>, <code>blue</code>, <code>red</code>, <code>purple</code>, <code>black</code>, and <code>globals</code>. Iterates through the entire registry and outputs the 10-25 variables directly impacting the currently requested algorithm.</p>
+<h3>4.2 Telemetry Engine</h3>
+<p><code>stats</code>
+A brutal memory check mapping plugin performance. Prints:
+*   Block Execution Nanosecond durations.
+*   Engine Swap counts (Proving memory persistence logic).
+*   Live Thread-Lock statuses.</p>
+<h3>4.3 Visual Overlays</h3>
+<p><code>watch &lt;slug&gt;</code>
+Takes a variable and pins it to a real-time HUD rendering at the very top vertical pixels of the console window. Up to 6 widgets can be concurrently mounted to visually diagnose sweeping interpolation functions in real-time. Use <code>unwatch &lt;slug&gt;</code> to rip it off the HUD.</p>
+<h3>4.4 The State Comparators</h3>
+<p><code>dump &lt;engine_color&gt;</code>
+Spits the raw values of all active and unactive engine parameters to the console window at once.</p>
+<p><code>diff factory</code>
+Takes a memory snapshot of your active plugin, instantiates an invisible duplicate processor loaded with factory C++ defaults on a secondary thread, cross-references them, and prints ONLY the explicit parameters you have altered. Crucial for understanding what caused an un-intended artifact.</p>
+<p><code>reset &lt;slug&gt;</code>
+Using the same secondary thread check, maps the exact payload of the factory algorithm into your selected widget payload variables, immediately restoring the parameter. Or, use <code>reset all</code> to completely wipe your session configuration.</p>
+<hr />
+<h5 id="console-history">5. History Transactions</h5>
+
+<p>Every <code>set</code>, <code>add</code>, or UI drag triggers an <code>Atomic Change Gesture</code>. The console logs these inside a massive 256-step array structure.</p>
+<h3>5.1 The <code>undo</code> Stack</h3>
+<p><code>undo</code>
+Reverts your plugin strictly back to the state of the active payload immediately proceeding the last <code>beginChangeGesture()</code> flag hit.</p>
+<p><code>undo &lt;integer&gt;</code>
+A multi-step memory wipe. Iterates deeply through the stack structure, resetting the VST parameters multiple times. (e.g. <code>undo 5</code> removes the last 5 operations done). 
+You may also trigger <code>redo &lt;integer&gt;</code>. </p>
+<h3>5.2 Command Visualizer</h3>
+<p><code>history</code>
+Outputs the memory stack limits. It specifically differentiates between "Console Text String submissions" and "Visual UI Drag Drop gestures" with accurate atomic timestamps.</p>
+<hr />
+<h5 id="console-io">6. I/O Scripting (`.choroscript`)</h5>
+
+<p>Because the console acts as an integrated CLI, it makes perfect sense to export complex automation sweeps into text-readable documents.</p>
+<h3>6.1 State Serialization</h3>
+<p><code>export script</code>
+The developer payload generator. It walks through all dynamically scoped properties in your plugin, strips out defaults, and builds a massive string array of commands (e.g. <code>set bbd_depth 12.0 \n engine red \n</code>).
+It forcefully injects this output into your OS Clipboard. You can paste this text directly into an email or Reddit comment to share custom choruses.</p>
+<p><code>cp json</code> 
+An alternative to <code>export script</code> focused purely on nested mapping variable architectures instead of CLI lexer texts. Perfect for deep data parsing outside of the application.</p>
+<h3>6.2 State Instantiation</h3>
+<p><code>import script</code>
+When triggered, a standard OS File Dialog appears. You can select any standard <code>.txt</code> or <code>.choroscript</code> file containing new-line separated CLI commands. The Console will lock the parser and run every line at hyper-speed, completely rebuilding the DSP and UI arrays sequentially based on the script rules.</p>
+<p><code>save defaults</code>
+A hyper-specific alias of <code>cp json</code> that writes the JSON payload directly into <code>startup_prefs.xml</code>, replacing the application's base definitions upon boot logic.</p>
+<hr />
+<h5 id="console-tutorial">7. The Interactive Tutorial Engine</h5>
+
+<p>The console is connected heavily to the UI components. Typing <code>tutorial</code> hooks into the top-level View engine and launches the first of 6 hard-coded guided lesson maps.</p>
+<h3>7.1 Map Behaviors</h3>
+<p>When running, the HUD automatically invokes <code>view &lt;tab&gt;</code> commands, draws vector borders around specific UI elements, forces specific <code>engine</code> variables to clarify DSP context, and waits for user interaction before proceeding to the next step.</p>
+<ul>
+<li><code>tutorial next</code>: Moves to the next component highlight block.</li>
+<li><code>tutorial next section</code>: Bypasses granular analysis to hit macro level summaries.</li>
+<li><code>tutorial skip</code>: Forcefully terminates the active script logic, dumping the user back into unrestricted dev panel manipulation.</li>
+</ul>
+<h3>7.2 The Topic Index</h3>
+<p>You can jump directly into specific lesson maps by supplying the correct path variables:
+1. <code>tutorial bbd</code>: Bucket-Brigade Limits &amp; Filtering Constraints.
+2. <code>tutorial tape</code>: Mechanical wow/flutter offsets on Magnetic loops.
+3. <code>tutorial phase</code>: Dual LFO independent correlation structures.
+4. <code>tutorial bimodulation</code>: Asynchronous polynomial rendering on the Purple engine.
+5. <code>tutorial saturation</code>: Audio wave-limiting by hard and soft analog clipping architectures on Tone tabs.
+6. <code>tutorial envelope</code>: The Green transient follower equations and decay routing models.</p>
+<hr />
+<h5 id="console-index">8. The Master Index: All Parameter Slugs</h5>
+
+<p>The following lists are completely comprehensive as of <code>v2.02.2-beta</code>. Use these exact string titles to affect parameter tuning via console arrays.</p>
+<h3>8.1 Base Globals</h3>
+<p>These impact multi-variable smoothing and core macro routing interpolations.
+* <code>rate_smoothing_ms</code>
+* <code>depth_smoothing_ms</code>
+* <code>depth_rate_limit</code>
+* <code>centre_delay_smoothing_ms</code>
+* <code>centre_delay_base_ms</code>
+* <code>centre_delay_scale</code>
+* <code>color_smoothing_ms</code>
+* <code>width_smoothing_ms</code>
+* <code>hpf_cutoff_hz</code>
+* <code>hpf_q</code>
+* <code>lpf_cutoff_hz</code>
+* <code>lpf_q</code>
+* <code>pre_emphasis_freq_hz</code>
+* <code>pre_emphasis_q</code>
+* <code>pre_emphasis_gain</code>
+* <code>pre_emphasis_level_smoothing</code>
+* <code>pre_emphasis_quiet_threshold</code>
+* <code>pre_emphasis_max_amount</code>
+* <code>compressor_attack_ms</code>
+* <code>compressor_release_ms</code>
+* <code>compressor_threshold_db</code>
+* <code>compressor_ratio</code>
+* <code>saturation_drive_scale</code></p>
+<h3>8.2 Green Variables (Classic Bloom)</h3>
+<ul>
+<li><code>green_bloom_exponent</code></li>
+<li><code>green_bloom_depth_scale</code></li>
+<li><code>green_bloom_centre_offset_ms</code></li>
+<li><code>green_bloom_cutoff_max_hz</code></li>
+<li><code>green_bloom_cutoff_min_hz</code></li>
+<li><code>green_bloom_wet_blend</code></li>
+<li><code>green_bloom_gain</code></li>
+</ul>
+<h3>8.3 Blue Variables (Modern Focus)</h3>
+<ul>
+<li><code>blue_focus_exponent</code></li>
+<li><code>blue_focus_hp_min_hz</code></li>
+<li><code>blue_focus_hp_max_hz</code></li>
+<li><code>blue_focus_lp_max_hz</code></li>
+<li><code>blue_focus_lp_min_hz</code></li>
+<li><code>blue_presence_freq_min_hz</code></li>
+<li><code>blue_presence_freq_max_hz</code></li>
+<li><code>blue_presence_q_min</code></li>
+<li><code>blue_presence_q_max</code></li>
+<li><code>blue_presence_gain_max_db</code></li>
+<li><code>blue_focus_wet_blend</code></li>
+<li><code>blue_focus_output_gain</code></li>
+</ul>
+<h3>8.4 Red Variables (BBD / Analog Tape)</h3>
+<ul>
+<li><code>bbd_delay_smoothing_ms</code></li>
+<li><code>bbd_delay_min_ms</code></li>
+<li><code>bbd_delay_max_ms</code></li>
+<li><code>bbd_centre_base_ms</code></li>
+<li><code>bbd_centre_scale</code></li>
+<li><code>bbd_depth_ms</code></li>
+<li><code>bbd_clock_smoothing_ms</code></li>
+<li><code>bbd_filter_smoothing_ms</code></li>
+<li><code>bbd_filter_cutoff_min_hz</code></li>
+<li><code>bbd_filter_cutoff_max_hz</code></li>
+<li><code>bbd_filter_cutoff_scale</code></li>
+<li><code>bbd_clock_min_hz</code></li>
+<li><code>bbd_clock_max_ratio</code></li>
+<li><code>bbd_stages</code></li>
+<li><code>bbd_filter_max_ratio</code></li>
+<li><code>tape_delay_smoothing_ms</code></li>
+<li><code>tape_centre_base_ms</code></li>
+<li><code>tape_centre_scale</code></li>
+<li><code>tape_tone_max_hz</code></li>
+<li><code>tape_tone_min_hz</code></li>
+<li><code>tape_tone_smoothing_coeff</code></li>
+<li><code>tape_drive_scale</code></li>
+<li><code>tape_lfo_ratio_scale</code></li>
+<li><code>tape_lfo_mod_smoothing_coeff</code></li>
+<li><code>tape_ratio_smoothing_coeff</code></li>
+<li><code>tape_phase_damping</code></li>
+<li><code>tape_wow_freq_base</code></li>
+<li><code>tape_wow_freq_spread</code></li>
+<li><code>tape_flutter_freq_base</code></li>
+<li><code>tape_flutter_freq_spread</code></li>
+<li><code>tape_wow_depth_base</code></li>
+<li><code>tape_wow_depth_spread</code></li>
+<li><code>tape_flutter_depth_base</code></li>
+<li><code>tape_flutter_depth_spread</code></li>
+<li><code>tape_ratio_min</code></li>
+<li><code>tape_ratio_max</code></li>
+<li><code>tape_wet_gain</code></li>
+<li><code>tape_hermite_tension</code></li>
+</ul>
+<h3>8.5 Purple Variables (Experimental Phase Warp / Orbit)</h3>
+<ul>
+<li><code>purple_warp_a</code></li>
+<li><code>purple_warp_b</code></li>
+<li><code>purple_warp_k_base</code></li>
+<li><code>purple_warp_k_scale</code></li>
+<li><code>purple_warp_delay_smoothing_ms</code></li>
+<li><code>purple_orbit_eccentricity</code></li>
+<li><code>purple_orbit_theta_rate_base_hz</code></li>
+<li><code>purple_orbit_theta_rate_scale_hz</code></li>
+<li><code>purple_orbit_theta_rate2_ratio</code></li>
+<li><code>purple_orbit_eccentricity2_ratio</code></li>
+<li><code>purple_orbit_mix1</code></li>
+<li><code>purple_orbit_stereo_theta_offset</code></li>
+<li><code>purple_orbit_delay_smoothing_ms</code></li>
+</ul>
+<h3>8.6 Black Variables (Linear / Intensity Ensemble)</h3>
+<ul>
+<li><code>black_nq_depth_base</code></li>
+<li><code>black_nq_depth_scale</code></li>
+<li><code>black_nq_delay_glide_ms</code></li>
+<li><code>black_hq_tap2_mix_base</code></li>
+<li><code>black_hq_tap2_mix_scale</code></li>
+<li><code>black_hq_second_tap_depth_base</code></li>
+<li><code>black_hq_second_tap_depth_scale</code></li>
+<li><code>black_hq_second_tap_delay_offset_base</code></li>
+<li><code>black_hq_second_tap_delay_offset_scale</code></li>
+</ul>
+<h3>8.7 Dev Panel Environment Settings</h3>
+<p>These settings define the accessibility options and rendering layouts bounding the framework logic inside the Dev Panel proper.
+* <code>settings_tutorial_hints</code>
+* <code>settings_ui_text_size</code>
+* <code>settings_ui_text_mode</code>
+* <code>settings_theme_preset</code>
+* <code>settings_accent_source</code>
+* <code>settings_manual_accent</code>
+* <code>settings_color_vision_mode</code>
+* <code>settings_reduced_motion</code>
+* <code>settings_large_hit_targets</code>
+* <code>settings_strong_focus_ring</code>
+* <code>settings_console_auto_scroll</code>
+* <code>settings_console_timestamps</code>
+* <code>settings_console_wrap_lines</code>
+* <code>settings_console_max_lines</code>
+* <code>settings_show_scope_hint_line</code>
+* <code>settings_confirm_reset_factory</code>
+* <code>settings_confirm_set_defaults</code></p>
+<p><em>(End of Interactive Console API Manual)</em></p>
+<hr>
+<h5 id="console-glossary">9. Full Command Glossary</h5>
+<h6>Base Commands</h6><div class="command-list"><ul><li><code>alias</code></li><li><code>bypass off</code></li><li><code>bypass on</code></li><li><code>clear</code></li><li><code>cp json</code></li><li><code>diff factory</code></li><li><code>dump black</code></li><li><code>dump blue</code></li><li><code>dump green</code></li><li><code>dump purple</code></li><li><code>dump red</code></li><li><code>engine black</code></li><li><code>engine blue</code></li><li><code>engine green</code></li><li><code>engine purple</code></li><li><code>engine red</code></li><li><code>export script</code></li><li><code>fx 0</code></li><li><code>fx 1</code></li><li><code>fx 2</code></li><li><code>help</code></li><li><code>history</code></li><li><code>hq off</code></li><li><code>hq on</code></li><li><code>import script</code></li><li><code>list black</code></li><li><code>list black full</code></li><li><code>list blue</code></li><li><code>list blue full</code></li><li><code>list globals</code></li><li><code>list globals full</code></li><li><code>list green</code></li><li><code>list green full</code></li><li><code>list purple</code></li><li><code>list purple full</code></li><li><code>list red</code></li><li><code>list red full</code></li><li><code>macro color</code></li><li><code>macro depth</code></li><li><code>macro mix</code></li><li><code>macro offset</code></li><li><code>macro rate</code></li><li><code>macro width</code></li><li><code>redo</code></li><li><code>save defaults</code></li><li><code>search</code></li><li><code>solo</code></li><li><code>stats</code></li><li><code>tutorial</code></li><li><code>tutorial bbd</code></li><li><code>tutorial bimodulation</code></li><li><code>tutorial envelope</code></li><li><code>tutorial exit</code></li><li><code>tutorial next</code></li><li><code>tutorial next section</code></li><li><code>tutorial phase</code></li><li><code>tutorial saturation</code></li><li><code>tutorial skip</code></li><li><code>tutorial tape</code></li><li><code>undo</code></li><li><code>unsolo</code></li><li><code>view engine</code></li><li><code>view layout</code></li><li><code>view modulation</code></li><li><code>view overview</code></li><li><code>view settings</code></li><li><code>view tone</code></li><li><code>view validation</code></li></ul></div>
+<h6>Targeted Commands (add, get, set, etc.)</h6><div class="command-list"><ul><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset all</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_centre_base_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_centre_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_clock_max_ratio</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_clock_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_clock_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_delay_max_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_delay_min_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_delay_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_depth_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_filter_cutoff_max_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_filter_cutoff_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_filter_cutoff_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_filter_max_ratio</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_filter_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset bbd_stages</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_hq_second_tap_delay_offset_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_hq_second_tap_delay_offset_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_hq_second_tap_depth_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_hq_second_tap_depth_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_hq_tap2_mix_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_hq_tap2_mix_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_nq_delay_glide_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_nq_depth_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset black_nq_depth_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_exponent</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_hp_max_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_hp_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_lp_max_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_lp_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_output_gain</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_focus_wet_blend</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_presence_freq_max_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_presence_freq_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_presence_gain_max_db</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_presence_q_max</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset blue_presence_q_min</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset centre_delay_base_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset centre_delay_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset centre_delay_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset color_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset compressor_attack_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset compressor_ratio</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset compressor_release_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset compressor_threshold_db</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset depth_rate_limit</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset depth_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_centre_offset_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_cutoff_max_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_cutoff_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_depth_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_exponent</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_gain</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset green_bloom_wet_blend</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset hpf_cutoff_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset hpf_q</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset lpf_cutoff_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset lpf_q</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset pre_emphasis_freq_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset pre_emphasis_gain</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset pre_emphasis_level_smoothing</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset pre_emphasis_max_amount</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset pre_emphasis_q</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset pre_emphasis_quiet_threshold</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_delay_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_eccentricity</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_eccentricity2_ratio</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_mix1</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_stereo_theta_offset</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_theta_rate2_ratio</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_theta_rate_base_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_orbit_theta_rate_scale_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_warp_a</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_warp_b</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_warp_delay_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_warp_k_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset purple_warp_k_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset rate_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset saturation_drive_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_accent_source</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_color_vision_mode</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_confirm_reset_factory</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_confirm_set_defaults</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_console_auto_scroll</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_console_max_lines</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_console_timestamps</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_console_wrap_lines</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_large_hit_targets</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_manual_accent</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_reduced_motion</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_show_scope_hint_line</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_strong_focus_ring</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_theme_preset</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_tutorial_hints</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_ui_text_mode</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset settings_ui_text_size</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_centre_base_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_centre_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_delay_smoothing_ms</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_drive_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_flutter_depth_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_flutter_depth_spread</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_flutter_freq_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_flutter_freq_spread</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_hermite_tension</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_lfo_mod_smoothing_coeff</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_lfo_ratio_scale</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_phase_damping</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_ratio_max</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_ratio_min</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_ratio_smoothing_coeff</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_tone_max_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_tone_min_hz</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_tone_smoothing_coeff</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_wet_gain</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_wow_depth_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_wow_depth_spread</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_wow_freq_base</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset tape_wow_freq_spread</code></li><li><code>add/get/set/sub/toggle/sweep/lock/unlock/watch/unwatch/reset width_smoothing_ms</code></li></ul></div>
+    </main>
+</body>
+</html>
