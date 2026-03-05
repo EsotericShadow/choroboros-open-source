@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Choroboros VERSION 2.0.2)
 
-# Beta version string for feedback/reports
-set(CHOROBOROS_VERSION_STRING "2.02.2-beta" CACHE STRING "Version string for feedback and display")
+# Version string for feedback/reports
+set(CHOROBOROS_VERSION_STRING "2.02.2" CACHE STRING "Version string for feedback and display")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -158,6 +158,7 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/fonts/titles/JetBrainsMono-ExtraBold.ttf
         Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLight.ttf
         Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLightItalic.ttf
+        windows/windows_factory_defaults.json
         EULA.md
 )
 

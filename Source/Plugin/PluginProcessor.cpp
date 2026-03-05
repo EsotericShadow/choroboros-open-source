@@ -605,6 +605,33 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
     // factory engine defaults each plugin load. Do not import persisted defaults
     // profiles here, otherwise stale snapshots can override intended base presets.
 }
+
+void seedPersistedDefaultsFromBundledWindowsFactory()
+{
+#if JUCE_WINDOWS
+    const auto userFile = DefaultsPersistence::getUserDefaultsFile();
+    const auto factoryFile = DefaultsPersistence::getFactoryDefaultsFile();
+    const bool seedUser = !userFile.existsAsFile() || userFile.getSize() <= 0;
+    const bool seedFactory = !factoryFile.existsAsFile() || factoryFile.getSize() <= 0;
+    if (!seedUser && !seedFactory)
+        return;
+
+    int dataSize = 0;
+    const char* data = BinaryData::getNamedResource("windows_factory_defaults_json", dataSize);
+    if (data == nullptr || dataSize <= 0)
+        return;
+
+    const juce::String bundledJson = juce::String::fromUTF8(data, dataSize);
+    if (bundledJson.isEmpty() || juce::JSON::parse(bundledJson).isVoid())
+        return;
+
+    juce::String writeError;
+    if (seedFactory)
+        DefaultsPersistence::saveFactory(bundledJson, &writeError);
+    if (seedUser)
+        DefaultsPersistence::saveUser(bundledJson, &writeError);
+#endif
+}
 } // namespace
 
 void ChoroborosAudioProcessor::StereoTapRingBuffer::clear() noexcept
@@ -709,6 +736,7 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     initializeEngineInternalProfiles();
     chorusDSP->setCoreAssignments(coreAssignments);
     chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
+    seedPersistedDefaultsFromBundledWindowsFactory();
     loadPersistedDefaults(*this);
     applyEngineParamProfile(getCurrentEngineColorIndex());
     saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
