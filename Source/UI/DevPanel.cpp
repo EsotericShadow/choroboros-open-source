@@ -176,17 +176,6 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     };
     content.addAndMakeVisible(engineFilterClearButton);
 
-    engineShowAdvancedToggle.setButtonText("Show Advanced");
-    engineShowAdvancedToggle.setTooltip("Show engine-specific advanced internals in addition to core timing/filter/compressor.");
-    engineShowAdvancedToggle.onClick = [this]
-    {
-        engineShowAdvanced = engineShowAdvancedToggle.getToggleState();
-        updateEngineSectionVisibility();
-        resized();
-    };
-    engineShowAdvancedToggle.setToggleState(engineShowAdvanced, juce::dontSendNotification);
-    content.addAndMakeVisible(engineShowAdvancedToggle);
-
     styleTitle(mappingTitle, "Parameter Mapping");
     styleDescription(mappingDescription, "Map UI values into DSP ranges (min/max/curve).");
     styleTitle(uiTitle, "UI Response");
@@ -249,6 +238,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         if (suppressDevModeControlCallbacks)
             return;
         const int selectedEngine = juce::jlimit(0, 4, devEngineModeBox.getSelectedId() - 1);
+        setCurrentEngineSkinColour(selectedEngine);
+        getDevPanelThemeLookAndFeel().refreshThemeColours();
+        getDevPanelSectionLookAndFeel().refreshThemeColours();
+        sendLookAndFeelChange();
         styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectedEngine));
         if (auto* param = processor.getValueTreeState().getParameter(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
         {
@@ -258,6 +251,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             param->setValueNotifyingHost(normalized);
             param->endChangeGesture();
         }
+        updateActiveProfileLabel();
+        updateRightTabVisibility();
+        resized();
+        repaint();
     };
 
     devHqModeToggle.setButtonText("HQ");
@@ -273,6 +270,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             param->setValueNotifyingHost(normalized);
             param->endChangeGesture();
         }
+        updateActiveProfileLabel();
+        updateRightTabVisibility();
+        resized();
+        repaint();
     };
 
     content.addAndMakeVisible(mappingTitle);
@@ -368,7 +369,6 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
 
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(processor.getCurrentEngineColorIndex()));
     styleHackerToggleButton(devHqModeToggle);
-    styleHackerToggleButton(engineShowAdvancedToggle);
     styleHackerEditor(engineFilterEditor);
 
 

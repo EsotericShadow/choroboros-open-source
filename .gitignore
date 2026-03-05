@@ -42,3 +42,22 @@ Documentation/*.url
 
 # Beta tester feedback (names, emails, verbatim responses)
 feedback/
+
+# Local workspace noise (duplicate root-level source copies)
+/AnimatedToggleButton.cpp
+/AnimatedToggleButton.h
+/CustomLookAndFeel.cpp
+/DevPanel.cpp
+/PluginEditor.cpp
+/PluginEditor.h
+/PluginEditorSetup.cpp
+/PluginEditorSetup.h
+
+# Local comparison scratch scripts
+/compare_internals.py
+/compare_internals_param.py
+
+# Local artifacts / external bundles
+/aax-validator-dsh-2024-6-0-138bab0d-mac-arm64/
+/build-verify/
+/Pro_Tools_3PDev_2025_12_0_Mac_arm/

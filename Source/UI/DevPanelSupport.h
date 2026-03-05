@@ -917,6 +917,7 @@ public:
         };
         addAndMakeVisible(lockButton);
 
+        refreshThemeColours();
         setLocked(true);
         refresh();
     }
@@ -927,6 +928,12 @@ public:
         if (!valueEditor.hasKeyboardFocus(true) && !isDragging)
             refreshEditorText();
         applyEnablement();
+    }
+
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
     }
 
     void resized() override
@@ -970,6 +977,17 @@ public:
     bool isLocked() const { return locked; }
 
 private:
+    void refreshThemeColours()
+    {
+        styleHackerEditor(valueEditor);
+        valueEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0x00000000));
+        valueEditor.setColour(juce::TextEditor::outlineColourId, juce::Colour(0x00000000));
+        valueEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x00000000));
+        valueEditor.setColour(juce::TextEditor::textColourId, hackerText());
+        valueEditor.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.85f));
+        repaint();
+    }
+
     class StepArrowButton : public juce::Button
     {
     public:
@@ -1431,9 +1449,9 @@ public:
         setTooltip(tooltipText);
         valueLabel.setTooltip(tooltipText);
         valueLabel.setJustificationType(juce::Justification::centredRight);
-        valueLabel.setColour(juce::Label::textColourId, hackerText());
         valueLabel.setFont(makeRetroFont(Typography::inspectorReadout, false));
         addAndMakeVisible(valueLabel);
+        refreshThemeColours();
         refresh();
     }
 
@@ -1448,7 +1466,19 @@ public:
         valueLabel.setBounds(getLookAndFeel().getPropertyComponentContentPosition(*this).reduced(2, 2));
     }
 
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
+    }
+
 private:
+    void refreshThemeColours()
+    {
+        valueLabel.setColour(juce::Label::textColourId, hackerText());
+        repaint();
+    }
+
     std::function<juce::String()> valueProvider;
     juce::Label valueLabel;
 };
@@ -1472,13 +1502,9 @@ public:
         consoleEditor.setScrollbarsShown(true);
         consoleEditor.setJustification(juce::Justification::topLeft);
         consoleEditor.setFont(makeLabelFont(Typography::consoleLog, false));
-        consoleEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff010301));
-        consoleEditor.setColour(juce::TextEditor::textColourId, hackerText());
-        consoleEditor.setColour(juce::TextEditor::outlineColourId, hackerBorder().withAlpha(0.85f));
-        consoleEditor.setColour(juce::TextEditor::focusedOutlineColourId, hackerBorderStrong());
-        consoleEditor.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.82f));
         consoleEditor.setBorder(juce::BorderSize<int>(6, 8, 6, 8));
         addAndMakeVisible(consoleEditor);
+        refreshThemeColours();
         setPreferredHeight(220);
         refresh();
     }
@@ -1494,7 +1520,23 @@ public:
         consoleEditor.setBounds(getLocalBounds().reduced(4, 4));
     }
 
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
+    }
+
 private:
+    void refreshThemeColours()
+    {
+        consoleEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff010301));
+        consoleEditor.setColour(juce::TextEditor::textColourId, hackerText());
+        consoleEditor.setColour(juce::TextEditor::outlineColourId, hackerBorder().withAlpha(0.85f));
+        consoleEditor.setColour(juce::TextEditor::focusedOutlineColourId, hackerBorderStrong());
+        consoleEditor.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.82f));
+        repaint();
+    }
+
     std::function<juce::String()> valueProvider;
     juce::TextEditor consoleEditor;
 };

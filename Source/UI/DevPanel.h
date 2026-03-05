@@ -184,14 +184,12 @@ private:
     juce::ToggleButton devHqModeToggle;
     juce::TextEditor engineFilterEditor;
     juce::TextButton engineFilterClearButton;
-    juce::ToggleButton engineShowAdvancedToggle;
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
     bool editingLocked = true;
     bool suppressDevModeControlCallbacks = false;
     int saveButtonResetCountdownTicks = 0;
     int selectedRightTab = 0; // 0=Overview, 1=Modulation, 2=Tone, 3=Engine, 4=Look&Feel, 5=Validation, 6=Settings
     std::array<int, 7> selectedSubTabs { { 0, 0, 0, 0, 0, 0, 0 } };
-    bool engineShowAdvanced = false;
     bool macroTouchHistoryPrimed = false;
     float lastRateRaw = 0.0f;
     float lastDepthRaw = 0.0f;

@@ -26,6 +26,49 @@ using namespace devpanel;
 namespace
 {
 constexpr int kPanelAutoPadding = 26;
+
+bool sectionNameMatchesFilter(const juce::String& sectionName, const juce::StringArray& terms)
+{
+    if (terms.isEmpty())
+        return true;
+
+    const juce::String candidate = sectionName.toLowerCase();
+    for (const auto& term : terms)
+    {
+        if (!candidate.contains(term))
+            return false;
+    }
+    return true;
+}
+
+void applySectionFilterToPanel(juce::PropertyPanel& panel, const juce::String& filterText)
+{
+    const juce::String trimmedFilter = filterText.trim();
+    if (trimmedFilter.isEmpty())
+        return;
+
+    juce::StringArray filterTerms;
+    filterTerms.addTokens(trimmedFilter.toLowerCase(), " \t,;/|:+-_()", "\"'");
+    filterTerms.trim();
+    filterTerms.removeEmptyStrings();
+    if (filterTerms.isEmpty())
+        return;
+
+    const auto sectionNames = panel.getSectionNames();
+    juce::Array<bool> matches;
+    matches.ensureStorageAllocated(sectionNames.size());
+    bool hasAnyMatch = false;
+    for (const auto& sectionName : sectionNames)
+    {
+        const bool matchesFilter = sectionNameMatchesFilter(sectionName, filterTerms)
+                                || sectionNameMatchesFilter(normalizeSectionHeader(sectionName), filterTerms);
+        matches.add(matchesFilter);
+        hasAnyMatch = hasAnyMatch || matchesFilter;
+    }
+
+    for (int i = 0; i < sectionNames.size(); ++i)
+        panel.setSectionOpen(i, hasAnyMatch && matches[i]);
+}
 }
 
 int DevPanel::getSelectedSubTab() const
@@ -356,16 +399,19 @@ void DevPanel::resized()
     const bool showRightTools = selectedRightTab == 3 && selectedSubTab == 3;
     if (showRightTools)
     {
-        const int toggleW = 160;
-        engineShowAdvancedToggle.setBounds(rightX + rightColumnWidth - toggleW, rightY, toggleW, toolsH);
-        engineFilterLabel.setBounds(0, 0, 0, 0);
-        engineFilterEditor.setBounds(0, 0, 0, 0);
-        engineFilterClearButton.setBounds(0, 0, 0, 0);
+        const int labelW = 126;
+        const int clearW = 76;
+        const int toolsGap = 8;
+        const int editorX = rightX + labelW + toolsGap;
+        const int editorRight = rightX + rightColumnWidth - clearW - toolsGap;
+        const int editorW = juce::jmax(140, editorRight - editorX);
+        engineFilterLabel.setBounds(rightX, rightY + 4, labelW, toolsH - 4);
+        engineFilterEditor.setBounds(editorX, rightY, editorW, toolsH);
+        engineFilterClearButton.setBounds(rightX + rightColumnWidth - clearW, rightY, clearW, toolsH);
         rightY += toolsH + 18;
     }
     else
     {
-        engineShowAdvancedToggle.setBounds(0, 0, 0, 0);
         engineFilterLabel.setBounds(0, 0, 0, 0);
         engineFilterEditor.setBounds(0, 0, 0, 0);
         engineFilterClearButton.setBounds(0, 0, 0, 0);
@@ -544,6 +590,7 @@ void DevPanel::updateActiveProfileLabel()
     setCurrentEngineSkinColour(colorIndex);
     getDevPanelThemeLookAndFeel().refreshThemeColours();
     getDevPanelSectionLookAndFeel().refreshThemeColours();
+    sendLookAndFeelChange();
     const juce::Colour profileAccent = hackerText();
     const juce::String profileName = engineNames[colorIndex] + (hqEnabled ? " HQ" : " NQ");
     suppressDevModeControlCallbacks = true;
@@ -555,7 +602,6 @@ void DevPanel::updateActiveProfileLabel()
     devEngineModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(colorIndex));
     styleHackerToggleButton(devHqModeToggle);
-    styleHackerToggleButton(engineShowAdvancedToggle);
     styleHackerTextButton(copyJsonButton, false);
     styleHackerTextButton(saveDefaultsButton, false);
     styleHackerTextButton(resetFactoryButton, false);
@@ -636,8 +682,20 @@ void DevPanel::updateEngineSectionVisibility()
     setProfilePanelVisible(internalsBlackNqPanel, activePanel == &internalsBlackNqPanel);
     setProfilePanelVisible(internalsBlackHqPanel, activePanel == &internalsBlackHqPanel);
 
-    bbdPanel.setVisible(showEngine && engineShowAdvanced && isRedNQ);
-    tapePanel.setVisible(showEngine && engineShowAdvanced && isRedHQ);
+    bbdPanel.setVisible(showEngine && isRedNQ);
+    tapePanel.setVisible(showEngine && isRedHQ);
+
+    const juce::String sectionFilter = engineFilterEditor.getText().trim();
+    if (showEngine && sectionFilter.isNotEmpty())
+    {
+        applySectionFilterToPanel(enginePanel, sectionFilter);
+        if (activePanel != nullptr)
+            applySectionFilterToPanel(*activePanel, sectionFilter);
+        if (bbdPanel.isVisible())
+            applySectionFilterToPanel(bbdPanel, sectionFilter);
+        if (tapePanel.isVisible())
+            applySectionFilterToPanel(tapePanel, sectionFilter);
+    }
 }
 
 void DevPanel::updateRightTabVisibility()
@@ -764,14 +822,13 @@ void DevPanel::updateRightTabVisibility()
     devEngineModeLabel.setVisible(true);
     devEngineModeBox.setVisible(true);
     devHqModeToggle.setVisible(true);
-    engineFilterLabel.setVisible(false);
-    engineFilterEditor.setVisible(false);
-    engineFilterClearButton.setVisible(false);
-    engineShowAdvancedToggle.setVisible(showEngine && selectedSubTab == 3);
-    engineFilterLabel.setColour(juce::Label::textColourId, (showEngine && selectedSubTab == 3) ? hackerText() : hackerTextMuted());
+    const bool showEngineInternalsTools = showEngine && selectedSubTab == 3;
+    engineFilterLabel.setVisible(showEngineInternalsTools);
+    engineFilterEditor.setVisible(showEngineInternalsTools);
+    engineFilterClearButton.setVisible(showEngineInternalsTools);
+    engineFilterLabel.setColour(juce::Label::textColourId, showEngineInternalsTools ? hackerText() : hackerTextMuted());
     styleHackerEditor(engineFilterEditor);
     styleHackerTextButton(engineFilterClearButton, false);
-    styleHackerToggleButton(engineShowAdvancedToggle);
     validationTitle.setVisible(showValidation);
     validationDescription.setVisible(showValidation);
     validationPanel.setVisible(showValidation);
@@ -831,8 +888,8 @@ void DevPanel::updateRightTabVisibility()
     setInternalsEnabled(internalsPurpleHqPanel);
     setInternalsEnabled(internalsBlackNqPanel);
     setInternalsEnabled(internalsBlackHqPanel);
-    setAllSectionsEnabled(bbdPanel, showEngine && selectedSubTab == 3 && activeInternalsPanel == &internalsRedNqPanel && engineShowAdvanced);
-    setAllSectionsEnabled(tapePanel, showEngine && selectedSubTab == 3 && activeInternalsPanel == &internalsRedHqPanel && engineShowAdvanced);
+    setAllSectionsEnabled(bbdPanel, showEngine && selectedSubTab == 3 && activeInternalsPanel == &internalsRedNqPanel);
+    setAllSectionsEnabled(tapePanel, showEngine && selectedSubTab == 3 && activeInternalsPanel == &internalsRedHqPanel);
 
     if (showEngine && selectedSubTab == 3)
     {
