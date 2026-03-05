@@ -392,6 +392,7 @@ public:
     {
         setUsingNativeTitleBar(true);
         setResizable(true, true);
+        setResizeLimits(1028, 525, 8192, 8192);
         setAlwaysOnTop(true);
         setContentOwned(new DevPanel(editor, processor), true);
         centreAroundComponent(&editor, 900, 700);

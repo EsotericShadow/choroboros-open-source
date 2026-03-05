@@ -54,6 +54,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     // Windows GDI doesn't clear before repaint; content fills background to prevent scroll ghosting
     content.setOpaque(true);
 #endif
+    recentTouchesLogFile = DefaultsPersistence::getUserDefaultsFile()
+                               .getParentDirectory()
+                               .getChildFile("devpanel_recent_touches.log");
+    recentTouchesLogFile.getParentDirectory().createDirectory();
 
     content.addAndMakeVisible(copyJsonButton);
     copyJsonButton.setButtonText("Copy JSON");
@@ -378,6 +382,27 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         const juce::String n = name.toLowerCase();
 
+        if (n.contains("audio thread time"))
+            return "Average audio callback execution time from processBlock telemetry. Use it to watch CPU headroom and detect spikes under automation.";
+        if (n.contains("signal peak hold (in)"))
+            return "Peak-hold input level at the plugin input (L/R dBFS). Confirms what is feeding the effect before internal processing.";
+        if (n.contains("signal peak hold (out)"))
+            return "Peak-hold output level at the plugin output (L/R dBFS). Compare against input hold to spot gain staging changes or clipping risk.";
+        if (n.contains("callbacks / writes"))
+            return "Running counts of audio callbacks and parameter writes. Useful for spotting excessive automation traffic versus audio block cadence.";
+        if (n.contains("mode switches"))
+            return "Counts engine profile switches and HQ toggles during runtime. Helps confirm UI actions and host automation are reaching DSP state changes.";
+        if (n.contains("host audio config"))
+            return "Current host sample rate and buffer size seen by the plugin. Verify expected session configuration when debugging behavior differences.";
+        if (n.contains("analyzer frame"))
+            return "Latest analyzer snapshot sequence and sample rate. \"pending\" means the analyzer has not produced a valid frame yet.";
+        if (n.contains("analyzer delay probe"))
+            return "Live analyzer-derived center delay and modulation depth estimate. Use this to verify motion depth reacts as expected while tuning.";
+        if (n.contains("trace matrix"))
+            return "Validation table mapping UI raw values to mapped values, active profile snapshot values, and effective runtime probes for sync checks.";
+        if (n.contains("recent touches"))
+            return "Recent control interactions with timestamps. Useful for confirming what changed most recently while validating trace/telemetry behavior.";
+
         if (n.contains("bbd filter max ratio"))
             return "Caps BBD filter cutoff as a sample-rate ratio (0.1-0.5). Lower values are darker/safer; higher values are brighter.";
         if (n.contains("bbd stages") || n.contains("stages"))
@@ -502,6 +527,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         auto* prop = new LockableFloatPropertyComponent(valueToControl, name, min, max, step, skew, makeTooltipForControl(name));
         lockableProperties.add(prop);
+        registerConsoleTarget(prop, name);
         return prop;
     };
 

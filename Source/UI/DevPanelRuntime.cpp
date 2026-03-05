@@ -224,23 +224,29 @@ void DevPanel::refreshSecondaryTabButtons()
 void DevPanel::resized()
 {
     const auto previousViewPos = viewport.getViewPosition();
-    auto bounds = getLocalBounds().reduced(14);
+    auto bounds = getLocalBounds().reduced(18);
     viewport.setBounds(bounds);
 
+    constexpr int contentInsetLeft = 16;
+    constexpr int contentInsetRight = 16;
+    constexpr int contentInsetTop = 14;
+    constexpr int contentInsetBottom = 16;
     const int columnGap = 28;
-    const int contentWidth = juce::jmax(320, bounds.getWidth() - viewport.getScrollBarThickness());
-    const float leftColumnRatio = contentWidth >= 1500 ? 0.29f : 0.31f;
-    int leftColumnWidth = juce::jlimit(260, 430, static_cast<int>(std::round(contentWidth * leftColumnRatio)));
-    int rightColumnWidth = contentWidth - columnGap - leftColumnWidth;
+    const int usableContentWidth = juce::jmax(320, bounds.getWidth() - viewport.getScrollBarThickness() - contentInsetLeft - contentInsetRight);
+    const int contentWidth = usableContentWidth + contentInsetLeft + contentInsetRight;
+    const float leftColumnRatio = usableContentWidth >= 1500 ? 0.29f : 0.31f;
+    int leftColumnWidth = juce::jlimit(260, 430, static_cast<int>(std::round(usableContentWidth * leftColumnRatio)));
+    int rightColumnWidth = usableContentWidth - columnGap - leftColumnWidth;
     constexpr int minRightColumnWidth = 540;
     if (rightColumnWidth < minRightColumnWidth)
     {
         const int widthDeficit = minRightColumnWidth - rightColumnWidth;
         leftColumnWidth = juce::jmax(260, leftColumnWidth - widthDeficit);
-        rightColumnWidth = contentWidth - columnGap - leftColumnWidth;
+        rightColumnWidth = usableContentWidth - columnGap - leftColumnWidth;
     }
-    const int leftX = 0;
+    const int leftX = contentInsetLeft;
     const int rightX = leftColumnWidth + columnGap;
+    const int rightColumnX = leftX + rightX;
 
     struct SectionSpacing
     {
@@ -335,14 +341,14 @@ void DevPanel::resized()
         y += deckHeight + spacing.afterDeckGap;
     };
 
-    int leftY = 0;
-    int rightY = 0;
+    int leftY = contentInsetTop;
+    int rightY = contentInsetTop;
     const int selectedSubTab = getSelectedSubTab();
 
     const int tabHeight = 38;
     const int tabGap = 6;
     const int tabButtonWidth = juce::jmax(82, (rightColumnWidth - (tabGap * 6)) / 7);
-    int tabX = rightX;
+    int tabX = rightColumnX;
     tabOverviewButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
     tabX += tabButtonWidth + tabGap;
     tabInternalsButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
@@ -364,7 +370,7 @@ void DevPanel::resized()
     const int subTabCount = getSubTabCount(selectedRightTab);
     const int subTabButtonWidth = juce::jmax(108, (rightColumnWidth - (subTabGap * juce::jmax(0, subTabCount - 1))) / juce::jmax(1, subTabCount));
     juce::TextButton* subTabButtons[4] = { &subTabButtonA, &subTabButtonB, &subTabButtonC, &subTabButtonD };
-    int subTabX = rightX;
+    int subTabX = rightColumnX;
     for (int i = 0; i < 4; ++i)
     {
         if (i < subTabCount)
@@ -380,10 +386,10 @@ void DevPanel::resized()
     rightY += subTabHeight + 14;
 
     const int activeProfileH = 26;
-    activeProfileLabel.setBounds(rightX, rightY, rightColumnWidth, activeProfileH);
+    activeProfileLabel.setBounds(rightColumnX, rightY, rightColumnWidth, activeProfileH);
     rightY += activeProfileH + 4;
     const int scopeHintH = 22;
-    activeScopeHintLabel.setBounds(rightX, rightY, rightColumnWidth, scopeHintH);
+    activeScopeHintLabel.setBounds(rightColumnX, rightY, rightColumnWidth, scopeHintH);
     rightY += scopeHintH + 12;
 
     const int toolsH = 32;
@@ -391,9 +397,9 @@ void DevPanel::resized()
     const int modeComboW = 136;
     const int modeHqW = 64;
     const int modeGap = 8;
-    devEngineModeLabel.setBounds(rightX, rightY + 4, modeLabelW, toolsH - 4);
-    devEngineModeBox.setBounds(rightX + modeLabelW + modeGap, rightY, modeComboW, toolsH);
-    devHqModeToggle.setBounds(rightX + modeLabelW + modeGap + modeComboW + modeGap, rightY, modeHqW, toolsH);
+    devEngineModeLabel.setBounds(rightColumnX, rightY + 4, modeLabelW, toolsH - 4);
+    devEngineModeBox.setBounds(rightColumnX + modeLabelW + modeGap, rightY, modeComboW, toolsH);
+    devHqModeToggle.setBounds(rightColumnX + modeLabelW + modeGap + modeComboW + modeGap, rightY, modeHqW, toolsH);
     rightY += toolsH + 14;
 
     const bool showRightTools = selectedRightTab == 3 && selectedSubTab == 3;
@@ -402,12 +408,12 @@ void DevPanel::resized()
         const int labelW = 126;
         const int clearW = 76;
         const int toolsGap = 8;
-        const int editorX = rightX + labelW + toolsGap;
-        const int editorRight = rightX + rightColumnWidth - clearW - toolsGap;
+        const int editorX = rightColumnX + labelW + toolsGap;
+        const int editorRight = rightColumnX + rightColumnWidth - clearW - toolsGap;
         const int editorW = juce::jmax(140, editorRight - editorX);
-        engineFilterLabel.setBounds(rightX, rightY + 4, labelW, toolsH - 4);
+        engineFilterLabel.setBounds(rightColumnX, rightY + 4, labelW, toolsH - 4);
         engineFilterEditor.setBounds(editorX, rightY, editorW, toolsH);
-        engineFilterClearButton.setBounds(rightX + rightColumnWidth - clearW, rightY, clearW, toolsH);
+        engineFilterClearButton.setBounds(rightColumnX + rightColumnWidth - clearW, rightY, clearW, toolsH);
         rightY += toolsH + 18;
     }
     else
@@ -499,65 +505,65 @@ void DevPanel::resized()
 
     if (selectedRightTab == 0)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, overviewTitle, overviewDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, overviewTitle, overviewDescription, visualSection);
         auto cards = selectedDeckCards(overviewVisualDeckCards, selectedSubTab);
-        layoutVisualDeck(rightX, rightColumnWidth, rightY, overviewVisualDeck, cards, overviewVisualDeckCards, overviewDeckSpacing);
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, overviewVisualDeck, cards, overviewVisualDeckCards, overviewDeckSpacing);
     }
     else if (selectedRightTab == 1)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, modulationTitle, modulationDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, modulationTitle, modulationDescription, visualSection);
         auto cards = selectedDeckCards(modulationVisualDeckCards, selectedSubTab);
-        layoutVisualDeck(rightX, rightColumnWidth, rightY, modulationVisualDeck, cards, modulationVisualDeckCards, modulationDeckSpacing);
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, modulationVisualDeck, cards, modulationVisualDeckCards, modulationDeckSpacing);
     }
     else if (selectedRightTab == 2)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, toneTitle, toneDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, toneTitle, toneDescription, visualSection);
         auto cards = selectedDeckCards(toneVisualDeckCards, selectedSubTab);
-        layoutVisualDeck(rightX, rightColumnWidth, rightY, toneVisualDeck, cards, toneVisualDeckCards, toneDeckSpacing);
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, toneVisualDeck, cards, toneVisualDeckCards, toneDeckSpacing);
     }
     else if (selectedRightTab == 3)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, engineTitle, engineDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, engineTitle, engineDescription, visualSection);
         auto cards = selectedDeckCards(engineVisualDeckCards, 0);
-        layoutVisualDeck(rightX, rightColumnWidth, rightY, engineVisualDeck, cards, engineVisualDeckCards, engineDeckSpacing);
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, engineVisualDeck, cards, engineVisualDeckCards, engineDeckSpacing);
     }
     else if (selectedRightTab == 4)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, layoutTitle, layoutDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, layoutTitle, layoutDescription, visualSection);
         auto cards = selectedDeckCards(lookFeelVisualDeckCards, 0);
-        layoutVisualDeck(rightX, rightColumnWidth, rightY, lookFeelVisualDeck, cards, lookFeelVisualDeckCards, lookFeelDeckSpacing);
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, lookFeelVisualDeck, cards, lookFeelVisualDeckCards, lookFeelDeckSpacing);
     }
     else if (selectedRightTab == 5)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, validationTitle, validationDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, validationTitle, validationDescription, visualSection);
         auto cards = selectedDeckCards(validationVisualDeckCards, selectedSubTab);
-        layoutVisualDeck(rightX, rightColumnWidth, rightY, validationVisualDeck, cards, validationVisualDeckCards, lookFeelDeckSpacing);
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, validationVisualDeck, cards, validationVisualDeckCards, lookFeelDeckSpacing);
     }
     else if (selectedRightTab == 6)
     {
-        layoutSectionHeader(rightX, rightColumnWidth, rightY, settingsTitle, settingsDescription, visualSection);
+        layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, settingsTitle, settingsDescription, visualSection);
 
         const int buttonHeight = 38;
         const int buttonGap = 12;
         const int firstRowWidth = (rightColumnWidth - (buttonGap * 2)) / 3;
         int rowY = rightY;
-        int rowX = rightX;
+        int rowX = rightColumnX;
         fxPresetOffButton.setBounds(rowX, rowY, firstRowWidth, buttonHeight);
         rowX += firstRowWidth + buttonGap;
         fxPresetSubtleButton.setBounds(rowX, rowY, firstRowWidth, buttonHeight);
         rowX += firstRowWidth + buttonGap;
-        fxPresetMediumButton.setBounds(rowX, rowY, rightX + rightColumnWidth - rowX, buttonHeight);
+        fxPresetMediumButton.setBounds(rowX, rowY, rightColumnX + rightColumnWidth - rowX, buttonHeight);
 
         rowY += buttonHeight + 14;
         const int secondRowWidth = (rightColumnWidth - (buttonGap * 3)) / 4;
-        rowX = rightX;
+        rowX = rightColumnX;
         lockToggleButton.setBounds(rowX, rowY, secondRowWidth, buttonHeight);
         rowX += secondRowWidth + buttonGap;
         resetFactoryButton.setBounds(rowX, rowY, secondRowWidth, buttonHeight);
         rowX += secondRowWidth + buttonGap;
         saveDefaultsButton.setBounds(rowX, rowY, secondRowWidth, buttonHeight);
         rowX += secondRowWidth + buttonGap;
-        copyJsonButton.setBounds(rowX, rowY, rightX + rightColumnWidth - rowX, buttonHeight);
+        copyJsonButton.setBounds(rowX, rowY, rightColumnX + rightColumnWidth - rowX, buttonHeight);
 
         rightY = rowY + buttonHeight + 16;
     }
@@ -573,7 +579,7 @@ void DevPanel::resized()
         copyJsonButton.setBounds(0, 0, 0, 0);
     }
 
-    const int contentHeight = std::max(leftY, rightY) + 16;
+    const int contentHeight = std::max(leftY, rightY) + contentInsetBottom;
     content.setBounds(0, 0, contentWidth, contentHeight);
 
     const int maxViewX = juce::jmax(0, content.getWidth() - viewport.getViewWidth());
@@ -1003,6 +1009,8 @@ int DevPanel::refreshVisibleLiveReadouts()
 
 void DevPanel::timerCallback()
 {
+    updateConsoleSweeps();
+
     auto readRaw = [this](const char* paramId) -> float
     {
         if (auto* p = processor.getValueTreeState().getRawParameterValue(paramId))
@@ -1025,14 +1033,16 @@ void DevPanel::timerCallback()
     {
         const juce::String timestamp = juce::Time::getCurrentTime().formatted("%H:%M:%S");
         const juce::String prefix = label + ":";
+        const juce::String line = prefix + " " + valueText + " @ " + timestamp;
         for (int i = recentTouchHistory.size() - 1; i >= 0; --i)
         {
             if (recentTouchHistory[i].startsWithIgnoreCase(prefix))
                 recentTouchHistory.remove(i);
         }
-        recentTouchHistory.insert(0, prefix + " " + valueText + " @ " + timestamp);
+        recentTouchHistory.insert(0, line);
         while (recentTouchHistory.size() > 10)
             recentTouchHistory.remove(recentTouchHistory.size() - 1);
+        appendRecentTouchLogLine(line);
     };
 
     if (!macroTouchHistoryPrimed)

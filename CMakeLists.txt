@@ -86,6 +86,7 @@ target_sources(Choroboros PRIVATE
     Source/UI/DevPanel.h
     Source/UI/DevPanelBuildContext.h
     Source/UI/DevPanelRuntime.cpp
+    Source/UI/DevPanelConsole.cpp
     Source/UI/DevPanelTabBuilders.cpp
     Source/UI/DevPanelPersistence.cpp
     Source/UI/DevPanelSupport.h

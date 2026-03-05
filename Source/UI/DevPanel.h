@@ -20,10 +20,19 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
+#include <functional>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 class ChoroborosPluginEditor;
 class ChoroborosAudioProcessor;
 struct DevPanelBuildContext;
+namespace devpanel
+{
+struct ConsoleCommandResult;
+class LockableFloatPropertyComponent;
+}
 
 /** Fills background on paint; prevents Windows GDI scroll ghosting. */
 class DevPanelContent : public juce::Component
@@ -201,6 +210,49 @@ private:
     bool lastKnownHqState = false;
     juce::String lastKnownSectionFilter;
     juce::StringArray recentTouchHistory;
+    struct ConsoleTargetBinding
+    {
+        juce::String slug;
+        juce::String displayName;
+        juce::PropertyComponent* property = nullptr;
+        double baselineValue = 0.0;
+        double lastKnownValue = 0.0;
+        double previousValue = 0.0;
+        bool hasPreviousValue = false;
+        bool engineSpecific = false;
+        int engineScope = -1; // -1 = global, 0..4 = engine-specific
+    };
+    struct ConsoleAction
+    {
+        juce::String label;
+        std::function<void()> undo;
+        std::function<void()> redo;
+    };
+    struct ConsoleSweepState
+    {
+        devpanel::LockableFloatPropertyComponent* lockable = nullptr;
+        juce::String slug;
+        double startValue = 0.0;
+        double endValue = 0.0;
+        double preSweepValue = 0.0;
+        int totalTicks = 1;
+        int tick = 0;
+    };
+    std::vector<ConsoleTargetBinding> consoleTargets;
+    std::vector<ConsoleAction> consoleUndoStack;
+    std::vector<ConsoleAction> consoleRedoStack;
+    std::vector<ConsoleSweepState> consoleSweeps;
+    std::unordered_map<std::string, double> consoleFactoryValues;
+    std::unordered_map<std::string, juce::String> consoleAliases;
+    bool consoleFactoryValuesReady = false;
+    juce::StringArray consoleWatchSlugs;
+    juce::StringArray consoleCommandHistory;
+    bool consoleBypassActive = false;
+    float consoleBypassStoredMixRaw = 0.0f;
+    bool consoleSoloActive = false;
+    juce::String consoleSoloNode;
+    float consoleSoloStoredMixRaw = 0.0f;
+    juce::File recentTouchesLogFile;
     int analyzerRefreshTickCounter = 0;
     bool lastModulationDemand = true;
     bool lastSpectrumDemand = true;
@@ -229,6 +281,12 @@ private:
     bool isPropertyVisibleInViewport(const juce::PropertyComponent* property) const;
     void updateAnalyzerDemandFromVisibility();
     int refreshVisibleLiveReadouts();
+    void registerConsoleTarget(juce::PropertyComponent* property, const juce::String& name);
+    devpanel::ConsoleCommandResult executeConsoleCommand(const juce::String& command);
+    void appendRecentTouchLogLine(const juce::String& line) const;
+    juce::String buildConsoleWatchHudText() const;
+    void updateConsoleSweeps();
+    void cancelConsoleSweeps();
     void triggerSaveButtonReset();
     void triggerResetFactoryButtonReset();
     void buildOverviewTab(DevPanelBuildContext& ctx);

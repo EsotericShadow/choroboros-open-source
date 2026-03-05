@@ -975,6 +975,15 @@ public:
     }
 
     bool isLocked() const { return locked; }
+    double getCurrentValueForCommand() const { return currentValue; }
+    double getMinimumForCommand() const { return minValue; }
+    double getMaximumForCommand() const { return maxValue; }
+    double getStepForCommand() const { return stepValue; }
+
+    void setValueFromCommand(double value)
+    {
+        applyValueFromUserInput(value);
+    }
 
 private:
     void refreshThemeColours()
@@ -1539,6 +1548,221 @@ private:
 
     std::function<juce::String()> valueProvider;
     juce::TextEditor consoleEditor;
+};
+
+struct ConsoleCommandResult
+{
+    juce::String output;
+    bool clearOutput = false;
+};
+
+class CommandConsolePropertyComponent : public juce::PropertyComponent
+{
+public:
+    using CommandHandler = std::function<ConsoleCommandResult(const juce::String&)>;
+    using HudProvider = std::function<juce::String()>;
+
+    CommandConsolePropertyComponent(const juce::String& name,
+                                    CommandHandler commandHandlerIn,
+                                    const juce::String& tooltipText,
+                                    HudProvider hudProviderIn = {})
+        : juce::PropertyComponent(""),
+          commandHandler(std::move(commandHandlerIn)),
+          hudProvider(std::move(hudProviderIn))
+    {
+        setTooltip(tooltipText);
+
+        hudLabel.setTooltip("Pinned watch list");
+        hudLabel.setJustificationType(juce::Justification::centredLeft);
+        hudLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+        addAndMakeVisible(hudLabel);
+
+        outputEditor.setTooltip(tooltipText);
+        outputEditor.setMultiLine(true);
+        outputEditor.setReturnKeyStartsNewLine(false);
+        outputEditor.setReadOnly(true);
+        outputEditor.setCaretVisible(false);
+        outputEditor.setPopupMenuEnabled(true);
+        outputEditor.setScrollbarsShown(true);
+        outputEditor.setJustification(juce::Justification::topLeft);
+        outputEditor.setFont(makeLabelFont(Typography::consoleLog, false));
+        outputEditor.setBorder(juce::BorderSize<int>(6, 8, 6, 8));
+        addAndMakeVisible(outputEditor);
+
+        inputEditor.setTooltip("Type command and press Enter. Use Up/Down for previous commands.");
+        inputEditor.setMultiLine(false);
+        inputEditor.setReturnKeyStartsNewLine(false);
+        inputEditor.setScrollbarsShown(false);
+        inputEditor.setJustification(juce::Justification::centredLeft);
+        inputEditor.setFont(makeLabelFont(Typography::inspectorInput, false));
+        inputEditor.setBorder(juce::BorderSize<int>(4, 8, 4, 8));
+        inputEditor.setTextToShowWhenEmpty("Type command + Enter (help for command list)", hackerTextMuted());
+        inputEditor.onReturnKey = [this] { submitCommand(); };
+        inputEditor.keyInterceptor = [this](const juce::KeyPress& key) { return handleHistoryKey(key); };
+        addAndMakeVisible(inputEditor);
+
+        refreshThemeColours();
+        updateHudLine();
+        appendOutputLine(name + " ready. Type `help` and press Enter.");
+        setPreferredHeight(256);
+    }
+
+    void refresh() override
+    {
+        updateHudLine();
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(4, 4);
+        constexpr int hudHeight = 22;
+        auto hudArea = area.removeFromTop(hudHeight);
+        hudLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+        hudLabel.setBounds(hudArea.reduced(2, 2));
+        area.removeFromTop(2);
+        constexpr int inputHeight = 34;
+        auto inputArea = area.removeFromBottom(inputHeight);
+        inputEditor.setFont(makeLabelFont(Typography::inspectorInput, false));
+        outputEditor.setFont(makeLabelFont(Typography::consoleLog, false));
+        outputEditor.setBounds(area);
+        inputEditor.setBounds(inputArea.withTrimmedTop(4));
+    }
+
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
+    }
+
+private:
+    class HistoryTextEditor final : public juce::TextEditor
+    {
+    public:
+        std::function<bool(const juce::KeyPress&)> keyInterceptor;
+
+        bool keyPressed(const juce::KeyPress& key) override
+        {
+            if (keyInterceptor && keyInterceptor(key))
+                return true;
+            return juce::TextEditor::keyPressed(key);
+        }
+    };
+
+    void refreshThemeColours()
+    {
+        hudLabel.setColour(juce::Label::textColourId, hackerTextDim());
+        hudLabel.setColour(juce::Label::backgroundColourId, hackerBgField().withAlpha(0.4f));
+        outputEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff010301));
+        outputEditor.setColour(juce::TextEditor::textColourId, hackerText());
+        outputEditor.setColour(juce::TextEditor::outlineColourId, hackerBorder().withAlpha(0.85f));
+        outputEditor.setColour(juce::TextEditor::focusedOutlineColourId, hackerBorderStrong());
+        outputEditor.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.82f));
+        styleHackerEditor(inputEditor);
+        repaint();
+    }
+
+    bool handleHistoryKey(const juce::KeyPress& key)
+    {
+        if (key.getKeyCode() == juce::KeyPress::upKey)
+        {
+            if (commandHistory.isEmpty())
+                return true;
+            if (historyCursor < 0)
+                historyCursor = commandHistory.size() - 1;
+            else
+                historyCursor = juce::jmax(0, historyCursor - 1);
+            inputEditor.setText(commandHistory[historyCursor], juce::dontSendNotification);
+            inputEditor.moveCaretToEnd();
+            return true;
+        }
+
+        if (key.getKeyCode() == juce::KeyPress::downKey)
+        {
+            if (commandHistory.isEmpty())
+                return true;
+            if (historyCursor < 0)
+                return true;
+            ++historyCursor;
+            if (historyCursor >= commandHistory.size())
+            {
+                historyCursor = -1;
+                inputEditor.clear();
+            }
+            else
+            {
+                inputEditor.setText(commandHistory[historyCursor], juce::dontSendNotification);
+                inputEditor.moveCaretToEnd();
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    void submitCommand()
+    {
+        const juce::String command = inputEditor.getText().trim();
+        if (command.isEmpty())
+            return;
+
+        appendOutputLine("> " + command);
+        if (commandHistory.isEmpty() || !commandHistory[commandHistory.size() - 1].equalsIgnoreCase(command))
+            commandHistory.add(command);
+        while (commandHistory.size() > 200)
+            commandHistory.remove(0);
+        historyCursor = -1;
+
+        ConsoleCommandResult result;
+        if (commandHandler)
+            result = commandHandler(command);
+
+        if (result.clearOutput)
+            outputLines.clear();
+
+        if (result.output.isNotEmpty())
+        {
+            juce::StringArray lines;
+            lines.addLines(result.output);
+            if (lines.isEmpty())
+                lines.add(result.output);
+            appendOutputLines(lines);
+        }
+
+        updateHudLine();
+        inputEditor.clear();
+    }
+
+    void appendOutputLine(const juce::String& line)
+    {
+        juce::StringArray singleLine;
+        singleLine.add(line);
+        appendOutputLines(singleLine);
+    }
+
+    void appendOutputLines(const juce::StringArray& lines)
+    {
+        for (const auto& line : lines)
+            outputLines.add(line);
+        while (outputLines.size() > 600)
+            outputLines.remove(0);
+        outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
+        outputEditor.moveCaretToEnd();
+    }
+
+    void updateHudLine()
+    {
+        const juce::String hudText = hudProvider ? hudProvider() : juce::String();
+        hudLabel.setText(hudText.isNotEmpty() ? hudText : "Watch: (none)", juce::dontSendNotification);
+    }
+
+    CommandHandler commandHandler;
+    HudProvider hudProvider;
+    juce::Label hudLabel;
+    juce::TextEditor outputEditor;
+    HistoryTextEditor inputEditor;
+    juce::StringArray outputLines;
+    juce::StringArray commandHistory;
+    int historyCursor = -1;
 };
 
 class SparklinePropertyComponent : public juce::PropertyComponent

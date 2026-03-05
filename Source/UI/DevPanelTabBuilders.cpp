@@ -680,11 +680,11 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
 void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
 {
     const auto& makeReadOnly = ctx.makeReadOnly;
-    const auto& makeMultiLineReadOnly = ctx.makeMultiLineReadOnly;
     const auto& makeTraceMatrix = ctx.makeTraceMatrix;
     const auto& readRawParam = ctx.readRawParam;
     const auto& getActiveProfileRaw = ctx.getActiveProfileRaw;
     const auto& readAnalyzerSnapshot = ctx.readAnalyzerSnapshot;
+    const auto& registerControlMetadata = ctx.registerControlMetadata;
     juce::Array<juce::PropertyComponent*> validationTelemetry;
     validationTelemetry.add(makeReadOnly("Audio Thread Time", [this]() -> juce::String
     {
@@ -819,24 +819,21 @@ void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
     validationVisualDeck.addAndMakeVisible(validationTraceMatrixCard);
     validationVisualDeckCards.add(validationTraceMatrixCard);
 
-    auto* validationRecentLog = makeMultiLineReadOnly("Recent Touches", [this]() -> juce::String
-    {
-        if (recentTouchHistory.isEmpty())
-            return "No recent changes yet.";
-
-        juce::String joined;
-        const int maxLines = juce::jmin(6, recentTouchHistory.size());
-        for (int i = 0; i < maxLines; ++i)
-        {
-            if (i > 0)
-                joined << "\n";
-            joined << recentTouchHistory[i];
-        }
-        return joined;
-    });
-    validationRecentLog->setPreferredHeight(184);
-    validationVisualDeck.addAndMakeVisible(validationRecentLog);
-    validationVisualDeckCards.add(validationRecentLog);
+    auto* validationConsole = new CommandConsolePropertyComponent("Validation Console",
+                                                                  [this](const juce::String& text)
+                                                                  {
+                                                                      return executeConsoleCommand(text);
+                                                                  },
+                                                                  "Power console for direct Dev Panel state control. Type `help` for commands.",
+                                                                  [this]()
+                                                                  {
+                                                                      return buildConsoleWatchHudText();
+                                                                  });
+    validationConsole->setPreferredHeight(264);
+    liveReadoutProperties.add(validationConsole);
+    validationVisualDeck.addAndMakeVisible(validationConsole);
+    validationVisualDeckCards.add(validationConsole);
+    registerControlMetadata("Validation Console", {}, "command_console", "interactive", "console_only");
 }
 
 void DevPanel::buildInternalsTab(DevPanelBuildContext& ctx)
