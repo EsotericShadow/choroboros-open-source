@@ -120,6 +120,15 @@ inline LinkGroup gLinkedGroup = LinkGroup::none;
 inline juce::Colour gCurrentEngineSkinColour { juce::Colour(StagePalette::skinGreen) };
 inline juce::String gActiveEngineSectionPrefix;
 inline bool gStripActiveEngineSectionPrefix = false;
+inline float gDevPanelUserTextScale = 1.0f;
+inline int gDevPanelTextColourMode = 0; // 0=auto, 1=high-contrast, 2=white, 3=cyan, 4=amber
+inline int gDevPanelThemePreset = 0; // 0=engine adaptive, 1=classic hacker, 2=neutral studio, 3=high contrast
+inline int gDevPanelAccentSource = 0; // 0=follow engine, 1=manual
+inline int gDevPanelManualAccentIndex = 0;
+inline int gDevPanelColourVisionMode = 0; // 0=off, 1=deuteranopia, 2=protanopia, 3=tritanopia
+inline bool gDevPanelReducedMotion = false;
+inline bool gDevPanelLargeHitTargets = false;
+inline bool gDevPanelStrongFocusRing = true;
 
 juce::Font makeLabelFont(float height, bool bold, bool italic = false);
 juce::Font makeTitleFont(float height, bool bold = true);
@@ -142,19 +151,64 @@ inline juce::Colour engineSkinColourForIndex(int engineIndex)
     }
 }
 
+inline float devPanelEffectiveTextScale() { return 1.10f * juce::jlimit(0.85f, 1.35f, gDevPanelUserTextScale); }
+
+inline void setDevPanelUserTextScale(float scale) { gDevPanelUserTextScale = juce::jlimit(0.85f, 1.35f, scale); }
+inline void setDevPanelTextColourMode(int mode) { gDevPanelTextColourMode = juce::jlimit(0, 4, mode); }
+inline void setDevPanelThemePreset(int preset) { gDevPanelThemePreset = juce::jlimit(0, 3, preset); }
+inline void setDevPanelAccentSource(int source) { gDevPanelAccentSource = juce::jlimit(0, 1, source); }
+inline void setDevPanelManualAccentIndex(int index) { gDevPanelManualAccentIndex = juce::jlimit(0, 4, index); }
+inline void setDevPanelColourVisionMode(int mode) { gDevPanelColourVisionMode = juce::jlimit(0, 3, mode); }
+inline void setDevPanelReducedMotion(bool enabled) { gDevPanelReducedMotion = enabled; }
+inline void setDevPanelLargeHitTargets(bool enabled) { gDevPanelLargeHitTargets = enabled; }
+inline void setDevPanelStrongFocusRing(bool enabled) { gDevPanelStrongFocusRing = enabled; }
+inline bool isDevPanelReducedMotionEnabled() { return gDevPanelReducedMotion; }
+inline bool isDevPanelLargeHitTargetsEnabled() { return gDevPanelLargeHitTargets; }
+
+inline juce::Colour applyColourVisionMode(juce::Colour accent)
+{
+    if (gDevPanelColourVisionMode <= 0)
+        return accent;
+
+    const float hueShift = (gDevPanelColourVisionMode == 1 ? 0.08f
+                           : (gDevPanelColourVisionMode == 2 ? 0.14f : 0.32f));
+    const float h = std::fmod(accent.getHue() + hueShift, 1.0f);
+    const float s = juce::jlimit(0.30f, 0.95f, accent.getSaturation() * 0.78f);
+    const float v = juce::jlimit(0.60f, 1.0f, accent.getBrightness() * 1.03f);
+    return juce::Colour::fromHSV(h, s, v, 1.0f);
+}
+
+inline juce::Colour resolveEffectiveThemeAccent(int engineIndex)
+{
+    juce::Colour accent = engineSkinColourForIndex(engineIndex);
+
+    if (gDevPanelThemePreset == 1)       accent = juce::Colour(StagePalette::skinGreen);
+    else if (gDevPanelThemePreset == 2)  accent = juce::Colour(0xff8fd7cf);
+    else if (gDevPanelThemePreset == 3)  accent = juce::Colours::white;
+
+    // Manual accent must be a true override regardless of theme preset.
+    if (gDevPanelAccentSource == 1)
+        accent = engineSkinColourForIndex(gDevPanelManualAccentIndex);
+
+    return applyColourVisionMode(accent);
+}
+
 inline void applyHackerThemeAccent(juce::Colour accent)
 {
-    const auto baseBg = juce::Colour(0xff040704);
-    const auto baseElevated = juce::Colour(0xff0b120b);
-    const auto baseField = juce::Colour(0xff0f1810);
-    const auto baseSurface = juce::Colour(0xff0a120d);
-    const auto baseSurfaceAlt = juce::Colour(0xff101a14);
+    const bool highContrastTheme = (gDevPanelThemePreset == 3);
+    const auto baseBg = highContrastTheme ? juce::Colour(0xff030303) : juce::Colour(0xff040704);
+    const auto baseElevated = highContrastTheme ? juce::Colour(0xff090909) : juce::Colour(0xff0b120b);
+    const auto baseField = highContrastTheme ? juce::Colour(0xff0e0e0e) : juce::Colour(0xff0f1810);
+    const auto baseSurface = highContrastTheme ? juce::Colour(0xff0a0a0a) : juce::Colour(0xff0a120d);
+    const auto baseSurfaceAlt = highContrastTheme ? juce::Colour(0xff121212) : juce::Colour(0xff101a14);
 
     const auto tone = accent.withAlpha(1.0f);
     const auto toneDim = tone.interpolatedWith(juce::Colours::black, 0.28f);
     const auto toneMuted = tone.interpolatedWith(juce::Colours::black, 0.46f);
     const auto toneBorder = tone.interpolatedWith(juce::Colours::black, 0.62f);
-    const auto toneBorderStrong = tone.interpolatedWith(juce::Colours::black, 0.44f);
+    auto toneBorderStrong = tone.interpolatedWith(juce::Colours::black, 0.44f);
+    if (gDevPanelStrongFocusRing || highContrastTheme)
+        toneBorderStrong = toneBorderStrong.brighter(0.18f);
     const auto toneGrid = tone.interpolatedWith(juce::Colours::black, 0.76f);
 
     HackerTheme::text = tone.getARGB();
@@ -170,11 +224,39 @@ inline void applyHackerThemeAccent(juce::Colour accent)
     HackerTheme::surface = baseSurface.interpolatedWith(tone, 0.07f).getARGB();
     HackerTheme::surfaceAlt = baseSurfaceAlt.interpolatedWith(tone, 0.09f).getARGB();
     HackerTheme::wash = juce::Colour(0xff112114).interpolatedWith(tone, 0.20f).getARGB();
+
+    if (gDevPanelTextColourMode == 1 || highContrastTheme)
+    {
+        HackerTheme::text = juce::Colours::white.getARGB();
+        HackerTheme::textDim = juce::Colour(0xffd6d6d6).getARGB();
+        HackerTheme::textMuted = juce::Colour(0xffb3b3b3).getARGB();
+    }
+    else if (gDevPanelTextColourMode == 2)
+    {
+        const auto t = juce::Colours::white;
+        HackerTheme::text = t.getARGB();
+        HackerTheme::textDim = t.darker(0.22f).getARGB();
+        HackerTheme::textMuted = t.darker(0.38f).getARGB();
+    }
+    else if (gDevPanelTextColourMode == 3)
+    {
+        const auto t = juce::Colour(0xff9ae6ff);
+        HackerTheme::text = t.getARGB();
+        HackerTheme::textDim = t.darker(0.24f).getARGB();
+        HackerTheme::textMuted = t.darker(0.40f).getARGB();
+    }
+    else if (gDevPanelTextColourMode == 4)
+    {
+        const auto t = juce::Colour(0xffffc978);
+        HackerTheme::text = t.getARGB();
+        HackerTheme::textDim = t.darker(0.26f).getARGB();
+        HackerTheme::textMuted = t.darker(0.42f).getARGB();
+    }
 }
 
 inline void setCurrentEngineSkinColour(int engineIndex)
 {
-    gCurrentEngineSkinColour = engineSkinColourForIndex(engineIndex);
+    gCurrentEngineSkinColour = resolveEffectiveThemeAccent(engineIndex);
     applyHackerThemeAccent(gCurrentEngineSkinColour);
 }
 
@@ -702,6 +784,29 @@ inline juce::Value makeBoolValue(std::function<bool()> getter, std::function<voi
     return juce::Value(new BoolValueSource(std::move(getter), std::move(setter)));
 }
 
+class IntValueSource : public juce::Value::ValueSource
+{
+public:
+    IntValueSource(std::function<int()> getterIn, std::function<void(int)> setterIn)
+        : getter(std::move(getterIn)), setter(std::move(setterIn)) {}
+
+    juce::var getValue() const override { return getter(); }
+
+    void setValue(const juce::var& newValue) override
+    {
+        setter(static_cast<int>(newValue));
+    }
+
+private:
+    std::function<int()> getter;
+    std::function<void(int)> setter;
+};
+
+inline juce::Value makeIntValue(std::function<int()> getter, std::function<void(int)> setter)
+{
+    return juce::Value(new IntValueSource(std::move(getter), std::move(setter)));
+}
+
 constexpr int kDevPanelTimerHz = 30;
 constexpr int kDenseReadoutHeight = 156;
 constexpr int kTraceMatrixHeight = 520;
@@ -709,8 +814,6 @@ constexpr int kRowHeightMicro = 42;
 constexpr int kRowHeightCompact = 46;
 constexpr int kRowHeightStandard = 52;
 constexpr int kRowHeightControl = 48;
-constexpr float kDevPanelTextScale = 1.10f;
-
 inline juce::String formatFloat(float value)
 {
     return juce::String(value, 4);
@@ -790,7 +893,7 @@ inline juce::Typeface::Ptr loadTypefaceFromBinary(const char* data, int dataSize
 
 inline juce::Font makeLabelFont(float height, bool bold, bool italic)
 {
-    const float scaledHeight = height * kDevPanelTextScale;
+    const float scaledHeight = height * devPanelEffectiveTextScale();
     static juce::Typeface::Ptr thinTypeface = loadTypefaceFromBinary(BinaryData::JetBrainsMonoNLThin_ttf,
                                                                      BinaryData::JetBrainsMonoNLThin_ttfSize);
     static juce::Typeface::Ptr italicTypeface = loadTypefaceFromBinary(BinaryData::JetBrainsMonoThinItalic_ttf,
@@ -815,7 +918,7 @@ inline juce::Font makeLabelFont(float height, bool bold, bool italic)
 
 inline juce::Font makeTitleFont(float height, bool bold)
 {
-    const float scaledHeight = height * kDevPanelTextScale;
+    const float scaledHeight = height * devPanelEffectiveTextScale();
     juce::ignoreUnused(bold);
     static juce::Typeface::Ptr titleTypeface = loadTypefaceFromBinary(BinaryData::JetBrainsMonoExtraBold_ttf,
                                                                       BinaryData::JetBrainsMonoExtraBold_ttfSize);
@@ -826,7 +929,7 @@ inline juce::Font makeTitleFont(float height, bool bold)
 
 inline juce::Font makeTooltipFont(float height, bool italic)
 {
-    const float scaledHeight = height * kDevPanelTextScale;
+    const float scaledHeight = height * devPanelEffectiveTextScale();
     static juce::Typeface::Ptr tooltipTypeface = loadTypefaceFromBinary(BinaryData::JetBrainsMonoNLExtraLight_ttf,
                                                                         BinaryData::JetBrainsMonoNLExtraLight_ttfSize);
     static juce::Typeface::Ptr tooltipItalicTypeface = loadTypefaceFromBinary(BinaryData::JetBrainsMonoNLExtraLightItalic_ttf,
@@ -1610,6 +1713,53 @@ private:
     juce::Label titleLabel;
 };
 
+class ActionButtonPropertyComponent : public juce::PropertyComponent
+{
+public:
+    ActionButtonPropertyComponent(const juce::String& name,
+                                  const juce::String& buttonText,
+                                  const juce::String& tooltipText,
+                                  std::function<void()> onClickIn)
+        : juce::PropertyComponent(name),
+          onClick(std::move(onClickIn))
+    {
+        setTooltip(tooltipText);
+        actionButton.setButtonText(buttonText);
+        actionButton.setTooltip(tooltipText);
+        actionButton.onClick = [this]
+        {
+            if (onClick)
+                onClick();
+        };
+        addAndMakeVisible(actionButton);
+        setPreferredHeight(40);
+        refreshThemeColours();
+    }
+
+    void refresh() override {}
+
+    void resized() override
+    {
+        auto content = getLookAndFeel().getPropertyComponentContentPosition(*this);
+        actionButton.setBounds(content.reduced(0, 2));
+    }
+
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
+    }
+
+private:
+    void refreshThemeColours()
+    {
+        styleHackerTextButton(actionButton, false);
+    }
+
+    juce::TextButton actionButton;
+    std::function<void()> onClick;
+};
+
 class EmbeddedPropertyPanelCard : public juce::PropertyComponent
 {
 public:
@@ -1881,6 +2031,24 @@ public:
         setPreferredHeight(256);
     }
 
+    void setAutoScroll(bool enabled) { autoScrollEnabled = enabled; }
+    void setShowTimestamps(bool enabled) { showTimestamps = enabled; }
+    void setWrapLongLines(bool enabled)
+    {
+        wrapLongLines = enabled;
+        outputEditor.setMultiLine(true, wrapLongLines);
+    }
+    void setMaxOutputLines(int maxLines)
+    {
+        maxOutputLines = juce::jlimit(120, 4000, maxLines);
+        const int overflow = outputLines.size() - maxOutputLines;
+        if (overflow > 0)
+            outputLines.removeRange(0, overflow);
+        outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
+        if (autoScrollEnabled)
+            outputEditor.moveCaretToEnd();
+    }
+
     void refresh() override
     {
         updateHudLine();
@@ -2068,7 +2236,10 @@ private:
     void appendOutputLine(const juce::String& line)
     {
         juce::StringArray singleLine;
-        singleLine.add(line);
+        if (showTimestamps)
+            singleLine.add(juce::Time::getCurrentTime().formatted("[%H:%M:%S] ") + line);
+        else
+            singleLine.add(line);
         appendOutputLines(singleLine);
     }
 
@@ -2078,13 +2249,13 @@ private:
             return;
 
         outputLines.addArray(lines);
-        constexpr int kMaxConsoleOutputLines = 600;
-        const int overflow = outputLines.size() - kMaxConsoleOutputLines;
+        const int overflow = outputLines.size() - maxOutputLines;
         if (overflow > 0)
             outputLines.removeRange(0, overflow);
 
         outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
-        outputEditor.moveCaretToEnd();
+        if (autoScrollEnabled)
+            outputEditor.moveCaretToEnd();
     }
 
     void updateHudLine()
@@ -2102,6 +2273,10 @@ private:
     juce::StringArray commandHistory;
     int historyCursor = -1;
     int spinnerFrameIndex = 0;
+    bool autoScrollEnabled = true;
+    bool showTimestamps = true;
+    bool wrapLongLines = true;
+    int maxOutputLines = 600;
 };
 
 class SparklinePropertyComponent : public juce::PropertyComponent
@@ -3232,8 +3407,9 @@ inline void stylePanel(juce::PropertyPanel& panel)
 inline void addPanelSection(juce::PropertyPanel& panel, const juce::String& name,
                      juce::Array<juce::PropertyComponent*>& props, bool shouldBeOpen)
 {
+    const int minRowHeight = isDevPanelLargeHitTargetsEnabled() ? 46 : 38;
     for (auto* prop : props)
-        prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), 38));
+        prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), minRowHeight));
     panel.addSection(name, props, shouldBeOpen);
     stylePanel(panel);
 }
@@ -3241,13 +3417,14 @@ inline void addPanelSection(juce::PropertyPanel& panel, const juce::String& name
 inline void addFlatPanelGroup(juce::PropertyPanel& panel, const juce::String& title,
                               juce::Array<juce::PropertyComponent*>& props)
 {
+    const int minRowHeight = isDevPanelLargeHitTargetsEnabled() ? 46 : 38;
     juce::Array<juce::PropertyComponent*> rows;
     rows.add(new FlatSectionHeaderPropertyComponent(title));
     for (auto* prop : props)
     {
         if (prop == nullptr)
             continue;
-        prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), 38));
+        prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), minRowHeight));
         rows.add(prop);
     }
     panel.addProperties(rows);

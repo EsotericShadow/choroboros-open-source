@@ -32,6 +32,7 @@ namespace devpanel
 {
 struct ConsoleCommandResult;
 class LockableFloatPropertyComponent;
+class CommandConsolePropertyComponent;
 }
 
 /** Fills background on paint; prevents Windows GDI scroll ghosting. */
@@ -229,6 +230,7 @@ private:
     juce::PropertyPanel internalsBlackHqPanel;
     juce::PropertyPanel bbdPanel;
     juce::PropertyPanel tapePanel;
+    juce::PropertyPanel settingsPanel;
     juce::PropertyPanel layoutGlobalPanel;
     juce::PropertyPanel layoutTextAnimationPanel;
     juce::PropertyPanel layoutGreenPanel;
@@ -271,6 +273,7 @@ private:
     juce::ToggleButton devHqModeToggle;
     juce::TextEditor engineFilterEditor;
     juce::TextButton engineFilterClearButton;
+    devpanel::CommandConsolePropertyComponent* validationConsoleComponent = nullptr;
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
     bool editingLocked = true;
     bool suppressDevModeControlCallbacks = false;
@@ -352,6 +355,24 @@ private:
     int tutorialPulseTick = 0;
     juce::File recentTouchesLogFile;
     int analyzerRefreshTickCounter = 0;
+    int settingsTutorialTopicIndex = 0;
+    bool settingsShowTutorialHintsOnOpen = true;
+    int settingsUiTextSize = 1; // 0=small,1=medium,2=large
+    int settingsUiTextColourMode = 0; // 0=auto,1=high-contrast,2=white,3=cyan,4=amber
+    int settingsThemePreset = 0; // 0=engine adaptive,1=classic hacker,2=neutral studio,3=high contrast
+    int settingsAccentSource = 0; // 0=follow engine,1=manual
+    int settingsManualAccent = 0; // 0..4
+    int settingsColourVisionMode = 0; // 0=off,1=deuter,2=protan,3=tritan
+    bool settingsReducedMotion = false;
+    bool settingsLargeHitTargets = false;
+    bool settingsStrongFocusRing = true;
+    bool settingsConsoleAutoScroll = true;
+    bool settingsConsoleTimestamps = true;
+    bool settingsConsoleWrapLines = true;
+    int settingsConsoleMaxLines = 600;
+    bool settingsShowScopeHintLine = true;
+    bool settingsConfirmResetFactory = true;
+    bool settingsConfirmSetDefaults = true;
     bool lastModulationDemand = true;
     bool lastSpectrumDemand = true;
     bool lastTransferDemand = true;
@@ -408,6 +429,7 @@ private:
     void buildInternalsTab(DevPanelBuildContext& ctx);
     void buildLayoutTab(DevPanelBuildContext& ctx);
     void timerCallback() override;
+    void applyUiPreferences();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DevPanel)
 };

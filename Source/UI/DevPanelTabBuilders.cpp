@@ -1597,6 +1597,7 @@ void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
                                                                   {
                                                                       return buildConsoleWatchHudText();
                                                                   });
+    validationConsoleComponent = validationConsole;
     validationConsole->setPreferredHeight(264);
     liveReadoutProperties.add(validationConsole);
     validationVisualDeck.addAndMakeVisible(validationConsole);

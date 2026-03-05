@@ -74,12 +74,44 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(saveDefaultsButton);
     saveDefaultsButton.setButtonText("Set Current as Defaults");
     saveDefaultsButton.setTooltip("Saves all current tuning, internals, and layout values to the user defaults sheet.");
-    saveDefaultsButton.onClick = [this] { saveCurrentAsDefaults(); };
+    saveDefaultsButton.onClick = [this]
+    {
+        if (settingsConfirmSetDefaults)
+        {
+            const bool accepted = juce::AlertWindow::showOkCancelBox(
+                juce::AlertWindow::WarningIcon,
+                "Set Current as Defaults",
+                "Save all current tuning, internals, and layout values as startup defaults?",
+                "Set Defaults",
+                "Cancel",
+                this,
+                nullptr);
+            if (!accepted)
+                return;
+        }
+        saveCurrentAsDefaults();
+    };
 
     content.addAndMakeVisible(resetFactoryButton);
     resetFactoryButton.setButtonText("Reset to Factory");
     resetFactoryButton.setTooltip("Resets runtime tuning/layout to factory baseline, writes factory sheet, then replaces user defaults with factory.");
-    resetFactoryButton.onClick = [this] { resetToFactoryDefaults(); };
+    resetFactoryButton.onClick = [this]
+    {
+        if (settingsConfirmResetFactory)
+        {
+            const bool accepted = juce::AlertWindow::showOkCancelBox(
+                juce::AlertWindow::WarningIcon,
+                "Reset to Factory",
+                "Reset all runtime tuning, internals, and layout values to factory defaults?",
+                "Reset",
+                "Cancel",
+                this,
+                nullptr);
+            if (!accepted)
+                return;
+        }
+        resetToFactoryDefaults();
+    };
 
     content.addAndMakeVisible(lockToggleButton);
     lockToggleButton.setTooltip("Locks or unlocks all controls for safe editing.");
@@ -247,7 +279,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         getDevPanelThemeLookAndFeel().refreshThemeColours();
         getDevPanelSectionLookAndFeel().refreshThemeColours();
         sendLookAndFeelChange();
-        styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectedEngine));
+        const int selectorAccentIndex = (settingsAccentSource == 1)
+            ? juce::jlimit(0, 4, settingsManualAccent)
+            : selectedEngine;
+        styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
         if (auto* param = processor.getValueTreeState().getParameter(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
         {
             const float normalized = processor.getValueTreeState().getParameterRange(ChoroborosAudioProcessor::ENGINE_COLOR_ID)
@@ -398,6 +433,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(tonePanel);
     content.addAndMakeVisible(enginePanel);
     content.addAndMakeVisible(validationPanel);
+    content.addAndMakeVisible(settingsPanel);
     content.addAndMakeVisible(internalsGreenNqPanel);
     content.addAndMakeVisible(internalsGreenHqPanel);
     content.addAndMakeVisible(internalsBlueNqPanel);
@@ -435,7 +471,11 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     styleActionButton(tutorialNextSectionButton);
     styleActionButton(tutorialSkipButton);
 
-    styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(processor.getCurrentEngineColorIndex()));
+    const int initialEngineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+    const int initialSelectorAccent = (settingsAccentSource == 1)
+        ? juce::jlimit(0, 4, settingsManualAccent)
+        : initialEngineIndex;
+    styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(initialSelectorAccent));
     styleHackerToggleButton(devHqModeToggle);
     styleHackerEditor(engineFilterEditor);
 
@@ -941,6 +981,352 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     buildInternalsTab(ctx);
     buildLayoutTab(ctx);
 
+    settingsPanel.clear();
+
+    const juce::StringArray tutorialTopicLabels {
+        "Core Walkthrough",
+        "Overview",
+        "Modulation",
+        "Tone",
+        "Engine",
+        "Validation",
+        "BBD",
+        "Tape",
+        "Phase",
+        "Bi-Modulation",
+        "Saturation",
+        "Envelope"
+    };
+    const juce::StringArray tutorialTopicKeys {
+        "core",
+        "overview",
+        "modulation",
+        "tone",
+        "engine",
+        "validation",
+        "bbd",
+        "tape",
+        "phase",
+        "bimodulation",
+        "saturation",
+        "envelope"
+    };
+
+    auto makeChoice = [](juce::Value value,
+                         const juce::String& name,
+                         const juce::String& tooltip,
+                         const juce::StringArray& choices) -> juce::PropertyComponent*
+    {
+        juce::Array<juce::var> choiceValues;
+        choiceValues.ensureStorageAllocated(choices.size());
+        for (int i = 0; i < choices.size(); ++i)
+            choiceValues.add(i);
+        auto* prop = new juce::ChoicePropertyComponent(value, name, choices, choiceValues);
+        prop->setTooltip(tooltip);
+        return prop;
+    };
+
+    juce::Array<juce::PropertyComponent*> settingsTutorial;
+    settingsTutorial.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsTutorialTopicIndex; },
+            [this, topicCount = tutorialTopicLabels.size()](int v)
+            {
+                settingsTutorialTopicIndex = juce::jlimit(0, juce::jmax(0, topicCount - 1), v);
+            }),
+        "Tutorial Topic",
+        "Choose which guided walkthrough to launch.",
+        tutorialTopicLabels));
+
+    auto* tutorialHintsProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsShowTutorialHintsOnOpen; },
+            [this](bool enabled)
+            {
+                settingsShowTutorialHintsOnOpen = enabled;
+                applyUiPreferences();
+            }),
+        "Show Tutorial Focus Hints", "Hints");
+    tutorialHintsProp->setTooltip("Show or hide contextual focus hints while tutorial steps run.");
+    settingsTutorial.add(tutorialHintsProp);
+
+    settingsTutorial.add(new ActionButtonPropertyComponent(
+        "Start Tutorial", "Run",
+        "Start the selected tutorial topic immediately.",
+        [this, tutorialTopicKeys]
+        {
+            const int idx = juce::jlimit(0, juce::jmax(0, tutorialTopicKeys.size() - 1), settingsTutorialTopicIndex);
+            juce::String status;
+            if (!startTutorial(tutorialTopicKeys[idx], status))
+            {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Tutorial", status);
+                return;
+            }
+            if (!settingsShowTutorialHintsOnOpen)
+                tutorialFocusHintLabel.setText({}, juce::dontSendNotification);
+        }));
+    settingsTutorial.add(new ActionButtonPropertyComponent(
+        "Tutorial Controls", "Skip Active Tutorial",
+        "Abort the currently running tutorial.",
+        [this]
+        {
+            juce::String status;
+            stopTutorial(true, status);
+        }));
+    addPanelSection(settingsPanel, "Tutorial", settingsTutorial, true);
+
+    juce::Array<juce::PropertyComponent*> settingsTypography;
+    settingsTypography.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsUiTextSize; },
+            [this](int v)
+            {
+                settingsUiTextSize = juce::jlimit(0, 2, v);
+                applyUiPreferences();
+            }),
+        "UI Text Size",
+        "Scale text used across the Dev Panel UI.",
+        { "Small", "Medium", "Large" }));
+    settingsTypography.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsUiTextColourMode; },
+            [this](int v)
+            {
+                settingsUiTextColourMode = juce::jlimit(0, 4, v);
+                applyUiPreferences();
+            }),
+        "UI Text Colour",
+        "Override text colour rendering mode across the Dev Panel.",
+        { "Auto", "High Contrast", "White", "Cyan", "Amber" }));
+    addPanelSection(settingsPanel, "UI Text", settingsTypography, false);
+
+    juce::Array<juce::PropertyComponent*> settingsTheme;
+    settingsTheme.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsThemePreset; },
+            [this](int v)
+            {
+                settingsThemePreset = juce::jlimit(0, 3, v);
+                applyUiPreferences();
+            }),
+        "Theme Preset",
+        "Select overall Dev Panel theme behavior.",
+        { "Engine Adaptive", "Classic Hacker", "Neutral Studio", "High Contrast" }));
+    settingsTheme.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsAccentSource; },
+            [this](int v)
+            {
+                settingsAccentSource = juce::jlimit(0, 1, v);
+                applyUiPreferences();
+            }),
+        "Accent Source",
+        "Use active engine accent or force a manual accent color.",
+        { "Follow Engine", "Manual Accent" }));
+    settingsTheme.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsManualAccent; },
+            [this](int v)
+            {
+                settingsManualAccent = juce::jlimit(0, 4, v);
+                applyUiPreferences();
+            }),
+        "Manual Accent Colour",
+        "Accent used when Accent Source is set to Manual.",
+        { "Green", "Blue", "Red", "Purple", "Black" }));
+    addPanelSection(settingsPanel, "Theme", settingsTheme, false);
+
+    juce::Array<juce::PropertyComponent*> settingsAccessibility;
+    settingsAccessibility.add(makeChoice(
+        makeIntValue(
+            [this] { return settingsColourVisionMode; },
+            [this](int v)
+            {
+                settingsColourVisionMode = juce::jlimit(0, 3, v);
+                applyUiPreferences();
+            }),
+        "Colour Vision Mode",
+        "Adjust accent rendering to improve readability for common colour-vision profiles.",
+        { "Off", "Deuteranopia Assist", "Protanopia Assist", "Tritanopia Assist" }));
+
+    auto* reducedMotionProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsReducedMotion; },
+            [this](bool enabled)
+            {
+                settingsReducedMotion = enabled;
+                applyUiPreferences();
+            }),
+        "Reduce Motion", "Reduce");
+    reducedMotionProp->setTooltip("Use calmer tutorial/focus animations.");
+    settingsAccessibility.add(reducedMotionProp);
+
+    auto* largeTargetsProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsLargeHitTargets; },
+            [this](bool enabled)
+            {
+                settingsLargeHitTargets = enabled;
+                applyUiPreferences();
+            }),
+        "Large Hit Targets", "Large");
+    largeTargetsProp->setTooltip("Use larger minimum row target heights for inspector controls.");
+    settingsAccessibility.add(largeTargetsProp);
+
+    auto* focusRingProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsStrongFocusRing; },
+            [this](bool enabled)
+            {
+                settingsStrongFocusRing = enabled;
+                applyUiPreferences();
+            }),
+        "Strong Focus Ring", "Strong");
+    focusRingProp->setTooltip("Increase control focus outline contrast.");
+    settingsAccessibility.add(focusRingProp);
+
+    auto* showScopeHintProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsShowScopeHintLine; },
+            [this](bool enabled)
+            {
+                settingsShowScopeHintLine = enabled;
+                applyUiPreferences();
+            }),
+        "Show Scope Hint", "Show");
+    showScopeHintProp->setTooltip("Show or hide the active scope hint line under Active Profile.");
+    settingsAccessibility.add(showScopeHintProp);
+    addPanelSection(settingsPanel, "Accessibility", settingsAccessibility, false);
+
+    const std::array<int, 4> consoleLinePresets { 300, 600, 1000, 2000 };
+    const auto getConsoleLinePresetIndex = [consoleLinePresets](int lines) -> int
+    {
+        int bestIndex = 0;
+        int bestDistance = std::abs(lines - consoleLinePresets[0]);
+        for (int i = 1; i < static_cast<int>(consoleLinePresets.size()); ++i)
+        {
+            const int distance = std::abs(lines - consoleLinePresets[static_cast<size_t>(i)]);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    };
+
+    juce::Array<juce::PropertyComponent*> settingsConsole;
+    auto* consoleAutoScrollProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsConsoleAutoScroll; },
+            [this](bool enabled)
+            {
+                settingsConsoleAutoScroll = enabled;
+                applyUiPreferences();
+            }),
+        "Console Auto-Scroll", "Auto");
+    consoleAutoScrollProp->setTooltip("Automatically scroll Console output to newest lines.");
+    settingsConsole.add(consoleAutoScrollProp);
+
+    auto* consoleTimestampsProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsConsoleTimestamps; },
+            [this](bool enabled)
+            {
+                settingsConsoleTimestamps = enabled;
+                applyUiPreferences();
+            }),
+        "Console Timestamps", "Time");
+    consoleTimestampsProp->setTooltip("Prefix Console output lines with current clock time.");
+    settingsConsole.add(consoleTimestampsProp);
+
+    auto* consoleWrapProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsConsoleWrapLines; },
+            [this](bool enabled)
+            {
+                settingsConsoleWrapLines = enabled;
+                applyUiPreferences();
+            }),
+        "Console Wrap Long Lines", "Wrap");
+    consoleWrapProp->setTooltip("Wrap long console lines instead of horizontal clipping.");
+    settingsConsole.add(consoleWrapProp);
+
+    settingsConsole.add(makeChoice(
+        makeIntValue(
+            [this, getConsoleLinePresetIndex]
+            {
+                return getConsoleLinePresetIndex(settingsConsoleMaxLines);
+            },
+            [this, consoleLinePresets](int v)
+            {
+                const int clamped = juce::jlimit(0, static_cast<int>(consoleLinePresets.size()) - 1, v);
+                settingsConsoleMaxLines = consoleLinePresets[static_cast<size_t>(clamped)];
+                applyUiPreferences();
+            }),
+        "Console Max Lines",
+        "Maximum retained output lines in Validation / Console.",
+        { "300", "600", "1000", "2000" }));
+    addPanelSection(settingsPanel, "Validation Console", settingsConsole, false);
+
+    juce::Array<juce::PropertyComponent*> settingsSafety;
+    auto* confirmResetProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsConfirmResetFactory; },
+            [this](bool enabled) { settingsConfirmResetFactory = enabled; }),
+        "Confirm Factory Reset", "Confirm");
+    confirmResetProp->setTooltip("Require confirmation before Reset to Factory executes.");
+    settingsSafety.add(confirmResetProp);
+
+    auto* confirmDefaultsProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsConfirmSetDefaults; },
+            [this](bool enabled) { settingsConfirmSetDefaults = enabled; }),
+        "Confirm Set Defaults", "Confirm");
+    confirmDefaultsProp->setTooltip("Require confirmation before Set Current as Defaults executes.");
+    settingsSafety.add(confirmDefaultsProp);
+    addPanelSection(settingsPanel, "Safety", settingsSafety, false);
+
+    juce::Array<juce::PropertyComponent*> settingsHelp;
+    settingsHelp.add(new ActionButtonPropertyComponent(
+        "Command Reference", "Open Console Help",
+        "Jump to Validation / Console and print the current help command list.",
+        [this]
+        {
+            selectedRightTab = 5;
+            selectedSubTabs[5] = 2;
+            refreshSecondaryTabButtons();
+            updateActiveProfileLabel();
+            updateRightTabVisibility();
+            resized();
+            if (validationConsoleComponent != nullptr)
+                validationConsoleComponent->submitCommandForTesting("help", false);
+        }));
+    settingsHelp.add(new ActionButtonPropertyComponent(
+        "Website", "Open Site",
+        "Open the Choroboros website in your default browser.",
+        []
+        {
+            juce::URL("https://kaizenstrategic.ai").launchInDefaultBrowser();
+        }));
+    settingsHelp.add(new ActionButtonPropertyComponent(
+        "Feedback", "Send Feedback",
+        "Open the feedback form in your default browser.",
+        []
+        {
+            juce::URL("https://docs.google.com/forms/d/e/1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform")
+                .launchInDefaultBrowser();
+        }));
+    settingsHelp.add(new ActionButtonPropertyComponent(
+        "Support", "Email Support",
+        "Open your default mail client with a prefilled support address.",
+        []
+        {
+            juce::URL("mailto:info@kaizenstrategic.ai?subject=Choroboros%20Dev%20Panel%20Support")
+                .launchInDefaultBrowser();
+        }));
+    addPanelSection(settingsPanel, "Help & Feedback", settingsHelp, false);
+
     for (auto* property : lockableProperties)
     {
         if (property == nullptr)
@@ -969,9 +1355,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         metadataValidationText = "OK: registry is stable; each control maps to visual or explicit no-visual reason.";
 
     setEditingLocked(true);
-    refreshSecondaryTabButtons();
-    updateActiveProfileLabel();
-    updateRightTabVisibility();
+    applyUiPreferences();
     lastKnownEngineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     lastKnownHqState = processor.isHqEnabled();
     lastKnownSectionFilter = engineFilterEditor.getText().trim();

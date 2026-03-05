@@ -666,7 +666,7 @@ void DevPanel::resized()
     }
     else if (selectedRightTab == 6)
     {
-        // Settings uses right-column action groups; keep inspector as context-only.
+        layoutPanelOnly(leftX, leftColumnWidth, leftY, settingsPanel, compactSection);
     }
 
     if (selectedRightTab == 0)
@@ -805,7 +805,10 @@ void DevPanel::updateActiveProfileLabel()
 
     activeProfileLabel.setColour(juce::Label::textColourId, profileAccent);
     devEngineModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
-    styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(colorIndex));
+    const int selectorAccentIndex = (settingsAccentSource == 1)
+        ? juce::jlimit(0, 4, settingsManualAccent)
+        : colorIndex;
+    styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
     styleHackerToggleButton(devHqModeToggle);
     styleHackerTextButton(copyJsonButton, false);
     styleHackerTextButton(saveDefaultsButton, false);
@@ -1029,6 +1032,8 @@ void DevPanel::updateRightTabVisibility()
     layoutBlackPanel.setVisible(showLayoutBlack);
     activeProfileLabel.setVisible(true);
     activeScopeHintLabel.setVisible(true);
+    if (!settingsShowScopeHintLine)
+        activeScopeHintLabel.setVisible(false);
     devEngineModeLabel.setVisible(true);
     devEngineModeBox.setVisible(true);
     devHqModeToggle.setVisible(true);
@@ -1045,6 +1050,7 @@ void DevPanel::updateRightTabVisibility()
     validationVisualDeck.setVisible(showValidation);
     settingsTitle.setVisible(showSettings);
     settingsDescription.setVisible(showSettings);
+    settingsPanel.setVisible(showSettings);
     layoutTitle.setVisible(showLookFeel);
     layoutDescription.setVisible(showLookFeel);
     inspectorTitle.setVisible(true);
@@ -1075,6 +1081,7 @@ void DevPanel::updateRightTabVisibility()
     setAllSectionsEnabled(tonePanel, showTone);
     setAllSectionsEnabled(enginePanel, showEngine);
     setAllSectionsEnabled(validationPanel, showValidation);
+    setAllSectionsEnabled(settingsPanel, showSettings);
     setAllSectionsEnabled(mappingPanel, showLookFeelMapping);
     setAllSectionsEnabled(uiPanel, showLookFeelUi);
     setAllSectionsEnabled(layoutGlobalPanel, showLookFeelGlobalLayout);
@@ -1093,6 +1100,8 @@ void DevPanel::updateRightTabVisibility()
         openAllSections(tonePanel);
     if (showValidation)
         openAllSections(validationPanel);
+    if (showSettings)
+        openAllSections(settingsPanel);
     const auto* activeInternalsPanel = showEngine ? getActiveEngineInternalsPanel() : nullptr;
     auto setInternalsEnabled = [&](juce::PropertyPanel& panel)
     {
@@ -1159,6 +1168,155 @@ void DevPanel::updateRightTabVisibility()
     tabSettingsButton.setToggleState(showSettings, juce::dontSendNotification);
 
     updateAnalyzerDemandFromVisibility();
+}
+
+void DevPanel::applyUiPreferences()
+{
+    const float uiTextScale = (settingsUiTextSize <= 0 ? 0.90f : (settingsUiTextSize >= 2 ? 1.18f : 1.0f));
+    setDevPanelUserTextScale(uiTextScale);
+    setDevPanelTextColourMode(settingsUiTextColourMode);
+    setDevPanelThemePreset(settingsThemePreset);
+    setDevPanelAccentSource(settingsAccentSource);
+    setDevPanelManualAccentIndex(settingsManualAccent);
+    setDevPanelColourVisionMode(settingsColourVisionMode);
+    setDevPanelReducedMotion(settingsReducedMotion);
+    setDevPanelLargeHitTargets(settingsLargeHitTargets);
+    setDevPanelStrongFocusRing(settingsStrongFocusRing);
+
+    const int currentEngine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+    setCurrentEngineSkinColour(currentEngine);
+    getDevPanelThemeLookAndFeel().refreshThemeColours();
+    getDevPanelSectionLookAndFeel().refreshThemeColours();
+    sendLookAndFeelChange();
+
+    auto styleTitleLabel = [](juce::Label& label)
+    {
+        label.setFont(makeTitleFont(Typography::title, true));
+        label.setColour(juce::Label::textColourId, hackerText());
+    };
+    auto styleDescriptionLabel = [](juce::Label& label)
+    {
+        label.setFont(makeLabelFont(Typography::description, false));
+        label.setColour(juce::Label::textColourId, hackerTextDim());
+    };
+
+    styleTitleLabel(mappingTitle);
+    styleDescriptionLabel(mappingDescription);
+    styleTitleLabel(uiTitle);
+    styleDescriptionLabel(uiDescription);
+    styleTitleLabel(overviewTitle);
+    styleDescriptionLabel(overviewDescription);
+    styleTitleLabel(modulationTitle);
+    styleDescriptionLabel(modulationDescription);
+    styleTitleLabel(toneTitle);
+    styleDescriptionLabel(toneDescription);
+    styleTitleLabel(engineTitle);
+    styleDescriptionLabel(engineDescription);
+    styleTitleLabel(validationTitle);
+    styleDescriptionLabel(validationDescription);
+    styleTitleLabel(internalsTitle);
+    styleDescriptionLabel(internalsDescription);
+    styleTitleLabel(bbdTitle);
+    styleDescriptionLabel(bbdDescription);
+    styleTitleLabel(tapeTitle);
+    styleDescriptionLabel(tapeDescription);
+    styleTitleLabel(layoutTitle);
+    styleDescriptionLabel(layoutDescription);
+    styleTitleLabel(settingsTitle);
+    styleDescriptionLabel(settingsDescription);
+    styleTitleLabel(inspectorTitle);
+    styleDescriptionLabel(inspectorDescription);
+
+    activeProfileLabel.setFont(makeLabelFont(Typography::description, false));
+    activeScopeHintLabel.setFont(makeLabelFont(Typography::description, false));
+    devEngineModeLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    engineFilterLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    tutorialStepLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    tutorialTitleLabel.setFont(makeLabelFont(Typography::title, true));
+    tutorialFocusHintLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    tutorialBodyText.setFont(makeLabelFont(Typography::description, false));
+    engineFilterEditor.setFont(makeLabelFont(Typography::labelSmall, false));
+
+    const int selectorAccentIndex = (settingsAccentSource == 1)
+        ? juce::jlimit(0, 4, settingsManualAccent)
+        : currentEngine;
+    styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
+    styleHackerToggleButton(devHqModeToggle);
+    styleHackerTextButton(copyJsonButton, false);
+    styleHackerTextButton(saveDefaultsButton, false);
+    styleHackerTextButton(resetFactoryButton, false);
+    styleHackerTextButton(lockToggleButton, false);
+    styleHackerTextButton(fxPresetOffButton, false);
+    styleHackerTextButton(fxPresetSubtleButton, false);
+    styleHackerTextButton(fxPresetMediumButton, false);
+    styleHackerTextButton(engineFilterClearButton, false);
+    styleHackerTextButton(tutorialNextButton, false);
+    styleHackerTextButton(tutorialNextSectionButton, false);
+    styleHackerTextButton(tutorialSkipButton, false);
+    styleHackerEditor(engineFilterEditor);
+
+    if (validationConsoleComponent != nullptr)
+    {
+        validationConsoleComponent->setAutoScroll(settingsConsoleAutoScroll);
+        validationConsoleComponent->setShowTimestamps(settingsConsoleTimestamps);
+        validationConsoleComponent->setWrapLongLines(settingsConsoleWrapLines);
+        validationConsoleComponent->setMaxOutputLines(settingsConsoleMaxLines);
+    }
+
+    const int minRowHeight = settingsLargeHitTargets ? 46 : 38;
+    const auto enforceMinRowHeight = [minRowHeight](juce::PropertyPanel& panel)
+    {
+        auto* root = panel.getChildComponent(0);
+        if (root == nullptr)
+            return;
+        std::function<void(juce::Component&)> walk = [&](juce::Component& c)
+        {
+            if (auto* prop = dynamic_cast<juce::PropertyComponent*>(&c))
+            {
+                if (prop->getPreferredHeight() <= 50)
+                    prop->setPreferredHeight(minRowHeight);
+            }
+            for (int i = 0; i < c.getNumChildComponents(); ++i)
+                walk(*c.getChildComponent(i));
+        };
+        walk(*root);
+    };
+
+    enforceMinRowHeight(mappingPanel);
+    enforceMinRowHeight(uiPanel);
+    enforceMinRowHeight(overviewPanel);
+    enforceMinRowHeight(modulationPanel);
+    enforceMinRowHeight(tonePanel);
+    enforceMinRowHeight(enginePanel);
+    enforceMinRowHeight(validationPanel);
+    enforceMinRowHeight(settingsPanel);
+    enforceMinRowHeight(internalsGreenNqPanel);
+    enforceMinRowHeight(internalsGreenHqPanel);
+    enforceMinRowHeight(internalsBlueNqPanel);
+    enforceMinRowHeight(internalsBlueHqPanel);
+    enforceMinRowHeight(internalsRedNqPanel);
+    enforceMinRowHeight(internalsRedHqPanel);
+    enforceMinRowHeight(internalsPurpleNqPanel);
+    enforceMinRowHeight(internalsPurpleHqPanel);
+    enforceMinRowHeight(internalsBlackNqPanel);
+    enforceMinRowHeight(internalsBlackHqPanel);
+    enforceMinRowHeight(bbdPanel);
+    enforceMinRowHeight(tapePanel);
+    enforceMinRowHeight(layoutGlobalPanel);
+    enforceMinRowHeight(layoutTextAnimationPanel);
+    enforceMinRowHeight(layoutGreenPanel);
+    enforceMinRowHeight(layoutBluePanel);
+    enforceMinRowHeight(layoutRedPanel);
+    enforceMinRowHeight(layoutPurplePanel);
+    enforceMinRowHeight(layoutBlackPanel);
+
+    updateActiveProfileLabel();
+    refreshSecondaryTabButtons();
+    updateRightTabVisibility();
+    if (tutorialActive)
+        applyTutorialStep();
+    resized();
+    repaint();
 }
 
 bool DevPanel::isPropertyVisibleInViewport(const juce::PropertyComponent* property) const
@@ -1228,7 +1386,9 @@ void DevPanel::timerCallback()
     if (tutorialActive)
     {
         ++tutorialPulseTick;
-        const float pulse = 0.55f + 0.45f * std::sin(static_cast<float>(tutorialPulseTick) * 0.24f);
+        const float pulse = isDevPanelReducedMotionEnabled()
+            ? 0.92f
+            : (0.55f + 0.45f * std::sin(static_cast<float>(tutorialPulseTick) * 0.24f));
         tutorialFocusHighlight.setPulseAlpha(pulse);
         layoutTutorialOverlay();
         updateTutorialHighlight();
@@ -1385,6 +1545,7 @@ void DevPanel::timerCallback()
         || panelHeightDrifted(tonePanel, kPanelAutoPadding)
         || panelHeightDrifted(enginePanel, kPanelAutoPadding)
         || panelHeightDrifted(validationPanel, kPanelAutoPadding)
+        || panelHeightDrifted(settingsPanel, kPanelAutoPadding)
         || panelHeightDrifted(internalsGreenNqPanel, kPanelAutoPadding)
         || panelHeightDrifted(internalsGreenHqPanel, kPanelAutoPadding)
         || panelHeightDrifted(internalsBlueNqPanel, kPanelAutoPadding)
@@ -1610,7 +1771,10 @@ void DevPanel::applyTutorialStep()
     tutorialTitleLabel.setText(step.title, juce::dontSendNotification);
     tutorialBodyText.setText(step.body, juce::dontSendNotification);
     tutorialBodyText.setCaretPosition(0);
-    tutorialFocusHintLabel.setText(step.focusHint.isNotEmpty() ? ("Focus: " + step.focusHint) : juce::String(),
+    const juce::String focusHintText = settingsShowTutorialHintsOnOpen
+        ? (step.focusHint.isNotEmpty() ? ("Focus: " + step.focusHint) : juce::String())
+        : juce::String();
+    tutorialFocusHintLabel.setText(focusHintText,
                                    juce::dontSendNotification);
     tutorialNextButton.setButtonText(finalStep ? "Got It" : "Next");
     tutorialNextSectionButton.setEnabled(hasNextSection);
