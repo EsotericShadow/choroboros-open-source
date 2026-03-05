@@ -43,6 +43,21 @@ Write-Check -Label "msbuild in PATH" -Ok $hasMsbuild
 $cmakePresets = Join-Path $repoRoot "CMakePresets.json"
 Write-Check -Label "CMakePresets.json present" -Ok (Test-Path $cmakePresets)
 
+$windowsFactoryDefaults = Join-Path $repoRoot "windows\windows_factory_defaults.json"
+$factoryDefaultsJsonValid = $false
+if (Test-Path $windowsFactoryDefaults) {
+    try {
+        $rawJson = Get-Content -Raw -Path $windowsFactoryDefaults
+        if (-not [string]::IsNullOrWhiteSpace($rawJson)) {
+            $null = $rawJson | ConvertFrom-Json
+            $factoryDefaultsJsonValid = $true
+        }
+    } catch {
+        $factoryDefaultsJsonValid = $false
+    }
+}
+Write-Check -Label "windows_factory_defaults.json valid JSON" -Ok $factoryDefaultsJsonValid
+
 $juceLocal = Join-Path $repoRoot "JUCE\CMakeLists.txt"
 $hasLocalJuce = Test-Path $juceLocal
 Write-Check -Label "Local JUCE tree present" -Ok $hasLocalJuce
