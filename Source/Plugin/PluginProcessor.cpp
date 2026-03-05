@@ -18,6 +18,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "BinaryData.h"
 #include "../DSP/ChorusDSP.h"
 #include "../Config/DefaultsPersistence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
