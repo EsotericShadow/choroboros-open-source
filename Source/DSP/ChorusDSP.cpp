@@ -32,24 +32,75 @@
 #include "../Cores/black_engine_linear/ChorusCoreLinearEnsemble.h"
 #include <cmath>
 
+namespace
+{
+choroboros::CoreId legacyCoreIdForSlot(int colorIndex, bool hqEnabled)
+{
+    switch (juce::jlimit(0, 4, colorIndex))
+    {
+        case 0: return hqEnabled ? choroboros::CoreId::lagrange5 : choroboros::CoreId::lagrange3;
+        case 1: return hqEnabled ? choroboros::CoreId::thiran : choroboros::CoreId::cubic;
+        case 2: return hqEnabled ? choroboros::CoreId::tape : choroboros::CoreId::bbd;
+        case 3: return hqEnabled ? choroboros::CoreId::orbit : choroboros::CoreId::phase_warp;
+        case 4: default: return hqEnabled ? choroboros::CoreId::ensemble : choroboros::CoreId::linear;
+    }
+}
+
+std::unique_ptr<ChorusCore> createCoreForId(choroboros::CoreId coreId)
+{
+    switch (coreId)
+    {
+        case choroboros::CoreId::lagrange3: return std::make_unique<ChorusCoreLagrange3rd>();
+        case choroboros::CoreId::lagrange5: return std::make_unique<ChorusCoreLagrange5th>();
+        case choroboros::CoreId::cubic: return std::make_unique<ChorusCoreCubic>();
+        case choroboros::CoreId::thiran: return std::make_unique<ChorusCoreThiran>();
+        case choroboros::CoreId::bbd: return std::make_unique<ChorusCoreBBD>();
+        case choroboros::CoreId::tape: return std::make_unique<ChorusCoreTape>();
+        case choroboros::CoreId::phase_warp: return std::make_unique<ChorusCorePhaseWarped>();
+        case choroboros::CoreId::orbit: return std::make_unique<ChorusCoreOrbit>();
+        case choroboros::CoreId::linear: return std::make_unique<ChorusCoreLinear>();
+        case choroboros::CoreId::ensemble: return std::make_unique<ChorusCoreLinearEnsemble>();
+        case choroboros::CoreId::count: break;
+    }
+
+    return std::make_unique<ChorusCoreLagrange3rd>();
+}
+}
+
 ChorusDSP::ChorusDSP()
 {
     // Pre-create all engine/HQ core variants to avoid heap allocation on the audio thread.
-    coreVariants[getCoreVariantIndex(0, false)] = std::make_unique<ChorusCoreLagrange3rd>();
-    coreVariants[getCoreVariantIndex(0, true)]  = std::make_unique<ChorusCoreLagrange5th>();
-    coreVariants[getCoreVariantIndex(1, false)] = std::make_unique<ChorusCoreCubic>();
-    coreVariants[getCoreVariantIndex(1, true)]  = std::make_unique<ChorusCoreThiran>();
-    coreVariants[getCoreVariantIndex(2, false)] = std::make_unique<ChorusCoreBBD>();
-    coreVariants[getCoreVariantIndex(2, true)]  = std::make_unique<ChorusCoreTape>();
-    coreVariants[getCoreVariantIndex(3, false)] = std::make_unique<ChorusCorePhaseWarped>();
-    coreVariants[getCoreVariantIndex(3, true)]  = std::make_unique<ChorusCoreOrbit>();
-    coreVariants[getCoreVariantIndex(4, false)] = std::make_unique<ChorusCoreLinear>();
-    coreVariants[getCoreVariantIndex(4, true)]  = std::make_unique<ChorusCoreLinearEnsemble>();
+    for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+    {
+        for (int mode = 0; mode < choroboros::kEngineModeCount; ++mode)
+        {
+            const bool hqEnabled = (mode == 1);
+            const choroboros::CoreId legacyCore = legacyCoreIdForSlot(engine, hqEnabled);
+            coreVariants[static_cast<size_t>(getCoreVariantIndex(engine, hqEnabled))] = createCoreForId(legacyCore);
+        }
+    }
+
+    // Build a fully prewarmed modular pool: each slot/mode gets all assignable cores.
+    for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+    {
+        for (int mode = 0; mode < choroboros::kEngineModeCount; ++mode)
+        {
+            for (std::size_t coreIndex = 0; coreIndex < kNumAssignableCores; ++coreIndex)
+            {
+                const auto coreId = static_cast<choroboros::CoreId>(coreIndex);
+                modularCorePool[static_cast<size_t>(engine)]
+                              [static_cast<size_t>(mode)]
+                              [coreIndex] = createCoreForId(coreId);
+            }
+        }
+    }
 
     // Start with Green Normal (Lagrange3rd)
     currentColorIndex = 0;
     currentQualityHQ = false;
-    currentCore = coreVariants[getCoreVariantIndex(currentColorIndex, currentQualityHQ)].get();
+    coreAssignments.resetToLegacy();
+    currentCore = resolveCorePointer(currentColorIndex, currentQualityHQ, &currentCoreId);
+    pendingCoreId = currentCoreId;
 }
 
 ChorusDSP::~ChorusDSP()
@@ -317,6 +368,12 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     for (auto& core : coreVariants)
         if (core)
             core->prepare(spec, this);
+
+    for (auto& perEngine : modularCorePool)
+        for (auto& perMode : perEngine)
+            for (auto& core : perMode)
+                if (core)
+                    core->prepare(spec, this);
     
     ChorusDSPPrepare::prepareLFOs(*this, spec);
     ChorusDSPPrepare::prepareBuffers(*this, spec);
@@ -371,6 +428,12 @@ void ChorusDSP::reset()
     for (auto& core : coreVariants)
         if (core)
             core->reset();
+
+    for (auto& perEngine : modularCorePool)
+        for (auto& perMode : perEngine)
+            for (auto& core : perMode)
+                if (core)
+                    core->reset();
     
     lfo.reset();
     lfoCos.reset();
@@ -410,6 +473,8 @@ void ChorusDSP::reset()
     lastLfoAmplitude = 0.0f;
     previousCore = nullptr;
     pendingCore = nullptr;
+    currentCore = resolveCorePointer(currentColorIndex, currentQualityHQ, &currentCoreId);
+    pendingCoreId = currentCoreId;
 
     std::fill(greenWetLPState.begin(), greenWetLPState.end(), 0.0f);
     std::fill(blueWetHPState.begin(), blueWetHPState.end(), 0.0f);
@@ -472,6 +537,13 @@ float ChorusDSP::mapRateToEngineRange(float normalizedRate) const
 float ChorusDSP::mapDepthToEngineRange(float normalizedDepth) const
 {
     // Map normalized depth (0-1) to engine-specific ranges
+    if (modularCoreModeEnabled)
+    {
+        if (descriptorForResolvedCore().depthCompression)
+            return normalizedDepth * 0.45f;
+        return normalizedDepth;
+    }
+
     if (currentColorIndex == 3) // Purple
     {
         // For Purple: map 0-1 (0-100% UI) to 0-0.45 (0-45% actual depth)
@@ -758,13 +830,15 @@ void ChorusDSP::setMix(float mix_)
 
 void ChorusDSP::switchCore(int colorIndex, bool hq)
 {
-    const int variantIndex = getCoreVariantIndex(colorIndex, hq);
-    ChorusCore* newCore = coreVariants[variantIndex].get();
+    choroboros::CoreId resolvedCoreId = choroboros::CoreId::lagrange3;
+    ChorusCore* newCore = resolveCorePointer(colorIndex, hq, &resolvedCoreId);
     if (newCore == nullptr)
         return;
 
     if (newCore == currentCore)
     {
+        currentCoreId = resolvedCoreId;
+        pendingCoreId = resolvedCoreId;
         pendingCore = nullptr;
         coreSwitchTargetCrossfadeSamples = 0;
         coreSwitchWarmupSamplesRemaining = 0;
@@ -773,24 +847,45 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
         return;
     }
     if (newCore == pendingCore)
+    {
+        pendingCoreId = resolvedCoreId;
         return;
+    }
 
-    const auto variantForCore = [this](const ChorusCore* corePtr) -> int
+    const auto slotForCore = [this](const ChorusCore* corePtr) -> int
     {
         if (corePtr == nullptr)
             return -1;
-        for (int i = 0; i < kNumEngineVariants; ++i)
+
+        for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
         {
-            if (coreVariants[static_cast<size_t>(i)].get() == corePtr)
-                return i;
+            for (int mode = 0; mode < choroboros::kEngineModeCount; ++mode)
+            {
+                const bool slotHq = mode == 1;
+                const int slotIndex = getCoreVariantIndex(engine, slotHq);
+                if (coreVariants[static_cast<std::size_t>(slotIndex)].get() == corePtr)
+                    return getCoreVariantIndex(engine, slotHq);
+
+                for (std::size_t coreIndex = 0; coreIndex < kNumAssignableCores; ++coreIndex)
+                {
+                    if (modularCorePool[static_cast<std::size_t>(engine)]
+                                       [static_cast<std::size_t>(mode)]
+                                       [coreIndex]
+                            .get() == corePtr)
+                    {
+                        return slotIndex;
+                    }
+                }
+            }
         }
         return -1;
     };
 
-    const int currentVariantIndex = variantForCore(currentCore);
-    const bool engineFamilySwitch = (currentVariantIndex >= 0) && ((currentVariantIndex / 2) != (variantIndex / 2));
-    const bool qualityToggleOnly = (currentVariantIndex >= 0) && ((currentVariantIndex / 2) == (variantIndex / 2))
-                                   && ((currentVariantIndex % 2) != (variantIndex % 2));
+    const int currentSlotIndex = slotForCore(currentCore);
+    const int requestedSlotIndex = getCoreVariantIndex(colorIndex, hq);
+    const bool engineFamilySwitch = (currentSlotIndex >= 0) && ((currentSlotIndex / 2) != (requestedSlotIndex / 2));
+    const bool qualityToggleOnly = (currentSlotIndex >= 0) && ((currentSlotIndex / 2) == (requestedSlotIndex / 2))
+                                   && ((currentSlotIndex % 2) != (requestedSlotIndex % 2));
 
     const float rateJumpNorm = juce::jlimit(0.0f, 1.0f,
         std::abs(smoothedRate.getTargetValue() - smoothedRate.getCurrentValue()) / 20.0f);
@@ -829,6 +924,7 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     coreSwitchOldBasePhaseRad = lastBaseLfoPhaseRad;
     coreSwitchOldLfoAmplitude = lastLfoAmplitude;
     pendingCore = newCore;
+    pendingCoreId = resolvedCoreId;
 
     if (spec.sampleRate > 0.0)
     {
@@ -841,6 +937,7 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     else
     {
         currentCore = pendingCore;
+        currentCoreId = pendingCoreId;
         pendingCore = nullptr;
         coreSwitchCrossfadeTotalSamples = 0;
         coreSwitchCrossfadeSamplesRemaining = 0;
@@ -851,4 +948,118 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
         coreSwitchOldParamsSnapshotValid = false;
         previousCore = nullptr;
     }
+}
+
+void ChorusDSP::setModularCoreModeEnabled(bool enabled)
+{
+    if (modularCoreModeEnabled == enabled)
+        return;
+
+    modularCoreModeEnabled = enabled;
+    switchCore(currentColorIndex, currentQualityHQ);
+}
+
+void ChorusDSP::setCoreAssignments(const choroboros::CoreAssignmentTable& assignments)
+{
+    coreAssignments = assignments;
+    if (modularCoreModeEnabled)
+        switchCore(currentColorIndex, currentQualityHQ);
+}
+
+bool ChorusDSP::setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId)
+{
+    const int safeEngine = juce::jlimit(0, 4, colorIndex);
+    const std::size_t coreIndex = static_cast<std::size_t>(coreId);
+    const choroboros::CoreId safeCoreId = coreIndex < choroboros::coreIdCount()
+        ? coreId
+        : legacyCoreIdForSlot(safeEngine, hqEnabled);
+
+    const bool duplicate = choroboros::assignmentIsDuplicate(coreAssignments, safeEngine, hqEnabled, safeCoreId);
+    coreAssignments.set(safeEngine, hqEnabled, safeCoreId);
+
+    if (modularCoreModeEnabled && safeEngine == currentColorIndex && hqEnabled == currentQualityHQ)
+        switchCore(currentColorIndex, currentQualityHQ);
+
+    return duplicate;
+}
+
+std::vector<choroboros::SlotAssignment> ChorusDSP::getDuplicateAssignmentWarnings() const
+{
+    std::vector<choroboros::SlotAssignment> warnings;
+    for (std::size_t i = 0; i < choroboros::coreIdCount(); ++i)
+    {
+        const auto coreId = static_cast<choroboros::CoreId>(i);
+        const auto assignments = choroboros::findAssignmentsForCore(coreAssignments, coreId);
+        if (assignments.size() > 1)
+            warnings.insert(warnings.end(), assignments.begin(), assignments.end());
+    }
+    return warnings;
+}
+
+choroboros::CoreId ChorusDSP::getAssignedCoreId(int colorIndex, bool hqEnabled) const
+{
+    return coreAssignments.get(colorIndex, hqEnabled);
+}
+
+choroboros::CoreId ChorusDSP::getResolvedCoreId(int colorIndex, bool hqEnabled) const
+{
+    if (!modularCoreModeEnabled)
+        return legacyCoreIdForSlot(colorIndex, hqEnabled);
+    return coreAssignments.get(colorIndex, hqEnabled);
+}
+
+choroboros::CoreId ChorusDSP::getCurrentResolvedCoreId() const
+{
+    if (currentCore != nullptr)
+        return currentCoreId;
+    return getResolvedCoreId(currentColorIndex, currentQualityHQ);
+}
+
+const choroboros::CorePackageDescriptor& ChorusDSP::getCurrentCoreDescriptor() const
+{
+    return choroboros::descriptorForCore(getCurrentResolvedCoreId());
+}
+
+const std::array<choroboros::CorePackageDescriptor, choroboros::coreIdCount()>& ChorusDSP::getCorePackageDescriptors()
+{
+    return choroboros::kCorePackageDescriptors;
+}
+
+const choroboros::CorePackageDescriptor& ChorusDSP::getCorePackageDescriptor(choroboros::CoreId coreId)
+{
+    return choroboros::descriptorForCore(coreId);
+}
+
+ChorusCore* ChorusDSP::resolveCorePointer(int colorIndex, bool hqEnabled, choroboros::CoreId* outCoreId)
+{
+    const int safeEngine = juce::jlimit(0, 4, colorIndex);
+    const int safeMode = hqEnabled ? 1 : 0;
+
+    if (modularCoreModeEnabled)
+    {
+        const choroboros::CoreId assigned = coreAssignments.get(safeEngine, hqEnabled);
+        std::size_t coreIndex = static_cast<std::size_t>(assigned);
+        if (coreIndex >= kNumAssignableCores)
+            coreIndex = static_cast<std::size_t>(legacyCoreIdForSlot(safeEngine, hqEnabled));
+
+        if (outCoreId != nullptr)
+            *outCoreId = static_cast<choroboros::CoreId>(coreIndex);
+
+        auto* core = modularCorePool[static_cast<std::size_t>(safeEngine)]
+                                     [static_cast<std::size_t>(safeMode)]
+                                     [coreIndex]
+                         .get();
+        if (core != nullptr)
+            return core;
+    }
+
+    const choroboros::CoreId legacyId = legacyCoreIdForSlot(safeEngine, hqEnabled);
+    if (outCoreId != nullptr)
+        *outCoreId = legacyId;
+    return coreVariants[static_cast<size_t>(getCoreVariantIndex(safeEngine, hqEnabled))].get();
+}
+
+const choroboros::CorePackageDescriptor& ChorusDSP::descriptorForResolvedCore() const
+{
+    return choroboros::descriptorForCore(getCurrentResolvedCoreId());
 }

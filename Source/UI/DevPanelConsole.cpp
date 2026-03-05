@@ -139,6 +139,22 @@ bool parseOnOffToken(const juce::String& token, bool& valueOut)
     return false;
 }
 
+bool parseModeToken(const juce::String& token, bool& hqEnabledOut)
+{
+    const auto lower = token.trim().toLowerCase();
+    if (lower == "hq")
+    {
+        hqEnabledOut = true;
+        return true;
+    }
+    if (lower == "nq")
+    {
+        hqEnabledOut = false;
+        return true;
+    }
+    return false;
+}
+
 template <typename Fn>
 void forEachRuntimeTuningValue(const ChorusDSP::RuntimeTuning& tuning, Fn&& fn)
 {
@@ -545,6 +561,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         editor.applyLayout();
         selectedRightTab = juce::jlimit(0, 6, snapshot.selectedTab);
         selectedSubTabs = snapshot.selectedSubTabs;
+        markLazyUiStateDirty();
         consoleBypassActive = snapshot.bypassActive;
         consoleBypassStoredMixRaw = snapshot.bypassStoredMix;
         consoleSoloActive = snapshot.soloActive;
@@ -728,8 +745,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             return true;
         }
 
-        refreshAllPanels();
-        repaint();
+        lockable.refresh();
 
         auto* lockablePtr = &lockable;
         ConsoleAction actionEntry;
@@ -777,6 +793,8 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             "  hq <on|off>\n"
             "  view <overview|modulation|tone|engine|layout|validation|settings>\n"
             "  bypass <on|off>\n"
+            "  slot show\n"
+            "  slot set <green|blue|red|purple|black> <nq|hq> <core_id>\n"
             "  solo <node>\n"
             "  unsolo\n"
             "Parameter Tuning:\n"
@@ -810,6 +828,8 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             "  stats\n"
             "  list <color> [all] [full]\n"
             "  list globals [full]\n"
+            "  core list\n"
+            "  core show <id>\n"
             "  export script\n"
             "  import script\n"
             "  alias <name> <command>\n"
@@ -935,6 +955,184 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         return result;
     }
 
+    if (action == "core")
+    {
+        if (tokens.size() < 2)
+        {
+            result.output = "ERROR: usage: core <list|show>";
+            return result;
+        }
+
+        const juce::String op = tokens[1].toLowerCase();
+        if (op == "list")
+        {
+            juce::StringArray lines;
+            lines.add("Assignable cores:");
+            const auto& descriptors = ChorusDSP::getCorePackageDescriptors();
+            for (const auto& descriptor : descriptors)
+            {
+                lines.add("  " + juce::String(descriptor.token)
+                          + "  [" + juce::String(descriptor.displayName) + "]"
+                          + "  macros=" + juce::String(descriptor.macroLabel));
+            }
+            lines.add("Duplicate policy: warn but allow.");
+            result.output = lines.joinIntoString("\n");
+            return result;
+        }
+
+        if (op == "show")
+        {
+            if (tokens.size() < 3)
+            {
+                result.output = "ERROR: usage: core show <core_id>";
+                return result;
+            }
+
+            choroboros::CoreId coreId = choroboros::CoreId::lagrange3;
+            const juce::String token = tokens[2].trim().toLowerCase();
+            bool parsed = choroboros::parseCoreIdToken(token.toStdString(), coreId);
+            if (!parsed && token.containsOnly("0123456789"))
+            {
+                const int idx = token.getIntValue();
+                if (idx >= 0 && idx < static_cast<int>(choroboros::coreIdCount()))
+                {
+                    coreId = static_cast<choroboros::CoreId>(idx);
+                    parsed = true;
+                }
+            }
+            if (!parsed)
+            {
+                result.output = "ERROR: unknown core id `" + tokens[2] + "`. Use `core list`.";
+                return result;
+            }
+
+            const auto& descriptor = choroboros::descriptorForCore(coreId);
+            const auto assignments = choroboros::findAssignmentsForCore(processor.getCoreAssignments(), coreId);
+            juce::StringArray lines;
+            lines.add("Core: " + juce::String(descriptor.displayName) + " (" + juce::String(descriptor.token) + ")");
+            lines.add("  macro_label=" + juce::String(descriptor.macroLabel));
+            lines.add("  semantics=" + juce::String(descriptor.macroSemantics));
+            lines.add("  notes=" + juce::String(descriptor.notes));
+            lines.add("  assignments=" + juce::String(static_cast<int>(assignments.size())));
+            if (assignments.empty())
+            {
+                lines.add("  (unassigned)");
+            }
+            else
+            {
+                for (const auto& slot : assignments)
+                {
+                    lines.add("  - " + engineNameForIndex(slot.engineColor)
+                              + " " + juce::String(slot.hqEnabled ? "hq" : "nq"));
+                }
+            }
+            result.output = lines.joinIntoString("\n");
+            return result;
+        }
+
+        result.output = "ERROR: usage: core <list|show>";
+        return result;
+    }
+
+    if (action == "slot")
+    {
+        if (tokens.size() < 2)
+        {
+            result.output = "ERROR: usage: slot <show|set>";
+            return result;
+        }
+
+        const juce::String op = tokens[1].toLowerCase();
+        if (op == "show")
+        {
+            const auto& assignments = processor.getCoreAssignments();
+            const int activeEngine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+            const bool activeHq = processor.isHqEnabled();
+            juce::StringArray lines;
+            lines.add("Slot assignments (modular cores " + juce::String(processor.isModularCoresEnabled() ? "on" : "off") + "):");
+            for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+            {
+                for (int mode = 0; mode < choroboros::kEngineModeCount; ++mode)
+                {
+                    const bool hq = mode == 1;
+                    const auto coreId = assignments.get(engine, hq);
+                    const bool activeSlot = (engine == activeEngine && hq == activeHq);
+                    lines.add("  " + juce::String(activeSlot ? "* " : "  ")
+                              + engineNameForIndex(engine)
+                              + " " + juce::String(hq ? "hq" : "nq")
+                              + " -> " + juce::String(choroboros::coreIdToToken(coreId))
+                              + " [" + juce::String(choroboros::coreIdToDisplayName(coreId)) + "]");
+                }
+            }
+            const auto dupes = processor.getDuplicateAssignmentWarnings();
+            if (!dupes.empty())
+                lines.add("WARNING: " + juce::String(static_cast<int>(dupes.size())) + " duplicated slot assignments currently active (allowed).");
+            result.output = lines.joinIntoString("\n");
+            return result;
+        }
+
+        if (op == "set")
+        {
+            if (tokens.size() < 5)
+            {
+                result.output = "ERROR: usage: slot set <green|blue|red|purple|black> <nq|hq> <core_id>";
+                return result;
+            }
+
+            const int engineIndex = parseEngineIndexToken(tokens[2]);
+            if (engineIndex < 0)
+            {
+                result.output = "ERROR: invalid engine. Use: green, blue, red, purple, black.";
+                return result;
+            }
+
+            bool hqEnabled = false;
+            if (!parseModeToken(tokens[3], hqEnabled))
+            {
+                result.output = "ERROR: invalid mode. Use nq or hq.";
+                return result;
+            }
+
+            choroboros::CoreId coreId = choroboros::CoreId::lagrange3;
+            const juce::String coreToken = tokens[4].trim().toLowerCase();
+            bool parsed = choroboros::parseCoreIdToken(coreToken.toStdString(), coreId);
+            if (!parsed && coreToken.containsOnly("0123456789"))
+            {
+                const int idx = coreToken.getIntValue();
+                if (idx >= 0 && idx < static_cast<int>(choroboros::coreIdCount()))
+                {
+                    coreId = static_cast<choroboros::CoreId>(idx);
+                    parsed = true;
+                }
+            }
+            if (!parsed)
+            {
+                result.output = "ERROR: unknown core id `" + tokens[4] + "`. Use `core list`.";
+                return result;
+            }
+
+            const bool duplicate = choroboros::assignmentIsDuplicate(processor.getCoreAssignments(), engineIndex, hqEnabled, coreId);
+            runSnapshotAction("slot set " + engineNameForIndex(engineIndex) + " " + (hqEnabled ? "hq" : "nq"),
+                              [this, engineIndex, hqEnabled, coreId]
+            {
+                processor.setCoreAssignment(engineIndex, hqEnabled, coreId);
+                updateActiveProfileLabel();
+                updateRightTabVisibility();
+                resized();
+                repaint();
+            });
+
+            result.output = juce::String(duplicate ? "WARNING: duplicate core assignment applied: " : "Applied: ")
+                          + engineNameForIndex(engineIndex) + " " + juce::String(hqEnabled ? "hq" : "nq")
+                          + " -> " + juce::String(choroboros::coreIdToToken(coreId))
+                          + " [" + juce::String(choroboros::coreIdToDisplayName(coreId)) + "]";
+            return result;
+        }
+
+        result.output = "ERROR: usage: slot <show|set>";
+        return result;
+    }
+
     if (action == "engine")
     {
         if (tokens.size() < 2)
@@ -1033,6 +1231,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             selectedSubTabs[static_cast<size_t>(targetTab)] =
                 juce::jlimit(0, juce::jmax(0, getSubTabCount(targetTab) - 1),
                              selectedSubTabs[static_cast<size_t>(targetTab)]);
+            markLazyUiStateDirty();
             refreshSecondaryTabButtons();
             updateActiveProfileLabel();
             updateRightTabVisibility();
@@ -1533,8 +1732,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         binding->previousValue = oldValue;
         binding->hasPreviousValue = true;
         binding->lastKnownValue = newValue;
-        refreshAllPanels();
-        repaint();
+        lockable->refresh();
 
         ConsoleAction historyAction;
         historyAction.label = "reset " + binding->slug;
@@ -1577,8 +1775,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         }
 
         lockable->setLocked(shouldLock);
-        refreshAllPanels();
-        repaint();
+        lockable->refresh();
 
         ConsoleAction historyAction;
         historyAction.label = action + " " + binding->slug;

@@ -20,6 +20,7 @@
 
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_basics/juce_audio_basics.h>
+#include "CoreAssignments.h"
 #include <atomic>
 #include <array>
 #include <memory>
@@ -170,6 +171,18 @@ public:
     void setEngineColor(int colorIndex); // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     void setQualityEnabled(bool enabled); // false=Normal, true=HQ
     void setMix(float mix); // 0.0 to 1.0 (dry/wet mix)
+    void setModularCoreModeEnabled(bool enabled);
+    bool isModularCoreModeEnabled() const { return modularCoreModeEnabled; }
+    void setCoreAssignments(const choroboros::CoreAssignmentTable& assignments);
+    const choroboros::CoreAssignmentTable& getCoreAssignments() const { return coreAssignments; }
+    bool setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId);
+    std::vector<choroboros::SlotAssignment> getDuplicateAssignmentWarnings() const;
+    choroboros::CoreId getAssignedCoreId(int colorIndex, bool hqEnabled) const;
+    choroboros::CoreId getResolvedCoreId(int colorIndex, bool hqEnabled) const;
+    choroboros::CoreId getCurrentResolvedCoreId() const;
+    const choroboros::CorePackageDescriptor& getCurrentCoreDescriptor() const;
+    static const std::array<choroboros::CorePackageDescriptor, choroboros::coreIdCount()>& getCorePackageDescriptors();
+    static const choroboros::CorePackageDescriptor& getCorePackageDescriptor(choroboros::CoreId coreId);
 
     RuntimeTuning& getRuntimeTuning() { return runtimeTuning; }
     const RuntimeTuning& getRuntimeTuning() const { return runtimeTuning; }
@@ -191,7 +204,8 @@ public:
     friend class ChoroborosAudioProcessor;
 
 private:
-    static constexpr int kNumEngineVariants = 10;
+    static constexpr int kNumEngineVariants = choroboros::kEngineColorCount * choroboros::kEngineModeCount;
+    static constexpr std::size_t kNumAssignableCores = choroboros::coreIdCount();
     static int getCoreVariantIndex(int colorIndex, bool hq) { return juce::jlimit(0, 4, colorIndex) * 2 + (hq ? 1 : 0); }
 
     struct RuntimeTuningSnapshot
@@ -321,10 +335,17 @@ private:
     ChorusCore* previousCore = nullptr;
     ChorusCore* pendingCore = nullptr;
     std::array<std::unique_ptr<ChorusCore>, kNumEngineVariants> coreVariants;
+    std::array<std::array<std::array<std::unique_ptr<ChorusCore>, kNumAssignableCores>,
+                          choroboros::kEngineModeCount>,
+               choroboros::kEngineColorCount> modularCorePool;
     
     // Engine selection state
     int currentColorIndex = 0; // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     bool currentQualityHQ = false; // false=Normal, true=HQ
+    bool modularCoreModeEnabled = false;
+    choroboros::CoreAssignmentTable coreAssignments;
+    choroboros::CoreId currentCoreId = choroboros::CoreId::lagrange3;
+    choroboros::CoreId pendingCoreId = choroboros::CoreId::lagrange3;
     bool coreSwitchCrossfadeActive = false;
     int coreSwitchCrossfadeSamplesRemaining = 0;
     int coreSwitchCrossfadeTotalSamples = 0;
@@ -344,6 +365,8 @@ private:
     
     // Create and switch to a new core based on color and quality
     void switchCore(int colorIndex, bool hq);
+    ChorusCore* resolveCorePointer(int colorIndex, bool hqEnabled, choroboros::CoreId* outCoreId);
+    const choroboros::CorePackageDescriptor& descriptorForResolvedCore() const;
     
     // Oscillators for LFO generation
     juce::dsp::Oscillator<float> lfo;  // Sine LFO for left channel

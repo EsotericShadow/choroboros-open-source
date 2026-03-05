@@ -60,6 +60,7 @@ target_sources(Choroboros PRIVATE
     Source/DSP/ChorusDSPProcess.h
     
     # Chorus cores
+    Source/DSP/CoreAssignments.h
     Source/Cores/ChorusCore.h
     Source/Cores/green_engine_classic/ChorusCoreLagrange3rd.cpp
     Source/Cores/green_engine_classic/ChorusCoreLagrange3rd.h

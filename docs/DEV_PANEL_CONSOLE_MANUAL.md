@@ -1,172 +1,234 @@
-# Choroboros Dev Panel: Console & Tutorials Manual
+# Choroboros Dev Panel: Interactive Console Manual
 
-Welcome to the Choroboros Dev Panel. This interface is built for power users, sound designers, and educators who want to modify the internal DSP mathematics of the plugin, trace signal flow, and learn about the analog-modeled components.
+*Version: 2.02.2-beta*
+*Audience: Shell Enthusiasts, Headless Automated Testers, and Preset Designers.*
 
-At the heart of the Dev Panel is the **Interactive Console**, located at the bottom of the Validation tab (and globally accessible via keyboard focus).
+Welcome to the command-line documentation for the **Choroboros Dev Panel**. If the standard interface of Choroboros is a simple 6-knob pedal, and the Dev Panel UI is an aircraft cockpit, then the **Interactive Console** is raw access to the flight computer's C++ shell memory.
 
-The console features a highly optimized C++ parser string-matching engine with aliasing, fuzzy search, latency telemetry, and deep introspection commands.
-
----
-
-## 1. Parameter Slugification (The "Target")
-
-To make setting parameters fast from the keyboard, all internal properties are mapped to a lowercase **slug** format. 
-The parser removes special characters and converts spaces to underscores.
-
-**Examples:**
-* `"Rate Smooth (ms)"` ➔ `rate_smooth`
-* `"Green Bloom Cutoff Max (Hz)"` ➔ `green_bloom_cutoff_max`
-* `"Tape Drive Scale"` ➔ `tape_drive_scale`
-
-### Global vs. Engine-Specific Scoping
-If a parameter is completely specific to an engine (like `bbd_stages` or `purple_orbit_eccentricity`), it will only appear in the `list` output for that specific engine.
-If a parameter applies across all engines (like `rate_smooth` or `hpf_cutoff_hz`), it is considered a global.
-
-*Tip: If you don't know a parameter's slug, use the `search <term>` or `list <color>` commands.*
+ *(If you are looking for documentation regarding the visual graphs, mapping structures, and inspector panes, please see `DEV_PANEL_MANUAL.md`).*
 
 ---
 
-## 2. Command Dictionary
-
-The console parses space-separated commands. Hit `Enter` to execute, and use the `Up Arrow` to cycle through your command history.
-
-### 2.1 Engine & Plugin State
-These commands modify the macro-level state of the plugin and UI context.
-
-| Command | Action | Example | Detailed Behavior |
-| :--- | :--- | :--- | :--- |
-| `engine <color>` | Sets active engine. | `engine purple` | Immediately swaps the DSP profile. Colors: `green`, `blue`, `red`, `purple`, `black`. Safe to execute during audio playback; applies transactional crossfades to prevent zippering. |
-| `hq <on/off>` | Toggles HQ mode. | `hq on` | Flips between the two algorithms built into every engine (e.g., Red NQ is BBD, Red HQ is Tape). |
-| `view <tab_name>` | Switches right-column. | `view tape` | Valid tabs include: `overview`, `modulation`, `tone`, `engine`, `layout`, `validation`, `settings`, or specific sub-tabs like `bbd` or `tape`. |
-| `bypass <on/off>` | Globally bypasses. | `bypass on` | Hard bypasses all DSP. The plugin outputs 100% dry signal. |
-| `solo <node>` | Mutes all other paths. | `solo bbd_left` | Forces the DSP matrix to only pass the exact node string provided. Use `unsolo` to revert. |
-| `unsolo` | Reverts solo routing. | `unsolo` | Restores normal DSP matrix execution paths. |
-
-### 2.2 Parameter Tuning & Automation
-These commands dictate the underlying mathematical behavior of the DSP engine and UI sliders.
-
-| Command | Action | Example | Detailed Behavior |
-| :--- | :--- | :--- | :--- |
-| `set <target> <val>` | Sets a float/int value. | `set bbd_depth 12.5` | Bypasses UI scaling and writes the exact floating point value to the parameter memory. |
-| `add <target> <val>` | Relative increase. | `add bbd_depth 2.0` | Takes the current value and mathematically adds `<val>` to it. Useful for bumping filter cutoffs. |
-| `sub <target> <val>` | Relative decrease. | `sub rate_smooth 5` | Takes the current value and mathematically subtracts `<val>` from it. |
-| `toggle <target>` | Flips boolean param. | `toggle tape_enabled` | If a parameter is 0, it becomes 1. If 1, it becomes 0. Fast way to flip switches. |
-| `sweep <target> <start> <end> <ms>` | Smooth automation over time. | `sweep tape_drive 0 10 5000` | Asynchronously interpolates the parameter from the start value to the end value over the specified milliseconds (`ms`). The console updates at GUI refresh rate. Can be aborted by manually setting the parameter or typing another `sweep` on the same target. |
-| `macro <name> <0-100>` | Simulates turning master knob. | `macro depth 75` | Maps onto the 6 master plugin knobs: `rate`, `depth`, `offset`, `width`, `color`, `mix`. Pass an integer 0 through 100 representing percentage. |
-| `get <target>` | Prints current/previous value. | `get hpf_cutoff_hz` | Outputs the current exact float value AND tracks the value from before the last change. |
-| `reset <target>` | Restores a single parameter. | `reset green_bloom_gain` | Snaps a targeted internal to the hardcoded factory default C++ schema value. |
-| `reset all` | Nuke and pave everything. | `reset all` | Instantly resets **all** tuning, internal, and layout values to factory defaults. Use with caution. |
-| `lock <target>` | Prevents UI modification. | `lock tape_drive` | Disables the UI slider for the target. Changes can still be forced via console `set` commands. |
-| `unlock <target>` | Re-enables UI modification. | `unlock tape_drive` | Re-enables interaction with the slider. |
-
-### 2.3 History & Undos
-The console tracks every single parameter touch (via UI or Console) up to 256 actions deep.
-
-| Command | Action | Example | Detailed Behavior |
-| :--- | :--- | :--- | :--- |
-| `undo` | Reverts last action. | `undo` | Restores the snapshot from before the last parameter adjustment or engine switch. |
-| `undo <n>` | Reverts `n` actions. | `undo 3` | Undoes the last three actions in sequence. |
-| `redo` | Restores undone action. | `redo` | Redoes the parameter adjustment or engine switch. |
-| `redo <n>` | Restores `n` actions. | `redo 2` | Redoes the last two undone actions in sequence. |
-| `history` | Prints history log. | `history` | Outputs a numbered, chronological list of your recent touches and console commands. |
-
-### 2.4 Deep Introspection & Telemetry
-These commands extract data from the running DSP without modifying audio.
-
-| Command | Action | Example | Detailed Behavior |
-| :--- | :--- | :--- | :--- |
-| `dump <color>` | Prints all internal values. | `dump green` | Iterates over the memory block and prints every parameter value registered to the requested engine. |
-| `diff factory` | Prints modified parameters. | `diff factory` | Runs a background cache check against the C++ default schema and prints ONLY parameters in the active engine that have been altered. |
-| `search <term>` | Fuzzy search parameters. | `search delay` | Searches all slugs and display names and prints matches along with their current running value. |
-| `watch <target>` | Pins telemetry HUD. | `watch lfo1_rate` | Pins the target property to the top edge of the console window. It updates at 30 fps to reflect live changes. Max 6 pins shown, unlimited tracked in background. |
-| `unwatch <target>` | Un-pins telemetry HUD. | `unwatch lfo1_rate` | Removes the parameter from the HUD. |
-| `stats` | Perf/CPU Telemetry. | `stats` | Prints real-time tracking of DSP block execution times, engine profile swap counts, LFO phase integrators, and callback allocations. Vital for profiling. |
-| `list <color>` | Formatted param list. | `list purple` | Prints all parameters categorized under an engine. Returns paged outputs by default. |
-| `list <color> full` | Bypasses paging caps. | `list purple full` | Prints the unabridged list of all parameters. |
-| `list globals` | Shared param list. | `list globals` | Prints parameters that affect the entire plugin (e.g., Pre-Emphasis EQ, Master Compressors). |
-
-### 2.5 Utilities & Scripting
-These commands manage Dev Panel preferences, exports, and custom aliases.
-
-| Command | Action | Example | Detailed Behavior |
-| :--- | :--- | :--- | :--- |
-| `alias <name> <command>` | Registers a custom shortcut. | `alias panic reset all` | Maps `name` to execute `command`. Future calls to `panic` will run `reset all`. |
-| `export script` | Generates a preset script. | `export script` | Compiles every modified parameter into a newline-separated list of `set <target> <val>` commands. Copies output instantly to system clipboard. |
-| `import script` | Executes a batch script. | `import script` | Triggers a file selector dialog to load and execute a `.txt` or `.choroscript` batch, setting all state instantly. |
-| `cp json` | JSON export. | `cp json` | Dumps the Dev Panel's exact memory tree state into a minified JSON object and copies to system clipboard. |
-| `save defaults` | Modifies startup state. | `save defaults` | Writes your exact current configuration to disk. Every time the plugin is newly instantiated, it will load these tuning values instead of factory ones. |
-| `fx <0/1/2>` | Globals layout preset. | `fx 2` | 0 = Flat graphics, 1 = Animations On, 2 = Heavy Glassmorphism. |
-| `clear` | Clears console text. | `clear` | Deletes the visual log output. |
-| `help` | Prints cheat sheet. | `help` | Outputs the condensed quick-reference list of all commands. |
+## Table of Contents
+1.  **Architecture & Parsing Mechanics**
+    *   1.1 The Lexer Pipeline
+    *   1.2 Command Verification & Aliasing
+    *   1.3 Fuzzy Path Execution
+2.  **State Transactions (Macro Limits)**
+    *   2.1 `engine` & `hq` hot swapping
+    *   2.2 Bypassing UI Visuals (`view`)
+3.  **Property Tuning Commands**
+    *   3.1 The `set`, `add`, and `sub` triad
+    *   3.2 `toggle` boundaries
+    *   3.3 Background Automations (`sweep`)
+    *   3.4 UI Locking
+4.  **Deep Introspection Utilities**
+    *   4.1 Readout parsing (`get`, `list`, `search`)
+    *   4.2 `stats`: The Telemetry Matrix
+    *   4.3 Visual `watch` HUD pinning
+    *   4.4 The `dump` and `diff factory` engines
+5.  **History Transactions**
+    *   5.1 Atomic `undo` / `redo`
+    *   5.2 Command `history` memory buffer
+6.  **I/O Scripting (`.choroscript`)**
+    *   6.1 Serialization: `export script` and `cp json`
+    *   6.2 Instantiation: `import script` and `save defaults`
+7.  **The Interactive Tutorial Engine**
+    *   7.1 Running sequential HUD layers
+    *   7.2 Granular Topic Indexes
+8.  **The Master Index: All Parameter Slugs**
+    *   8.1 Globals
+    *   8.2 Engine Specific Architectures (BBD, Tape, Orbit, Fast-Fourier Transforms)
 
 ---
 
-## 3. The Interactive Tutorial System
+## 1. Architecture & Parsing Mechanics
 
-To teach users the fundamentals of DSP and analog circuitry modeling, we built a fully interactive guided tutorial system overlay. 
+The Interactive Console sits at the literal bottom of the `Validation` tab window. You can focus it by clicking the black text box directly above the parameter slug definitions. 
 
-The tutorial system automatically routes you to the correct tabs, highlights specific UI components, forces engine configurations, and provides step-by-step explanatory HUDs.
+### 1.1 The Lexer Pipeline
+The interactive console evaluates commands space-separated inputs. It relies heavily on standard parsing: 
+1. The user presses `Enter`.
+2. The UI pushes the input string to the central C++ message thread.
+3. The parser tokenizes the string by whitespaces (`" "`, `"\t"`).
+4. The FIRST argument (`tokens[0]`) is the **Action**.
+5. Following arguments are interpreted based on the designated Action signature.
 
-**Core Commands:**
-* `tutorial` — Starts the 6-module master walk-through.
-* `tutorial next` — Advances to the next instructional step.
-* `tutorial next section` — Skips the current granular lesson and jumps to the next major tutorial section.
-* `tutorial exit` (or `skip`) — Instantly aborts the active tutorial.
+### 1.2 Command Verification & Aliasing
+Before parsing Actions, the system runs an Alias check up to 8 levels deep.
+If you type `alias wipe reset all`, the system maps the string `wipe` to the execution queue `reset all`.
+To protect the app from recursive crash loops (e.g. `alias wipe destroy`, `alias destroy wipe`), the parser tracks visited aliases and instantly aborts execution if a loop detects it is consuming its own tail.
 
-### Granular Deep-Dive Lessons
-
-You can trigger specific granular lessons directly from the console at any time:
-
-#### `tutorial bbd` (Bucket-Brigade Lesson)
-Forces the **Red NQ** engine. Walks through:
-1. Bucket-Brigade Stages and memory limits.
-2. Analog clock speeds.
-3. High-frequency aliasing and "Clock Whine" noise induction.
-4. The delicate balance of steep Anti-Alias and Reconstruction Filtering to hide analog artifacts without destroying clarity.
-
-#### `tutorial tape` (Magnetic Tape Lesson)
-Forces the **Red HQ** engine. Walks through:
-1. Physical tape loop concepts.
-2. Wow (slow, mechanical pitch drift from un-rounded tape reels).
-3. Flutter (fast, jittery friction from tape heads).
-4. Tone LPFs to simulate varying ages of magnetic media degradation.
-5. Tape Drive nonlinear saturation curves.
-
-#### `tutorial phase` (Stereo Width Lesson)
-Walks through:
-1. The Modulation visual scope.
-2. Independent Left/Right Dual LFO integrators.
-3. Phase offset alignment.
-4. How 180-degree anti-phase creates massive stereo enveloping and brain localization illusion.
-
-#### `tutorial bimodulation` (Complex Motion Lesson)
-Forces the **Purple NQ (Phase Warp)** engine. Walks through:
-1. Why sine LFOs become predictably fatiguing.
-2. Bi-Modulation theory (multiplying two independent LFOs).
-3. Setting asynchronous speeds (e.g., 1.0Hz and 0.37Hz) to prevent alignment.
-4. Visualizing organic, non-repeating chorus cycles.
-
-#### `tutorial saturation` (Harmonics Lesson)
-Walks through:
-1. Tone Tab transfer curve visualizations.
-2. Contrasting aggressive digital Hard Clipping (Black Engine fuzz) vs analog Soft Clipping (Red Tape Tube-style limiting).
-3. Odd vs Even order harmonic generation.
-
-#### `tutorial envelope` (Dynamics Lesson)
-Forces the **Green HQ (Bloom)** engine. Walks through:
-1. Envelope Follower mechanic theory.
-2. Transients, Attack, and Release detector speeds.
-3. How to dynamically map audio amplitude to LFO depth to make the chorus "breathe" with the performance (ducking during transients, swelling during tails).
-
-*(These tutorials can also be triggered visually from the Setting dropdown menu.)*
+### 1.3 Slugification & Fuzzy Matching
+Every single text-slider and parameter toggle in the Dev Panel memory block has a "Target Slug."
+The C++ system strips the human-readable text `Black HQ Tap2 Delay Offset Base (ms)` through a regex filter converting spaces to underscores and dropping units, generating `black_hq_tap2_delay_offset_base`.
+When you target this slider, you must use this exact syntax. However, the system utilizes fuzzy memory matching; if you misspell a slug slightly, or only type part of the string, it will scan through all 90 parameters and attempt to find a single valid conclusion before rejecting the operation as ambiguous.
 
 ---
 
-## 4. Complete List of Exposable Target Slugs
+## 2. State Transactions (Macro Limits)
 
-Below is the definitive reference for every DSP mapping variable you can access using the `set`, `get`, `add`, `sub`, and `sweep` commands.
+These tools manipulate the bounds of the global plugin algorithm.
 
-### 4.1 Global Tuning & Filtering Variables
+### 2.1 Engine & HQ
+`engine <color>`
+**Parameters:** `green`, `blue`, `red`, `purple`, `black`.
+Instantly purges the running chorus iteration from memory, calculates parameter crossfades to prevent auditory pops, and loads the entire DSP memory structure of the new array.
+*   *Example:* `engine blue` -> Swaps from the default green bloom to the Blue Focus filter algorithm.
+
+`hq <on/off>`
+**Parameters:** `on`, `off`, `true`, `false`, `1`, `0`.
+Dictates the internal precision. In most cases, this drastically alters the backend algorithm.
+*   *Example:* `hq on` while in `engine red` removes the Bucket-Brigade algorithm entirely and mounts the magnetic Tape module.
+
+### 2.2 Routing
+`bypass <on/off>`
+Disengages the plugin instantly. Perfect for A/B critical listening during mix sessions where latency matching is imperative to preventing perception bias.
+
+`solo <node>`
+**Parameters:** String routing destinations (e.g. `bbd_left`, `tape_input`, `black_tap2_mix`).
+Useful for DSP debugging. Cuts audio to all matrices except the specific requested node. Type `unsolo` to revert.
+
+`view <tab_name>`
+Forces the UI to instantly render a specific graphical section. Useful for macro building. (e.g. `view modulation`, `view validation`, `view tape`).
+
+---
+
+## 3. Property Tuning Commands
+
+These functions manipulate exact internal memory values of defined parameters.
+
+### 3.1 The Value Triad (`set`, `add`, `sub`)
+`set <slug> <value>`
+Bypasses the UI completely, ignoring whatever limits are arbitrarily set by the `Min` and `Max` GUI boundaries in the Left Inspector. It forces the true float directly into the AudioProcessor state.
+*   *Example:* `set pre_emphasis_gain 24.5` will push the high-end EQ transient punch to absurd levels.
+
+`add <slug> <value>` / `sub <slug> <value>`
+Relative mathematical shifting. Reads the active value dynamically and performs standard addition or subtraction.
+*   *Example:* If `lpf_cutoff_hz` is currently `1000.0`, running `add lpf_cutoff_hz 500` will smoothly update the active state to `1500.0`.
+
+### 3.2 Toggles Boundaries
+`toggle <slug>`
+Locates any parameter that operates within a strictly boolean 0 or 1 range, reads it, and instantly flips the bit in memory. 
+
+### 3.3 Background Automations
+`sweep <slug> <start_val> <end_val> <duration_in_ms>`
+Executes an asynchronous interpolation sequence. Over the specified milliseconds, it pulls the target slider from Start to End while updating the UI GUI 30 times a second to represent the live sweep.
+*   *Caveat:* If you manually drag a slider or trigger a new `set` command while a `sweep` is running, the interpolation process aborts instantly to respect physical input hierarchy.
+
+`macro <master_knob_name> <percent(0-100)>`
+Simulates a human physically touching the front visual UI. E.g. `macro depth 75` is identical to spinning the Depth knob to 3 o'clock.
+
+### 3.4 UI Locking
+`lock <slug>` / `unlock <slug>`
+Flags the targeted UI Component as read-only. Standard users will not be able to interact with the slider via mouse inputs. Commands like `set` and `sweep` still perfectly modify the internal values regardless of physical view locks.
+
+---
+
+## 4. Deep Introspection Utilities
+
+These tools do not interact with audio parameters. They read back engine state mapping variables to understand memory context.
+
+### 4.1 Readout Tools
+`get <slug>`
+Returns the exact float payload that the variable possesses at this static millisecond, but it ALSO prints whatever the previous value was, giving context to exactly how far a parameter moved during the last interpolation sequence.
+
+`search <substring>` 
+A heavily optimized fuzzy scan matching against both the slugified name AND the formatted "human readable UI label". It prints out all possible conclusions.
+
+`list <engine_target>`
+Accepts `green`, `blue`, `red`, `purple`, `black`, and `globals`. Iterates through the entire registry and outputs the 10-25 variables directly impacting the currently requested algorithm.
+
+### 4.2 Telemetry Engine
+`stats`
+A brutal memory check mapping plugin performance. Prints:
+*   Block Execution Nanosecond durations.
+*   Engine Swap counts (Proving memory persistence logic).
+*   Live Thread-Lock statuses.
+
+### 4.3 Visual Overlays
+`watch <slug>`
+Takes a variable and pins it to a real-time HUD rendering at the very top vertical pixels of the console window. Up to 6 widgets can be concurrently mounted to visually diagnose sweeping interpolation functions in real-time. Use `unwatch <slug>` to rip it off the HUD.
+
+### 4.4 The State Comparators
+`dump <engine_color>`
+Spits the raw values of all active and unactive engine parameters to the console window at once.
+
+`diff factory`
+Takes a memory snapshot of your active plugin, instantiates an invisible duplicate processor loaded with factory C++ defaults on a secondary thread, cross-references them, and prints ONLY the explicit parameters you have altered. Crucial for understanding what caused an un-intended artifact.
+
+`reset <slug>`
+Using the same secondary thread check, maps the exact payload of the factory algorithm into your selected widget payload variables, immediately restoring the parameter. Or, use `reset all` to completely wipe your session configuration.
+
+---
+
+## 5. History Transactions
+
+Every `set`, `add`, or UI drag triggers an `Atomic Change Gesture`. The console logs these inside a massive 256-step array structure.
+
+### 5.1 The `undo` Stack
+`undo`
+Reverts your plugin strictly back to the state of the active payload immediately proceeding the last `beginChangeGesture()` flag hit.
+
+`undo <integer>`
+A multi-step memory wipe. Iterates deeply through the stack structure, resetting the VST parameters multiple times. (e.g. `undo 5` removes the last 5 operations done). 
+You may also trigger `redo <integer>`. 
+
+### 5.2 Command Visualizer
+`history`
+Outputs the memory stack limits. It specifically differentiates between "Console Text String submissions" and "Visual UI Drag Drop gestures" with accurate atomic timestamps.
+
+---
+
+## 6. I/O Scripting (`.choroscript`)
+
+Because the console acts as an integrated CLI, it makes perfect sense to export complex automation sweeps into text-readable documents.
+
+### 6.1 State Serialization
+`export script`
+The developer payload generator. It walks through all dynamically scoped properties in your plugin, strips out defaults, and builds a massive string array of commands (e.g. `set bbd_depth 12.0 \n engine red \n`).
+It forcefully injects this output into your OS Clipboard. You can paste this text directly into an email or Reddit comment to share custom choruses.
+
+`cp json` 
+An alternative to `export script` focused purely on nested mapping variable architectures instead of CLI lexer texts. Perfect for deep data parsing outside of the application.
+
+### 6.2 State Instantiation
+`import script`
+When triggered, a standard OS File Dialog appears. You can select any standard `.txt` or `.choroscript` file containing new-line separated CLI commands. The Console will lock the parser and run every line at hyper-speed, completely rebuilding the DSP and UI arrays sequentially based on the script rules.
+
+`save defaults`
+A hyper-specific alias of `cp json` that writes the JSON payload directly into `startup_prefs.xml`, replacing the application's base definitions upon boot logic.
+
+---
+
+## 7. The Interactive Tutorial Engine
+
+The console is connected heavily to the UI components. Typing `tutorial` hooks into the top-level View engine and launches the first of 6 hard-coded guided lesson maps.
+
+### 7.1 Map Behaviors
+When running, the HUD automatically invokes `view <tab>` commands, draws vector borders around specific UI elements, forces specific `engine` variables to clarify DSP context, and waits for user interaction before proceeding to the next step.
+
+*   `tutorial next`: Moves to the next component highlight block.
+*   `tutorial next section`: Bypasses granular analysis to hit macro level summaries.
+*   `tutorial skip`: Forcefully terminates the active script logic, dumping the user back into unrestricted dev panel manipulation.
+
+### 7.2 The Topic Index
+You can jump directly into specific lesson maps by supplying the correct path variables:
+1. `tutorial bbd`: Bucket-Brigade Limits & Filtering Constraints.
+2. `tutorial tape`: Mechanical wow/flutter offsets on Magnetic loops.
+3. `tutorial phase`: Dual LFO independent correlation structures.
+4. `tutorial bimodulation`: Asynchronous polynomial rendering on the Purple engine.
+5. `tutorial saturation`: Audio wave-limiting by hard and soft analog clipping architectures on Tone tabs.
+6. `tutorial envelope`: The Green transient follower equations and decay routing models.
+
+---
+
+## 8. The Master Index: All Parameter Slugs
+
+The following lists are completely comprehensive as of `v2.02.2-beta`. Use these exact string titles to affect parameter tuning via console arrays.
+
+### 8.1 Base Globals 
+These impact multi-variable smoothing and core macro routing interpolations.
 * `rate_smoothing_ms`
 * `depth_smoothing_ms`
 * `depth_rate_limit`
@@ -191,7 +253,7 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `compressor_ratio`
 * `saturation_drive_scale`
 
-### 4.2 Green (Classic Bloom) Sub-Parameters
+### 8.2 Green Variables (Classic Bloom) 
 * `green_bloom_exponent`
 * `green_bloom_depth_scale`
 * `green_bloom_centre_offset_ms`
@@ -200,7 +262,7 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `green_bloom_wet_blend`
 * `green_bloom_gain`
 
-### 4.3 Blue (Modern Focus) Sub-Parameters
+### 8.3 Blue Variables (Modern Focus) 
 * `blue_focus_exponent`
 * `blue_focus_hp_min_hz`
 * `blue_focus_hp_max_hz`
@@ -214,7 +276,7 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `blue_focus_wet_blend`
 * `blue_focus_output_gain`
 
-### 4.4 Red (BBD / Analog Tape) Sub-Parameters
+### 8.4 Red Variables (BBD / Analog Tape) 
 * `bbd_delay_smoothing_ms`
 * `bbd_delay_min_ms`
 * `bbd_delay_max_ms`
@@ -254,7 +316,7 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `tape_wet_gain`
 * `tape_hermite_tension`
 
-### 4.5 Purple (Experimental Phase/Orbit) Sub-Parameters
+### 8.5 Purple Variables (Experimental Phase Warp / Orbit) 
 * `purple_warp_a`
 * `purple_warp_b`
 * `purple_warp_k_base`
@@ -269,7 +331,7 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `purple_orbit_stereo_theta_offset`
 * `purple_orbit_delay_smoothing_ms`
 
-### 4.6 Black (Linear / Intensity Ensemble) Sub-Parameters
+### 8.6 Black Variables (Linear / Intensity Ensemble) 
 * `black_nq_depth_base`
 * `black_nq_depth_scale`
 * `black_nq_delay_glide_ms`
@@ -280,7 +342,8 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `black_hq_second_tap_delay_offset_base`
 * `black_hq_second_tap_delay_offset_scale`
 
-### 4.7 UI Settings Variables
+### 8.7 Dev Panel Environment Settings 
+These settings define the accessibility options and rendering layouts bounding the framework logic inside the Dev Panel proper.
 * `settings_tutorial_hints`
 * `settings_ui_text_size`
 * `settings_ui_text_mode`
@@ -298,3 +361,5 @@ Below is the definitive reference for every DSP mapping variable you can access 
 * `settings_show_scope_hint_line`
 * `settings_confirm_reset_factory`
 * `settings_confirm_set_defaults`
+
+*(End of Interactive Console API Manual)*

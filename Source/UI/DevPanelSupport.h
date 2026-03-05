@@ -2045,6 +2045,7 @@ public:
         if (overflow > 0)
             outputLines.removeRange(0, overflow);
         outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
+        outputEditorHasText = !outputLines.isEmpty();
         if (autoScrollEnabled)
             outputEditor.moveCaretToEnd();
     }
@@ -2076,13 +2077,16 @@ public:
         refreshThemeColours();
     }
 
-    ConsoleCommandResult submitCommandForTesting(const juce::String& command, bool recordInHistory = true)
+    ConsoleCommandResult submitCommandForTesting(const juce::String& command,
+                                                 bool recordInHistory = true,
+                                                 bool mirrorToConsoleOutput = false)
     {
         const juce::String trimmed = command.trim();
         if (trimmed.isEmpty())
             return {};
 
-        appendOutputLine("> " + trimmed);
+        if (mirrorToConsoleOutput)
+            appendOutputLine("> " + trimmed);
 
         if (recordInHistory && (commandHistory.isEmpty() || !commandHistory[commandHistory.size() - 1].equalsIgnoreCase(trimmed)))
             commandHistory.add(trimmed);
@@ -2095,9 +2099,14 @@ public:
             result = commandHandler(trimmed);
 
         if (result.clearOutput)
-            outputLines.clear();
+        {
+            if (mirrorToConsoleOutput)
+                clearOutputBuffer();
+            else
+                outputLines.clear();
+        }
 
-        if (result.output.isNotEmpty())
+        if (mirrorToConsoleOutput && result.output.isNotEmpty())
         {
             juce::StringArray lines;
             lines.addLines(result.output);
@@ -2106,7 +2115,8 @@ public:
             appendOutputLines(lines);
         }
 
-        updateHudLine();
+        if (mirrorToConsoleOutput)
+            updateHudLine();
         return result;
     }
 
@@ -2194,7 +2204,7 @@ private:
             result = commandHandler(command);
 
         if (result.clearOutput)
-            outputLines.clear();
+            clearOutputBuffer();
 
         if (result.output.isNotEmpty())
         {
@@ -2251,11 +2261,34 @@ private:
         outputLines.addArray(lines);
         const int overflow = outputLines.size() - maxOutputLines;
         if (overflow > 0)
+        {
             outputLines.removeRange(0, overflow);
+            outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
+            outputEditorHasText = !outputLines.isEmpty();
+        }
+        else
+        {
+            juce::String appended = lines.joinIntoString("\n");
+            if (outputEditorHasText)
+                appended = "\n" + appended;
 
-        outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
+            const bool wasReadOnly = outputEditor.isReadOnly();
+            outputEditor.setReadOnly(false);
+            outputEditor.moveCaretToEnd();
+            outputEditor.insertTextAtCaret(appended);
+            outputEditor.setReadOnly(wasReadOnly);
+            outputEditorHasText = true;
+        }
+
         if (autoScrollEnabled)
             outputEditor.moveCaretToEnd();
+    }
+
+    void clearOutputBuffer()
+    {
+        outputLines.clear();
+        outputEditor.setText({}, juce::dontSendNotification);
+        outputEditorHasText = false;
     }
 
     void updateHudLine()
@@ -2273,6 +2306,7 @@ private:
     juce::StringArray commandHistory;
     int historyCursor = -1;
     int spinnerFrameIndex = 0;
+    bool outputEditorHasText = false;
     bool autoScrollEnabled = true;
     bool showTimestamps = true;
     bool wrapLongLines = true;

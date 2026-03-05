@@ -169,6 +169,19 @@ juce::String DevPanel::buildJson() const
     appendInternalsObject("internalsPurpleHQ", processor.getEngineDspInternals(3, true));
     appendInternalsObject("internalsBlackHQ", processor.getEngineDspInternals(4, true));
 
+    json << "  \"modularCoresEnabled\": " << (processor.isModularCoresEnabled() ? "true" : "false") << ",\n";
+    json << "  \"coreAssignments\": {\n";
+    for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+    {
+        const juce::String engineToken(choroboros::kEngineColorTokens[static_cast<std::size_t>(engine)]);
+        const auto& assignments = processor.getCoreAssignments();
+        json << "    \"" << engineToken << "\": {"
+             << "\"nq\": \"" << juce::String(choroboros::coreIdToToken(assignments.get(engine, false))) << "\""
+             << ", \"hq\": \"" << juce::String(choroboros::coreIdToToken(assignments.get(engine, true))) << "\""
+             << "}" << (engine < choroboros::kEngineColorCount - 1 ? ",\n" : "\n");
+    }
+    json << "  },\n";
+
     json << "  \"engineParamProfiles\": {\n";
     const char* engineKeys[] = { "green", "blue", "red", "purple", "black" };
     for (int i = 0; i < 5; ++i)
@@ -487,6 +500,8 @@ void DevPanel::saveCurrentAsDefaults()
         const bool semanticMatch = !generated.isVoid() && varsEquivalent(generated, roundTrip);
         const bool hasCoreSections = (root != nullptr
             && root->hasProperty("tuning") && root->hasProperty("layout")
+            && root->hasProperty("coreAssignments")
+            && root->hasProperty("modularCoresEnabled")
             && root->hasProperty("engineParamProfiles")
             && root->hasProperty("internalsGreen") && root->hasProperty("internalsGreenHQ")
             && root->hasProperty("internalsBlue") && root->hasProperty("internalsBlueHQ")

@@ -26,16 +26,11 @@ using namespace devpanel;
 
 namespace
 {
-juce::String engineCoreTypeLabel(const int engineIndex, const bool hqEnabled)
+juce::String engineCoreTypeLabel(const ChoroborosAudioProcessor& processor, const int engineIndex, const bool hqEnabled)
 {
-    switch (juce::jlimit(0, 4, engineIndex))
-    {
-        case 0: return hqEnabled ? "Lagrange 5th (HQ)" : "Lagrange 3rd (NQ)";
-        case 1: return hqEnabled ? "Thiran Allpass (HQ)" : "Cubic (NQ)";
-        case 2: return hqEnabled ? "Tape (HQ)" : "BBD (NQ)";
-        case 3: return hqEnabled ? "Orbit (HQ)" : "Phase Warp (NQ)";
-        case 4: default: return hqEnabled ? "Ensemble (HQ)" : "Linear (NQ)";
-    }
+    const int safeEngine = juce::jlimit(0, 4, engineIndex);
+    const auto coreId = processor.getCoreAssignments().get(safeEngine, hqEnabled);
+    return juce::String(choroboros::coreIdToDisplayName(coreId)) + (hqEnabled ? " (HQ)" : " (NQ)");
 }
 }
 
@@ -197,7 +192,7 @@ void DevPanel::buildOverviewTab(DevPanelBuildContext& ctx)
             true
         };
 
-        state.stages[3] = { "Core", engineCoreTypeLabel(engine, hq), true };
+        state.stages[3] = { "Core", engineCoreTypeLabel(processor, engine, hq), true };
 
         state.stages[4] = {
             "Color",
@@ -952,6 +947,65 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
             [](ChorusDSP::RuntimeTuning& rt, float v) { rt.depthRateLimit.store(v); },
             0.01, 5.0, 0.01, 1.0);
     };
+
+    juce::StringArray coreChoiceLabels;
+    juce::Array<juce::var> coreChoiceValues;
+    coreChoiceLabels.ensureStorageAllocated(static_cast<int>(choroboros::coreIdCount()));
+    coreChoiceValues.ensureStorageAllocated(static_cast<int>(choroboros::coreIdCount()));
+    for (std::size_t i = 0; i < choroboros::coreIdCount(); ++i)
+    {
+        const auto coreId = static_cast<choroboros::CoreId>(i);
+        coreChoiceLabels.add(juce::String(choroboros::coreIdToDisplayName(coreId)));
+        coreChoiceValues.add(static_cast<int>(i));
+    }
+
+    auto makeCoreAssignmentChoice = [this, coreChoiceLabels, coreChoiceValues](const juce::String& label, bool hqEnabled) -> juce::PropertyComponent*
+    {
+        auto* prop = new juce::ChoicePropertyComponent(
+            makeIntValue(
+                [this, hqEnabled]
+                {
+                    const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+                    return static_cast<int>(processor.getCoreAssignments().get(engine, hqEnabled));
+                },
+                [this, hqEnabled](int selected)
+                {
+                    const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+                    const int clamped = juce::jlimit(0, static_cast<int>(choroboros::coreIdCount()) - 1, selected);
+                    const auto coreId = static_cast<choroboros::CoreId>(clamped);
+                    processor.setCoreAssignment(engine, hqEnabled, coreId);
+                    updateRightTabVisibility();
+                    resized();
+                    repaint();
+                }),
+            label,
+            coreChoiceLabels,
+            coreChoiceValues);
+        prop->setTooltip("Assign which chorus core algorithm this slot/mode runs. Duplicate assignments are allowed and surfaced as warnings.");
+        return prop;
+    };
+
+    auto buildDuplicateWarningSummary = [this]() -> juce::String
+    {
+        const auto warnings = processor.getDuplicateAssignmentWarnings();
+        if (warnings.empty())
+            return "Duplicate policy: warn but allow.\nNo duplicate core assignments are active.";
+
+        juce::StringArray lines;
+        lines.add("WARNING: duplicate core assignments detected (allowed):");
+        const int maxRows = juce::jmin(12, static_cast<int>(warnings.size()));
+        for (int i = 0; i < maxRows; ++i)
+        {
+            const auto& item = warnings[static_cast<std::size_t>(i)];
+            const juce::String engineName(choroboros::kEngineColorDisplay[static_cast<std::size_t>(juce::jlimit(0, 4, item.engineColor))]);
+            lines.add("  - " + engineName + " " + (item.hqEnabled ? "HQ" : "NQ")
+                      + " -> " + juce::String(choroboros::coreIdToDisplayName(item.coreId)));
+        }
+        if (static_cast<int>(warnings.size()) > maxRows)
+            lines.add("  ... +" + juce::String(static_cast<int>(warnings.size()) - maxRows) + " more");
+        return lines.joinIntoString("\n");
+    };
+
     juce::Array<juce::PropertyComponent*> engineReadouts;
     engineReadouts.add(makeReadOnly("Engine Character", [this]() -> juce::String
     {
@@ -961,25 +1015,20 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     }));
     engineReadouts.add(makeReadOnly("Color Semantics", [this]() -> juce::String
     {
-        switch (processor.getCurrentEngineColorIndex())
-        {
-            case 0: return "Bloom amount + tonal bloom.";
-            case 1: return "Focus amount + presence shaping.";
-            case 2: return processor.isHqEnabled() ? "Tape tone + drive." : "BBD/tape coloration + saturation.";
-            case 3: return processor.isHqEnabled() ? "Orbit eccentricity + rate." : "Warp intensity.";
-            case 4: return processor.isHqEnabled() ? "Ensemble tap behavior." : "Intensity depth/glide.";
-            default: return "Unknown.";
-        }
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+        const auto coreId = processor.getCoreAssignments().get(engine, hq);
+        const auto& descriptor = choroboros::descriptorForCore(coreId);
+        return juce::String(descriptor.macroSemantics) + " (" + juce::String(descriptor.macroLabel) + ")";
     }));
     engineReadouts.add(makeReadOnly("Applicability", [this]() -> juce::String
     {
-        const bool isRedNQ = processor.getCurrentEngineColorIndex() == 2 && !processor.isHqEnabled();
-        const bool isRedHQ = processor.getCurrentEngineColorIndex() == 2 && processor.isHqEnabled();
-        if (isRedNQ)
-            return "BBD active, Tape inactive.";
-        if (isRedHQ)
-            return "Tape active, BBD inactive.";
-        return "Engine-specific non-Red core active.";
+        const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hq = processor.isHqEnabled();
+        const auto coreId = processor.getCoreAssignments().get(engine, hq);
+        const auto& descriptor = choroboros::descriptorForCore(coreId);
+        return juce::String("Core package: ") + descriptor.displayName
+            + " | modular mode: " + (processor.isModularCoresEnabled() ? "on" : "off");
     }));
     setSectionRowHeight(engineReadouts, kRowHeightCompact);
     addFlatPanelGroup(enginePanel, "Active Engine Context (editing target)", engineReadouts);
@@ -1124,16 +1173,17 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         const float mixMapped = juce::jlimit(0.0f, 1.0f,
                                              processor.mapParameterValue(ChoroborosAudioProcessor::MIX_ID,
                                                                          readRawParam(ChoroborosAudioProcessor::MIX_ID)));
-        const bool isRedNQ = engine == 2 && !hq;
-        const bool isRedHQ = engine == 2 && hq;
+        const auto coreId = processor.getCoreAssignments().get(engine, hq);
+        const auto& descriptor = choroboros::descriptorForCore(coreId);
+        const bool driveActive = descriptor.postChorusSaturation || coreId == choroboros::CoreId::tape;
 
         state.modeLabel = names[engine] + (hq ? " HQ" : " NQ");
         state.stages[0] = { "Input", "Audio In", true };
         state.stages[1] = { "Tone", juce::String(rt.preEmphasisFreqHz.load(), 0) + " Hz", true };
         state.stages[2] = { "Filters", juce::String(rt.hpfCutoffHz.load(), 0) + " / " + juce::String(rt.lpfCutoffHz.load(), 0), true };
-        state.stages[3] = { "Core", engineCoreTypeLabel(engine, hq), true };
+        state.stages[3] = { "Core", engineCoreTypeLabel(processor, engine, hq), true };
         state.stages[4] = { "Color", juce::String(colorMapped, 3), true };
-        state.stages[5] = { "Drive", isRedNQ || isRedHQ ? "Active" : "Bypass", isRedNQ || isRedHQ };
+        state.stages[5] = { "Drive", driveActive ? "Active" : "Bypass", driveActive };
         state.stages[6] = { "Output", juce::String(mixMapped * 100.0f, 1) + "% wet", true };
 
         auto toNorm = [](float db)
@@ -1163,44 +1213,50 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     {
         const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
         const bool hq = processor.isHqEnabled();
-        static const juce::String names[] { "Green Bloom", "Blue Focus", "Red Vintage", "Purple Warp/Orbit", "Black Intensity/Ensemble" };
-        juce::String summary;
-        switch (engine)
-        {
-            case 0:
-                summary = "Green Bloom emphasizes organic bloom and tonal spread from the Color macro.";
-                break;
-            case 1:
-                summary = "Blue Focus emphasizes focus/presence shaping for tighter, clearer motion.";
-                break;
-            case 2:
-                summary = hq
-                    ? "Red HQ uses tape-style behavior with smoother tone-drive interaction."
-                    : "Red NQ uses BBD-style behavior with gritty clock/filter personality.";
-                break;
-            case 3:
-                summary = hq
-                    ? "Purple HQ uses orbit-style multi-motion behavior."
-                    : "Purple NQ uses warp-style nonlinear modulation.";
-                break;
-            case 4:
-                summary = hq
-                    ? "Black HQ uses ensemble-style second-tap behavior."
-                    : "Black NQ uses intensity/glide behavior.";
-                break;
-            default:
-                summary = "Unknown engine.";
-                break;
-        }
-
-        return "Mode: " + names[engine] + (hq ? " HQ" : " NQ")
-             + "\n\n" + summary
-             + "\n\nUse this tab for profile identity and main macro control context."
-             + "\n\nUse the next tab (" + getSubTabName(3, 2) + ") for engine-specific macro wiring controls.";
+        const auto coreId = processor.getCoreAssignments().get(engine, hq);
+        const auto& descriptor = choroboros::descriptorForCore(coreId);
+        const juce::String engineName(choroboros::kEngineColorDisplay[static_cast<std::size_t>(engine)]);
+        return "Slot: " + engineName + (hq ? " HQ" : " NQ")
+             + "\nCore: " + juce::String(descriptor.displayName) + " (" + juce::String(descriptor.token) + ")"
+             + "\nMacro Label: " + juce::String(descriptor.macroLabel)
+             + "\nSemantics: " + juce::String(descriptor.macroSemantics)
+             + "\n\n" + juce::String(descriptor.notes)
+             + "\n\nModular cores are " + juce::String(processor.isModularCoresEnabled() ? "enabled" : "disabled")
+             + ". Disable modular mode to force legacy fixed mapping."
+             + "\n\nUse " + getSubTabName(3, 2) + " for engine-specific macro wiring controls.";
     });
     engineIdentityCard->getProperties().set("devpanelSubTab", 1);
     engineIdentityCard->setPreferredHeight(212);
     engineVisuals.add(engineIdentityCard);
+
+    auto* coreAssignmentCard = new HorizontalControlStripCard(
+        "Core Assignment (active engine slot)",
+        "Choose NQ/HQ core packages for the active color slot. Duplicate assignments are allowed and reported as warnings.");
+    coreAssignmentCard->setName("Engine Core Assignment Card");
+    coreAssignmentCard->getProperties().set("devpanelSubTab", 1);
+    coreAssignmentCard->addControl("Modular Cores", new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return processor.isModularCoresEnabled(); },
+            [this](bool enabled)
+            {
+                settingsModularCoresEnabled = enabled;
+                processor.setModularCoresEnabled(enabled);
+                updateRightTabVisibility();
+                resized();
+                repaint();
+            }),
+        "Modular Cores", "Enabled"));
+    coreAssignmentCard->addControl("NQ Core", makeCoreAssignmentChoice("NQ Core", false));
+    coreAssignmentCard->addControl("HQ Core", makeCoreAssignmentChoice("HQ Core", true));
+    engineVisuals.add(coreAssignmentCard);
+
+    auto* duplicateWarningCard = makeMultiLineReadOnly("Core Assignment Warnings", [buildDuplicateWarningSummary]() -> juce::String
+    {
+        return buildDuplicateWarningSummary();
+    });
+    duplicateWarningCard->getProperties().set("devpanelSubTab", 1);
+    duplicateWarningCard->setPreferredHeight(140);
+    engineVisuals.add(duplicateWarningCard);
 
     auto* engineMacroWorkbenchCard = new HorizontalControlStripCard(
         "Engine Macro Workbench (main UI macros)",

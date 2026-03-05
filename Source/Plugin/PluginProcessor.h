@@ -115,6 +115,12 @@ public:
     const ChorusDSP::RuntimeTuning& getDspInternals() const { return chorusDSP->getRuntimeTuning(); }
     ChorusDSP::RuntimeTuning& getEngineDspInternals(int colorIndex, bool hqEnabled = false);
     const ChorusDSP::RuntimeTuning& getEngineDspInternals(int colorIndex, bool hqEnabled = false) const;
+    bool isModularCoresEnabled() const { return modularCoresEnabled; }
+    void setModularCoresEnabled(bool enabled);
+    const choroboros::CoreAssignmentTable& getCoreAssignments() const { return coreAssignments; }
+    void setCoreAssignments(const choroboros::CoreAssignmentTable& assignments);
+    bool setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId);
+    std::vector<choroboros::SlotAssignment> getDuplicateAssignmentWarnings() const;
     int getCurrentEngineColorIndex() const;
     bool isHqEnabled() const;
     const std::array<EngineParamProfile, 5>& getEngineParamProfiles() const { return engineParamProfiles; }
@@ -244,6 +250,8 @@ private:
     std::unique_ptr<ChorusDSP> chorusDSP;
     TuningState tuning;
     std::array<std::array<ChorusDSP::RuntimeTuning, 2>, 5> engineInternals;
+    choroboros::CoreAssignmentTable coreAssignments;
+    bool modularCoresEnabled = false;
     int activeInternalsEngine = 0;
     bool activeInternalsHQ = false;
     

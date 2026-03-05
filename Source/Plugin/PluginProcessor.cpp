@@ -55,6 +55,74 @@ double getNumberOrDefault(const juce::var& objectVar, const juce::Identifier& ke
     return fallback;
 }
 
+juce::var buildCoreAssignmentsVar(const choroboros::CoreAssignmentTable& table)
+{
+    auto* root = new juce::DynamicObject();
+    for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+    {
+        auto* engineNode = new juce::DynamicObject();
+        engineNode->setProperty("nq", juce::String(choroboros::coreIdToToken(table.get(engine, false))));
+        engineNode->setProperty("hq", juce::String(choroboros::coreIdToToken(table.get(engine, true))));
+        root->setProperty(juce::String(choroboros::kEngineColorTokens[static_cast<std::size_t>(engine)]), juce::var(engineNode));
+    }
+    return juce::var(root);
+}
+
+bool parseCoreAssignmentsFromVar(const juce::var& assignmentsVar, choroboros::CoreAssignmentTable& outTable)
+{
+    outTable.resetToLegacy();
+    const auto* root = assignmentsVar.getDynamicObject();
+    if (root == nullptr)
+        return false;
+
+    bool anyLoaded = false;
+    for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+    {
+        const juce::String engineToken(choroboros::kEngineColorTokens[static_cast<std::size_t>(engine)]);
+        const juce::var engineVar = root->getProperty(engineToken);
+        const auto* engineObj = engineVar.getDynamicObject();
+
+        auto parseMode = [&](bool hqEnabled) -> bool
+        {
+            juce::String tokenText;
+            if (engineObj != nullptr)
+            {
+                const juce::Identifier key(hqEnabled ? "hq" : "nq");
+                tokenText = engineObj->getProperty(key).toString().trim();
+            }
+            if (tokenText.isEmpty())
+                tokenText = root->getProperty(engineToken + "_" + (hqEnabled ? "hq" : "nq")).toString().trim();
+            if (tokenText.isEmpty())
+                return false;
+
+            choroboros::CoreId parsed = choroboros::CoreId::lagrange3;
+            if (!choroboros::parseCoreIdToken(tokenText.toStdString(), parsed))
+                return false;
+
+            outTable.set(engine, hqEnabled, parsed);
+            return true;
+        };
+
+        anyLoaded = parseMode(false) || anyLoaded;
+        anyLoaded = parseMode(true) || anyLoaded;
+    }
+
+    return anyLoaded;
+}
+
+juce::String encodeCoreAssignmentsForStateProperty(const choroboros::CoreAssignmentTable& table)
+{
+    return juce::JSON::toString(buildCoreAssignmentsVar(table), false);
+}
+
+bool decodeCoreAssignmentsFromStateProperty(const juce::String& text, choroboros::CoreAssignmentTable& outTable)
+{
+    const auto parsed = juce::JSON::parse(text);
+    if (parsed.isVoid())
+        return false;
+    return parseCoreAssignmentsFromVar(parsed, outTable);
+}
+
 void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeTuning& internals)
 {
     internals.rateSmoothingMs.store(static_cast<float>(getNumberOrDefault(internalsVar, "rateSmoothingMs", internals.rateSmoothingMs.load())));
@@ -422,6 +490,27 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
     if (root == nullptr)
         return;
 
+    choroboros::CoreAssignmentTable loadedAssignments;
+    bool assignmentsLoaded = false;
+    if (root->hasProperty("coreAssignments"))
+        assignmentsLoaded = parseCoreAssignmentsFromVar(root->getProperty("coreAssignments"), loadedAssignments);
+    if (!assignmentsLoaded)
+        loadedAssignments.resetToLegacy();
+    processor.setCoreAssignments(loadedAssignments);
+
+    bool modularEnabled = false;
+    if (root->hasProperty("modularCoresEnabled"))
+    {
+        const auto value = root->getProperty("modularCoresEnabled");
+        if (value.isBool())
+            modularEnabled = static_cast<bool>(value);
+        else if (value.isInt() || value.isInt64() || value.isDouble())
+            modularEnabled = static_cast<double>(value) >= 0.5;
+        else
+            modularEnabled = value.toString().equalsIgnoreCase("true") || value.toString() == "1";
+    }
+    processor.setModularCoresEnabled(modularEnabled);
+
     if (root->hasProperty("tuning"))
     {
         const juce::var tuningVar = root->getProperty("tuning");
@@ -618,6 +707,8 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 {
     initTuningDefaults();
     initializeEngineInternalProfiles();
+    chorusDSP->setCoreAssignments(coreAssignments);
+    chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
     loadPersistedDefaults(*this);
     applyEngineParamProfile(getCurrentEngineColorIndex());
     saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
@@ -1205,6 +1296,54 @@ const ChorusDSP::RuntimeTuning& ChoroborosAudioProcessor::getEngineDspInternals(
     return engineInternals[clampedColor][hqEnabled ? 1 : 0];
 }
 
+void ChoroborosAudioProcessor::setModularCoresEnabled(bool enabled)
+{
+    if (modularCoresEnabled == enabled)
+        return;
+
+    modularCoresEnabled = enabled;
+    if (chorusDSP != nullptr)
+        chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
+}
+
+void ChoroborosAudioProcessor::setCoreAssignments(const choroboros::CoreAssignmentTable& assignments)
+{
+    coreAssignments = assignments;
+    if (chorusDSP != nullptr)
+        chorusDSP->setCoreAssignments(coreAssignments);
+}
+
+bool ChoroborosAudioProcessor::setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId)
+{
+    const int safeEngine = juce::jlimit(0, 4, colorIndex);
+    const std::size_t coreIndex = static_cast<std::size_t>(coreId);
+    const choroboros::CoreId safeCore = coreIndex < choroboros::coreIdCount()
+        ? coreId
+        : coreAssignments.get(safeEngine, hqEnabled);
+
+    const bool duplicate = choroboros::assignmentIsDuplicate(coreAssignments, safeEngine, hqEnabled, safeCore);
+    coreAssignments.set(safeEngine, hqEnabled, safeCore);
+    if (chorusDSP != nullptr)
+        chorusDSP->setCoreAssignment(safeEngine, hqEnabled, safeCore);
+    return duplicate;
+}
+
+std::vector<choroboros::SlotAssignment> ChoroborosAudioProcessor::getDuplicateAssignmentWarnings() const
+{
+    if (chorusDSP != nullptr)
+        return chorusDSP->getDuplicateAssignmentWarnings();
+
+    std::vector<choroboros::SlotAssignment> warnings;
+    for (std::size_t i = 0; i < choroboros::coreIdCount(); ++i)
+    {
+        const auto coreId = static_cast<choroboros::CoreId>(i);
+        const auto assignments = choroboros::findAssignmentsForCore(coreAssignments, coreId);
+        if (assignments.size() > 1)
+            warnings.insert(warnings.end(), assignments.begin(), assignments.end());
+    }
+    return warnings;
+}
+
 int ChoroborosAudioProcessor::getCurrentEngineColorIndex() const
 {
     if (auto* engineColorParam = parameters.getRawParameterValue(ENGINE_COLOR_ID))
@@ -1266,6 +1405,8 @@ juce::AudioProcessorEditor* ChoroborosAudioProcessor::createEditor()
 void ChoroborosAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = parameters.copyState();
+    state.setProperty("modularCoresEnabled", modularCoresEnabled, nullptr);
+    state.setProperty("coreAssignmentsJson", encodeCoreAssignmentsForStateProperty(coreAssignments), nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     copyXmlToBinary (*xml, destData);
 }
@@ -1282,6 +1423,39 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
             parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
             if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
                 lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
+
+            bool restoredModular = false;
+            if (parameters.state.hasProperty("modularCoresEnabled"))
+            {
+                const auto value = parameters.state.getProperty("modularCoresEnabled");
+                if (value.isBool())
+                    restoredModular = static_cast<bool>(value);
+                else if (value.isInt() || value.isInt64() || value.isDouble())
+                    restoredModular = static_cast<double>(value) >= 0.5;
+                else
+                    restoredModular = value.toString().equalsIgnoreCase("true") || value.toString() == "1";
+            }
+            setModularCoresEnabled(restoredModular);
+
+            choroboros::CoreAssignmentTable restoredAssignments;
+            restoredAssignments.resetToLegacy();
+            bool loadedAssignments = false;
+            if (parameters.state.hasProperty("coreAssignmentsJson"))
+            {
+                loadedAssignments = decodeCoreAssignmentsFromStateProperty(
+                    parameters.state.getProperty("coreAssignmentsJson").toString(),
+                    restoredAssignments);
+            }
+            if (parameters.state.hasProperty("coreAssignments"))
+            {
+                loadedAssignments = parseCoreAssignmentsFromVar(
+                    parameters.state.getProperty("coreAssignments"),
+                    restoredAssignments) || loadedAssignments;
+            }
+            if (!loadedAssignments)
+                restoredAssignments.resetToLegacy();
+            setCoreAssignments(restoredAssignments);
+
             stateLoadInProgress = false;
         }
     }
@@ -1351,6 +1525,14 @@ void ChoroborosAudioProcessor::resetToFactoryDefaults()
 
     for (int i = 0; i < 5; ++i)
         engineParamProfiles[static_cast<size_t>(i)] = getEngineDefaults(i);
+
+    coreAssignments.resetToLegacy();
+    modularCoresEnabled = false;
+    if (chorusDSP != nullptr)
+    {
+        chorusDSP->setCoreAssignments(coreAssignments);
+        chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
+    }
 
     const auto setToDefault = [this](const juce::String& parameterId)
     {

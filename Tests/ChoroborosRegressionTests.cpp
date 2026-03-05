@@ -26,6 +26,21 @@ static int g_failCount = 0;
 } while(0)
 
 static bool isFinite(float x) { return std::isfinite(x); }
+static bool assignmentTablesEqual(const choroboros::CoreAssignmentTable& a,
+                                  const choroboros::CoreAssignmentTable& b)
+{
+    for (int engine = 0; engine < choroboros::kEngineColorCount; ++engine)
+    {
+        for (int mode = 0; mode < choroboros::kEngineModeCount; ++mode)
+        {
+            const bool hqEnabled = (mode == 1);
+            if (a.get(engine, hqEnabled) != b.get(engine, hqEnabled))
+                return false;
+        }
+    }
+    return true;
+}
+
 static bool hasNaNOrInf(const juce::AudioBuffer<float>& buf)
 {
     for (int ch = 0; ch < buf.getNumChannels(); ++ch)
@@ -90,6 +105,12 @@ static void testStateRoundTrip()
     auto* rateParam = proc.getParameters()[0];
     if (rateParam) rateParam->setValueNotifyingHost(0.75f);
 
+    proc.setModularCoresEnabled(true);
+    proc.setCoreAssignment(0, false, choroboros::CoreId::tape);
+    proc.setCoreAssignment(1, true, choroboros::CoreId::bbd);
+    proc.setCoreAssignment(3, false, choroboros::CoreId::ensemble);
+    const auto expectedAssignments = proc.getCoreAssignments();
+
     juce::MemoryBlock state2;
     proc.getStateInformation(state2);
 
@@ -99,6 +120,37 @@ static void testStateRoundTrip()
 
     REGRESS_ASSERT(state2.getSize() == state3.getSize(),
         "State round-trip size mismatch");
+    REGRESS_ASSERT(proc.isModularCoresEnabled(), "Modular cores flag was not restored by state round-trip");
+    REGRESS_ASSERT(assignmentTablesEqual(proc.getCoreAssignments(), expectedAssignments),
+                   "Core assignment table changed after state round-trip");
+
+    const bool duplicateApplied = proc.setCoreAssignment(4, true, choroboros::CoreId::tape);
+    REGRESS_ASSERT(duplicateApplied, "Duplicate core assignment should be warned but allowed");
+    const auto duplicateWarnings = proc.getDuplicateAssignmentWarnings();
+    REGRESS_ASSERT(!duplicateWarnings.empty(), "Duplicate assignment warnings should report duplicates");
+
+    std::unique_ptr<juce::XmlElement> xmlState(
+        juce::AudioProcessor::getXmlFromBinary(state2.getData(), static_cast<int>(state2.getSize())));
+    REGRESS_ASSERT(xmlState != nullptr, "Failed to decode XML state for legacy fallback test");
+    if (xmlState != nullptr)
+    {
+        xmlState->removeAttribute("modularCoresEnabled");
+        xmlState->removeAttribute("coreAssignmentsJson");
+
+        juce::MemoryBlock legacyState;
+        juce::AudioProcessor::copyXmlToBinary(*xmlState, legacyState);
+
+        ChoroborosAudioProcessor legacyProc;
+        legacyProc.prepareToPlay(44100.0, 512);
+        legacyProc.setStateInformation(legacyState.getData(), static_cast<int>(legacyState.getSize()));
+
+        choroboros::CoreAssignmentTable legacyExpected;
+        legacyExpected.resetToLegacy();
+        REGRESS_ASSERT(!legacyProc.isModularCoresEnabled(),
+                       "Legacy state without modular flag should restore modular mode as disabled");
+        REGRESS_ASSERT(assignmentTablesEqual(legacyProc.getCoreAssignments(), legacyExpected),
+                       "Legacy state without core assignments should fall back to legacy assignment map");
+    }
 }
 
 static void testMaxBlockChannels()

@@ -31,6 +31,7 @@ DevPanel::~DevPanel()
     if (tooltipWindow != nullptr)
         tooltipWindow->setLookAndFeel(nullptr);
     devEngineModeBox.setLookAndFeel(nullptr);
+    devCoreModeBox.setLookAndFeel(nullptr);
     content.setLookAndFeel(nullptr);
     viewport.setLookAndFeel(nullptr);
     setLookAndFeel(nullptr);
@@ -42,6 +43,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     setLookAndFeel(&getDevPanelThemeLookAndFeel());
     viewport.setLookAndFeel(&getDevPanelThemeLookAndFeel());
     content.setLookAndFeel(&getDevPanelThemeLookAndFeel());
+    settingsModularCoresEnabled = processor.isModularCoresEnabled();
     setCurrentEngineSkinColour(juce::jlimit(0, 4, processor.getCurrentEngineColorIndex()));
     getDevPanelThemeLookAndFeel().refreshThemeColours();
     getDevPanelSectionLookAndFeel().refreshThemeColours();
@@ -142,6 +144,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             selectedSubTabs[static_cast<size_t>(tabIndex)] =
                 juce::jlimit(0, juce::jmax(0, getSubTabCount(tabIndex) - 1),
                              selectedSubTabs[static_cast<size_t>(tabIndex)]);
+            markLazyUiStateDirty();
             refreshSecondaryTabButtons();
             updateActiveProfileLabel();
             updateRightTabVisibility();
@@ -174,6 +177,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         {
             const int maxSubTab = juce::jmax(0, getSubTabCount(selectedRightTab) - 1);
             selectedSubTabs[static_cast<size_t>(selectedRightTab)] = juce::jlimit(0, maxSubTab, subTabIndex);
+            markLazyUiStateDirty();
             refreshSecondaryTabButtons();
             updateActiveProfileLabel();
             updateRightTabVisibility();
@@ -297,6 +301,40 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         repaint();
     };
 
+    devCoreModeLabel.setText("Core", juce::dontSendNotification);
+    devCoreModeLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    devCoreModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
+    devCoreModeLabel.setJustificationType(juce::Justification::centredLeft);
+    devCoreModeLabel.setTooltip("Assign the active core package for the selected Profile + HQ/NQ slot.");
+
+    for (std::size_t i = 0; i < choroboros::coreIdCount(); ++i)
+    {
+        const auto coreId = static_cast<choroboros::CoreId>(i);
+        const juce::String coreLabel(choroboros::coreIdToToken(coreId));
+        devCoreModeBox.addItem(coreLabel, static_cast<int>(i) + 1);
+    }
+    devCoreModeBox.setTooltip("Assign active slot core. List includes all 10 core packages (duplicates warn but are allowed).");
+    devCoreModeBox.onChange = [this]
+    {
+        if (suppressDevModeControlCallbacks)
+            return;
+
+        const int selectedCoreIndex =
+            juce::jlimit(0, static_cast<int>(choroboros::coreIdCount()) - 1, devCoreModeBox.getSelectedId() - 1);
+        const auto selectedCore = static_cast<choroboros::CoreId>(selectedCoreIndex);
+        const int engineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const bool hqEnabled = processor.isHqEnabled();
+
+        settingsModularCoresEnabled = true;
+        processor.setModularCoresEnabled(true);
+        processor.setCoreAssignment(engineIndex, hqEnabled, selectedCore);
+
+        updateActiveProfileLabel();
+        updateRightTabVisibility();
+        resized();
+        repaint();
+    };
+
     devHqModeToggle.setButtonText("HQ");
     devHqModeToggle.setTooltip("Toggle NQ/HQ directly from the Dev Panel.");
     devHqModeToggle.onClick = [this]
@@ -346,6 +384,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(activeScopeHintLabel);
     content.addAndMakeVisible(devEngineModeLabel);
     content.addAndMakeVisible(devEngineModeBox);
+    content.addAndMakeVisible(devCoreModeLabel);
+    content.addAndMakeVisible(devCoreModeBox);
     content.addAndMakeVisible(devHqModeToggle);
     content.addAndMakeVisible(overviewVisualDeck);
     content.addAndMakeVisible(modulationVisualDeck);
@@ -476,6 +516,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         ? juce::jlimit(0, 4, settingsManualAccent)
         : initialEngineIndex;
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(initialSelectorAccent));
+    styleProfileSelectorComboBox(devCoreModeBox, profileSelectorColourForEngineIndex(initialSelectorAccent));
     styleHackerToggleButton(devHqModeToggle);
     styleHackerEditor(engineFilterEditor);
 
@@ -1136,6 +1177,36 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         { "Green", "Blue", "Red", "Purple", "Black" }));
     addPanelSection(settingsPanel, "Theme", settingsTheme, false);
 
+    juce::Array<juce::PropertyComponent*> settingsCoreRouting;
+    auto* modularCoresProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsModularCoresEnabled; },
+            [this](bool enabled)
+            {
+                settingsModularCoresEnabled = enabled;
+                processor.setModularCoresEnabled(enabled);
+                updateActiveProfileLabel();
+                updateRightTabVisibility();
+                resized();
+                repaint();
+            }),
+        "Enable Modular Cores (DevPanel)", "Enabled");
+    modularCoresProp->setTooltip("Feature-flagged swappable core routing for DevPanel workflows. Host automation params stay unchanged.");
+    settingsCoreRouting.add(modularCoresProp);
+    settingsCoreRouting.add(new ActionButtonPropertyComponent(
+        "Reset Core Assignments", "Restore Legacy Map",
+        "Restore legacy fixed engine core mapping (Green=Lagrange, Blue=Cubic/Thiran, Red=BBD/Tape, Purple=Warp/Orbit, Black=Linear/Ensemble).",
+        [this]
+        {
+            choroboros::CoreAssignmentTable table;
+            table.resetToLegacy();
+            processor.setCoreAssignments(table);
+            updateRightTabVisibility();
+            resized();
+            repaint();
+        }));
+    addPanelSection(settingsPanel, "Core Routing", settingsCoreRouting, false);
+
     juce::Array<juce::PropertyComponent*> settingsAccessibility;
     settingsAccessibility.add(makeChoice(
         makeIntValue(
@@ -1197,6 +1268,21 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     showScopeHintProp->setTooltip("Show or hide the active scope hint line under Active Profile.");
     settingsAccessibility.add(showScopeHintProp);
     addPanelSection(settingsPanel, "Accessibility", settingsAccessibility, false);
+
+    juce::Array<juce::PropertyComponent*> settingsPerformance;
+    auto* lazyUiProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsLazyUiEnabled; },
+            [this](bool enabled)
+            {
+                settingsLazyUiEnabled = enabled;
+                markLazyUiStateDirty();
+                updateAnalyzerDemandFromVisibility();
+            }),
+        "Lazy UI Refresh", "Enabled");
+    lazyUiProp->setTooltip("Refresh only visible or active-tab components to reduce UI CPU load.");
+    settingsPerformance.add(lazyUiProp);
+    addPanelSection(settingsPanel, "Performance", settingsPerformance, false);
 
     const std::array<int, 4> consoleLinePresets { 300, 600, 1000, 2000 };
     const auto getConsoleLinePresetIndex = [consoleLinePresets](int lines) -> int
@@ -1295,12 +1381,13 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         {
             selectedRightTab = 5;
             selectedSubTabs[5] = 2;
+            markLazyUiStateDirty();
             refreshSecondaryTabButtons();
             updateActiveProfileLabel();
             updateRightTabVisibility();
             resized();
             if (validationConsoleComponent != nullptr)
-                validationConsoleComponent->submitCommandForTesting("help", false);
+                validationConsoleComponent->submitCommandForTesting("help", false, true);
         }));
     settingsHelp.add(new ActionButtonPropertyComponent(
         "Website", "Open Site",
@@ -1334,6 +1421,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         registerControlMetadata(property->getName(), {}, "raw->mapped", "effective_runtime", "control_only");
     }
     registerControlMetadata("Dev Engine Mode", {}, "meta_choice", "engine_switch", "control_only");
+    registerControlMetadata("Dev Active Core", {}, "meta_choice", "core_assignment", "control_only");
     registerControlMetadata("Dev HQ Mode", {}, "meta_toggle", "hq_toggle", "control_only");
     registerControlMetadata("Engine Section Filter", {}, "ui_filter", "visibility_only", "control_only");
 

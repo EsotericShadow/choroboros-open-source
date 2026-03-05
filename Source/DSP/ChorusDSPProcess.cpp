@@ -23,9 +23,20 @@
 
 void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
-    // Red NQ: skip pre-emphasis - it boosts highs before BBD, which aliase and cause downsampled drone
-    if (chorusDSP.currentColorIndex == 2 && !chorusDSP.currentQualityHQ)
+    if (block.getNumSamples() == 0 || block.getNumChannels() == 0)
         return;
+
+    if (chorusDSP.isModularCoreModeEnabled())
+    {
+        if (chorusDSP.getCurrentCoreDescriptor().skipPreEmphasis)
+            return;
+    }
+    else
+    {
+        // Red NQ: skip pre-emphasis - it boosts highs before BBD, which aliase and cause downsampled drone
+        if (chorusDSP.currentColorIndex == 2 && !chorusDSP.currentQualityHQ)
+            return;
+    }
 
     float rmsLevel = 0.0f;
     const int blockSize = static_cast<int>(block.getNumSamples());
@@ -80,6 +91,24 @@ void ChorusDSPProcess::processWetCharacter(ChorusDSP& chorusDSP, juce::dsp::Audi
     // Color drives wet-only character macros:
     // Green => Bloom, Blue => Focus, others => handled elsewhere.
     const float currentColor = juce::jlimit(0.0f, 1.0f, chorusDSP.colorBlockValue);
+    if (chorusDSP.isModularCoreModeEnabled())
+    {
+        const auto& descriptor = chorusDSP.getCurrentCoreDescriptor();
+        if (descriptor.bloomWetCharacter)
+        {
+            chorusDSP.processGreenBloomWet(block, currentColor);
+            return;
+        }
+
+        if (descriptor.focusWetCharacter)
+        {
+            chorusDSP.processBlueFocusWet(block, currentColor);
+            return;
+        }
+
+        return;
+    }
+
     if (chorusDSP.currentColorIndex == 0)
     {
         chorusDSP.processGreenBloomWet(block, currentColor);
@@ -95,9 +124,18 @@ void ChorusDSPProcess::processWetCharacter(ChorusDSP& chorusDSP, juce::dsp::Audi
 
 void ChorusDSPProcess::processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
-    // Red NQ is the only engine where Color is post-chorus saturation.
-    const int engine = chorusDSP.currentColorIndex;
-    const bool usesPostSaturation = (engine == 2 && !chorusDSP.currentQualityHQ);
+    bool usesPostSaturation = false;
+    if (chorusDSP.isModularCoreModeEnabled())
+    {
+        usesPostSaturation = chorusDSP.getCurrentCoreDescriptor().postChorusSaturation;
+    }
+    else
+    {
+        // Red NQ is the only legacy engine where Color is post-chorus saturation.
+        const int engine = chorusDSP.currentColorIndex;
+        usesPostSaturation = (engine == 2 && !chorusDSP.currentQualityHQ);
+    }
+
     if (!usesPostSaturation)
         return;
 
@@ -144,8 +182,11 @@ void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNu
     chorusDSP.smoothedColor.skip(blockNumSamples - 1);
     chorusDSP.colorBlockValue = currentColor;
 
-    // Green "Bloom": Color thickens motion and offsets centre delay slightly.
-    if (chorusDSP.currentColorIndex == 0)
+    const bool modular = chorusDSP.isModularCoreModeEnabled();
+    const auto& descriptor = chorusDSP.getCurrentCoreDescriptor();
+
+    // Bloom behavior can now follow core package semantics in modular mode.
+    if ((modular && descriptor.bloomDepthScale) || (!modular && chorusDSP.currentColorIndex == 0))
     {
         const auto& tuning = chorusDSP.runtimeTuningSnapshot;
         const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
@@ -154,7 +195,7 @@ void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNu
     }
     
     float centreDelayMs = chorusDSP.calculateCentreDelay(currentDepth);
-    if (chorusDSP.currentColorIndex == 0)
+    if ((modular && descriptor.bloomCentreOffset) || (!modular && chorusDSP.currentColorIndex == 0))
     {
         const auto& tuning = chorusDSP.runtimeTuningSnapshot;
         const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
@@ -385,6 +426,7 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     {
         chorusDSP.previousCore = chorusDSP.currentCore;
         chorusDSP.currentCore = chorusDSP.pendingCore;
+        chorusDSP.currentCoreId = chorusDSP.pendingCoreId;
         chorusDSP.pendingCore = nullptr;
         chorusDSP.coreSwitchWarmupSamplesRemaining = 0;
         chorusDSP.coreSwitchWarmupTotalSamples = 0;

@@ -193,6 +193,7 @@ private:
     juce::Label activeProfileLabel;
     juce::Label activeScopeHintLabel;
     juce::Label devEngineModeLabel;
+    juce::Label devCoreModeLabel;
     juce::Label engineFilterLabel;
     juce::Label inspectorTitle;
     juce::Label inspectorDescription;
@@ -270,6 +271,7 @@ private:
     juce::TextButton subTabButtonD;
     juce::TextButton subTabButtonE;
     juce::ComboBox devEngineModeBox;
+    juce::ComboBox devCoreModeBox;
     juce::ToggleButton devHqModeToggle;
     juce::TextEditor engineFilterEditor;
     juce::TextButton engineFilterClearButton;
@@ -371,6 +373,8 @@ private:
     bool settingsConsoleWrapLines = true;
     int settingsConsoleMaxLines = 600;
     bool settingsShowScopeHintLine = true;
+    bool settingsLazyUiEnabled = true;
+    bool settingsModularCoresEnabled = false;
     bool settingsConfirmResetFactory = true;
     bool settingsConfirmSetDefaults = true;
     bool lastModulationDemand = true;
@@ -382,6 +386,13 @@ private:
     int metadataNoVisualCount = 0;
     juce::String metadataValidationText;
     int resetFactoryButtonResetCountdownTicks = 0;
+    int lazyUiWarmRefreshCounter = 0;
+    int lazyUiSectionOpenCounter = 0;
+    int lazyUiRelayoutCounter = 0;
+    int lazyUiLastObservedTab = -1;
+    int lazyUiLastObservedSubTab = -1;
+    bool lazyUiOpenSectionsDirty = true;
+    bool lazyUiRelayoutDirty = true;
 
     juce::String buildJson() const;
     void setEditingLocked(bool shouldLock);
@@ -397,6 +408,7 @@ private:
     void refreshSecondaryTabButtons();
     void updateEngineSectionVisibility();
     void updateRightTabVisibility();
+    void markLazyUiStateDirty();
     bool isPropertyVisibleInViewport(const juce::PropertyComponent* property) const;
     void updateAnalyzerDemandFromVisibility();
     int refreshVisibleLiveReadouts();
