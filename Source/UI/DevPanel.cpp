@@ -809,58 +809,18 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         processor.getAnalyzerSnapshot(snapshot);
         return snapshot;
     };
-    std::vector<ControlMetadata> metadataRegistry;
-    metadataRegistry.reserve(512);
-    std::unordered_set<std::string> metadataIds;
+    metadataIds.clear();
+    metadataHasDuplicateIds = false;
+    metadataControlCount = 0;
+    metadataVisualMappedCount = 0;
+    metadataNoVisualCount = 0;
+    metadataLockableRegisteredCount = 0;
 
-    auto inferStage = [](const juce::String& label) -> juce::String
-    {
-        const auto n = label.toLowerCase();
-        if (n.contains("layout") || n.contains("flip") || n.contains("button")
-            || n.contains("selector") || n.contains("font") || n.contains("knob sweep"))
-            return "layout";
-        if (n.contains("trace") || n.contains("validation") || n.contains("sync")
-            || n.contains("wiring") || n.contains("telemetry") || n.contains("recent"))
-            return "validation";
-        if (n.contains("lfo") || n.contains("delay") || n.contains("rate")
-            || n.contains("depth") || n.contains("offset") || n.contains("width")
-            || n.contains("trajectory"))
-            return "modulation";
-        if (n.contains("hpf") || n.contains("lpf") || n.contains("pre")
-            || n.contains("tone") || n.contains("compressor") || n.contains("saturation")
-            || n.contains("spectrum") || n.contains("transfer"))
-            return "tone_dynamics";
-        if (n.contains("engine") || n.contains("bloom") || n.contains("focus")
-            || n.contains("warp") || n.contains("orbit") || n.contains("bbd")
-            || n.contains("tape") || n.contains("ensemble") || n.contains("intensity"))
-            return "engine";
-        return "general";
-    };
-
-    auto inferAppliesTo = [](const juce::String& label) -> std::uint16_t
-    {
-        constexpr std::uint16_t allModes = 0x03ffu;
-        const auto n = label.toLowerCase();
-        auto maskForEngine = [](int engineIndex) -> std::uint16_t
-        {
-            const int bit = juce::jlimit(0, 4, engineIndex) * 2;
-            return static_cast<std::uint16_t>((1u << bit) | (1u << (bit + 1)));
-        };
-        if (n.contains("red nq")) return static_cast<std::uint16_t>(1u << (2 * 2));
-        if (n.contains("red hq")) return static_cast<std::uint16_t>(1u << (2 * 2 + 1));
-        if (n.contains("green")) return maskForEngine(0);
-        if (n.contains("blue")) return maskForEngine(1);
-        if (n.contains("red")) return maskForEngine(2);
-        if (n.contains("purple")) return maskForEngine(3);
-        if (n.contains("black")) return maskForEngine(4);
-        return allModes;
-    };
-
-    auto registerControlMetadata = [&](const juce::String& label,
+    registerControlMetadataFn = [this](const juce::String& label,
                                        const juce::String& visualCardId,
-                                       const juce::String& rawToMappedHook,
-                                       const juce::String& effectiveProbeHook,
-                                       const juce::String& noVisualReason)
+                                       const juce::String&,
+                                       const juce::String&,
+                                       const juce::String&)
     {
         juce::String baseId = label.toLowerCase().retainCharacters("abcdefghijklmnopqrstuvwxyz0123456789");
         if (baseId.isEmpty())
@@ -872,36 +832,31 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             controlId = baseId + juce::String(suffix);
             ++suffix;
         }
-        metadataIds.insert(controlId.toStdString());
-
-        ControlMetadata metadata;
-        metadata.id = controlId;
-        metadata.label = label;
-        metadata.stage = inferStage(label);
-        metadata.appliesToMask = inferAppliesTo(label);
-        metadata.rawToMappedHook = rawToMappedHook;
-        metadata.effectiveProbeHook = effectiveProbeHook;
-        metadata.visualCardId = visualCardId;
-        metadata.noVisualReason = noVisualReason;
-        metadataRegistry.push_back(std::move(metadata));
+        const bool inserted = metadataIds.insert(controlId.toStdString()).second;
+        if (!inserted)
+            metadataHasDuplicateIds = true;
+        ++metadataControlCount;
+        if (visualCardId.isNotEmpty())
+            ++metadataVisualMappedCount;
+        metadataNoVisualCount = metadataControlCount - metadataVisualMappedCount;
     };
 
-    auto makeReadOnly = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name, std::function<juce::String()> valueProvider)
+    auto makeReadOnly = [this, &makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
     {
         auto* prop = new ReadOnlyDiagnosticPropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
         liveReadoutProperties.add(prop);
-        registerControlMetadata(name, {}, "read_only", "derived_probe", "readout_only");
+        registerControlMetadataFn(name, {}, "read_only", "derived_probe", "readout_only");
         return prop;
     };
-    auto makeMultiLineReadOnly = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name, std::function<juce::String()> valueProvider)
+    auto makeMultiLineReadOnly = [this, &makeTooltipForControl](const juce::String& name, std::function<juce::String()> valueProvider)
     {
         auto* prop = new MultiLineReadOnlyPropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name));
         liveReadoutProperties.add(prop);
-        registerControlMetadata(name, {}, "read_only", "derived_probe", "readout_only");
+        registerControlMetadataFn(name, {}, "read_only", "derived_probe", "readout_only");
         return prop;
     };
 
-    auto makeSparkline = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name, std::function<std::vector<float>()> valueProvider, LinkGroup linkGroup = LinkGroup::none)
+    auto makeSparkline = [this, &makeTooltipForControl](const juce::String& name, std::function<std::vector<float>()> valueProvider, LinkGroup linkGroup = LinkGroup::none)
     {
         auto* prop = new SparklinePropertyComponent(name, std::move(valueProvider), makeTooltipForControl(name),
                                                     [this, linkGroup](bool active)
@@ -920,10 +875,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         modulationVisualizerProperties.add(prop);
         const juce::String card = name.containsIgnoreCase("lfo") ? "lfo_scope"
                                 : (name.containsIgnoreCase("delay") ? "delay_trajectory" : "sparkline");
-        registerControlMetadata(name, card, "analyzer_snapshot", "visualized", {});
+        registerControlMetadataFn(name, card, "analyzer_snapshot", "visualized", {});
         return prop;
     };
-    auto makeTransferCurve = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name,
+    auto makeTransferCurve = [this, &makeTooltipForControl](const juce::String& name,
                                                              std::function<TransferCurvePropertyComponent::State()> stateProvider,
                                                              LinkGroup linkGroup = LinkGroup::none)
     {
@@ -942,10 +897,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
                                                         });
         liveReadoutProperties.add(prop);
         transferVisualizerProperties.add(prop);
-        registerControlMetadata(name, "transfer_curve", "raw->mapped->measured", "transfer_probe", {});
+        registerControlMetadataFn(name, "transfer_curve", "raw->mapped->measured", "transfer_probe", {});
         return prop;
     };
-    auto makeSpectrumOverlay = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name,
+    auto makeSpectrumOverlay = [this, &makeTooltipForControl](const juce::String& name,
                                                               std::function<SpectrumOverlayPropertyComponent::State()> stateProvider,
                                                               LinkGroup linkGroup = LinkGroup::none)
     {
@@ -964,10 +919,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
                                                           });
         liveReadoutProperties.add(prop);
         spectrumVisualizerProperties.add(prop);
-        registerControlMetadata(name, "spectrum_overlay", "raw->mapped", "spectrum_probe", {});
+        registerControlMetadataFn(name, "spectrum_overlay", "raw->mapped", "spectrum_probe", {});
         return prop;
     };
-    auto makeSignalFlow = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name,
+    auto makeSignalFlow = [this, &makeTooltipForControl](const juce::String& name,
                                                          std::function<SignalFlowPropertyComponent::State()> stateProvider,
                                                          LinkGroup linkGroup = LinkGroup::none)
     {
@@ -987,40 +942,36 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         liveReadoutProperties.add(prop);
         modulationVisualizerProperties.add(prop);
         analyzerTelemetryProperties.add(prop);
-        registerControlMetadata(name, "signal_flow", "runtime", "signal_path_probe", {});
+        registerControlMetadataFn(name, "signal_flow", "runtime", "signal_path_probe", {});
         return prop;
     };
-    auto makeTraceMatrix = [this, &makeTooltipForControl, &registerControlMetadata](const juce::String& name,
+    auto makeTraceMatrix = [this, &makeTooltipForControl](const juce::String& name,
                                                           std::function<ValidationTraceMatrixPropertyComponent::State()> stateProvider)
     {
         auto* prop = new ValidationTraceMatrixPropertyComponent(name, std::move(stateProvider), makeTooltipForControl(name));
         liveReadoutProperties.add(prop);
-        registerControlMetadata(name, "trace_matrix", "ui->mapped->snapshot", "effective_probe", {});
+        registerControlMetadataFn(name, "trace_matrix", "ui->mapped->snapshot", "effective_probe", {});
         return prop;
     };
 
-    DevPanelBuildContext ctx;
-    ctx.makeLockable = makeLockable;
-    ctx.makeLiveMappedControl = makeLiveMappedControl;
-    ctx.makeReadOnly = makeReadOnly;
-    ctx.makeMultiLineReadOnly = makeMultiLineReadOnly;
-    ctx.makeSparkline = makeSparkline;
-    ctx.makeTransferCurve = makeTransferCurve;
-    ctx.makeSpectrumOverlay = makeSpectrumOverlay;
-    ctx.makeSignalFlow = makeSignalFlow;
-    ctx.makeTraceMatrix = makeTraceMatrix;
-    ctx.readRawParam = readRawParam;
-    ctx.getActiveProfileRaw = getActiveProfileRaw;
-    ctx.readAnalyzerSnapshot = readAnalyzerSnapshot;
-    ctx.registerControlMetadata = registerControlMetadata;
+    buildContext = std::make_unique<DevPanelBuildContext>();
+    buildContext->makeLockable = makeLockable;
+    buildContext->makeLiveMappedControl = makeLiveMappedControl;
+    buildContext->makeReadOnly = makeReadOnly;
+    buildContext->makeMultiLineReadOnly = makeMultiLineReadOnly;
+    buildContext->makeSparkline = makeSparkline;
+    buildContext->makeTransferCurve = makeTransferCurve;
+    buildContext->makeSpectrumOverlay = makeSpectrumOverlay;
+    buildContext->makeSignalFlow = makeSignalFlow;
+    buildContext->makeTraceMatrix = makeTraceMatrix;
+    buildContext->readRawParam = readRawParam;
+    buildContext->getActiveProfileRaw = getActiveProfileRaw;
+    buildContext->readAnalyzerSnapshot = readAnalyzerSnapshot;
+    buildContext->registerControlMetadata = registerControlMetadataFn;
 
-    buildOverviewTab(ctx);
-    buildModulationTab(ctx);
-    buildToneTab(ctx);
-    buildEngineTab(ctx);
-    buildValidationTab(ctx);
-    buildInternalsTab(ctx);
-    buildLayoutTab(ctx);
+    rightTabBuilt.fill(false);
+    rightTabBuilt[6] = true; // Settings tab is constructed directly in this constructor.
+    ensureTabBuilt(0); // Overview is built eagerly; other tabs build on first access.
 
     settingsPanel.clear();
 
@@ -1418,29 +1369,14 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         if (property == nullptr)
             continue;
-        registerControlMetadata(property->getName(), {}, "raw->mapped", "effective_runtime", "control_only");
+        registerControlMetadataFn(property->getName(), {}, "raw->mapped", "effective_runtime", "control_only");
     }
-    registerControlMetadata("Dev Engine Mode", {}, "meta_choice", "engine_switch", "control_only");
-    registerControlMetadata("Dev Active Core", {}, "meta_choice", "core_assignment", "control_only");
-    registerControlMetadata("Dev HQ Mode", {}, "meta_toggle", "hq_toggle", "control_only");
-    registerControlMetadata("Engine Section Filter", {}, "ui_filter", "visibility_only", "control_only");
-
-    metadataControlCount = static_cast<int>(metadataRegistry.size());
-    metadataVisualMappedCount = 0;
-    for (const auto& metadata : metadataRegistry)
-    {
-        if (metadata.visualCardId.isNotEmpty())
-            ++metadataVisualMappedCount;
-    }
-    metadataNoVisualCount = metadataControlCount - metadataVisualMappedCount;
-
-    const bool hasDuplicateIds = static_cast<int>(metadataIds.size()) != metadataControlCount;
-    if (metadataControlCount <= 0)
-        metadataValidationText = "WARN: no controls registered.";
-    else if (hasDuplicateIds)
-        metadataValidationText = "WARN: duplicate control IDs detected.";
-    else
-        metadataValidationText = "OK: registry is stable; each control maps to visual or explicit no-visual reason.";
+    metadataLockableRegisteredCount = lockableProperties.size();
+    registerControlMetadataFn("Dev Engine Mode", {}, "meta_choice", "engine_switch", "control_only");
+    registerControlMetadataFn("Dev Active Core", {}, "meta_choice", "core_assignment", "control_only");
+    registerControlMetadataFn("Dev HQ Mode", {}, "meta_toggle", "hq_toggle", "control_only");
+    registerControlMetadataFn("Engine Section Filter", {}, "ui_filter", "visibility_only", "control_only");
+    updateMetadataSummary();
 
     setEditingLocked(true);
     applyUiPreferences();

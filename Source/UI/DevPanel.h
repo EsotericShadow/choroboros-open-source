@@ -21,8 +21,10 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class ChoroborosPluginEditor;
@@ -381,6 +383,16 @@ private:
     bool lastSpectrumDemand = true;
     bool lastTransferDemand = true;
     bool lastTelemetryDemand = true;
+    std::unique_ptr<DevPanelBuildContext> buildContext;
+    std::array<bool, 7> rightTabBuilt { { false, false, false, false, false, false, true } };
+    std::function<void(const juce::String&,
+                       const juce::String&,
+                       const juce::String&,
+                       const juce::String&,
+                       const juce::String&)> registerControlMetadataFn;
+    std::unordered_set<std::string> metadataIds;
+    bool metadataHasDuplicateIds = false;
+    int metadataLockableRegisteredCount = 0;
     int metadataControlCount = 0;
     int metadataVisualMappedCount = 0;
     int metadataNoVisualCount = 0;
@@ -408,6 +420,10 @@ private:
     void refreshSecondaryTabButtons();
     void updateEngineSectionVisibility();
     void updateRightTabVisibility();
+    void ensureTabBuilt(int mainTab);
+    void ensureCurrentTabBuilt();
+    void registerPendingLockableMetadata();
+    void updateMetadataSummary();
     void markLazyUiStateDirty();
     bool isPropertyVisibleInViewport(const juce::PropertyComponent* property) const;
     void updateAnalyzerDemandFromVisibility();

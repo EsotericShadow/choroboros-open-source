@@ -225,8 +225,80 @@ void DevPanel::refreshSecondaryTabButtons()
     }
 }
 
+void DevPanel::registerPendingLockableMetadata()
+{
+    if (!registerControlMetadataFn)
+        return;
+
+    const int lockableCount = lockableProperties.size();
+    for (int i = juce::jlimit(0, lockableCount, metadataLockableRegisteredCount); i < lockableCount; ++i)
+    {
+        if (auto* property = lockableProperties[i])
+            registerControlMetadataFn(property->getName(), {}, "raw->mapped", "effective_runtime", "control_only");
+    }
+    metadataLockableRegisteredCount = lockableCount;
+}
+
+void DevPanel::updateMetadataSummary()
+{
+    metadataNoVisualCount = metadataControlCount - metadataVisualMappedCount;
+    if (metadataControlCount <= 0)
+        metadataValidationText = "WARN: no controls registered.";
+    else if (metadataHasDuplicateIds)
+        metadataValidationText = "WARN: duplicate control IDs detected.";
+    else
+        metadataValidationText = "OK: registry is stable; each control maps to visual or explicit no-visual reason.";
+}
+
+void DevPanel::ensureTabBuilt(int mainTab)
+{
+    const int safeTab = juce::jlimit(0, 6, mainTab);
+    if (rightTabBuilt[static_cast<size_t>(safeTab)])
+        return;
+    if (buildContext == nullptr)
+        return;
+
+    switch (safeTab)
+    {
+        case 0:
+            buildOverviewTab(*buildContext);
+            break;
+        case 1:
+            buildModulationTab(*buildContext);
+            break;
+        case 2:
+            buildToneTab(*buildContext);
+            break;
+        case 3:
+            buildEngineTab(*buildContext);
+            buildInternalsTab(*buildContext);
+            break;
+        case 4:
+            buildLayoutTab(*buildContext);
+            break;
+        case 5:
+            buildValidationTab(*buildContext);
+            break;
+        case 6:
+            break;
+        default:
+            return;
+    }
+
+    rightTabBuilt[static_cast<size_t>(safeTab)] = true;
+    registerPendingLockableMetadata();
+    updateMetadataSummary();
+    markLazyUiStateDirty();
+}
+
+void DevPanel::ensureCurrentTabBuilt()
+{
+    ensureTabBuilt(selectedRightTab);
+}
+
 void DevPanel::resized()
 {
+    ensureCurrentTabBuilt();
     const auto previousViewPos = viewport.getViewPosition();
     auto bounds = getLocalBounds().reduced(18);
     viewport.setBounds(bounds);
@@ -932,6 +1004,8 @@ void DevPanel::updateEngineSectionVisibility()
 
 void DevPanel::updateRightTabVisibility()
 {
+    ensureCurrentTabBuilt();
+
     const bool showOverview = selectedRightTab == 0;
     const bool showModulation = selectedRightTab == 1;
     const bool showTone = selectedRightTab == 2;
