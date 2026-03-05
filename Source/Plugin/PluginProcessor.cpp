@@ -18,13 +18,17 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "BinaryData.h"
 #include "../DSP/ChorusDSP.h"
 #include "../Config/DefaultsPersistence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include <algorithm>
 #include <cmath>
+
+namespace BinaryData
+{
+const char* getNamedResource(const char* resourceNameUTF8, int& dataSizeInBytes);
+}
 
 namespace
 {
@@ -617,8 +621,8 @@ void seedPersistedDefaultsFromBundledWindowsFactory()
     if (!seedUser && !seedFactory)
         return;
 
-    const char* data = BinaryData::windows_factory_defaults_json;
-    const int dataSize = BinaryData::windows_factory_defaults_jsonSize;
+    int dataSize = 0;
+    const char* data = BinaryData::getNamedResource("windows_factory_defaults_json", dataSize);
     if (data == nullptr || dataSize <= 0)
         return;
 
