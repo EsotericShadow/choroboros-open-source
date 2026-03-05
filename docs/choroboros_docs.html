@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Choroboros Documentation</title>
+    <title>Kaizen DSP Documentation</title>
     <style>
         @font-face {
             font-family: "JetBrainsMonoUI";
@@ -23,6 +23,13 @@
             font-family: "JetBrainsMonoUI";
             src: url("../Assets/fonts/titles/JetBrainsMono-ExtraBold.ttf") format("truetype");
             font-weight: 800;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "ChoroborosBrand";
+            src: url("../Assets/fonts/choroboros.ttf") format("truetype");
+            font-weight: 400;
             font-style: normal;
             font-display: swap;
         }
@@ -220,6 +227,32 @@
             text-decoration-color: rgba(127, 217, 255, 0.5);
         }
         a:hover { color: #a6e6ff; }
+        .brand-choroboros {
+            font-family: "ChoroborosBrand", "JetBrainsMonoUI", "JetBrains Mono", Menlo, Consolas, monospace;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+        }
+        .brand-panel {
+            border: 1px solid var(--border-color);
+            background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin: 10px 0 16px;
+        }
+        .brand-panel strong {
+            color: var(--heading-1);
+        }
+        .brand-links {
+            margin: 8px 0 0;
+            padding-left: 1.2em;
+        }
+        .brand-footer {
+            margin-top: 2.5em;
+            padding-top: 0.8em;
+            border-top: 1px solid var(--border-color);
+            color: var(--muted-fg);
+            font-size: 0.92rem;
+        }
         hr {
             border: 0;
             border-top: 1px solid var(--border-color);
@@ -229,7 +262,7 @@
 </head>
 <body>
     <aside id="sidebar">
-        <h2>Choroboros Docs</h2>
+        <h2><span class="brand-choroboros">Choroboros</span> Docs</h2>
         <ul>
             <li class="l1"><a href="#intro">1. Overview</a></li>
             <li class="l1"><a href="#quick-start">2. Quick Start</a></li>
@@ -264,19 +297,27 @@
             <li class="l1"><a href="#files">7. File Locations and Persistence</a></li>
             <li class="l1"><a href="#performance">8. Performance and Troubleshooting</a></li>
             <li class="l1"><a href="#glossary">9. Glossary</a></li>
-            <li class="l1"><a href="#references">10. References</a></li>
+            <li class="l1"><a href="#references">10. Licenses and Attribution</a></li>
         </ul>
     </aside>
 
     <main id="content">
-        <h1 id="intro">Choroboros Documentation</h1>
+        <h1 id="intro"><span class="brand-choroboros">Choroboros</span> Documentation</h1>
         <p class="meta">Version target: 2.02.2-beta</p>
-        <p>This document explains how Choroboros is organized today: the front panel workflow, the Dev Panel architecture, the modular core assignment system, the tutorial flow, and the full interactive console command surface.</p>
+        <div class="brand-panel">
+            <strong>Kaizen DSP 2026</strong><br>
+            Official links:
+            <ul class="brand-links">
+                <li><a href="https://www.kaizenstrategic.ai/" target="_blank" rel="noopener noreferrer">kaizenstrategic.ai</a></li>
+                <li><a href="https://choro-beta-site.vercel.app/" target="_blank" rel="noopener noreferrer">choro-beta-site.vercel.app</a></li>
+            </ul>
+        </div>
+        <p>This document explains how <span class="brand-choroboros">Choroboros</span> is organized today: the front panel workflow, the Dev Panel architecture, the modular core assignment system, the tutorial flow, and the full interactive console command surface.</p>
         <p>It is written as one continuous learning path so you can read top-to-bottom without jumping around.</p>
 
         <h2 id="quick-start">2. Quick Start</h2>
         <ol>
-            <li>Load Choroboros on a track in your DAW.</li>
+            <li>Load <span class="brand-choroboros">Choroboros</span> on a track in your DAW.</li>
             <li>Choose an engine color and HQ mode.</li>
             <li>Set <code>rate</code>, <code>depth</code>, <code>offset</code>, <code>width</code>, <code>color</code>, <code>mix</code>.</li>
             <li>Open Dev Panel for deep tuning and diagnostics.</li>
@@ -784,7 +825,7 @@ export script</pre>
         <hr>
 
         <h1 id="files">7. File Locations and Persistence</h1>
-        <p>State and recovery files are stored in the user application data directory under <code>Choroboros/</code>.</p>
+        <p>State and recovery files are stored in the user application data directory under <code><span class="brand-choroboros">Choroboros</span>/</code>.</p>
         <ul>
             <li><code>defaults_user.json</code></li>
             <li><code>defaults_factory.json</code></li>
@@ -850,25 +891,66 @@ export script</pre>
             <li><strong>Macro</strong>: high-level control that steers multiple lower-level behaviors.</li>
         </ul>
 
-        <h1 id="references">10. References</h1>
-        <p>Primary project docs:</p>
-        <ul>
-            <li><a href="./DEV_PANEL_MANUAL.md">DEV_PANEL_MANUAL.md</a></li>
-            <li><a href="./DEV_PANEL_CONSOLE_MANUAL.md">DEV_PANEL_CONSOLE_MANUAL.md</a></li>
-        </ul>
+        <h1 id="references">10. Licenses and Attribution</h1>
+        <p>This section documents what third-party frameworks and SDKs are used, where their licenses live in this repository, and what should ship with binaries for transparency.</p>
 
-        <p>Relevant source references:</p>
+        <h2>10.1 Project Ownership and Primary License Files</h2>
+        <table>
+            <thead>
+                <tr><th>Item</th><th>Path</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Project copyright notice</td><td><code>CMakeLists.txt</code></td><td>Build metadata identifies Kaizen Strategic AI Inc. and 2026 copyright string.</td></tr>
+                <tr><td>GPL text bundle</td><td><code>LICENSE</code>, <code>COPYING</code></td><td>Repository currently contains GPLv3 license text files.</td></tr>
+                <tr><td>EULA text</td><td><code>EULA.md</code></td><td>End-user agreement file is also present and embedded in plugin binary data.</td></tr>
+            </tbody>
+        </table>
+        <div class="warn"><strong>Transparency note:</strong> This repository currently contains both GPL and EULA artifacts. For releases, ship one clear licensing model and matching notices so users are not given conflicting terms.</div>
+
+        <h2>10.2 Frameworks and SDKs Used in Build</h2>
+        <table>
+            <thead>
+                <tr><th>Framework / SDK</th><th>Used For</th><th>License / Notice Location</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>JUCE Framework</td><td>Plugin runtime, UI, DSP plumbing, format clients</td><td><code>JUCE/LICENSE.md</code> (dual-license model described there)</td></tr>
+                <tr><td>Steinberg VST3 SDK (via JUCE)</td><td>VST3 format support</td><td><code>JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK/LICENSE.txt</code> (MIT)</td></tr>
+                <tr><td>Avid AAX SDK (via JUCE)</td><td>AAX format support</td><td><code>JUCE/modules/juce_audio_plugin_client/AAX/SDK/LICENSE.txt</code> (Avid license terms / GPL option as stated by SDK)</td></tr>
+                <tr><td>Apple AudioUnit SDK (via JUCE)</td><td>AU format support</td><td><code>JUCE/modules/juce_audio_plugin_client/AU/AudioUnitSDK/LICENSE.txt</code> (Apache 2.0)</td></tr>
+            </tbody>
+        </table>
+        <div class="note"><strong>Scope note:</strong> JUCE contains many optional third-party dependencies. Only a subset is exercised by this plugin's enabled modules and target formats.</div>
+
+        <h2>10.3 Fonts, Branding, and UI Assets</h2>
+        <table>
+            <thead>
+                <tr><th>Asset</th><th>Path</th><th>Attribution Status</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><span class="brand-choroboros">Choroboros</span> brand font</td><td><code>Assets/fonts/choroboros.ttf</code></td><td>Project-specific branding font.</td></tr>
+                <tr><td>JetBrains Mono variants</td><td><code>Assets/fonts/labels/</code>, <code>Assets/fonts/titles/</code>, <code>Assets/fonts/tooltips/</code></td><td>Font files are present; ensure upstream license text is included in distribution packages.</td></tr>
+                <tr><td>Plugin art and icons</td><td><code>Assets/</code>, <code>Assets/gui_icons/</code></td><td>Owned project art unless separately licensed.</td></tr>
+            </tbody>
+        </table>
+
+        <h2>10.4 Third-Party Notice Bundles in Repository</h2>
+        <p>Additional vendor notices are archived under <code>Licenses/</code>, including:</p>
         <ul>
-            <li><a href="../Source/UI/DevPanelRuntime.cpp">Source/UI/DevPanelRuntime.cpp</a> (tab/subtab routing, tutorial flow, layout behavior)</li>
-            <li><a href="../Source/UI/DevPanelTabBuilders.cpp">Source/UI/DevPanelTabBuilders.cpp</a> (panel sections, cards, workbenches)</li>
-            <li><a href="../Source/UI/DevPanelConsole.cpp">Source/UI/DevPanelConsole.cpp</a> (console commands and parsing)</li>
-            <li><a href="../Source/DSP/CoreAssignments.h">Source/DSP/CoreAssignments.h</a> (core IDs, descriptors, legacy map)</li>
-            <li><a href="../Source/Plugin/PluginProcessor.cpp">Source/Plugin/PluginProcessor.cpp</a> (state persistence and modular flag handling)</li>
-            <li><a href="../Source/Config/DefaultsPersistence.cpp">Source/Config/DefaultsPersistence.cpp</a> (defaults and recovery file paths)</li>
-            <li><a href="../Source/Plugin/PluginEditor.cpp">Source/Plugin/PluginEditor.cpp</a> (Dev Panel window limits)</li>
+            <li><code>Licenses/Avid/</code></li>
+            <li><code>Licenses/Third Party/</code></li>
+        </ul>
+        <p>These folders contain notices from SDK/toolchain bundles and historical packaging work. Not every file in those folders is necessarily linked into the current shipping binary.</p>
+
+        <h2>10.5 Public Project Links</h2>
+        <ul>
+            <li><a href="https://www.kaizenstrategic.ai/" target="_blank" rel="noopener noreferrer">Kaizen Strategic AI</a></li>
+            <li><a href="https://choro-beta-site.vercel.app/" target="_blank" rel="noopener noreferrer"><span class="brand-choroboros">Choroboros</span> Beta Site</a></li>
         </ul>
 
         <p><em>End of manual.</em></p>
+        <div class="brand-footer">
+            <strong>Kaizen DSP 2026</strong> · <span class="brand-choroboros">Choroboros</span> User Manual
+        </div>
     </main>
 </body>
 </html>
