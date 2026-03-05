@@ -62,3 +62,7 @@ feedback/
 /aax-validator-dsh-2024-6-0-138bab0d-mac-arm64/
 /build-verify/
 /Pro_Tools_3PDev_2025_12_0_Mac_arm/
+
+# Removed Bloat
+/local_archive/
+/JUCE/

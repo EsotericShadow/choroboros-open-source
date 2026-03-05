@@ -11,7 +11,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Generate compile_commands.json for IDE language servers
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_subdirectory(JUCE)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/CMakeLists.txt")
+    message(STATUS "Using local JUCE directory")
+    add_subdirectory(JUCE)
+else()
+    message(STATUS "Local JUCE not found. Fetching JUCE 6.0.8...")
+    include(FetchContent)
+    FetchContent_Declare(
+        JUCE
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG        29396c22c93392d6738e021b83196283d6e4d850
+    )
+    FetchContent_MakeAvailable(JUCE)
+endif()
 
 juce_add_plugin(Choroboros
     COMPANY_NAME "Kaizen Strategic AI"
