@@ -86,7 +86,7 @@ void AnimatedToggleButton::mouseDown(const juce::MouseEvent& e)
     juce::Slider::mouseDown(e); // keep APVTS SliderAttachment gesture behavior
     juce::Component::beginDragAutoRepeat(16);
     dragStartScreenY = e.getScreenPosition().y;
-    dragTriggered = false;
+    dragAnchorScreenY = dragStartScreenY;
     pointerIsDown = true;
     if (!isTimerRunning())
         startTimerHz(120);
@@ -94,37 +94,12 @@ void AnimatedToggleButton::mouseDown(const juce::MouseEvent& e)
 
 void AnimatedToggleButton::mouseDrag(const juce::MouseEvent& e)
 {
-    if (dragTriggered)
-        return;
-
-    const float dragDeltaY = static_cast<float>(e.getScreenPosition().y - dragStartScreenY);
-    // HQ on = up, HQ off = down: drag up -> ON, drag down -> OFF
-    if (dragDeltaY < 0.0f && getValue() < 0.5)
-    {
-        dragTriggered = true;
-        commitToggleState(true, juce::sendNotificationSync);
-    }
-    else if (dragDeltaY > 0.0f && getValue() >= 0.5)
-    {
-        dragTriggered = true;
-        commitToggleState(false, juce::sendNotificationSync);
-    }
+    tryCommitDragAtScreenY(e.getScreenPosition().y);
 }
 
 void AnimatedToggleButton::mouseUp(const juce::MouseEvent& e)
 {
-    const float dragDeltaY = static_cast<float>(e.getScreenPosition().y - dragStartScreenY);
-    // HQ on = up, HQ off = down: drag up -> ON, drag down -> OFF
-    if (!dragTriggered && dragDeltaY < 0.0f && getValue() < 0.5)
-    {
-        dragTriggered = true;
-        commitToggleState(true, juce::sendNotificationSync);
-    }
-    else if (!dragTriggered && dragDeltaY > 0.0f && getValue() >= 0.5)
-    {
-        dragTriggered = true;
-        commitToggleState(false, juce::sendNotificationSync);
-    }
+    tryCommitDragAtScreenY(e.getScreenPosition().y);
     pointerIsDown = false;
     juce::Slider::mouseUp(e);
 }
@@ -137,20 +112,10 @@ void AnimatedToggleButton::mouseDoubleClick(const juce::MouseEvent& e)
 
 void AnimatedToggleButton::timerCallback()
 {
-    if (pointerIsDown && !dragTriggered)
+    if (pointerIsDown)
     {
         const int currentScreenY = juce::Desktop::getInstance().getMousePosition().y;
-        // HQ on = up, HQ off = down
-        if (currentScreenY < dragStartScreenY && getValue() < 0.5)
-        {
-            dragTriggered = true;
-            commitToggleState(true, juce::sendNotificationSync);
-        }
-        else if (currentScreenY > dragStartScreenY && getValue() >= 0.5)
-        {
-            dragTriggered = true;
-            commitToggleState(false, juce::sendNotificationSync);
-        }
+        tryCommitDragAtScreenY(currentScreenY);
     }
 
     if (animationRunning)
@@ -173,4 +138,28 @@ void AnimatedToggleButton::timerCallback()
 
     if (!pointerIsDown && !animationRunning)
         stopTimer();
+}
+
+void AnimatedToggleButton::tryCommitDragAtScreenY(int screenY)
+{
+    const int deltaY = screenY - dragAnchorScreenY;
+
+    // HQ on = up, HQ off = down. Anchor is reset after each successful flip so
+    // a single press-drag can keep flipping as the pointer direction alternates.
+    if (deltaY <= -kDragToggleThresholdPx && getValue() < 0.5)
+    {
+        dragAnchorScreenY = screenY;
+        commitToggleState(true, juce::sendNotificationSync);
+        return;
+    }
+
+    if (deltaY >= kDragToggleThresholdPx && getValue() >= 0.5)
+    {
+        dragAnchorScreenY = screenY;
+        commitToggleState(false, juce::sendNotificationSync);
+        return;
+    }
+
+    if (std::abs(deltaY) >= kDragToggleThresholdPx * 3)
+        dragAnchorScreenY = screenY;
 }

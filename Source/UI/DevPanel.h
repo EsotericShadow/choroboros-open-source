@@ -84,6 +84,73 @@ private:
     juce::Colour accentColour { juce::Colour(0xff80ef80) };
 };
 
+class TutorialOverlayContainer final : public juce::Component
+{
+public:
+    void setAccentColour(juce::Colour accent)
+    {
+        accentColour = accent;
+        repaint();
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto area = getLocalBounds().toFloat();
+        juce::ColourGradient bg(juce::Colour(0xee060b08),
+                                area.getX(), area.getY(),
+                                juce::Colour(0xee0d1711),
+                                area.getRight(), area.getBottom(),
+                                false);
+        g.setGradientFill(bg);
+        g.fillRoundedRectangle(area, 10.0f);
+
+        juce::ColourGradient wash(accentColour.withAlpha(0.24f),
+                                  area.getX(), area.getY(),
+                                  accentColour.withAlpha(0.06f),
+                                  area.getX(), area.getBottom(),
+                                  false);
+        g.setGradientFill(wash);
+        g.fillRoundedRectangle(area.reduced(1.0f), 10.0f);
+
+        g.setColour(accentColour.withAlpha(0.8f));
+        g.drawRoundedRectangle(area.reduced(0.5f), 10.0f, 1.2f);
+    }
+
+private:
+    juce::Colour accentColour { juce::Colour(0xff80ef80) };
+};
+
+class TutorialFocusHighlight final : public juce::Component
+{
+public:
+    void setAccentColour(juce::Colour accent)
+    {
+        accentColour = accent;
+        repaint();
+    }
+
+    void setPulseAlpha(float alpha)
+    {
+        pulseAlpha = juce::jlimit(0.05f, 1.0f, alpha);
+        repaint();
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto area = getLocalBounds().toFloat().reduced(1.0f);
+        g.setColour(accentColour.withAlpha(0.1f * pulseAlpha));
+        g.fillRoundedRectangle(area, 9.0f);
+        g.setColour(accentColour.withAlpha(0.88f * pulseAlpha));
+        g.drawRoundedRectangle(area, 9.0f, 2.0f);
+        g.setColour(accentColour.withAlpha(0.45f * pulseAlpha));
+        g.drawRoundedRectangle(area.reduced(4.0f), 7.0f, 1.0f);
+    }
+
+private:
+    juce::Colour accentColour { juce::Colour(0xff80ef80) };
+    float pulseAlpha = 1.0f;
+};
+
 class DevPanel : public juce::Component,
                  private juce::Timer
 {
@@ -134,6 +201,15 @@ private:
     VisualDeckContent engineVisualDeck;
     VisualDeckContent lookFeelVisualDeck;
     VisualDeckContent validationVisualDeck;
+    TutorialOverlayContainer tutorialOverlay;
+    TutorialFocusHighlight tutorialFocusHighlight;
+    juce::Label tutorialStepLabel;
+    juce::Label tutorialTitleLabel;
+    juce::TextEditor tutorialBodyText;
+    juce::Label tutorialFocusHintLabel;
+    juce::TextButton tutorialNextButton;
+    juce::TextButton tutorialNextSectionButton;
+    juce::TextButton tutorialSkipButton;
     juce::PropertyPanel mappingPanel;
     juce::PropertyPanel uiPanel;
     juce::PropertyPanel overviewPanel;
@@ -154,6 +230,7 @@ private:
     juce::PropertyPanel bbdPanel;
     juce::PropertyPanel tapePanel;
     juce::PropertyPanel layoutGlobalPanel;
+    juce::PropertyPanel layoutTextAnimationPanel;
     juce::PropertyPanel layoutGreenPanel;
     juce::PropertyPanel layoutBluePanel;
     juce::PropertyPanel layoutRedPanel;
@@ -189,6 +266,7 @@ private:
     juce::TextButton subTabButtonB;
     juce::TextButton subTabButtonC;
     juce::TextButton subTabButtonD;
+    juce::TextButton subTabButtonE;
     juce::ComboBox devEngineModeBox;
     juce::ToggleButton devHqModeToggle;
     juce::TextEditor engineFilterEditor;
@@ -238,10 +316,23 @@ private:
         int totalTicks = 1;
         int tick = 0;
     };
+    struct TutorialStep
+    {
+        juce::String title;
+        juce::String body;
+        int rightTab = -1;
+        int subTab = -1;
+        int forceEngine = -1;
+        int forceHq = -1; // -1 keeps current mode, otherwise 0/1.
+        juce::String focusTarget;
+        juce::String focusHint;
+    };
     std::vector<ConsoleTargetBinding> consoleTargets;
     std::vector<ConsoleAction> consoleUndoStack;
     std::vector<ConsoleAction> consoleRedoStack;
     std::vector<ConsoleSweepState> consoleSweeps;
+    std::unordered_map<std::string, size_t> consoleTargetIndexBySlug;
+    std::unordered_map<std::string, juce::String> consoleListOutputCache;
     std::unordered_map<std::string, double> consoleFactoryValues;
     std::unordered_map<std::string, juce::String> consoleAliases;
     bool consoleFactoryValuesReady = false;
@@ -252,6 +343,13 @@ private:
     bool consoleSoloActive = false;
     juce::String consoleSoloNode;
     float consoleSoloStoredMixRaw = 0.0f;
+    bool tutorialActive = false;
+    juce::String tutorialTopicKey;
+    juce::String tutorialTopicTitle;
+    std::vector<TutorialStep> tutorialSteps;
+    int tutorialStepIndex = -1;
+    juce::String tutorialFocusTarget;
+    int tutorialPulseTick = 0;
     juce::File recentTouchesLogFile;
     int analyzerRefreshTickCounter = 0;
     bool lastModulationDemand = true;
@@ -287,6 +385,19 @@ private:
     juce::String buildConsoleWatchHudText() const;
     void updateConsoleSweeps();
     void cancelConsoleSweeps();
+    bool startTutorial(const juce::String& requestedTopic, juce::String& statusMessage);
+    bool stopTutorial(bool skipped, juce::String& statusMessage);
+    void advanceTutorialStep();
+    void advanceTutorialSection();
+    void applyTutorialStep();
+    void layoutTutorialOverlay();
+    void updateTutorialHighlight();
+    void expandTutorialFocusSections();
+    void revealTutorialFocusTarget();
+    juce::Component* resolveTutorialFocusComponent(const juce::String& focusTarget) const;
+    std::vector<TutorialStep> buildTutorialScript(const juce::String& requestedTopic,
+                                                  juce::String& resolvedTopic,
+                                                  juce::String& resolvedTitle) const;
     void triggerSaveButtonReset();
     void triggerResetFactoryButtonReset();
     void buildOverviewTab(DevPanelBuildContext& ctx);

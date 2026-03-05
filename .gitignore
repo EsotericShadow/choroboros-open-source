@@ -4,6 +4,7 @@
 # Build and cache
 Build/
 build/
+build-*/
 Release/
 Universal-Build/
 AU/

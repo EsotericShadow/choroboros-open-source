@@ -153,6 +153,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     configureSubTabButton(subTabButtonB, 1);
     configureSubTabButton(subTabButtonC, 2);
     configureSubTabButton(subTabButtonD, 3);
+    configureSubTabButton(subTabButtonE, 4);
 
     engineFilterLabel.setText("Engine Sections", juce::dontSendNotification);
     engineFilterLabel.setFont(makeLabelFont(Typography::labelSmall, false));
@@ -317,6 +318,65 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(engineVisualDeck);
     content.addAndMakeVisible(lookFeelVisualDeck);
     content.addAndMakeVisible(validationVisualDeck);
+    content.addAndMakeVisible(tutorialFocusHighlight);
+    content.addAndMakeVisible(tutorialOverlay);
+    tutorialOverlay.addAndMakeVisible(tutorialStepLabel);
+    tutorialOverlay.addAndMakeVisible(tutorialTitleLabel);
+    tutorialOverlay.addAndMakeVisible(tutorialBodyText);
+    tutorialOverlay.addAndMakeVisible(tutorialFocusHintLabel);
+    tutorialOverlay.addAndMakeVisible(tutorialNextButton);
+    tutorialOverlay.addAndMakeVisible(tutorialNextSectionButton);
+    tutorialOverlay.addAndMakeVisible(tutorialSkipButton);
+    tutorialOverlay.setVisible(false);
+    tutorialFocusHighlight.setVisible(false);
+    tutorialFocusHighlight.setInterceptsMouseClicks(false, false);
+    tutorialOverlay.setInterceptsMouseClicks(true, true);
+
+    tutorialStepLabel.setText("Tutorial", juce::dontSendNotification);
+    tutorialStepLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    tutorialStepLabel.setColour(juce::Label::textColourId, hackerTextDim());
+    tutorialStepLabel.setJustificationType(juce::Justification::centredLeft);
+
+    tutorialTitleLabel.setText("DevPanel Tutorial", juce::dontSendNotification);
+    tutorialTitleLabel.setFont(makeLabelFont(Typography::title, true));
+    tutorialTitleLabel.setColour(juce::Label::textColourId, hackerText());
+    tutorialTitleLabel.setJustificationType(juce::Justification::centredLeft);
+
+    tutorialBodyText.setReadOnly(true);
+    tutorialBodyText.setMultiLine(true);
+    tutorialBodyText.setReturnKeyStartsNewLine(true);
+    tutorialBodyText.setScrollbarsShown(true);
+    tutorialBodyText.setCaretVisible(false);
+    tutorialBodyText.setPopupMenuEnabled(true);
+    tutorialBodyText.setFont(makeLabelFont(Typography::description, false));
+    tutorialBodyText.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0x00000000));
+    tutorialBodyText.setColour(juce::TextEditor::textColourId, hackerText());
+    tutorialBodyText.setColour(juce::TextEditor::outlineColourId, juce::Colour(0x00000000));
+    tutorialBodyText.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x00000000));
+    tutorialBodyText.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.82f));
+    tutorialBodyText.setBorder(juce::BorderSize<int>(0));
+    tutorialBodyText.setText("", juce::dontSendNotification);
+
+    tutorialFocusHintLabel.setText("", juce::dontSendNotification);
+    tutorialFocusHintLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    tutorialFocusHintLabel.setColour(juce::Label::textColourId, hackerTextMuted());
+    tutorialFocusHintLabel.setJustificationType(juce::Justification::centredLeft);
+
+    tutorialNextButton.setButtonText("Next");
+    tutorialNextButton.setTooltip("Advance to the next tutorial step.");
+    tutorialNextButton.onClick = [this] { advanceTutorialStep(); };
+
+    tutorialNextSectionButton.setButtonText("Next Section");
+    tutorialNextSectionButton.setTooltip("Skip ahead to the next tutorial tab/subtab section.");
+    tutorialNextSectionButton.onClick = [this] { advanceTutorialSection(); };
+
+    tutorialSkipButton.setButtonText("Skip Tutorial");
+    tutorialSkipButton.setTooltip("Abort the active tutorial.");
+    tutorialSkipButton.onClick = [this]
+    {
+        juce::String status;
+        stopTutorial(true, status);
+    };
 
     overviewVisualDeck.setAccentColour(visualOverview());
     modulationVisualDeck.setAccentColour(visualModulation());
@@ -351,6 +411,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(bbdPanel);
     content.addAndMakeVisible(tapePanel);
     content.addAndMakeVisible(layoutGlobalPanel);
+    content.addAndMakeVisible(layoutTextAnimationPanel);
     content.addAndMakeVisible(layoutGreenPanel);
     content.addAndMakeVisible(layoutBluePanel);
     content.addAndMakeVisible(layoutRedPanel);
@@ -370,6 +431,9 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     styleActionButton(fxPresetSubtleButton);
     styleActionButton(fxPresetMediumButton);
     styleActionButton(engineFilterClearButton);
+    styleActionButton(tutorialNextButton);
+    styleActionButton(tutorialNextSectionButton);
+    styleActionButton(tutorialSkipButton);
 
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(processor.getCurrentEngineColorIndex()));
     styleHackerToggleButton(devHqModeToggle);

@@ -845,6 +845,8 @@ inline juce::Font makeRetroFont(float height, bool bold)
 class LockableFloatPropertyComponent : public juce::PropertyComponent
 {
 public:
+    using ContextMenuHandler = std::function<void(LockableFloatPropertyComponent&, const juce::MouseEvent&)>;
+
     LockableFloatPropertyComponent(const juce::Value& valueToControl, const juce::String& name,
                                    double min, double max, double step, double skew,
                                    const juce::String& tooltipText)
@@ -878,7 +880,7 @@ public:
             refreshEditorText();
             valueEditor.giveAwayKeyboardFocus();
         };
-        valueEditor.onMouseDownCallback = [this](const juce::MouseEvent& e) { beginDrag(e); };
+        valueEditor.onMouseDownCallback = [this](const juce::MouseEvent& e) { return beginDrag(e); };
         valueEditor.onMouseDragCallback = [this](const juce::MouseEvent& e) { dragAdjust(e); };
         valueEditor.onMouseUpCallback = [this](const juce::MouseEvent& e) { endDrag(e); };
         valueEditor.onWheelCallback = [this](const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
@@ -940,7 +942,11 @@ public:
     {
         auto content = getLookAndFeel().getPropertyComponentContentPosition(*this);
         const int rowHeight = content.getHeight();
-        const int lockSide = juce::jlimit(15, 19, rowHeight - 4);
+        const int legacyLockSide = juce::jlimit(15, 19, rowHeight - 4);
+        const int legacyInputHeight = juce::jlimit(24, 32, rowHeight - 2);
+        // Keep input and lock at a shared mid-size to avoid oversized fields + tiny lock icons.
+        const int controlSide = juce::jlimit(21, 27, juce::roundToInt((legacyLockSide + legacyInputHeight) * 0.5f));
+        const int lockSide = juce::jmin(controlSide, juce::jmax(0, content.getWidth()));
         auto lockBounds = content.removeFromRight(lockSide).withSizeKeepingCentre(lockSide, lockSide);
         lockButton.setBounds(lockBounds);
         content.removeFromRight(2);
@@ -949,8 +955,7 @@ public:
         const int preferredInputWidth = juce::jlimit(52, 104, juce::roundToInt(static_cast<float>(availableWidth) * 1.00f));
         const int inputWidth = juce::jlimit(0, availableWidth, preferredInputWidth);
         auto inputBounds = content.removeFromLeft(inputWidth);
-        const int inputHeight = juce::jlimit(24, 32, rowHeight - 2);
-        inputBounds = inputBounds.withSizeKeepingCentre(inputBounds.getWidth(), inputHeight);
+        inputBounds = inputBounds.withSizeKeepingCentre(inputBounds.getWidth(), controlSide);
         inputContainer.setBounds(inputBounds);
 
         auto inputArea = inputContainer.getLocalBounds().reduced(1, 1);
@@ -979,6 +984,7 @@ public:
     double getMinimumForCommand() const { return minValue; }
     double getMaximumForCommand() const { return maxValue; }
     double getStepForCommand() const { return stepValue; }
+    void setContextMenuHandler(ContextMenuHandler handler) { contextMenuHandler = std::move(handler); }
 
     void setValueFromCommand(double value)
     {
@@ -1258,15 +1264,18 @@ private:
     class DragTextEditor : public juce::TextEditor
     {
     public:
-        std::function<void(const juce::MouseEvent&)> onMouseDownCallback;
+        std::function<bool(const juce::MouseEvent&)> onMouseDownCallback;
         std::function<void(const juce::MouseEvent&)> onMouseDragCallback;
         std::function<void(const juce::MouseEvent&)> onMouseUpCallback;
         std::function<void(const juce::MouseEvent&, const juce::MouseWheelDetails&)> onWheelCallback;
 
         void mouseDown(const juce::MouseEvent& e) override
         {
+            bool consumeEvent = false;
             if (onMouseDownCallback)
-                onMouseDownCallback(e);
+                consumeEvent = onMouseDownCallback(e);
+            if (consumeEvent)
+                return;
             juce::TextEditor::mouseDown(e);
         }
 
@@ -1295,13 +1304,24 @@ private:
         }
     };
 
-    void beginDrag(const juce::MouseEvent& e)
+    bool beginDrag(const juce::MouseEvent& e)
     {
+        if (e.mods.isPopupMenu())
+        {
+            if (contextMenuHandler)
+            {
+                contextMenuHandler(*this, e);
+                return true;
+            }
+            return false;
+        }
+
         if (locked || !e.mods.isLeftButtonDown())
-            return;
+            return false;
         dragStartScreenY = e.getScreenPosition().getY();
         dragStartValue = currentValue;
         isDragging = false;
+        return false;
     }
 
     void dragAdjust(const juce::MouseEvent& e)
@@ -1403,17 +1423,9 @@ private:
         stepDownButton.setEnabled(!locked);
     }
 
-    static int decimalPlacesForStep(double step)
-    {
-        if (step >= 1.0)
-            return 0;
-        const double safe = juce::jmax(1.0e-8, step);
-        return juce::jlimit(1, 6, static_cast<int>(std::ceil(-std::log10(safe))));
-    }
-
     void refreshEditorText()
     {
-        const int decimals = decimalPlacesForStep(stepValue);
+        constexpr int decimals = 3;
         valueEditor.setText(juce::String(currentValue, decimals), juce::dontSendNotification);
     }
 
@@ -1444,6 +1456,7 @@ private:
     double dragStartValue = 0.0;
     bool isDragging = false;
     bool locked = true;
+    ContextMenuHandler contextMenuHandler;
 };
 
 class ReadOnlyDiagnosticPropertyComponent : public juce::PropertyComponent
@@ -1550,6 +1563,267 @@ private:
     juce::TextEditor consoleEditor;
 };
 
+class FlatSectionHeaderPropertyComponent : public juce::PropertyComponent
+{
+public:
+    explicit FlatSectionHeaderPropertyComponent(const juce::String& titleText)
+        : juce::PropertyComponent("")
+    {
+        titleLabel.setText(titleText, juce::dontSendNotification);
+        titleLabel.setInterceptsMouseClicks(false, false);
+        titleLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(titleLabel);
+        setPreferredHeight(30);
+        refreshThemeColours();
+    }
+
+    void refresh() override {}
+
+    void resized() override
+    {
+        titleLabel.setFont(makeTitleFont(Typography::sectionHeader, true));
+        titleLabel.setBounds(getLocalBounds().reduced(8, 4));
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto area = getLocalBounds().toFloat().reduced(0.5f);
+        g.setColour(hackerBgElevated().withAlpha(0.95f));
+        g.fillRoundedRectangle(area, 3.0f);
+        g.setColour(hackerBorder().withAlpha(0.75f));
+        g.drawRoundedRectangle(area, 3.0f, 1.0f);
+    }
+
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
+    }
+
+private:
+    void refreshThemeColours()
+    {
+        titleLabel.setColour(juce::Label::textColourId, hackerText());
+        repaint();
+    }
+
+    juce::Label titleLabel;
+};
+
+class EmbeddedPropertyPanelCard : public juce::PropertyComponent
+{
+public:
+    EmbeddedPropertyPanelCard(const juce::String& tooltipText)
+        : juce::PropertyComponent("")
+    {
+        setTooltip(tooltipText);
+        panel.setMessageWhenEmpty("No controls available.");
+        addAndMakeVisible(panel);
+        setPreferredHeight(180);
+    }
+
+    void setSection(const juce::String& sectionName, juce::Array<juce::PropertyComponent*>& props, bool initiallyOpen)
+    {
+        panel.clear();
+        panel.addSection(sectionName, props);
+        if (panel.getSectionNames().size() > 0)
+            panel.setSectionOpen(0, initiallyOpen);
+        setPreferredHeight(juce::jmax(148, panel.getTotalContentHeight() + 24));
+        resized();
+    }
+
+    void refresh() override
+    {
+        panel.refreshAll();
+    }
+
+    void resized() override
+    {
+        panel.setBounds(getLocalBounds().reduced(4, 4));
+    }
+
+private:
+    juce::PropertyPanel panel;
+};
+
+class HorizontalControlStripCard : public juce::PropertyComponent
+{
+public:
+    HorizontalControlStripCard(const juce::String& titleTextIn, const juce::String& tooltipText)
+        : juce::PropertyComponent(""),
+          titleText(titleTextIn)
+    {
+        setTooltip(tooltipText);
+        titleLabel.setTooltip(tooltipText);
+        titleLabel.setInterceptsMouseClicks(false, false);
+        titleLabel.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(titleLabel);
+        setPreferredHeight(126);
+        refreshThemeColours();
+    }
+
+    ~HorizontalControlStripCard() override
+    {
+        for (auto* control : controls)
+        {
+            if (control != nullptr)
+                control->setLookAndFeel(nullptr);
+        }
+    }
+
+    void addControl(const juce::String& labelText, juce::PropertyComponent* control)
+    {
+        if (control == nullptr)
+            return;
+
+        auto* label = labels.add(new juce::Label());
+        label->setText(labelText, juce::dontSendNotification);
+        label->setInterceptsMouseClicks(false, false);
+        label->setJustificationType(juce::Justification::centred);
+        label->setTooltip(control->getTooltip());
+        addAndMakeVisible(label);
+
+        control->setLookAndFeel(&inlineLookAndFeel);
+        addAndMakeVisible(control);
+        controls.add(control);
+
+        setPreferredHeight(juce::jmax(118, controls.size() > 5 ? 130 : 122));
+        refreshThemeColours();
+        resized();
+    }
+
+    void refresh() override
+    {
+        for (auto* control : controls)
+        {
+            if (control != nullptr)
+                control->refresh();
+        }
+    }
+
+    void lookAndFeelChanged() override
+    {
+        juce::PropertyComponent::lookAndFeelChanged();
+        refreshThemeColours();
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto bounds = getLocalBounds().toFloat().reduced(0.5f);
+        g.setColour(hackerSurfaceAlt().withAlpha(0.96f));
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(hackerBorder().withAlpha(0.78f));
+        g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
+
+        auto header = bounds.removeFromTop(24.0f);
+        g.setColour(hackerBgElevated().withAlpha(0.92f));
+        g.fillRoundedRectangle(header.reduced(1.0f, 1.0f), 3.0f);
+        g.setColour(hackerBorderStrong().withAlpha(0.55f));
+        g.drawLine(header.getX() + 1.0f, header.getBottom() - 0.5f,
+                   header.getRight() - 1.0f, header.getBottom() - 0.5f, 1.0f);
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(8, 6);
+        titleLabel.setFont(makeTitleFont(Typography::sectionHeader, true));
+        titleLabel.setBounds(area.removeFromTop(20));
+        area.removeFromTop(6);
+
+        const int columnCount = controls.size();
+        if (columnCount <= 0)
+            return;
+
+        constexpr int nominalGap = 8;
+        auto labelsRow = area.removeFromTop(16);
+        area.removeFromTop(4);
+        auto controlsRow = area.removeFromTop(juce::jmax(24, area.getHeight()));
+
+        const int availableWidth = juce::jmax(1, controlsRow.getWidth());
+        const int gap = (availableWidth >= columnCount * 64) ? nominalGap : 4;
+        const int totalGap = gap * juce::jmax(0, columnCount - 1);
+        const int baseColumnWidth = juce::jmax(1, (availableWidth - totalGap) / columnCount);
+        int x = controlsRow.getX();
+
+        for (int i = 0; i < columnCount; ++i)
+        {
+            const int isLast = (i == columnCount - 1) ? 1 : 0;
+            const int remainingRight = controlsRow.getRight() - x;
+            const int width = isLast ? remainingRight : juce::jmin(baseColumnWidth, remainingRight);
+
+            auto labelBounds = juce::Rectangle<int>(x, labelsRow.getY(), width, labelsRow.getHeight());
+            labels[i]->setFont(makeLabelFont(Typography::labelSmall, true));
+            labels[i]->setBounds(labelBounds);
+
+            auto controlBounds = juce::Rectangle<int>(x, controlsRow.getY(), width, controlsRow.getHeight());
+            controls[i]->setBounds(controlBounds);
+            x += width + gap;
+        }
+    }
+
+private:
+    class InlineControlLookAndFeel final : public juce::LookAndFeel_V4
+    {
+    public:
+        InlineControlLookAndFeel()
+        {
+            refreshThemeColours();
+        }
+
+        void refreshThemeColours()
+        {
+            setColour(juce::PropertyComponent::backgroundColourId, juce::Colours::transparentBlack);
+            setColour(juce::PropertyComponent::labelTextColourId, hackerText());
+            setColour(juce::Label::textColourId, hackerText());
+            setColour(juce::TextButton::buttonColourId, hackerBgField());
+            setColour(juce::TextButton::buttonOnColourId, hackerBgActive());
+            setColour(juce::TextButton::textColourOffId, hackerText());
+            setColour(juce::TextButton::textColourOnId, hackerText());
+            setColour(juce::ToggleButton::textColourId, hackerText());
+            setColour(juce::ToggleButton::tickColourId, hackerText());
+            setColour(juce::ToggleButton::tickDisabledColourId, hackerTextMuted());
+            setColour(juce::TextEditor::backgroundColourId, hackerBgField());
+            setColour(juce::TextEditor::textColourId, hackerText());
+            setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.85f));
+            setColour(juce::TextEditor::outlineColourId, hackerBorder());
+            setColour(juce::TextEditor::focusedOutlineColourId, hackerBorderStrong());
+        }
+
+        juce::Rectangle<int> getPropertyComponentContentPosition(juce::PropertyComponent& component) override
+        {
+            return component.getLocalBounds().reduced(1, 1);
+        }
+
+        void drawPropertyComponentBackground(juce::Graphics&, int, int, juce::PropertyComponent&) override {}
+        void drawPropertyComponentLabel(juce::Graphics&, int, int, juce::PropertyComponent&) override {}
+
+        juce::Font getLabelFont(juce::Label&) override
+        {
+            return makeLabelFont(Typography::label, false);
+        }
+    };
+
+    void refreshThemeColours()
+    {
+        inlineLookAndFeel.refreshThemeColours();
+        titleLabel.setText(titleText, juce::dontSendNotification);
+        titleLabel.setColour(juce::Label::textColourId, hackerText());
+        for (auto* label : labels)
+        {
+            if (label == nullptr)
+                continue;
+            label->setColour(juce::Label::textColourId, hackerTextDim());
+        }
+        repaint();
+    }
+
+    juce::String titleText;
+    juce::Label titleLabel;
+    juce::OwnedArray<juce::Label> labels;
+    juce::OwnedArray<juce::PropertyComponent> controls;
+    InlineControlLookAndFeel inlineLookAndFeel;
+};
+
 struct ConsoleCommandResult
 {
     juce::String output;
@@ -1634,6 +1908,40 @@ public:
         refreshThemeColours();
     }
 
+    ConsoleCommandResult submitCommandForTesting(const juce::String& command, bool recordInHistory = true)
+    {
+        const juce::String trimmed = command.trim();
+        if (trimmed.isEmpty())
+            return {};
+
+        appendOutputLine("> " + trimmed);
+
+        if (recordInHistory && (commandHistory.isEmpty() || !commandHistory[commandHistory.size() - 1].equalsIgnoreCase(trimmed)))
+            commandHistory.add(trimmed);
+        while (commandHistory.size() > 200)
+            commandHistory.remove(0);
+        historyCursor = -1;
+
+        ConsoleCommandResult result;
+        if (commandHandler)
+            result = commandHandler(trimmed);
+
+        if (result.clearOutput)
+            outputLines.clear();
+
+        if (result.output.isNotEmpty())
+        {
+            juce::StringArray lines;
+            lines.addLines(result.output);
+            if (lines.isEmpty())
+                lines.add(result.output);
+            appendOutputLines(lines);
+        }
+
+        updateHudLine();
+        return result;
+    }
+
 private:
     class HistoryTextEditor final : public juce::TextEditor
     {
@@ -1713,6 +2021,7 @@ private:
         historyCursor = -1;
 
         ConsoleCommandResult result;
+        maybeShowResetWaitIndicator(command);
         if (commandHandler)
             result = commandHandler(command);
 
@@ -1732,6 +2041,30 @@ private:
         inputEditor.clear();
     }
 
+    void maybeShowResetWaitIndicator(const juce::String& command)
+    {
+        juce::StringArray tokens;
+        tokens.addTokens(command, " \t", "\"'");
+        tokens.trim();
+        tokens.removeEmptyStrings();
+        if (tokens.size() < 2)
+            return;
+        if (!tokens[0].equalsIgnoreCase("reset"))
+            return;
+
+        const juce::String target = tokens[1].trim().unquoted();
+        if (target.isEmpty())
+            return;
+
+        static constexpr const char* frames[] = { "::", ".:", ":." };
+        const auto frame = juce::String(frames[spinnerFrameIndex % 3]);
+        ++spinnerFrameIndex;
+
+        appendOutputLine("resetting: '" + target + "' " + frame);
+        if (auto* peer = outputEditor.getPeer())
+            peer->performAnyPendingRepaintsNow();
+    }
+
     void appendOutputLine(const juce::String& line)
     {
         juce::StringArray singleLine;
@@ -1741,10 +2074,15 @@ private:
 
     void appendOutputLines(const juce::StringArray& lines)
     {
-        for (const auto& line : lines)
-            outputLines.add(line);
-        while (outputLines.size() > 600)
-            outputLines.remove(0);
+        if (lines.isEmpty())
+            return;
+
+        outputLines.addArray(lines);
+        constexpr int kMaxConsoleOutputLines = 600;
+        const int overflow = outputLines.size() - kMaxConsoleOutputLines;
+        if (overflow > 0)
+            outputLines.removeRange(0, overflow);
+
         outputEditor.setText(outputLines.joinIntoString("\n"), juce::dontSendNotification);
         outputEditor.moveCaretToEnd();
     }
@@ -1763,6 +2101,7 @@ private:
     juce::StringArray outputLines;
     juce::StringArray commandHistory;
     int historyCursor = -1;
+    int spinnerFrameIndex = 0;
 };
 
 class SparklinePropertyComponent : public juce::PropertyComponent
@@ -2896,6 +3235,22 @@ inline void addPanelSection(juce::PropertyPanel& panel, const juce::String& name
     for (auto* prop : props)
         prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), 38));
     panel.addSection(name, props, shouldBeOpen);
+    stylePanel(panel);
+}
+
+inline void addFlatPanelGroup(juce::PropertyPanel& panel, const juce::String& title,
+                              juce::Array<juce::PropertyComponent*>& props)
+{
+    juce::Array<juce::PropertyComponent*> rows;
+    rows.add(new FlatSectionHeaderPropertyComponent(title));
+    for (auto* prop : props)
+    {
+        if (prop == nullptr)
+            continue;
+        prop->setPreferredHeight(juce::jmax(prop->getPreferredHeight(), 38));
+        rows.add(prop);
+    }
+    panel.addProperties(rows);
     stylePanel(panel);
 }
 

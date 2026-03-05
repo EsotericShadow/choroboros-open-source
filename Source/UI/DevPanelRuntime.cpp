@@ -20,6 +20,8 @@
 #include "../Plugin/PluginEditor.h"
 #include "../Plugin/PluginProcessor.h"
 #include "DevPanelSupport.h"
+#include <cmath>
+#include <limits>
 
 using namespace devpanel;
 
@@ -69,6 +71,18 @@ void applySectionFilterToPanel(juce::PropertyPanel& panel, const juce::String& f
     for (int i = 0; i < sectionNames.size(); ++i)
         panel.setSectionOpen(i, hasAnyMatch && matches[i]);
 }
+
+void openAllSections(juce::PropertyPanel& panel)
+{
+    const auto sectionNames = panel.getSectionNames();
+    for (int i = 0; i < sectionNames.size(); ++i)
+        panel.setSectionOpen(i, true);
+}
+
+int rectangleArea(const juce::Rectangle<int>& r)
+{
+    return juce::jmax(0, r.getWidth()) * juce::jmax(0, r.getHeight());
+}
 }
 
 int DevPanel::getSelectedSubTab() const
@@ -83,10 +97,10 @@ int DevPanel::getSubTabCount(int mainTab) const
     switch (juce::jlimit(0, 6, mainTab))
     {
         case 0: return 2; // Overview
-        case 1: return 3; // Modulation
+        case 1: return 0; // Modulation (unified deck, no secondary tabs)
         case 2: return 2; // Tone
-        case 3: return 4; // Engine
-        case 4: return 4; // Look & Feel
+        case 3: return 3; // Engine
+        case 4: return 5; // Look & Feel
         case 5: return 3; // Validation
         case 6: return 1; // Settings
         default: break;
@@ -107,21 +121,15 @@ juce::String DevPanel::getSubTabName(int mainTab, int subTab) const
                 case 1: default: return "Delay Visual";
             }
         case 1:
-            switch (safeSubTab)
-            {
-                case 0: return "LFO Left";
-                case 1: return "LFO Right";
-                case 2: default: return "Trajectory";
-            }
+            return "LFO + Trajectory";
         case 2:
             switch (safeSubTab)
             {
                 case 0: return "Spectrum";
-                case 1: default: return "Transfer";
+                case 1: default: return "Engine Response";
             }
         case 3:
         {
-            static const juce::String engineNames[] { "Green", "Blue", "Red", "Purple", "Black" };
             const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
             const bool hq = processor.isHqEnabled();
             juce::String macroLabel;
@@ -134,13 +142,11 @@ juce::String DevPanel::getSubTabName(int mainTab, int subTab) const
                 case 4: macroLabel = hq ? "Ensemble Macros" : "Intensity Macros"; break;
                 default: macroLabel = "Engine Macros"; break;
             }
-            const juce::String internalsLabel = engineNames[engine] + (hq ? " HQ Internals" : " NQ Internals");
             switch (safeSubTab)
             {
                 case 0: return "Signal Flow";
                 case 1: return "Engine Identity";
-                case 2: return macroLabel;
-                case 3: default: return internalsLabel;
+                case 2: default: return macroLabel;
             }
         }
         case 4:
@@ -149,14 +155,15 @@ juce::String DevPanel::getSubTabName(int mainTab, int subTab) const
                 case 0: return "Mapping";
                 case 1: return "UI Feel";
                 case 2: return "Engine Layout";
-                case 3: default: return "Global Layout";
+                case 3: return "Global Layout";
+                case 4: default: return "Text Animations";
             }
         case 5:
             switch (safeSubTab)
             {
                 case 0: return "Telemetry";
                 case 1: return "Trace Matrix";
-                case 2: default: return "Live Log";
+                case 2: default: return "Console";
             }
         case 6:
             switch (safeSubTab)
@@ -197,14 +204,14 @@ juce::PropertyPanel* DevPanel::getActiveEngineInternalsPanel()
 
 void DevPanel::refreshSecondaryTabButtons()
 {
-    juce::TextButton* buttons[4] = { &subTabButtonA, &subTabButtonB, &subTabButtonC, &subTabButtonD };
+    juce::TextButton* buttons[5] = { &subTabButtonA, &subTabButtonB, &subTabButtonC, &subTabButtonD, &subTabButtonE };
     const int safeMainTab = juce::jlimit(0, 6, selectedRightTab);
     const int subTabCount = getSubTabCount(safeMainTab);
     selectedSubTabs[static_cast<size_t>(safeMainTab)] =
         juce::jlimit(0, juce::jmax(0, subTabCount - 1), selectedSubTabs[static_cast<size_t>(safeMainTab)]);
     const int selectedSubTab = getSelectedSubTab();
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         auto* button = buttons[i];
         const bool visible = i < subTabCount;
@@ -341,6 +348,131 @@ void DevPanel::resized()
         y += deckHeight + spacing.afterDeckGap;
     };
 
+    auto layoutModulationDeck = [&](int x, int width, int& y, const DeckSpacing& spacing)
+    {
+        auto findRoleCard = [&](const juce::String& role) -> juce::PropertyComponent*
+        {
+            for (auto* card : modulationVisualDeckCards)
+            {
+                if (card == nullptr)
+                    continue;
+                if (!card->getProperties().contains("devpanelModRole"))
+                    continue;
+                if (card->getProperties()["devpanelModRole"].toString() == role)
+                    return card;
+            }
+            return nullptr;
+        };
+
+        for (auto* card : modulationVisualDeckCards)
+        {
+            if (card == nullptr)
+                continue;
+            card->setVisible(false);
+            card->setBounds(0, 0, 0, 0);
+        }
+
+        auto* lfoLeftCard = findRoleCard("lfo_left");
+        auto* lfoRightCard = findRoleCard("lfo_right");
+        auto* trajectoryCard = findRoleCard("trajectory");
+        auto* workbenchCard = findRoleCard("lfo_workbench");
+
+        if (lfoLeftCard == nullptr && modulationVisualDeckCards.size() > 0)
+            lfoLeftCard = modulationVisualDeckCards[0];
+        if (lfoRightCard == nullptr && modulationVisualDeckCards.size() > 1)
+            lfoRightCard = modulationVisualDeckCards[1];
+        if (trajectoryCard == nullptr && modulationVisualDeckCards.size() > 2)
+            trajectoryCard = modulationVisualDeckCards[2];
+        if (workbenchCard == nullptr && modulationVisualDeckCards.size() > 3)
+            workbenchCard = modulationVisualDeckCards[3];
+
+        if (lfoLeftCard == nullptr && lfoRightCard == nullptr
+            && trajectoryCard == nullptr && workbenchCard == nullptr)
+        {
+            modulationVisualDeck.setBounds(0, 0, 0, 0);
+            return;
+        }
+
+        const int innerWidth = juce::jmax(40, width - spacing.deckPadding * 2);
+        const int rowGap = juce::jmax(8, spacing.cardGap);
+        int rowTopY = spacing.deckPadding;
+        int topRowHeight = 0;
+        int trajectoryHeight = 0;
+        int workbenchHeight = 0;
+
+        if (lfoLeftCard != nullptr || lfoRightCard != nullptr)
+        {
+            const int leftHeight = lfoLeftCard != nullptr ? lfoLeftCard->getPreferredHeight() : 0;
+            const int rightHeight = lfoRightCard != nullptr ? lfoRightCard->getPreferredHeight() : 0;
+            topRowHeight = juce::jmax(leftHeight, rightHeight);
+            rowTopY += topRowHeight + rowGap;
+        }
+
+        if (trajectoryCard != nullptr)
+        {
+            trajectoryHeight = trajectoryCard->getPreferredHeight();
+            rowTopY += trajectoryHeight + rowGap;
+        }
+
+        if (workbenchCard != nullptr)
+        {
+            workbenchHeight = workbenchCard->getPreferredHeight();
+            rowTopY += workbenchHeight + rowGap;
+        }
+
+        const int contentHeight = rowTopY - rowGap;
+        const int deckHeight = juce::jmax(0, contentHeight + spacing.deckPadding);
+        modulationVisualDeck.setBounds(x, y, width, deckHeight);
+
+        int cy = spacing.deckPadding;
+
+        if (lfoLeftCard != nullptr || lfoRightCard != nullptr)
+        {
+            const int sharedHeight = topRowHeight;
+            if (lfoLeftCard != nullptr && lfoRightCard != nullptr)
+            {
+                const int twoUpGap = juce::jmax(10, rowGap);
+                const int leftWidth = juce::jmax(80, (innerWidth - twoUpGap) / 2);
+                const int rightWidth = juce::jmax(80, innerWidth - leftWidth - twoUpGap);
+                lfoLeftCard->setVisible(true);
+                lfoRightCard->setVisible(true);
+                lfoLeftCard->setBounds(spacing.deckPadding, cy, leftWidth, sharedHeight);
+                lfoRightCard->setBounds(spacing.deckPadding + leftWidth + twoUpGap, cy, rightWidth, sharedHeight);
+            }
+            else if (lfoLeftCard != nullptr)
+            {
+                lfoLeftCard->setVisible(true);
+                lfoLeftCard->setBounds(spacing.deckPadding, cy, innerWidth, sharedHeight);
+            }
+            else if (lfoRightCard != nullptr)
+            {
+                lfoRightCard->setVisible(true);
+                lfoRightCard->setBounds(spacing.deckPadding, cy, innerWidth, sharedHeight);
+            }
+            cy += sharedHeight + rowGap;
+        }
+
+        if (trajectoryCard != nullptr)
+        {
+            int trajectoryWidth = innerWidth;
+            if (innerWidth > 560)
+                trajectoryWidth = juce::roundToInt(static_cast<float>(innerWidth) * 0.76f);
+            trajectoryWidth = juce::jlimit(220, innerWidth, trajectoryWidth);
+            const int trajectoryX = spacing.deckPadding + (innerWidth - trajectoryWidth) / 2;
+            trajectoryCard->setVisible(true);
+            trajectoryCard->setBounds(trajectoryX, cy, trajectoryWidth, trajectoryHeight);
+            cy += trajectoryHeight + rowGap;
+        }
+
+        if (workbenchCard != nullptr)
+        {
+            workbenchCard->setVisible(true);
+            workbenchCard->setBounds(spacing.deckPadding, cy, innerWidth, workbenchHeight);
+        }
+
+        y += deckHeight + spacing.afterDeckGap;
+    };
+
     int leftY = contentInsetTop;
     int rightY = contentInsetTop;
     const int selectedSubTab = getSelectedSubTab();
@@ -368,22 +500,32 @@ void DevPanel::resized()
     const int subTabHeight = 30;
     const int subTabGap = 6;
     const int subTabCount = getSubTabCount(selectedRightTab);
-    const int subTabButtonWidth = juce::jmax(108, (rightColumnWidth - (subTabGap * juce::jmax(0, subTabCount - 1))) / juce::jmax(1, subTabCount));
-    juce::TextButton* subTabButtons[4] = { &subTabButtonA, &subTabButtonB, &subTabButtonC, &subTabButtonD };
-    int subTabX = rightColumnX;
-    for (int i = 0; i < 4; ++i)
+    juce::TextButton* subTabButtons[5] = { &subTabButtonA, &subTabButtonB, &subTabButtonC, &subTabButtonD, &subTabButtonE };
+    if (subTabCount > 0)
     {
-        if (i < subTabCount)
+        const int subTabButtonWidth = juce::jmax(108, (rightColumnWidth - (subTabGap * juce::jmax(0, subTabCount - 1)))
+                                                       / juce::jmax(1, subTabCount));
+        int subTabX = rightColumnX;
+        for (int i = 0; i < 5; ++i)
         {
-            subTabButtons[i]->setBounds(subTabX, rightY, subTabButtonWidth, subTabHeight);
-            subTabX += subTabButtonWidth + subTabGap;
+            if (i < subTabCount)
+            {
+                subTabButtons[i]->setBounds(subTabX, rightY, subTabButtonWidth, subTabHeight);
+                subTabX += subTabButtonWidth + subTabGap;
+            }
+            else
+            {
+                subTabButtons[i]->setBounds(0, 0, 0, 0);
+            }
         }
-        else
-        {
-            subTabButtons[i]->setBounds(0, 0, 0, 0);
-        }
+        rightY += subTabHeight + 14;
     }
-    rightY += subTabHeight + 14;
+    else
+    {
+        for (auto* button : subTabButtons)
+            button->setBounds(0, 0, 0, 0);
+        rightY += 2;
+    }
 
     const int activeProfileH = 26;
     activeProfileLabel.setBounds(rightColumnX, rightY, rightColumnWidth, activeProfileH);
@@ -402,7 +544,7 @@ void DevPanel::resized()
     devHqModeToggle.setBounds(rightColumnX + modeLabelW + modeGap + modeComboW + modeGap, rightY, modeHqW, toolsH);
     rightY += toolsH + 14;
 
-    const bool showRightTools = selectedRightTab == 3 && selectedSubTab == 3;
+    const bool showRightTools = selectedRightTab == 3;
     if (showRightTools)
     {
         const int labelW = 126;
@@ -423,11 +565,42 @@ void DevPanel::resized()
         engineFilterClearButton.setBounds(0, 0, 0, 0);
     }
 
-    auto selectedDeckCards = [](const juce::Array<juce::PropertyComponent*>& source, int selectedIndex)
+    auto selectedDeckCards = [this](const juce::Array<juce::PropertyComponent*>& source, int selectedIndex)
     {
         juce::Array<juce::PropertyComponent*> result;
-        if (juce::isPositiveAndBelow(selectedIndex, source.size()))
-            result.add(source[selectedIndex]);
+        bool usedTaggedSelection = false;
+        const int activeEngineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+        const int activeHqMode = processor.isHqEnabled() ? 1 : 0;
+        for (auto* card : source)
+        {
+            if (card == nullptr)
+                continue;
+            if (!card->getProperties().contains("devpanelSubTab"))
+                continue;
+            usedTaggedSelection = true;
+            const int cardSubTab = static_cast<int>(card->getProperties()["devpanelSubTab"]);
+            if (cardSubTab != selectedIndex)
+                continue;
+            if (card->getProperties().contains("devpanelEngineIndex"))
+            {
+                const int cardEngine = static_cast<int>(card->getProperties()["devpanelEngineIndex"]);
+                if (cardEngine != activeEngineIndex)
+                    continue;
+            }
+            if (card->getProperties().contains("devpanelHqMode"))
+            {
+                const int cardHqMode = static_cast<int>(card->getProperties()["devpanelHqMode"]);
+                if (cardHqMode >= 0 && cardHqMode != activeHqMode)
+                    continue;
+            }
+            result.add(card);
+        }
+
+        if (!usedTaggedSelection)
+        {
+            if (juce::isPositiveAndBelow(selectedIndex, source.size()))
+                result.add(source[selectedIndex]);
+        }
         return result;
     };
 
@@ -446,7 +619,7 @@ void DevPanel::resized()
     }
 
     inspectorTitle.setText("Inspector", juce::dontSendNotification);
-    inspectorDescription.setText(inspectorScope + " controls/readouts. Expand sections to edit values.",
+    inspectorDescription.setText(inspectorScope + " controls/readouts. Use sections to edit values.",
                                  juce::dontSendNotification);
     const int inspectorTitleH = 30;
     const int inspectorDescH = 22;
@@ -470,15 +643,6 @@ void DevPanel::resized()
     else if (selectedRightTab == 3)
     {
         layoutPanelOnly(leftX, leftColumnWidth, leftY, enginePanel, compactSection);
-        if (selectedSubTab == 3)
-        {
-            if (auto* activeInternalsPanel = getActiveEngineInternalsPanel())
-                layoutPanelOnly(leftX, leftColumnWidth, leftY, *activeInternalsPanel, compactSection);
-            if (bbdPanel.isVisible())
-                layoutPanelOnly(leftX, leftColumnWidth, leftY, bbdPanel, compactSection);
-            if (tapePanel.isVisible())
-                layoutPanelOnly(leftX, leftColumnWidth, leftY, tapePanel, compactSection);
-        }
     }
     else if (selectedRightTab == 4)
     {
@@ -491,8 +655,10 @@ void DevPanel::resized()
             if (auto* activeEnginePanel = getActiveEngineLayoutPanel())
                 layoutPanelOnly(leftX, leftColumnWidth, leftY, *activeEnginePanel, compactSection);
         }
-        else
+        else if (selectedSubTab == 3)
             layoutPanelOnly(leftX, leftColumnWidth, leftY, layoutGlobalPanel, compactSection);
+        else if (selectedSubTab == 4)
+            layoutPanelOnly(leftX, leftColumnWidth, leftY, layoutTextAnimationPanel, compactSection);
     }
     else if (selectedRightTab == 5)
     {
@@ -512,8 +678,7 @@ void DevPanel::resized()
     else if (selectedRightTab == 1)
     {
         layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, modulationTitle, modulationDescription, visualSection);
-        auto cards = selectedDeckCards(modulationVisualDeckCards, selectedSubTab);
-        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, modulationVisualDeck, cards, modulationVisualDeckCards, modulationDeckSpacing);
+        layoutModulationDeck(rightColumnX, rightColumnWidth, rightY, modulationDeckSpacing);
     }
     else if (selectedRightTab == 2)
     {
@@ -524,8 +689,29 @@ void DevPanel::resized()
     else if (selectedRightTab == 3)
     {
         layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, engineTitle, engineDescription, visualSection);
-        auto cards = selectedDeckCards(engineVisualDeckCards, 0);
-        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, engineVisualDeck, cards, engineVisualDeckCards, engineDeckSpacing);
+        juce::Array<juce::PropertyComponent*> engineCards;
+        auto appendUnique = [&engineCards](const juce::Array<juce::PropertyComponent*>& source)
+        {
+            for (auto* card : source)
+            {
+                if (card == nullptr)
+                    continue;
+                if (!engineCards.contains(card))
+                    engineCards.add(card);
+            }
+        };
+
+        // Keep signal flow visible; show identity/macros only when their subtab is selected.
+        appendUnique(selectedDeckCards(engineVisualDeckCards, 0));
+        appendUnique(selectedDeckCards(engineVisualDeckCards, selectedSubTab));
+        layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, engineVisualDeck, engineCards, engineVisualDeckCards, engineDeckSpacing);
+
+        if (auto* activeInternalsPanel = getActiveEngineInternalsPanel())
+            layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, *activeInternalsPanel, compactSection);
+        if (bbdPanel.isVisible())
+            layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, bbdPanel, compactSection);
+        if (tapePanel.isVisible())
+            layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, tapePanel, compactSection);
     }
     else if (selectedRightTab == 4)
     {
@@ -586,6 +772,19 @@ void DevPanel::resized()
     const int maxViewY = juce::jmax(0, content.getHeight() - viewport.getViewHeight());
     viewport.setViewPosition(juce::jlimit(0, maxViewX, previousViewPos.x),
                              juce::jlimit(0, maxViewY, previousViewPos.y));
+
+    if (tutorialActive)
+    {
+        layoutTutorialOverlay();
+        updateTutorialHighlight();
+        tutorialFocusHighlight.toFront(false);
+        tutorialOverlay.toFront(false);
+    }
+    else
+    {
+        tutorialOverlay.setVisible(false);
+        tutorialFocusHighlight.setVisible(false);
+    }
 }
 
 void DevPanel::updateActiveProfileLabel()
@@ -616,6 +815,9 @@ void DevPanel::updateActiveProfileLabel()
     styleHackerTextButton(fxPresetSubtleButton, false);
     styleHackerTextButton(fxPresetMediumButton, false);
     styleHackerTextButton(engineFilterClearButton, false);
+    styleHackerTextButton(tutorialNextButton, false);
+    styleHackerTextButton(tutorialNextSectionButton, false);
+    styleHackerTextButton(tutorialSkipButton, false);
     styleHackerEditor(engineFilterEditor);
 
     activeProfileLabel.setText("Active Profile: " + profileName,
@@ -660,7 +862,7 @@ void DevPanel::updateEngineSectionVisibility()
 {
     const int colorIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     const bool hqEnabled = processor.isHqEnabled();
-    const bool showEngine = selectedRightTab == 3 && getSelectedSubTab() == 3;
+    const bool showEngine = selectedRightTab == 3;
     setActiveEngineSectionPrefix({}, false);
     const bool isRedNQ = colorIndex == 2 && !hqEnabled;
     const bool isRedHQ = colorIndex == 2 && hqEnabled;
@@ -788,6 +990,7 @@ void DevPanel::updateRightTabVisibility()
     const bool showLookFeelUi = showLookFeel && selectedSubTab == 1;
     const bool showLookFeelEngineLayout = showLookFeel && selectedSubTab == 2;
     const bool showLookFeelGlobalLayout = showLookFeel && selectedSubTab == 3;
+    const bool showLookFeelTextAnimations = showLookFeel && selectedSubTab == 4;
     const bool showLayoutGreen = showLookFeelEngineLayout && activeEngineIndex == 0;
     const bool showLayoutBlue = showLookFeelEngineLayout && activeEngineIndex == 1;
     const bool showLayoutRed = showLookFeelEngineLayout && activeEngineIndex == 2;
@@ -818,6 +1021,7 @@ void DevPanel::updateRightTabVisibility()
     uiDescription.setVisible(showLookFeelUi);
     uiPanel.setVisible(showLookFeelUi);
     layoutGlobalPanel.setVisible(showLookFeelGlobalLayout);
+    layoutTextAnimationPanel.setVisible(showLookFeelTextAnimations);
     layoutGreenPanel.setVisible(showLayoutGreen);
     layoutBluePanel.setVisible(showLayoutBlue);
     layoutRedPanel.setVisible(showLayoutRed);
@@ -828,7 +1032,7 @@ void DevPanel::updateRightTabVisibility()
     devEngineModeLabel.setVisible(true);
     devEngineModeBox.setVisible(true);
     devHqModeToggle.setVisible(true);
-    const bool showEngineInternalsTools = showEngine && selectedSubTab == 3;
+    const bool showEngineInternalsTools = showEngine;
     engineFilterLabel.setVisible(showEngineInternalsTools);
     engineFilterEditor.setVisible(showEngineInternalsTools);
     engineFilterClearButton.setVisible(showEngineInternalsTools);
@@ -853,8 +1057,8 @@ void DevPanel::updateRightTabVisibility()
     saveDefaultsButton.setVisible(showSettings);
     copyJsonButton.setVisible(showSettings);
 
-    internalsTitle.setVisible(showEngine && selectedSubTab == 3);
-    internalsDescription.setVisible(showEngine && selectedSubTab == 3);
+    internalsTitle.setVisible(false);
+    internalsDescription.setVisible(false);
     internalsGreenNqPanel.setVisible(false);
     internalsGreenHqPanel.setVisible(false);
     internalsBlueNqPanel.setVisible(false);
@@ -874,12 +1078,22 @@ void DevPanel::updateRightTabVisibility()
     setAllSectionsEnabled(mappingPanel, showLookFeelMapping);
     setAllSectionsEnabled(uiPanel, showLookFeelUi);
     setAllSectionsEnabled(layoutGlobalPanel, showLookFeelGlobalLayout);
+    setAllSectionsEnabled(layoutTextAnimationPanel, showLookFeelTextAnimations);
     setAllSectionsEnabled(layoutGreenPanel, showLayoutGreen);
     setAllSectionsEnabled(layoutBluePanel, showLayoutBlue);
     setAllSectionsEnabled(layoutRedPanel, showLayoutRed);
     setAllSectionsEnabled(layoutPurplePanel, showLayoutPurple);
     setAllSectionsEnabled(layoutBlackPanel, showLayoutBlack);
-    const auto* activeInternalsPanel = (showEngine && selectedSubTab == 3) ? getActiveEngineInternalsPanel() : nullptr;
+
+    if (showOverview)
+        openAllSections(overviewPanel);
+    if (showModulation)
+        openAllSections(modulationPanel);
+    if (showTone)
+        openAllSections(tonePanel);
+    if (showValidation)
+        openAllSections(validationPanel);
+    const auto* activeInternalsPanel = showEngine ? getActiveEngineInternalsPanel() : nullptr;
     auto setInternalsEnabled = [&](juce::PropertyPanel& panel)
     {
         setAllSectionsEnabled(panel, activeInternalsPanel == &panel);
@@ -894,10 +1108,10 @@ void DevPanel::updateRightTabVisibility()
     setInternalsEnabled(internalsPurpleHqPanel);
     setInternalsEnabled(internalsBlackNqPanel);
     setInternalsEnabled(internalsBlackHqPanel);
-    setAllSectionsEnabled(bbdPanel, showEngine && selectedSubTab == 3 && activeInternalsPanel == &internalsRedNqPanel);
-    setAllSectionsEnabled(tapePanel, showEngine && selectedSubTab == 3 && activeInternalsPanel == &internalsRedHqPanel);
+    setAllSectionsEnabled(bbdPanel, showEngine && activeInternalsPanel == &internalsRedNqPanel);
+    setAllSectionsEnabled(tapePanel, showEngine && activeInternalsPanel == &internalsRedHqPanel);
 
-    if (showEngine && selectedSubTab == 3)
+    if (showEngine)
     {
         updateEngineSectionVisibility();
     }
@@ -931,10 +1145,10 @@ void DevPanel::updateRightTabVisibility()
     if (!showValidation)
         validationVisualDeck.setBounds(0, 0, 0, 0);
 
-    bbdTitle.setVisible(showEngine && selectedSubTab == 3 && bbdPanel.isVisible());
-    bbdDescription.setVisible(showEngine && selectedSubTab == 3 && bbdPanel.isVisible());
-    tapeTitle.setVisible(showEngine && selectedSubTab == 3 && tapePanel.isVisible());
-    tapeDescription.setVisible(showEngine && selectedSubTab == 3 && tapePanel.isVisible());
+    bbdTitle.setVisible(false);
+    bbdDescription.setVisible(false);
+    tapeTitle.setVisible(false);
+    tapeDescription.setVisible(false);
 
     tabOverviewButton.setToggleState(showOverview, juce::dontSendNotification);
     tabInternalsButton.setToggleState(showModulation, juce::dontSendNotification);
@@ -1010,6 +1224,17 @@ int DevPanel::refreshVisibleLiveReadouts()
 void DevPanel::timerCallback()
 {
     updateConsoleSweeps();
+
+    if (tutorialActive)
+    {
+        ++tutorialPulseTick;
+        const float pulse = 0.55f + 0.45f * std::sin(static_cast<float>(tutorialPulseTick) * 0.24f);
+        tutorialFocusHighlight.setPulseAlpha(pulse);
+        layoutTutorialOverlay();
+        updateTutorialHighlight();
+        tutorialFocusHighlight.toFront(false);
+        tutorialOverlay.toFront(false);
+    }
 
     auto readRaw = [this](const char* paramId) -> float
     {
@@ -1125,6 +1350,16 @@ void DevPanel::timerCallback()
         refreshVisibleLiveReadouts();
     }
 
+    // These inspector tabs are intentionally fixed-open to avoid tiny accordion sections.
+    if (selectedRightTab == 0)
+        openAllSections(overviewPanel);
+    else if (selectedRightTab == 1)
+        openAllSections(modulationPanel);
+    else if (selectedRightTab == 2)
+        openAllSections(tonePanel);
+    else if (selectedRightTab == 5)
+        openAllSections(validationPanel);
+
     const auto panelHeightDrifted = [](juce::PropertyPanel& panel, int panelPadding) -> bool
     {
         if (!panel.isVisible() || !panel.isShowing())
@@ -1139,6 +1374,7 @@ void DevPanel::timerCallback()
         panelHeightDrifted(mappingPanel, kPanelAutoPadding)
         || panelHeightDrifted(uiPanel, kPanelAutoPadding)
         || panelHeightDrifted(layoutGlobalPanel, kPanelAutoPadding)
+        || panelHeightDrifted(layoutTextAnimationPanel, kPanelAutoPadding)
         || panelHeightDrifted(layoutGreenPanel, kPanelAutoPadding)
         || panelHeightDrifted(layoutBluePanel, kPanelAutoPadding)
         || panelHeightDrifted(layoutRedPanel, kPanelAutoPadding)
@@ -1184,4 +1420,985 @@ void DevPanel::timerCallback()
             resetFactoryButton.setEnabled(true);
         }
     }
+}
+
+bool DevPanel::startTutorial(const juce::String& requestedTopic, juce::String& statusMessage)
+{
+    juce::String resolvedTopic;
+    juce::String resolvedTitle;
+    auto steps = buildTutorialScript(requestedTopic, resolvedTopic, resolvedTitle);
+    if (steps.empty())
+    {
+        statusMessage = "ERROR: unknown tutorial topic `"
+                      + (requestedTopic.trim().isEmpty() ? juce::String("core") : requestedTopic.trim())
+                      + "`. Try: core, overview, modulation, tone, engine, validation, bbd, tape, phase, bimodulation, saturation, envelope.";
+        return false;
+    }
+
+    tutorialActive = true;
+    tutorialTopicKey = resolvedTopic;
+    tutorialTopicTitle = resolvedTitle;
+    tutorialSteps = std::move(steps);
+    tutorialStepIndex = 0;
+    tutorialFocusTarget.clear();
+    tutorialPulseTick = 0;
+    tutorialOverlay.setVisible(true);
+
+    applyTutorialStep();
+    statusMessage = "Started tutorial `" + tutorialTopicKey + "` (" + juce::String(static_cast<int>(tutorialSteps.size()))
+                + " steps). Use Next/Got It or `tutorial skip`.";
+    return true;
+}
+
+bool DevPanel::stopTutorial(bool skipped, juce::String& statusMessage)
+{
+    if (!tutorialActive)
+    {
+        statusMessage = "No active tutorial.";
+        return false;
+    }
+
+    const juce::String finishedTitle = tutorialTopicTitle.isNotEmpty() ? tutorialTopicTitle : tutorialTopicKey;
+    tutorialActive = false;
+    tutorialTopicKey.clear();
+    tutorialTopicTitle.clear();
+    tutorialSteps.clear();
+    tutorialStepIndex = -1;
+    tutorialFocusTarget.clear();
+    tutorialPulseTick = 0;
+    tutorialOverlay.setVisible(false);
+    tutorialFocusHighlight.setVisible(false);
+    resized();
+    repaint();
+
+    if (skipped)
+    {
+        statusMessage = "Tutorial skipped.";
+        appendRecentTouchLogLine("Tutorial skipped: " + finishedTitle);
+    }
+    else
+    {
+        statusMessage = "Tutorial complete: " + finishedTitle + ".";
+        appendRecentTouchLogLine("Tutorial complete: " + finishedTitle);
+    }
+    return true;
+}
+
+void DevPanel::advanceTutorialStep()
+{
+    if (!tutorialActive)
+        return;
+
+    ++tutorialStepIndex;
+    if (tutorialStepIndex >= static_cast<int>(tutorialSteps.size()))
+    {
+        juce::String status;
+        stopTutorial(false, status);
+        return;
+    }
+    applyTutorialStep();
+}
+
+void DevPanel::advanceTutorialSection()
+{
+    if (!tutorialActive)
+        return;
+
+    const int currentTab = selectedRightTab;
+    const int currentSubTab = getSelectedSubTab();
+
+    int effectiveTab = currentTab;
+    int effectiveSubTab = currentSubTab;
+    for (int i = tutorialStepIndex + 1; i < static_cast<int>(tutorialSteps.size()); ++i)
+    {
+        const auto& step = tutorialSteps[static_cast<size_t>(i)];
+        const int nextTab = step.rightTab >= 0 ? juce::jlimit(0, 6, step.rightTab) : effectiveTab;
+        const int nextSubTab = step.subTab >= 0 ? juce::jlimit(0, juce::jmax(0, getSubTabCount(nextTab) - 1), step.subTab)
+                                                : effectiveSubTab;
+
+        if (nextTab != currentTab || nextSubTab != currentSubTab)
+        {
+            tutorialStepIndex = i;
+            applyTutorialStep();
+            return;
+        }
+
+        effectiveTab = nextTab;
+        effectiveSubTab = nextSubTab;
+    }
+
+    juce::String status;
+    stopTutorial(false, status);
+}
+
+void DevPanel::applyTutorialStep()
+{
+    if (!tutorialActive || tutorialStepIndex < 0 || tutorialStepIndex >= static_cast<int>(tutorialSteps.size()))
+        return;
+
+    const auto& step = tutorialSteps[static_cast<size_t>(tutorialStepIndex)];
+
+    if (step.forceEngine >= 0)
+    {
+        const int engineIndex = juce::jlimit(0, 4, step.forceEngine);
+        if (auto* param = processor.getValueTreeState().getParameter(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+        {
+            const auto& range = processor.getValueTreeState().getParameterRange(ChoroborosAudioProcessor::ENGINE_COLOR_ID);
+            const float normalized = range.convertTo0to1(static_cast<float>(engineIndex));
+            param->beginChangeGesture();
+            param->setValueNotifyingHost(normalized);
+            param->endChangeGesture();
+        }
+    }
+
+    if (step.forceHq >= 0)
+    {
+        if (auto* param = processor.getValueTreeState().getParameter(ChoroborosAudioProcessor::HQ_ID))
+        {
+            const bool hqEnabled = step.forceHq > 0;
+            param->beginChangeGesture();
+            param->setValueNotifyingHost(hqEnabled ? 1.0f : 0.0f);
+            param->endChangeGesture();
+        }
+    }
+
+    if (step.rightTab >= 0)
+    {
+        selectedRightTab = juce::jlimit(0, 6, step.rightTab);
+        selectedSubTabs[static_cast<size_t>(selectedRightTab)] =
+            juce::jlimit(0, juce::jmax(0, getSubTabCount(selectedRightTab) - 1),
+                         selectedSubTabs[static_cast<size_t>(selectedRightTab)]);
+    }
+
+    const int activeTab = juce::jlimit(0, 6, selectedRightTab);
+    if (step.subTab >= 0)
+    {
+        const int clampedSub = juce::jlimit(0, juce::jmax(0, getSubTabCount(activeTab) - 1), step.subTab);
+        selectedSubTabs[static_cast<size_t>(activeTab)] = clampedSub;
+    }
+
+    tutorialFocusTarget = step.focusTarget.toLowerCase().trim();
+    refreshSecondaryTabButtons();
+    updateActiveProfileLabel();
+    updateRightTabVisibility();
+    expandTutorialFocusSections();
+    resized();
+    revealTutorialFocusTarget();
+
+    const int totalSteps = static_cast<int>(tutorialSteps.size());
+    const bool finalStep = tutorialStepIndex >= totalSteps - 1;
+    bool hasNextSection = false;
+    int effectiveTab = selectedRightTab;
+    int effectiveSubTab = getSelectedSubTab();
+    for (int i = tutorialStepIndex + 1; i < totalSteps; ++i)
+    {
+        const auto& future = tutorialSteps[static_cast<size_t>(i)];
+        const int nextTab = future.rightTab >= 0 ? juce::jlimit(0, 6, future.rightTab) : effectiveTab;
+        const int nextSub = future.subTab >= 0 ? juce::jlimit(0, juce::jmax(0, getSubTabCount(nextTab) - 1), future.subTab)
+                                               : effectiveSubTab;
+        if (nextTab != selectedRightTab || nextSub != getSelectedSubTab())
+        {
+            hasNextSection = true;
+            break;
+        }
+        effectiveTab = nextTab;
+        effectiveSubTab = nextSub;
+    }
+    tutorialStepLabel.setText("Tutorial: " + tutorialTopicTitle + "  •  Step "
+                              + juce::String(tutorialStepIndex + 1) + "/" + juce::String(totalSteps),
+                              juce::dontSendNotification);
+    tutorialTitleLabel.setText(step.title, juce::dontSendNotification);
+    tutorialBodyText.setText(step.body, juce::dontSendNotification);
+    tutorialBodyText.setCaretPosition(0);
+    tutorialFocusHintLabel.setText(step.focusHint.isNotEmpty() ? ("Focus: " + step.focusHint) : juce::String(),
+                                   juce::dontSendNotification);
+    tutorialNextButton.setButtonText(finalStep ? "Got It" : "Next");
+    tutorialNextSectionButton.setEnabled(hasNextSection);
+    tutorialNextSectionButton.setButtonText(hasNextSection ? "Next Section" : "Last Section");
+
+    juce::Colour accent = hackerText();
+    switch (activeTab)
+    {
+        case 0: accent = visualOverview(); break;
+        case 1: accent = visualModulation(); break;
+        case 2: accent = visualTone(); break;
+        case 3: accent = visualEngine(); break;
+        case 4: accent = visualLayout(); break;
+        case 5: accent = visualValidation(); break;
+        case 6: default: accent = hackerText(); break;
+    }
+    tutorialOverlay.setAccentColour(accent);
+    tutorialFocusHighlight.setAccentColour(accent);
+    tutorialFocusHighlight.setPulseAlpha(1.0f);
+    tutorialOverlay.setVisible(true);
+
+    layoutTutorialOverlay();
+    updateTutorialHighlight();
+    tutorialFocusHighlight.toFront(false);
+    tutorialOverlay.toFront(false);
+}
+
+void DevPanel::layoutTutorialOverlay()
+{
+    if (!tutorialActive || !tutorialOverlay.isVisible())
+        return;
+
+    const auto viewPos = viewport.getViewPosition();
+    juce::Rectangle<int> visibleAreaInContent(viewPos.x, viewPos.y, viewport.getViewWidth(), viewport.getViewHeight());
+    if (visibleAreaInContent.isEmpty())
+        return;
+
+    visibleAreaInContent = visibleAreaInContent.reduced(8);
+
+    juce::StringArray lines;
+    lines.addLines(tutorialBodyText.getText());
+    int estimatedLines = juce::jmax(1, lines.size());
+    for (const auto& line : lines)
+        estimatedLines += line.length() / 72;
+    estimatedLines = juce::jlimit(4, 12, estimatedLines);
+
+    const int width = juce::jlimit(360, 560, static_cast<int>(std::round(visibleAreaInContent.getWidth() * 0.45)));
+    const int bodyHeight = juce::jlimit(78, 150, estimatedLines * 12);
+    const int hintHeight = tutorialFocusHintLabel.getText().trim().isEmpty() ? 0 : 18;
+    const int height = juce::jlimit(168, 250, 20 + 30 + 4 + bodyHeight + hintHeight + 34 + 20);
+
+    auto placeCandidate = [&](int x, int y) -> juce::Rectangle<int>
+    {
+        auto candidate = juce::Rectangle<int>(x, y, width, height);
+        if (candidate.getX() < visibleAreaInContent.getX())
+            candidate.setX(visibleAreaInContent.getX());
+        if (candidate.getY() < visibleAreaInContent.getY())
+            candidate.setY(visibleAreaInContent.getY());
+        if (candidate.getRight() > visibleAreaInContent.getRight())
+            candidate.setX(visibleAreaInContent.getRight() - candidate.getWidth());
+        if (candidate.getBottom() > visibleAreaInContent.getBottom())
+            candidate.setY(visibleAreaInContent.getBottom() - candidate.getHeight());
+        return candidate;
+    };
+
+    juce::Rectangle<int> focusBounds;
+    if (auto* target = resolveTutorialFocusComponent(tutorialFocusTarget))
+    {
+        if (target->isVisible() && target->getWidth() > 0 && target->getHeight() > 0)
+            focusBounds = target->getBounds().expanded(10).getIntersection(content.getLocalBounds());
+    }
+
+    constexpr int margin = 10;
+    std::array<juce::Rectangle<int>, 4> candidates
+    {
+        placeCandidate(visibleAreaInContent.getRight() - width - margin, visibleAreaInContent.getY() + margin),
+        placeCandidate(visibleAreaInContent.getX() + margin, visibleAreaInContent.getY() + margin),
+        placeCandidate(visibleAreaInContent.getRight() - width - margin, visibleAreaInContent.getBottom() - height - margin),
+        placeCandidate(visibleAreaInContent.getX() + margin, visibleAreaInContent.getBottom() - height - margin)
+    };
+
+    juce::Rectangle<int> best = candidates[0];
+    int bestScore = std::numeric_limits<int>::max();
+    for (const auto& candidate : candidates)
+    {
+        const int overlapScore = rectangleArea(candidate.getIntersection(focusBounds)) * 10;
+        const int topBias = candidate.getY() - visibleAreaInContent.getY();
+        const int score = overlapScore + topBias;
+        if (score < bestScore)
+        {
+            bestScore = score;
+            best = candidate;
+        }
+    }
+    tutorialOverlay.setBounds(best);
+
+    auto area = tutorialOverlay.getLocalBounds().reduced(12, 10);
+    tutorialStepLabel.setBounds(area.removeFromTop(18));
+    tutorialTitleLabel.setBounds(area.removeFromTop(28));
+    area.removeFromTop(4);
+
+    auto footer = area.removeFromBottom(38 + hintHeight);
+    tutorialBodyText.setBounds(area);
+
+    if (hintHeight > 0)
+        tutorialFocusHintLabel.setBounds(footer.removeFromTop(hintHeight));
+    else
+        tutorialFocusHintLabel.setBounds(0, 0, 0, 0);
+    auto buttons = footer.removeFromBottom(34);
+    constexpr int gap = 8;
+    constexpr int skipW = 110;
+    constexpr int nextW = 96;
+    tutorialSkipButton.setBounds(buttons.removeFromLeft(skipW));
+    buttons.removeFromLeft(gap);
+    tutorialNextButton.setBounds(buttons.removeFromRight(nextW));
+    buttons.removeFromRight(gap);
+    tutorialNextSectionButton.setBounds(buttons);
+}
+
+void DevPanel::updateTutorialHighlight()
+{
+    if (!tutorialActive || tutorialFocusTarget.isEmpty())
+    {
+        tutorialFocusHighlight.setVisible(false);
+        return;
+    }
+
+    auto* target = resolveTutorialFocusComponent(tutorialFocusTarget);
+    if (target == nullptr || !target->isVisible() || target->getWidth() <= 0 || target->getHeight() <= 0)
+    {
+        tutorialFocusHighlight.setVisible(false);
+        return;
+    }
+
+    auto focusBounds = target->getBounds().expanded(8);
+    focusBounds = focusBounds.getIntersection(content.getLocalBounds());
+    if (focusBounds.isEmpty() || focusBounds.getWidth() < 16 || focusBounds.getHeight() < 16)
+    {
+        tutorialFocusHighlight.setVisible(false);
+        return;
+    }
+
+    tutorialFocusHighlight.setBounds(focusBounds);
+    tutorialFocusHighlight.setVisible(true);
+}
+
+void DevPanel::expandTutorialFocusSections()
+{
+    if (!tutorialActive)
+        return;
+
+    const juce::String key = tutorialFocusTarget.toLowerCase().trim();
+    if (key.isEmpty())
+        return;
+
+    if (key == "overview_inspector" || key == "overview_readouts")
+    {
+        openAllSections(overviewPanel);
+    }
+    else if (key == "modulation_inspector" || key == "modulation_readouts")
+    {
+        openAllSections(modulationPanel);
+    }
+    else if (key == "tone_inspector" || key == "tone_controls" || key == "tone_readouts")
+    {
+        openAllSections(tonePanel);
+    }
+    else if (key == "validation_inspector" || key == "validation_readouts")
+    {
+        openAllSections(validationPanel);
+    }
+    else if (key == "layout_inspector")
+    {
+        openAllSections(mappingPanel);
+        openAllSections(uiPanel);
+    }
+    else if (key == "layout_active_inspector")
+    {
+        const int selectedSubTab = getSelectedSubTab();
+        if (selectedRightTab == 4)
+        {
+            if (selectedSubTab == 0)
+                openAllSections(mappingPanel);
+            else if (selectedSubTab == 1)
+                openAllSections(uiPanel);
+            else if (selectedSubTab == 2)
+            {
+                if (auto* active = getActiveEngineLayoutPanel())
+                    openAllSections(*active);
+            }
+            else if (selectedSubTab == 3)
+                openAllSections(layoutGlobalPanel);
+            else if (selectedSubTab == 4)
+                openAllSections(layoutTextAnimationPanel);
+        }
+    }
+    else if (key == "engine_inspector" || key == "bbd_controls" || key == "tape_controls")
+    {
+        openAllSections(enginePanel);
+        if (auto* activeInternals = getActiveEngineInternalsPanel())
+            openAllSections(*activeInternals);
+        if (bbdPanel.isVisible())
+            openAllSections(bbdPanel);
+        if (tapePanel.isVisible())
+            openAllSections(tapePanel);
+    }
+}
+
+void DevPanel::revealTutorialFocusTarget()
+{
+    if (!tutorialActive || tutorialFocusTarget.isEmpty())
+        return;
+
+    auto* target = resolveTutorialFocusComponent(tutorialFocusTarget);
+    if (target == nullptr || !target->isVisible() || target->getWidth() <= 0 || target->getHeight() <= 0)
+        return;
+
+    const auto focusBounds = target->getBounds().expanded(18).getIntersection(content.getLocalBounds());
+    if (focusBounds.isEmpty())
+        return;
+
+    const auto viewPos = viewport.getViewPosition();
+    const auto viewportRect = juce::Rectangle<int>(viewPos.x, viewPos.y, viewport.getViewWidth(), viewport.getViewHeight());
+    int desiredX = viewportRect.getX();
+    int desiredY = viewportRect.getY();
+
+    if (focusBounds.getY() < viewportRect.getY() + 10)
+        desiredY = focusBounds.getY() - 18;
+    else if (focusBounds.getBottom() > viewportRect.getBottom() - 10)
+        desiredY = focusBounds.getBottom() - viewportRect.getHeight() + 18;
+
+    if (focusBounds.getX() < viewportRect.getX() + 10)
+        desiredX = focusBounds.getX() - 18;
+    else if (focusBounds.getRight() > viewportRect.getRight() - 10)
+        desiredX = focusBounds.getRight() - viewportRect.getWidth() + 18;
+
+    const int maxX = juce::jmax(0, content.getWidth() - viewport.getViewWidth());
+    const int maxY = juce::jmax(0, content.getHeight() - viewport.getViewHeight());
+    desiredX = juce::jlimit(0, maxX, desiredX);
+    desiredY = juce::jlimit(0, maxY, desiredY);
+
+    if (desiredX != viewPos.x || desiredY != viewPos.y)
+        viewport.setViewPosition(desiredX, desiredY);
+}
+
+juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& focusTarget) const
+{
+    const juce::String key = focusTarget.toLowerCase();
+    if (key == "active_profile") return const_cast<juce::Label*>(&activeProfileLabel);
+    if (key == "dev_profile_controls") return const_cast<juce::ComboBox*>(&devEngineModeBox);
+    if (key == "engine_selector") return const_cast<juce::ComboBox*>(&devEngineModeBox);
+    if (key == "hq_toggle") return const_cast<juce::ToggleButton*>(&devHqModeToggle);
+    if (key == "overview_visual") return const_cast<VisualDeckContent*>(&overviewVisualDeck);
+    if (key == "overview_inspector" || key == "overview_readouts")
+        return const_cast<juce::PropertyPanel*>(&overviewPanel);
+    if (key == "modulation_visual" || key == "lfo_scope") return const_cast<VisualDeckContent*>(&modulationVisualDeck);
+    if (key == "tone_visual" || key == "spectrum_visual" || key == "transfer_visual") return const_cast<VisualDeckContent*>(&toneVisualDeck);
+    if (key == "engine_visual" || key == "engine_signal_flow") return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    if (key == "validation_visual" || key == "trace_matrix" || key == "validation_console")
+        return const_cast<VisualDeckContent*>(&validationVisualDeck);
+    if (key == "modulation_controls")
+    {
+        for (auto* card : modulationVisualDeckCards)
+        {
+            if (card == nullptr || !card->isVisible())
+                continue;
+            if (card->getProperties().contains("devpanelModRole")
+                && card->getProperties()["devpanelModRole"].toString() == "lfo_workbench")
+                return card;
+        }
+        return const_cast<VisualDeckContent*>(&modulationVisualDeck);
+    }
+    if (key == "modulation_inspector" || key == "modulation_readouts")
+        return const_cast<juce::PropertyPanel*>(&modulationPanel);
+    if (key == "tone_inspector" || key == "tone_readouts")
+        return const_cast<juce::PropertyPanel*>(&tonePanel);
+    if (key == "tone_controls")
+    {
+        for (auto* card : toneVisualDeckCards)
+        {
+            if (card == nullptr || !card->isVisible())
+                continue;
+            if (card->getProperties().contains("devpanelSubTab")
+                && static_cast<int>(card->getProperties()["devpanelSubTab"]) == 1)
+            {
+                if (card->getName().containsIgnoreCase("Transfer Controls")
+                    || card->getName().containsIgnoreCase("Tone Controls")
+                    || card->getName().containsIgnoreCase("Engine Response Controls")
+                    || card->getName().containsIgnoreCase("Saturation Controls")
+                    || card->getTooltip().containsIgnoreCase("transfer controls")
+                    || card->getTooltip().containsIgnoreCase("response controls")
+                    || card->getTooltip().containsIgnoreCase("Saturation control workbench"))
+                    return card;
+            }
+        }
+        return const_cast<juce::PropertyPanel*>(&tonePanel);
+    }
+    if (key == "engine_inspector" || key == "bbd_controls" || key == "tape_controls")
+        return const_cast<juce::PropertyPanel*>(&enginePanel);
+    if (key == "validation_inspector" || key == "validation_readouts")
+        return const_cast<juce::PropertyPanel*>(&validationPanel);
+    if (key == "layout_inspector") return const_cast<juce::PropertyPanel*>(&mappingPanel);
+    if (key == "layout_active_inspector")
+    {
+        const int selectedSubTab = getSelectedSubTab();
+        if (selectedRightTab == 4)
+        {
+            if (selectedSubTab == 0) return const_cast<juce::PropertyPanel*>(&mappingPanel);
+            if (selectedSubTab == 1) return const_cast<juce::PropertyPanel*>(&uiPanel);
+            if (selectedSubTab == 2)
+            {
+                if (auto* active = const_cast<DevPanel*>(this)->getActiveEngineLayoutPanel())
+                    return active;
+            }
+            if (selectedSubTab == 3) return const_cast<juce::PropertyPanel*>(&layoutGlobalPanel);
+            if (selectedSubTab == 4) return const_cast<juce::PropertyPanel*>(&layoutTextAnimationPanel);
+        }
+    }
+    if (key == "settings_actions") return const_cast<juce::TextButton*>(&saveDefaultsButton);
+    return nullptr;
+}
+
+std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::String& requestedTopic,
+                                                                  juce::String& resolvedTopic,
+                                                                  juce::String& resolvedTitle) const
+{
+    juce::String topic = requestedTopic.trim().toLowerCase();
+    if (topic.isEmpty() || topic == "core" || topic == "full" || topic == "walkthrough" || topic == "tutorial")
+        topic = "core";
+
+    auto makeStep = [](const juce::String& title,
+                       const juce::String& body,
+                       int rightTab,
+                       int subTab,
+                       int forceEngine,
+                       int forceHq,
+                       const juce::String& focusTarget,
+                       const juce::String& focusHint) -> TutorialStep
+    {
+        TutorialStep step;
+        step.title = title;
+        step.body = body;
+        step.rightTab = rightTab;
+        step.subTab = subTab;
+        step.forceEngine = forceEngine;
+        step.forceHq = forceHq;
+        step.focusTarget = focusTarget;
+        step.focusHint = focusHint;
+        return step;
+    };
+
+    std::vector<TutorialStep> steps;
+
+    if (topic == "core")
+    {
+        resolvedTopic = "core";
+        resolvedTitle = "Core DSP Walkthrough";
+        steps.push_back(makeStep("Step 1: Orientation and Profile Target",
+                                 "Start at Profile and HQ controls. HQ/NQ means High Quality vs Normal Quality processing mode. Every edit in Modulation, Tone, and Engine writes to the active profile shown here.",
+                                 0, 0, -1, -1, "dev_profile_controls",
+                                 "Profile selector + HQ/NQ define your target profile."));
+        steps.push_back(makeStep("Step 2: Host Context First",
+                                 "Before tuning, read host sample rate and buffer size in telemetry. Different sessions can sound/measure different because DSP runs with different timing budgets.",
+                                 5, 0, -1, -1, "validation_readouts",
+                                 "Host context: sample rate + buffer size."));
+        steps.push_back(makeStep("Step 3: End-to-End Build Recipe",
+                                 "Recipe you can repeat:\n1) Start in Overview and pick profile.\n2) Set modulation motion (Rate/Depth/Width).\n3) Shape tone (LPF/HPF + drive).\n4) Validate telemetry and trace matrix.\n5) Save/export safely.",
+                                 0, 0, -1, -1, "overview_visual",
+                                 "This is the full workflow: build -> listen -> validate -> persist."));
+        steps.push_back(makeStep("Step 4: Chorus Principle",
+                                 "A chorus duplicates the signal, delays it a little, and keeps changing that delay over time. Mixing dry+moving-delay creates the thick multi-voice illusion.",
+                                 0, 0, -1, -1, "overview_visual",
+                                 "Overview / Signal Flow: chorus from first principles."));
+        steps.push_back(makeStep("Step 5: Overview Inspector Readouts",
+                                 "Use Overview inspector readouts for fast sanity checks before deep edits: active profile values, current behavior, and immediate context.",
+                                 0, 0, -1, -1, "overview_readouts",
+                                 "Overview readouts before touching controls."));
+        steps.push_back(makeStep("Step 6: Overview Delay Visual",
+                                 "Switch to Delay Visual (second-level subtab) and confirm movement shape and range. Listen for smooth motion without obvious stepping.",
+                                 0, 1, -1, -1, "overview_visual",
+                                 "Overview second-level subtab: Delay Visual."));
+        steps.push_back(makeStep("Step 7: LFO Definition and Motion",
+                                 "LFO means Low Frequency Oscillator: a slow repeating control signal that moves delay time. In Modulation, the unified motion deck shows Left/Right LFO scopes together.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "Left/Right scopes define movement speed and amount."));
+        steps.push_back(makeStep("Step 8: Modulation Controls + Readouts",
+                                 "Set core motion and listen:\n- Rate: movement speed\n- Depth: movement amount\n- Width: stereo spread\nReadouts confirm exact values while you listen.",
+                                 1, 0, -1, -1, "modulation_controls",
+                                 "Use the LFO Control Workbench under the motion visuals."));
+        steps.push_back(makeStep("Step 9: Right-Side Motion and Anti-Phase",
+                                 "Compare LFO Left and Right side-by-side. Anti-phase means one side rises while the other falls (often near 180 degrees offset), which increases stereo width.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "Left/Right phase relationship drives stereo width."));
+        steps.push_back(makeStep("Step 10: Trajectory and Zipper",
+                                 "Trajectory is how quickly targets are allowed to move over time. Zipper noise means audible stepping from abrupt parameter jumps. Use trajectory/smoothing limits to prevent it.",
+                                 1, 0, -1, -1, "modulation_visual",
+                                 "Trajectory card + LFO workbench prevent stepping artifacts."));
+        steps.push_back(makeStep("Step 11: LPF/HPF and Aliasing",
+                                 "Go to Tone / Spectrum. LPF/HPF means Low-Pass and High-Pass filters. LPF darkens highs; HPF removes lows. Aliasing is unwanted high-frequency foldback artifacts, often controlled with filtering.",
+                                 2, 0, -1, -1, "spectrum_visual",
+                                 "Tone / Spectrum: frequency shaping basics."));
+        steps.push_back(makeStep("Step 12: Tone Controls and Listening Goal",
+                                 "Tune tone with intent: reduce harsh swish with LPF, remove mud with HPF, and keep clarity in the source. Use analyzer visuals to confirm what you hear.",
+                                 2, 0, -1, -1, "tone_readouts",
+                                 "Tone inspector controls + analyzer readouts."));
+        steps.push_back(makeStep("Step 13: Engine Response and Harmonics",
+                                 "Switch to Tone / Engine Response. This subtab is engine-aware: Red modes expose saturation/tape behavior, while other engines expose their own response curves and tone behavior. Harmonics are extra overtones created by non-linearity.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Engine Response curve for the active engine."));
+        steps.push_back(makeStep("Step 14: Engine Response Controls",
+                                 "Use the Engine Response card controls while watching curve behavior. For Red, tune drive/saturation; for other engines, tune response-shaping controls tied to that engine family.",
+                                 2, 1, -1, -1, "tone_controls",
+                                 "Tone / Engine Response controls tied to audible effect."));
+        steps.push_back(makeStep("Step 15: Engine Signal Flow",
+                                 "Move to Engine / Signal Flow for algorithm routing context before fine tuning.",
+                                 3, 0, -1, -1, "engine_visual",
+                                 "Engine first subtab: routing context."));
+        steps.push_back(makeStep("Step 16: Engine Identity",
+                                 "Engine Identity shows which algorithm family is active and what behavior to expect from it.",
+                                 3, 1, -1, -1, "engine_visual",
+                                 "Engine second subtab: Identity."));
+        steps.push_back(makeStep("Step 17: Engine Comparison Table",
+                                 "Quick engine map:\nGreen: dynamic/envelope-reactive.\nBlue: modern/clean focus.\nRed NQ: BBD vintage grit.\nRed HQ: tape-style modulation.\nPurple: complex/bi-mod motion.\nBlack: intense/edge and ensemble variants.",
+                                 3, 1, -1, -1, "engine_visual",
+                                 "Plain comparison for choosing an engine."));
+        steps.push_back(makeStep("Step 18: Macro Definition",
+                                 "Macro means high-level control that steers multiple lower-level parameters together. Use Engine / Macros for broad tonal movement quickly.",
+                                 3, 2, -1, -1, "engine_inspector",
+                                 "Engine / Macros: musical high-level controls."));
+        steps.push_back(makeStep("Step 19: Internals Definition",
+                                 "Internals means low-level algorithm parameters. Use Engine / Internals only when macro-level shaping is not enough.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "Engine / Internals for fine-grain algorithm tuning."));
+        steps.push_back(makeStep("Step 20: Look & Feel Mapping",
+                                 "Look & Feel / Mapping changes UI-to-DSP behavior (how controls map), not DSP algorithm code itself.",
+                                 4, 0, -1, -1, "layout_active_inspector",
+                                 "Look & Feel / Mapping controls."));
+        steps.push_back(makeStep("Step 21: Look & Feel UI Feel",
+                                 "UI Feel adjusts interaction response and smoothing feel for editing ergonomics.",
+                                 4, 1, -1, -1, "layout_active_inspector",
+                                 "Look & Feel / UI Feel controls."));
+        steps.push_back(makeStep("Step 22: Look & Feel Engine Layout",
+                                 "Engine Layout sets per-engine visual placement/sizing in the main UI.",
+                                 4, 2, -1, -1, "layout_active_inspector",
+                                 "Look & Feel / Engine Layout."));
+        steps.push_back(makeStep("Step 23: Look & Feel Global Layout",
+                                 "Global Layout adjusts shared UI coordinates/styles such as top buttons, engine selector, and global knob response.",
+                                 4, 3, -1, -1, "layout_active_inspector",
+                                 "Look & Feel / Global Layout."));
+        steps.push_back(makeStep("Step 24: Look & Feel Text Animations",
+                                 "Text Animations controls the glow/reflect and flip motion systems for main, color, and mix value readouts.",
+                                 4, 4, -1, -1, "layout_active_inspector",
+                                 "Look & Feel / Text Animations."));
+        steps.push_back(makeStep("Step 25: Telemetry Overview",
+                                 "Validation / Telemetry shows process time, peaks, callback/write counters, and mode transitions. This is your runtime health dashboard.",
+                                 5, 0, -1, -1, "validation_readouts",
+                                 "Validation / Telemetry: live health data."));
+        steps.push_back(makeStep("Step 26: Telemetry Green/Yellow/Red",
+                                 "Use traffic-light guidance:\nGreen: process_ms_peak < 50% of audio-block budget.\nYellow: 50-80% of budget.\nRed: >80% or spikes near/over budget.\nBudget(ms)=bufferSize/sampleRate*1000.",
+                                 5, 0, -1, -1, "validation_readouts",
+                                 "Interpret process timing against block budget."));
+        steps.push_back(makeStep("Step 27: Write-Rate Guidance",
+                                 "Parameter write-rate guide:\nGreen: writes/callback usually <=1.\nYellow: sustained ~2-4 writes/callback.\nRed: sustained >4 writes/callback or bursty spikes. Investigate automation density/smoothing.",
+                                 5, 0, -1, -1, "validation_readouts",
+                                 "Use callback/write ratio to spot automation pressure."));
+        steps.push_back(makeStep("Step 28: Trace Matrix Definitions",
+                                 "Trace Matrix terms:\nraw = host/UI raw parameter value.\nmapped = scaled musical value.\nsnapshot = active profile stored value.\neffective = runtime value currently used by DSP.",
+                                 5, 1, -1, -1, "trace_matrix",
+                                 "Validation / Trace Matrix term definitions."));
+        steps.push_back(makeStep("Step 29: Console Command Surface",
+                                 "Validation / Console core commands: `engine`, `hq`, `view`, `set/get/reset`, `undo/redo/history`, `stats`, `list`, `search`, `watch`, `dump`, `diff factory`, `export script`, `import script`.",
+                                 5, 2, -1, -1, "validation_console",
+                                 "Console command vocabulary."));
+        steps.push_back(makeStep("Step 30: Console Workflow",
+                                 "Fast safe workflow:\n1) `search <term>`\n2) `watch <slug>`\n3) `set` / `add` / `sub`\n4) `undo` if needed\n5) `diff factory` and `stats` to validate.",
+                                 5, 2, -1, -1, "validation_console",
+                                 "Console build loop while listening."));
+        steps.push_back(makeStep("Step 31: Persistence Safety",
+                                 "Persistence safety:\n- `cp json`: copy current state snapshot.\n- `export script`: portable editable command list.\n- `save defaults`: changes startup behavior (high impact).\n- `reset factory`: destructive reset; use only after backup/export.",
+                                 6, 0, -1, -1, "settings_actions",
+                                 "Know safe vs destructive persistence actions."));
+        steps.push_back(makeStep("Step 32: Import/Apply Workflow",
+                                 "Safe apply order:\n1) backup with `cp json` or `export script`.\n2) try edits in session.\n3) validate telemetry + trace matrix.\n4) only then `save defaults`.",
+                                 6, 0, -1, -1, "settings_actions",
+                                 "Persistence workflow with rollback safety."));
+        steps.push_back(makeStep("Step 33: End-to-End Recipe Check",
+                                 "Build recipe recap: choose profile -> shape motion -> shape tone -> validate runtime -> persist safely. If results differ between projects, re-check host sample rate, buffer size, and automation density first.",
+                                 0, 0, -1, -1, "overview_visual",
+                                 "Complete loop: build, validate, persist."));
+        steps.push_back(makeStep("Step 34: Return to Overview",
+                                 "Tutorial complete. You are back at Overview / Signal Flow. Use this as your home base before each new tuning pass.",
+                                 0, 0, -1, -1, "overview_visual",
+                                 "Back to Overview after full pass."));
+        return steps;
+    }
+
+    if (topic == "overview")
+    {
+        resolvedTopic = "overview";
+        resolvedTitle = "Overview Primer";
+        steps.push_back(makeStep("Overview: Signal Context",
+                                 "This view gives a fast signal-level snapshot before deep tuning. Start here when checking whether profile changes are reaching motion and tone stages.",
+                                 0, 0, -1, -1, "overview_visual",
+                                 "Overview cards for immediate context."));
+        steps.push_back(makeStep("Overview: Inspector Readouts",
+                                 "Open the left inspector sections in Overview to validate the current profile readouts before moving into deep tuning tabs.",
+                                 0, 0, -1, -1, "overview_inspector",
+                                 "Overview inspector readouts/controls."));
+        steps.push_back(makeStep("Overview: Delay Visual Subtab",
+                                 "Use the second-level Delay Visual subtab for quick movement sanity checks before modulation edits.",
+                                 0, 1, -1, -1, "overview_visual",
+                                 "Overview second-level subtab: Delay Visual."));
+        return steps;
+    }
+
+    if (topic == "modulation")
+    {
+        resolvedTopic = "modulation";
+        resolvedTitle = "Modulation Deep Dive";
+        steps.push_back(makeStep("Modulation: LFO Shape",
+                                 "The LFO is the movement engine. Use Rate and Depth to establish macro motion shape and speed.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "LFO scope and controls."));
+        steps.push_back(makeStep("Modulation: Readouts + Workbench",
+                                 "The inspector keeps passive readouts, while active edits now live in the LFO Control Workbench below the motion visualizers.",
+                                 1, 0, -1, -1, "modulation_controls",
+                                 "Readouts left, controls in the unified workbench."));
+        steps.push_back(makeStep("Modulation: Left/Right Comparison",
+                                 "Use the two-up LFO cards to compare stereo-side motion in one glance instead of switching subtabs.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "Two-up LFO cards for stereo motion checks."));
+        steps.push_back(makeStep("Modulation: Stability Controls",
+                                 "Trajectory limits and smoothing guard against abrupt delay snaps. Tune them for motion that is rich but stable.",
+                                 1, 0, -1, -1, "modulation_visual",
+                                 "Trajectory card below LFO Left/Right."));
+        return steps;
+    }
+
+    if (topic == "tone")
+    {
+        resolvedTopic = "tone";
+        resolvedTitle = "Tone Deep Dive";
+        steps.push_back(makeStep("Tone: Spectral Control",
+                                 "Use LPF/HPF, pre-emphasis, and dynamics controls to place chorus texture around the source. Keep upper swish under control while preserving clarity.",
+                                 2, 0, -1, -1, "tone_visual",
+                                 "Tone visual deck and spectrum card."));
+        steps.push_back(makeStep("Tone: Inspector Readouts + Controls",
+                                 "The tone inspector readouts and controls map what you hear to concrete filter, dynamics, and engine-response parameters.",
+                                 2, 0, -1, -1, "tone_readouts",
+                                 "Tone inspector sections in Spectrum subtab."));
+        steps.push_back(makeStep("Tone: Engine Response",
+                                 "The Engine Response curve reflects the active engine mode. Red emphasizes saturation/tape transfer; non-red modes show their own response behavior and control set.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Engine Response curve and dynamic behavior."));
+        steps.push_back(makeStep("Tone: Engine Response Subtab Controls",
+                                 "On the Engine Response subtab, use controls while watching curve shape to tune the active engine's tone behavior safely.",
+                                 2, 1, -1, -1, "tone_controls",
+                                 "Tone controls in Engine Response subtab."));
+        return steps;
+    }
+
+    if (topic == "engine")
+    {
+        resolvedTopic = "engine";
+        resolvedTitle = "Engine Deep Dive";
+        steps.push_back(makeStep("Engine: Profile Selection",
+                                 "Engine color and HQ mode define the core algorithm family. Switching profile immediately retargets the controls in this panel.",
+                                 3, 0, -1, -1, "engine_selector",
+                                 "Profile selector and HQ toggle."));
+        steps.push_back(makeStep("Engine: Signal Flow Subtab",
+                                 "Start on signal flow to get routing context before adjusting internals.",
+                                 3, 0, -1, -1, "engine_visual",
+                                 "Engine second-level subtab: Signal Flow."));
+        steps.push_back(makeStep("Engine: Macro Subtab",
+                                 "Use the macro subtab to inspect profile macro behavior and response ranges.",
+                                 3, 2, -1, -1, "engine_inspector",
+                                 "Engine second-level subtab: Macros."));
+        steps.push_back(makeStep("Engine: Internals",
+                                 "Use the engine internals inspector for profile-specific tuning. This is where each algorithm's identity is sculpted.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "Engine internals inspector."));
+        return steps;
+    }
+
+    if (topic == "validation")
+    {
+        resolvedTopic = "validation";
+        resolvedTitle = "Validation Deep Dive";
+        steps.push_back(makeStep("Validation: Telemetry Subtab",
+                                 "Start with telemetry readouts to inspect callback timing, write activity, and profile/mode transitions.",
+                                 5, 0, -1, -1, "validation_readouts",
+                                 "Validation second-level subtab: Telemetry."));
+        steps.push_back(makeStep("Validation: Trace Matrix",
+                                 "The trace matrix confirms that UI movement maps correctly into profile values and effective runtime values.",
+                                 5, 1, -1, -1, "trace_matrix",
+                                 "Trace matrix in validation visual deck."));
+        steps.push_back(makeStep("Validation: Interactive Console",
+                                 "Use the console for scripted state edits, history, diff checks, and automation-friendly diagnostics while audio is running.",
+                                 5, 2, -1, -1, "validation_console",
+                                 "Validation console card."));
+        return steps;
+    }
+
+    if (topic == "bbd")
+    {
+        resolvedTopic = "bbd";
+        resolvedTitle = "Bucket-Brigade Lesson";
+        steps.push_back(makeStep("Step 1: Force Red NQ",
+                                 "BBD behavior lives in the Red NQ profile. This lesson switches there so every control and visual reflects analog-style bucket-brigade behavior.",
+                                 3, 0, 2, 0, "engine_selector",
+                                 "Profile selector: Red with HQ off."));
+        steps.push_back(makeStep("Step 2: BBD Stages",
+                                 "Stages act like the number of buckets in the line. Stage count shifts delay behavior and can reshape texture and bandwidth.",
+                                 3, 0, -1, -1, "bbd_controls",
+                                 "BBD sections in engine internals."));
+        steps.push_back(makeStep("Step 3: Clock Speed",
+                                 "Clock speed sets bucket handoff rate. Slower clocks enable longer delay feel but with more vintage artifacts.",
+                                 3, 0, -1, -1, "bbd_controls",
+                                 "Clock-related controls in engine internals."));
+        steps.push_back(makeStep("Step 4: Watch High-End Noise",
+                                 "As clock slows, high-frequency whine and aliasing risk can increase. Use the spectrum view to observe that change while tuning.",
+                                 2, 0, -1, -1, "spectrum_visual",
+                                 "Spectrum analyzer in Tone tab."));
+        steps.push_back(makeStep("Step 5: Anti-Alias and Reconstruction Filters",
+                                 "Steeper low-pass filtering hides clock artifacts. Raising cutoff can brighten tone but may reintroduce noise.",
+                                 3, 0, -1, -1, "bbd_controls",
+                                 "Filter controls around the BBD core."));
+        steps.push_back(makeStep("Step 6: Balance Clarity vs Character",
+                                 "BBD tuning is a balance: brighter settings improve clarity, darker settings suppress artifacts and emphasize vintage character.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "BBD tuning sections in inspector."));
+        return steps;
+    }
+
+    if (topic == "tape")
+    {
+        resolvedTopic = "tape";
+        resolvedTitle = "Magnetic Tape Lesson";
+        steps.push_back(makeStep("Step 1: Force Red HQ",
+                                 "Tape behavior lives in Red HQ. This switches profile so tape wow, flutter, and tape-tone controls are active.",
+                                 3, 0, 2, 1, "engine_selector",
+                                 "Profile selector: Red with HQ on."));
+        steps.push_back(makeStep("Step 2: Tape Wow",
+                                 "Wow is the slow drift caused by mechanical instability. It creates broad pitch movement that feels organic and worn.",
+                                 3, 0, -1, -1, "tape_controls",
+                                 "Tape wow controls in engine internals."));
+        steps.push_back(makeStep("Step 3: Tape Flutter",
+                                 "Flutter is faster jitter from tape/head friction. Blend wow and flutter carefully to avoid distracting warble.",
+                                 3, 0, -1, -1, "tape_controls",
+                                 "Tape flutter controls in engine internals."));
+        steps.push_back(makeStep("Step 4: Saturation Context",
+                                 "Tape tone depends on both modulation and non-linear drive. Move to Tone to evaluate harmonic behavior with analyzer visuals.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Engine Response curve in Tone tab."));
+        steps.push_back(makeStep("Step 5: Tape Drive",
+                                 "Tape Drive controls how hard the signal is pushed into the virtual medium. More drive adds density and natural compression.",
+                                 3, 0, -1, -1, "tape_controls",
+                                 "Tape drive and gain controls."));
+        steps.push_back(makeStep("Step 6: Observe Soft Limiting",
+                                 "As drive increases, peaks round rather than hard-clip. This thickens chorus tails while staying smoother than abrupt clipping.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Engine Response curve while increasing drive."));
+        steps.push_back(makeStep("Step 7: Age/Tone LPF",
+                                 "Lower LPF cutoff simulates darker, older tape. Raise it for cleaner top-end at the cost of less vintage softness.",
+                                 2, 0, -1, -1, "tone_inspector",
+                                 "LPF and tone-shaping controls in inspector."));
+        return steps;
+    }
+
+    if (topic == "phase")
+    {
+        resolvedTopic = "phase";
+        resolvedTitle = "Stereo Width Lesson";
+        steps.push_back(makeStep("Step 1: Dual Delay Concept",
+                                 "Stereo chorus uses left and right modulation paths. Phase relationships between those paths drive width perception.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "Modulation scope for left/right motion."));
+        steps.push_back(makeStep("Step 2: Read the Scope",
+                                 "The scope shows how motion evolves in time. Identical movement on both sides reads narrower than offset movement.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "LFO scope in modulation visual deck."));
+        steps.push_back(makeStep("Step 3: Width Offset",
+                                 "Width offset sets phase relationship between left and right trajectories. It is the key stereo-width lever.",
+                                 1, 0, -1, -1, "modulation_inspector",
+                                 "Width/offset controls in inspector."));
+        steps.push_back(makeStep("Step 4: 180 Degree Anti-Phase",
+                                 "At roughly 180 degrees, one side stretches while the other compresses. This creates strong, enveloping stereo motion.",
+                                 1, 0, -1, -1, "modulation_inspector",
+                                 "Offset controls while monitoring scope."));
+        steps.push_back(makeStep("Step 5: Musical Balance",
+                                 "Maximum width is not always best. Tune offset for size while preserving mono compatibility and center stability.",
+                                 1, 0, -1, -1, "modulation_visual",
+                                 "Scope plus width controls together."));
+        return steps;
+    }
+
+    if (topic == "bimodulation" || topic == "bi-modulation" || topic == "bimod" || topic == "warp")
+    {
+        resolvedTopic = "bimodulation";
+        resolvedTitle = "Complex Motion Lesson";
+        steps.push_back(makeStep("Step 1: Force Purple NQ",
+                                 "Purple NQ emphasizes warp-style bi-mod behavior. This lesson switches there to expose dual-LFO style controls.",
+                                 3, 0, 3, 0, "engine_selector",
+                                 "Profile selector: Purple with HQ off."));
+        steps.push_back(makeStep("Step 2: Two Independent Modulators",
+                                 "Bi-modulation layers two LFO paths so motion stops sounding predictably periodic.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "LFO scope showing composite motion."));
+        steps.push_back(makeStep("Step 3: Non-Related Speeds",
+                                 "Set unrelated rates so cycles rarely align. This prevents obvious repeating sweeps and keeps motion evolving.",
+                                 1, 0, -1, -1, "modulation_inspector",
+                                 "Rate controls for independent modulators."));
+        steps.push_back(makeStep("Step 4: Compound Shape",
+                                 "When two modulation paths interact, the resulting delay trajectory becomes richer and less mechanical.",
+                                 1, 0, -1, -1, "lfo_scope",
+                                 "Right/left LFO views for compound behavior."));
+        steps.push_back(makeStep("Step 5: Organic Motion",
+                                 "Use this mode for living, animated chorus textures where predictable whoosh would feel static.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "Purple warp internals in engine tab."));
+        return steps;
+    }
+
+    if (topic == "saturation")
+    {
+        resolvedTopic = "saturation";
+        resolvedTitle = "Harmonics Lesson";
+        steps.push_back(makeStep("Step 1: Saturation Fundamentals",
+                                 "Saturation is controlled clipping that reshapes waveform peaks and adds harmonics. Start on Tone / Engine Response with a Red mode selected.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Engine Response curve visualizer."));
+        steps.push_back(makeStep("Step 2: Linear Reference",
+                                 "A straight transfer line means input equals output. Deviations show where harmonic coloration starts.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Engine Response baseline reference."));
+        steps.push_back(makeStep("Step 3: Increase Drive",
+                                 "Raising drive pushes signal into non-linear regions. Watch the curve bend as harmonic content increases.",
+                                 2, 1, -1, -1, "tone_inspector",
+                                 "Drive controls in tone inspector."));
+        steps.push_back(makeStep("Step 4: Hard Clip Context",
+                                 "Switching to Black profile emphasizes harder clipping behavior. This creates stronger odd harmonics and bite.",
+                                 2, 1, 4, -1, "engine_selector",
+                                 "Profile selector for black engine contrast."));
+        steps.push_back(makeStep("Step 5: Hard Clip Character",
+                                 "Hard clipping flattens peaks quickly and can sound aggressive. Useful for edge, but easy to overdo.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Flattened transfer tops in black mode."));
+        steps.push_back(makeStep("Step 6: Return to Tape Soft Clip",
+                                 "Switch back to Red HQ tape for softer limiting. Soft clipping rounds peaks more gradually.",
+                                 2, 1, 2, 1, "engine_selector",
+                                 "Profile selector back to red HQ."));
+        steps.push_back(makeStep("Step 7: Soft Clip Warmth",
+                                 "Soft clipping adds density while staying smoother in transients. Use it for warm tails without brittle harshness.",
+                                 2, 1, -1, -1, "transfer_visual",
+                                 "Rounded transfer curve with tape behavior."));
+        return steps;
+    }
+
+    if (topic == "envelope" || topic == "dynamic" || topic == "dynamics")
+    {
+        resolvedTopic = "envelope";
+        resolvedTitle = "Dynamic Lesson";
+        steps.push_back(makeStep("Step 1: Force Green HQ",
+                                 "Green HQ is optimized for dynamic response workflows. This lesson switches there for envelope-focused tuning.",
+                                 3, 0, 0, 1, "engine_selector",
+                                 "Profile selector: Green HQ."));
+        steps.push_back(makeStep("Step 2: Envelope Follower",
+                                 "The envelope follower tracks incoming level over time. It can modulate chorus behavior dynamically from the source performance.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "Envelope-related controls in engine internals."));
+        steps.push_back(makeStep("Step 3: Detector Speed",
+                                 "Attack and release set how quickly the detector responds and recovers. Fast settings react instantly; slower settings smooth behavior.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "Detector attack/release controls."));
+        steps.push_back(makeStep("Step 4: Route to Modulation Depth",
+                                 "Once detected, envelope motion can drive depth so chorus intensity follows performance energy.",
+                                 1, 0, -1, -1, "modulation_inspector",
+                                 "Depth and response controls in modulation."));
+        steps.push_back(makeStep("Step 5: Amount Control",
+                                 "Envelope amount sets how strongly level changes influence modulation depth.",
+                                 3, 0, -1, -1, "engine_inspector",
+                                 "Envelope amount and scaling controls."));
+        steps.push_back(makeStep("Step 6: Musical Result",
+                                 "Dynamic chorus breathes with the source: more intensity on loud phrases, less movement on quiet passages.",
+                                 0, 0, -1, -1, "overview_visual",
+                                 "Confirm behavior through overview visuals."));
+        return steps;
+    }
+
+    return {};
 }

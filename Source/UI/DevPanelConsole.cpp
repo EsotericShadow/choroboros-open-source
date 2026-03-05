@@ -300,7 +300,10 @@ void DevPanel::registerConsoleTarget(juce::PropertyComponent* property, const ju
     }
     binding.slug = uniqueSlug;
 
+    const std::string slugKey = binding.slug.toStdString();
     consoleTargets.push_back(std::move(binding));
+    consoleTargetIndexBySlug[slugKey] = consoleTargets.size() - 1;
+    consoleListOutputCache.clear();
     consoleFactoryValuesReady = false;
 }
 
@@ -463,11 +466,19 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         refreshPanel(bbdPanel);
         refreshPanel(tapePanel);
         refreshPanel(layoutGlobalPanel);
+        refreshPanel(layoutTextAnimationPanel);
         refreshPanel(layoutGreenPanel);
         refreshPanel(layoutBluePanel);
         refreshPanel(layoutRedPanel);
         refreshPanel(layoutPurplePanel);
         refreshPanel(layoutBlackPanel);
+    };
+
+    auto refreshAllLockables = [this]
+    {
+        for (auto* property : lockableProperties)
+            if (property != nullptr)
+                property->refresh();
     };
 
     auto syncBindingValue = [](ConsoleTargetBinding& binding, bool trackPrevious)
@@ -525,7 +536,8 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         return snapshot;
     };
 
-    auto restoreSnapshot = [this](const ConsoleSnapshot& snapshot)
+    auto restoreSnapshot = [this, &refreshAllPanels, &refreshAllLockables](const ConsoleSnapshot& snapshot,
+                                                                            bool fullUiRefresh = true)
     {
         processor.setStateInformation(snapshot.processorState.getData(),
                                       static_cast<int>(snapshot.processorState.getSize()));
@@ -544,38 +556,20 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
                 lockState.first->setLocked(lockState.second);
         }
 
-        auto refreshPanel = [](juce::PropertyPanel& panel) { panel.refreshAll(); };
-        refreshPanel(mappingPanel);
-        refreshPanel(uiPanel);
-        refreshPanel(overviewPanel);
-        refreshPanel(modulationPanel);
-        refreshPanel(tonePanel);
-        refreshPanel(enginePanel);
-        refreshPanel(validationPanel);
-        refreshPanel(internalsGreenNqPanel);
-        refreshPanel(internalsGreenHqPanel);
-        refreshPanel(internalsBlueNqPanel);
-        refreshPanel(internalsBlueHqPanel);
-        refreshPanel(internalsRedNqPanel);
-        refreshPanel(internalsRedHqPanel);
-        refreshPanel(internalsPurpleNqPanel);
-        refreshPanel(internalsPurpleHqPanel);
-        refreshPanel(internalsBlackNqPanel);
-        refreshPanel(internalsBlackHqPanel);
-        refreshPanel(bbdPanel);
-        refreshPanel(tapePanel);
-        refreshPanel(layoutGlobalPanel);
-        refreshPanel(layoutGreenPanel);
-        refreshPanel(layoutBluePanel);
-        refreshPanel(layoutRedPanel);
-        refreshPanel(layoutPurplePanel);
-        refreshPanel(layoutBlackPanel);
+        if (fullUiRefresh)
+        {
+            refreshAllPanels();
+            updateActiveProfileLabel();
+            updateRightTabVisibility();
+            refreshSecondaryTabButtons();
+            resized();
+            repaint();
+        }
+        else
+        {
+            refreshAllLockables();
+        }
 
-        updateActiveProfileLabel();
-        updateRightTabVisibility();
-        refreshSecondaryTabButtons();
-        resized();
-        repaint();
         for (auto& binding : consoleTargets)
         {
             if (auto* lockable = dynamic_cast<LockableFloatPropertyComponent*>(binding.property))
@@ -623,6 +617,10 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
     auto findTarget = [this](const juce::String& userToken) -> ConsoleTargetBinding*
     {
         const juce::String normalized = slugifyParameterName(userToken);
+        const auto it = consoleTargetIndexBySlug.find(normalized.toStdString());
+        if (it != consoleTargetIndexBySlug.end() && it->second < consoleTargets.size())
+            return &consoleTargets[it->second];
+
         for (auto& binding : consoleTargets)
         {
             if (binding.slug == normalized || binding.slug.equalsIgnoreCase(userToken))
@@ -656,7 +654,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         }
     };
 
-    auto ensureFactoryValueCache = [this, &captureSnapshot, &restoreSnapshot, &refreshAllPanels, &syncAllBindings]() -> bool
+    auto ensureFactoryValueCache = [this, &captureSnapshot, &restoreSnapshot, &refreshAllLockables]() -> bool
     {
         if (consoleFactoryValuesReady && !consoleFactoryValues.empty())
             return true;
@@ -664,11 +662,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
         const auto snapshot = captureSnapshot();
         processor.resetToFactoryDefaults();
         editor.resetLayoutToFactoryDefaults();
-        refreshAllPanels();
-        updateActiveProfileLabel();
-        updateRightTabVisibility();
-        resized();
-        syncAllBindings(false);
+        refreshAllLockables();
 
         consoleFactoryValues.clear();
         for (auto& binding : consoleTargets)
@@ -677,7 +671,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
                 consoleFactoryValues[binding.slug.toStdString()] = lockable->getCurrentValueForCommand();
         }
 
-        restoreSnapshot(snapshot);
+        restoreSnapshot(snapshot, false);
         consoleFactoryValuesReady = !consoleFactoryValues.empty();
         return consoleFactoryValuesReady;
     };
@@ -799,6 +793,12 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             "  sweep <target> <start> <end> <time_ms>\n"
             "History:\n"
             "  undo [n], redo [n], history\n"
+            "Tutorials:\n"
+            "  tutorial\n"
+            "  tutorial <topic>\n"
+            "  tutorial next\n"
+            "  tutorial next section\n"
+            "  tutorial skip|exit\n"
             "Layout:\n"
             "  fx <0|1|2>\n"
             "Introspection & Utilities:\n"
@@ -872,6 +872,66 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
     {
         saveCurrentAsDefaults();
         result.output = "Saved current state as user defaults.";
+        return result;
+    }
+
+    if (action == "tutorial")
+    {
+        if (tokens.size() >= 2)
+        {
+            const juce::String op = tokens[1].toLowerCase();
+            if (op == "exit" || op == "skip")
+            {
+                juce::String status;
+                stopTutorial(true, status);
+                result.output = status;
+                return result;
+            }
+
+            if (op == "next" || op == "section" || op == "tab")
+            {
+                if (!tutorialActive)
+                {
+                    result.output = "No active tutorial. Start one with `tutorial` or `tutorial <topic>`.";
+                    return result;
+                }
+
+                const bool advanceSection = (op == "section" || op == "tab")
+                                         || (tokens.size() >= 3
+                                             && (tokens[2].equalsIgnoreCase("section")
+                                                 || tokens[2].equalsIgnoreCase("tab")));
+
+                if (advanceSection)
+                    advanceTutorialSection();
+                else
+                    advanceTutorialStep();
+
+                if (!tutorialActive)
+                {
+                    result.output = "Tutorial complete.";
+                    return result;
+                }
+
+                const int total = static_cast<int>(tutorialSteps.size());
+                const int oneBased = juce::jlimit(1, juce::jmax(1, total), tutorialStepIndex + 1);
+                juce::String title;
+                if (juce::isPositiveAndBelow(tutorialStepIndex, total))
+                    title = tutorialSteps[static_cast<size_t>(tutorialStepIndex)].title;
+                result.output = juce::String(advanceSection ? "Skipped to next section: " : "Advanced to next step: ")
+                              + "Step " + juce::String(oneBased) + "/" + juce::String(total)
+                              + (title.isNotEmpty() ? (" - " + title) : ".");
+                return result;
+            }
+        }
+
+        const juce::String topic = tokens.size() >= 2 ? tokens[1] : "core";
+        juce::String status;
+        if (!startTutorial(topic, status))
+        {
+            result.output = status.isNotEmpty() ? status : ("ERROR: unable to start tutorial `" + topic + "`.");
+            return result;
+        }
+        result.output = status;
         return result;
     }
 
@@ -1840,6 +1900,21 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             }
         }
 
+        const std::string cacheKey = [&]()
+        {
+            std::string key = globalsOnly ? "globals" : ("engine:" + std::to_string(selectedEngine));
+            if (includeGlobals)
+                key += ":all";
+            key += fullOutput ? ":full" : ":dedup";
+            return key;
+        }();
+
+        if (const auto cacheIt = consoleListOutputCache.find(cacheKey); cacheIt != consoleListOutputCache.end())
+        {
+            result.output = cacheIt->second;
+            return result;
+        }
+
         std::vector<const ConsoleTargetBinding*> sorted;
         sorted.reserve(consoleTargets.size());
         for (const auto& binding : consoleTargets)
@@ -1925,8 +2000,11 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
                 : ("Parameter slugs for " + engineNameForIndex(selectedEngine)
                    + (includeGlobals ? " + globals (deduped):" : " (engine-scoped, deduped):")));
 
-            for (const auto& entry : collapsed)
+            constexpr int kDefaultListDisplayCap = 180;
+            const int visibleCount = juce::jmin(kDefaultListDisplayCap, static_cast<int>(collapsed.size()));
+            for (int i = 0; i < visibleCount; ++i)
             {
+                const auto& entry = collapsed[static_cast<size_t>(i)];
                 juce::String line = "  " + entry.canonicalSlug + "  [" + entry.displayName + "]";
                 if (entry.variants > 1)
                     line << "  (" << juce::String(entry.variants) << " variants)";
@@ -1938,10 +2016,18 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             else
                 lines.add("Total: " + juce::String(static_cast<int>(collapsed.size())) + " unique slugs.");
 
+            if (static_cast<int>(collapsed.size()) > visibleCount)
+            {
+                lines.add("Showing first " + juce::String(visibleCount)
+                          + " entries; use `list " + (globalsOnly ? juce::String("globals") : engineNameForIndex(selectedEngine))
+                          + " full` for every variant slug.");
+            }
+
             if (!globalsOnly)
                 lines.add("Hint: use `list " + engineNameForIndex(selectedEngine) + " full` for every variant slug.");
         }
         result.output = lines.joinIntoString("\n");
+        consoleListOutputCache[cacheKey] = result.output;
         return result;
     }
 

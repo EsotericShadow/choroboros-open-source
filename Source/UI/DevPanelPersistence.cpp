@@ -548,6 +548,7 @@ void DevPanel::resetToFactoryDefaults()
     refreshPanel(bbdPanel);
     refreshPanel(tapePanel);
     refreshPanel(layoutGlobalPanel);
+    refreshPanel(layoutTextAnimationPanel);
     refreshPanel(layoutGreenPanel);
     refreshPanel(layoutBluePanel);
     refreshPanel(layoutRedPanel);
@@ -751,6 +752,7 @@ void DevPanel::applyValueFxPreset(int presetId)
     }
 
     layoutGlobalPanel.refreshAll();
+    layoutTextAnimationPanel.refreshAll();
     layoutGreenPanel.refreshAll();
     layoutBluePanel.refreshAll();
     layoutRedPanel.refreshAll();

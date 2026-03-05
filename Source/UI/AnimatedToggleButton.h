@@ -43,9 +43,11 @@ public:
 private:
     void startAnimationToState(bool on);
     void commitToggleState(bool newState, juce::NotificationType notificationType = juce::sendNotificationSync);
+    void tryCommitDragAtScreenY(int screenY);
     static constexpr int kNumFrames = 18;
     static constexpr int kCols = 5;
     static constexpr int kFramePx = 512;
+    static constexpr int kDragToggleThresholdPx = 4;
     float animatedFrame = 0.0f;
     float animationStartFrame = 0.0f;
     float animationEndFrame = 0.0f;
@@ -53,7 +55,7 @@ private:
     double animationDurationMs = 185.0;
     bool animationRunning = false;
     int dragStartScreenY = 0;
-    bool dragTriggered = false;
+    int dragAnchorScreenY = 0;
     bool pointerIsDown = false;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnimatedToggleButton)
