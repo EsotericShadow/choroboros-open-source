@@ -31,6 +31,25 @@
 
 namespace
 {
+struct BackgroundAssetPack
+{
+    juce::Image off;
+    juce::Image lit;
+};
+
+struct SharedBackgroundCache
+{
+    juce::CriticalSection lock;
+    std::array<BackgroundAssetPack, 5> packs {};
+    std::array<bool, 5> valid { false, false, false, false, false };
+};
+
+SharedBackgroundCache& getSharedBackgroundCache()
+{
+    static SharedBackgroundCache cache;
+    return cache;
+}
+
 int uiScaleInt(int value)
 {
     return juce::roundToInt(static_cast<float>(value) * ChoroborosPluginEditor::kUiScale);
@@ -456,6 +475,82 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     }
 }
 
+BackgroundAssetPack decodeBackgroundAssetPack(int colorIndex)
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    const char* offName = nullptr;
+    int offSize = 0;
+    const char* onName = nullptr;
+    int onSize = 0;
+
+    if (colorIndex == 0) // Green
+    {
+        offName = BinaryData::green_light_off_backpanel_png;
+        offSize = BinaryData::green_light_off_backpanel_pngSize;
+        onName = BinaryData::green_light_on_backpanel_png;
+        onSize = BinaryData::green_light_on_backpanel_pngSize;
+    }
+    else if (colorIndex == 1) // Blue
+    {
+        offName = BinaryData::blue_light_off_backpanel_png;
+        offSize = BinaryData::blue_light_off_backpanel_pngSize;
+        onName = BinaryData::blue_light_on_backpanel_png;
+        onSize = BinaryData::blue_light_on_backpanel_pngSize;
+    }
+    else if (colorIndex == 2) // Red
+    {
+        offName = BinaryData::red_light_off_backpanel_png;
+        offSize = BinaryData::red_light_off_backpanel_pngSize;
+        onName = BinaryData::red_light_on_backpanel_png;
+        onSize = BinaryData::red_light_on_backpanel_pngSize;
+    }
+    else if (colorIndex == 3) // Purple
+    {
+        offName = BinaryData::purple_light_off_backpanel_png;
+        offSize = BinaryData::purple_light_off_backpanel_pngSize;
+        onName = BinaryData::purple_light_on_backpanel_png;
+        onSize = BinaryData::purple_light_on_backpanel_pngSize;
+    }
+    else // Black (colorIndex == 4)
+    {
+        offName = BinaryData::black_light_off_backpanel_png;
+        offSize = BinaryData::black_light_off_backpanel_pngSize;
+        onName = BinaryData::black_light_on_backpanel_png;
+        onSize = BinaryData::black_light_on_backpanel_pngSize;
+    }
+
+    BackgroundAssetPack pack;
+    if (offName && offSize > 0)
+        pack.off = juce::ImageCache::getFromMemory(offName, offSize);
+    if (onName && onSize > 0)
+        pack.lit = juce::ImageCache::getFromMemory(onName, onSize);
+    return pack;
+}
+
+BackgroundAssetPack getOrDecodeBackgroundAssetPack(int colorIndex)
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    const auto index = static_cast<size_t>(colorIndex);
+    auto& cache = getSharedBackgroundCache();
+
+    {
+        const juce::ScopedLock lock(cache.lock);
+        if (cache.valid[index])
+            return cache.packs[index];
+    }
+
+    auto decoded = decodeBackgroundAssetPack(colorIndex);
+    {
+        const juce::ScopedLock lock(cache.lock);
+        if (!cache.valid[index])
+        {
+            cache.packs[index] = decoded;
+            cache.valid[index] = true;
+        }
+        return cache.packs[index];
+    }
+}
+
 class DevPanelWindow : public juce::DocumentWindow
 {
 public:
@@ -622,15 +717,6 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     applyLayout();
     setResizable(false, false);
 
-    const int activeEngineIndex = juce::jlimit(0, 4, engineColorBox.getSelectedId() - 1);
-    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-    juce::MessageManager::callAsync([safeThis, activeEngineIndex]()
-    {
-        if (safeThis == nullptr)
-            return;
-        safeThis->startDeferredThemePrewarm(activeEngineIndex);
-    });
-
     audioProcessor.logLoadTraceEvent("editor_ctor_total_ms",
                                      juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
 }
@@ -715,6 +801,13 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
         firstPaintTimingLogged = true;
         audioProcessor.logLoadTraceEvent("editor_first_paint_ms",
                                          juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
+
+        if (!themePrewarmStarted)
+        {
+            themePrewarmStarted = true;
+            const int activeEngineIndex = juce::jlimit(0, 4, engineColorBox.getSelectedId() - 1);
+            startDeferredThemePrewarm(activeEngineIndex);
+        }
     }
 
     // Draw background
@@ -875,19 +968,22 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
                 return;
 
             const int colorIndex = prewarmOrder[static_cast<size_t>(i)];
+            auto backgroundPack = getOrDecodeBackgroundAssetPack(colorIndex);
             auto pack = CustomLookAndFeel::getOrDecodeThemeAssetPack(colorIndex);
 
             if (stopFlag->load())
                 return;
 
             juce::MessageManager::callAsync(
-                [safeThis, colorIndex, activeColorIndex, pack = std::move(pack)]() mutable
+                [safeThis, colorIndex, activeColorIndex, pack = std::move(pack), backgroundPack = std::move(backgroundPack)]() mutable
                 {
                     if (safeThis == nullptr)
                         return;
                     safeThis->customLookAndFeel.installThemeAssetPack(colorIndex, std::move(pack));
                     if (colorIndex == activeColorIndex)
                     {
+                        safeThis->backgroundImage = backgroundPack.off;
+                        safeThis->backgroundImageLit = backgroundPack.lit;
                         safeThis->audioProcessor.logLoadTraceEvent(
                             "editor_active_theme_ready_ms",
                             juce::Time::getMillisecondCounterHiRes() - safeThis->editorCtorStartMs,
@@ -989,58 +1085,9 @@ void ChoroborosPluginEditor::updateValueLabelColors(int colorIndex)
 
 void ChoroborosPluginEditor::loadBackgroundImage(int colorIndex)
 {
-    colorIndex = juce::jlimit(0, 4, colorIndex);
-    
-    const char* offName = nullptr;
-    int offSize = 0;
-    const char* onName = nullptr;
-    int onSize = 0;
-    
-    if (colorIndex == 0) // Green
-    {
-        offName = BinaryData::green_light_off_backpanel_png;
-        offSize = BinaryData::green_light_off_backpanel_pngSize;
-        onName = BinaryData::green_light_on_backpanel_png;
-        onSize = BinaryData::green_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 1) // Blue
-    {
-        offName = BinaryData::blue_light_off_backpanel_png;
-        offSize = BinaryData::blue_light_off_backpanel_pngSize;
-        onName = BinaryData::blue_light_on_backpanel_png;
-        onSize = BinaryData::blue_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 2) // Red
-    {
-        offName = BinaryData::red_light_off_backpanel_png;
-        offSize = BinaryData::red_light_off_backpanel_pngSize;
-        onName = BinaryData::red_light_on_backpanel_png;
-        onSize = BinaryData::red_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 3) // Purple
-    {
-        offName = BinaryData::purple_light_off_backpanel_png;
-        offSize = BinaryData::purple_light_off_backpanel_pngSize;
-        onName = BinaryData::purple_light_on_backpanel_png;
-        onSize = BinaryData::purple_light_on_backpanel_pngSize;
-    }
-    else // Black (colorIndex == 4)
-    {
-        offName = BinaryData::black_light_off_backpanel_png;
-        offSize = BinaryData::black_light_off_backpanel_pngSize;
-        onName = BinaryData::black_light_on_backpanel_png;
-        onSize = BinaryData::black_light_on_backpanel_pngSize;
-    }
-    
-    if (offName && offSize > 0)
-        backgroundImage = juce::ImageCache::getFromMemory(offName, offSize);
-    else
-        backgroundImage = juce::Image();
-
-    if (onName && onSize > 0)
-        backgroundImageLit = juce::ImageCache::getFromMemory(onName, onSize);
-    else
-        backgroundImageLit = juce::Image();
+    const auto pack = getOrDecodeBackgroundAssetPack(colorIndex);
+    backgroundImage = pack.off;
+    backgroundImageLit = pack.lit;
 }
 
 int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const

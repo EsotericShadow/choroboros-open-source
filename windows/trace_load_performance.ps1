@@ -35,6 +35,17 @@ function Get-Percentile {
     return [double]$sorted[[int]$idx]
 }
 
+function Get-EventMetric {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$InstanceEvents,
+        [Parameter(Mandatory = $true)][string]$EventName
+    )
+
+    $match = $InstanceEvents | Where-Object { $_.event -eq $EventName -and $_.elapsedMs -ne $null } | Select-Object -First 1
+    if ($null -eq $match) { return $null }
+    return [double]$match.elapsedMs
+}
+
 $invalidBlocks = 0
 $events = @()
 $currentBlock = New-Object System.Text.StringBuilder
@@ -165,6 +176,50 @@ if ($rows.Count -gt 0) {
     $rows | Sort-Object Event | Format-Table -AutoSize
 } else {
     Write-Host "No matching timing events yet."
+}
+
+$instanceGroups = @($events | Group-Object instanceId | Sort-Object {[int64]$_.Name})
+if ($instanceGroups.Count -gt 0) {
+    $instanceRows = @()
+    foreach ($group in $instanceGroups) {
+        $instanceEvents = @($group.Group | Sort-Object { [datetimeoffset]::Parse($_.tsUtc) })
+        if ($instanceEvents.Count -eq 0) { continue }
+
+        $processorCreateMs = Get-EventMetric -InstanceEvents $instanceEvents -EventName "processor_create_editor_ms"
+        $editorCtorMs = Get-EventMetric -InstanceEvents $instanceEvents -EventName "editor_ctor_total_ms"
+        $editorFirstPaintMs = Get-EventMetric -InstanceEvents $instanceEvents -EventName "editor_first_paint_ms"
+        $activeThemeReadyMs = Get-EventMetric -InstanceEvents $instanceEvents -EventName "editor_active_theme_ready_ms"
+
+        $gapCreateToFirstPaintMs = $null
+        $gapCtorToFirstPaintMs = $null
+        $gapFirstPaintToThemeReadyMs = $null
+        if ($null -ne $processorCreateMs -and $null -ne $editorFirstPaintMs) {
+            $gapCreateToFirstPaintMs = [math]::Round(($editorFirstPaintMs - $processorCreateMs), 3)
+        }
+        if ($null -ne $editorCtorMs -and $null -ne $editorFirstPaintMs) {
+            $gapCtorToFirstPaintMs = [math]::Round(($editorFirstPaintMs - $editorCtorMs), 3)
+        }
+        if ($null -ne $activeThemeReadyMs -and $null -ne $editorFirstPaintMs) {
+            $gapFirstPaintToThemeReadyMs = [math]::Round(($activeThemeReadyMs - $editorFirstPaintMs), 3)
+        }
+
+        $instanceRows += [pscustomobject]@{
+            InstanceId = [int64]$group.Name
+            Host = $instanceEvents[0].host
+            Wrapper = $instanceEvents[0].wrapperType
+            ProcessorCreateEditorMs = $processorCreateMs
+            EditorCtorMs = $editorCtorMs
+            EditorFirstPaintMs = $editorFirstPaintMs
+            ActiveThemeReadyMs = $activeThemeReadyMs
+            GapCreateToFirstPaintMs = $gapCreateToFirstPaintMs
+            GapCtorToFirstPaintMs = $gapCtorToFirstPaintMs
+            GapFirstPaintToThemeReadyMs = $gapFirstPaintToThemeReadyMs
+        }
+    }
+
+    Write-Host ""
+    Write-Host "Per-instance startup timeline (ms):" -ForegroundColor Cyan
+    $instanceRows | Format-Table -AutoSize
 }
 
 Write-Host ""

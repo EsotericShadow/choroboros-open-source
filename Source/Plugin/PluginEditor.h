@@ -152,6 +152,7 @@ private:
     std::atomic<bool> stopThemePrewarm { false };
     double editorCtorStartMs = 0.0;
     bool firstPaintTimingLogged = false;
+    bool themePrewarmStarted = false;
     
     // Make members accessible to setup helper
     friend class PluginEditorSetup;
