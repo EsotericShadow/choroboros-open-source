@@ -40,7 +40,7 @@ class ChoroborosPluginEditor  : public juce::AudioProcessorEditor,
 public:
     ChoroborosPluginEditor (ChoroborosAudioProcessor&);
     ~ChoroborosPluginEditor() override;
-    static constexpr float kUiScale = 1.16875f;
+    static constexpr float kUiScale = 0.87f;
 
     //==============================================================================
     void paint (juce::Graphics&) override;
