@@ -496,14 +496,21 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         juce::String status;
         if (startTutorial("core", status))
+        {
+            overviewTutorialPopupHasOpenedSession = true;
             overviewTutorialPopupVisible = false;
+            overviewTutorialPopup.setVisible(false);
+        }
     };
 
     overviewTutorialPopupCloseButton.setButtonText("X");
     overviewTutorialPopupCloseButton.setTooltip("Close this popup for now.");
     overviewTutorialPopupCloseButton.onClick = [this]
     {
+        overviewTutorialPopupHasOpenedSession = true;
         overviewTutorialPopupVisible = false;
+        overviewTutorialPopup.setVisible(false);
+        updateRightTabVisibility();
         resized();
     };
 
@@ -1495,6 +1502,8 @@ void DevPanel::showUnlockWarningDialog(bool unlockingAll, std::function<void(boo
     warning->setColour(juce::ToggleButton::textColourId, hackerText());
 
     auto* hideFutureWarningToggle = new juce::ToggleButton("Hide this message in the future");
+    hideFutureWarningToggle->setSize(520, 28);
+    styleHackerToggleButton(*hideFutureWarningToggle);
     hideFutureWarningToggle->setToggleState(false, juce::dontSendNotification);
     warning->addCustomComponent(hideFutureWarningToggle);
 
