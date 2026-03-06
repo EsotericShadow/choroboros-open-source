@@ -333,9 +333,9 @@ inline juce::Colour visualValidation() { return juce::Colour(VisualizerPalette::
 inline juce::Colour visualLayout() { return juce::Colour(VisualizerPalette::layout); }
 inline juce::Colour visualNeutral() { return juce::Colour(VisualizerPalette::neutral); }
 inline juce::Colour tutorialHighContrastAccent() { return juce::Colour(0xff8dff74); }
-inline juce::Colour tutorialHighContrastText() { return juce::Colour(0xfff3fff5); }
-inline juce::Colour tutorialHighContrastTextDim() { return juce::Colour(0xffd8f2dc); }
-inline juce::Colour tutorialHighContrastTextMuted() { return juce::Colour(0xffb6d7bd); }
+inline juce::Colour tutorialHighContrastText() { return juce::Colours::white; }
+inline juce::Colour tutorialHighContrastTextDim() { return juce::Colours::white.withAlpha(0.90f); }
+inline juce::Colour tutorialHighContrastTextMuted() { return juce::Colours::white.withAlpha(0.80f); }
 inline juce::Colour tutorialHighContrastButtonBg() { return juce::Colour(0xff102015); }
 inline juce::Colour tutorialHighContrastButtonBgOn() { return juce::Colour(0xff1f3d26); }
 
