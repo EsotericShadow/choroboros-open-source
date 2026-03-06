@@ -90,6 +90,8 @@ Ableton Live and other DAWs are covered by external beta testing.
 
 - [ ] Build zip for x64 release package
 - [ ] Build zip for x86 compatibility package
+- [ ] Packaging command executed:
+  `powershell -ExecutionPolicy Bypass -File .\windows\package_windows_release.ps1 -Config Release -VersionLabel v2.03-beta`
 - [ ] Include README/install instructions and host path notes
 - [ ] Include commit SHA and build timestamp in release notes
 

@@ -64,6 +64,12 @@ powershell -ExecutionPolicy Bypass -File .\windows\capture_reaper_crash.ps1
 powershell -ExecutionPolicy Bypass -File .\windows\trace_load_performance.ps1
 ```
 
+10. Build release ZIP packages (x64 primary + x86 compatibility):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\package_windows_release.ps1 -Config Release -VersionLabel v2.03-beta
+```
+
 ## Presets
 
 Root `CMakePresets.json` includes:
@@ -91,6 +97,7 @@ Build presets:
 - `trace_effective_defaults.ps1` - runtime-equivalent defaults source trace + flattened diff
 - `capture_reaper_crash.ps1` - one-shot REAPER crash capture (LocalDumps + event log summary)
 - `trace_load_performance.ps1` - startup/load timing summary from `load_trace.ndjson`
+- `package_windows_release.ps1` - build x64/x86 Windows release ZIPs + SHA256 files
 - `build_windows_x64.bat` / `build_windows_x86.bat` - wrappers for double-click flow
 
 ## Important Invariants
