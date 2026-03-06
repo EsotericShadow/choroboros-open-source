@@ -18,10 +18,58 @@
 
 #pragma once
 
+#include <array>
+
 class ChoroborosPluginEditor;
 
 struct LayoutTuning
 {
+    static constexpr int engineCount = 5;
+    static constexpr int mainValueFieldCount = 4; // rate, depth, offset, width
+
+    struct MainValueFxParams
+    {
+        int enabled = 1;
+        int glowAlphaPct = 4;
+        int glowSpreadPxTimes100 = 65;
+        int perCharOffsetXPxTimes100 = 0;
+        int perCharOffsetYPxTimes100 = 0;
+        int topReflectAlphaPct = 2;
+        int topReflectOffsetXPxTimes100 = 0;
+        int topReflectOffsetYPxTimes100 = -80;
+        int topReflectShearPct = 6;
+        int topReflectRotateDeg = 0;
+        int bottomReflectAlphaPct = 3;
+        int bottomReflectOffsetXPxTimes100 = 0;
+        int bottomReflectOffsetYPxTimes100 = 110;
+        int bottomReflectShearPct = -8;
+        int bottomReflectRotateDeg = 0;
+        int reflectBlurPxTimes100 = 70;
+        int reflectSquashPct = 35;
+        int reflectMotionPct = 20;
+    };
+
+    struct MainValueFlipParams
+    {
+        int enabled = 1;
+        int durationMs = 140;
+        int travelUpPxTimes100 = 30;
+        int travelDownPxTimes100 = 30;
+        int travelOutPct = 100;
+        int travelInPct = 100;
+        int shearPct = 32;
+        int minScalePct = 35;
+    };
+
+    struct MainValueAnimationParams
+    {
+        MainValueFxParams fx;
+        MainValueFlipParams flip;
+    };
+
+    using MainValueAnimationByField = std::array<MainValueAnimationParams, mainValueFieldCount>;
+    using MainValueAnimationByEngine = std::array<MainValueAnimationByField, engineCount>;
+
     int mainKnobSize = 128; // Legacy fallback/default
     int mainKnobSizeGreen = 128;
     int mainKnobSizeBlue = 128;
@@ -150,9 +198,29 @@ struct LayoutTuning
     int widthValueOffsetXPurple = -25;
     int widthValueOffsetXBlack = -25;
     int rateValueOffsetY = 0;
+    int rateValueOffsetYGreen = 0;
+    int rateValueOffsetYBlue = 0;
+    int rateValueOffsetYRed = 0;
+    int rateValueOffsetYPurple = 0;
+    int rateValueOffsetYBlack = 0;
     int depthValueOffsetY = 0;
+    int depthValueOffsetYGreen = 0;
+    int depthValueOffsetYBlue = 0;
+    int depthValueOffsetYRed = 0;
+    int depthValueOffsetYPurple = 0;
+    int depthValueOffsetYBlack = 0;
     int offsetValueOffsetY = 0;
+    int offsetValueOffsetYGreen = 0;
+    int offsetValueOffsetYBlue = 0;
+    int offsetValueOffsetYRed = 0;
+    int offsetValueOffsetYPurple = 0;
+    int offsetValueOffsetYBlack = 0;
     int widthValueOffsetY = 0;
+    int widthValueOffsetYGreen = 0;
+    int widthValueOffsetYBlue = 0;
+    int widthValueOffsetYRed = 0;
+    int widthValueOffsetYPurple = 0;
+    int widthValueOffsetYBlack = 0;
 
     int colorValueCenterX = 360;  // Color value/label horizontal center - independent of slider
     int colorValueWidth = 65;
@@ -218,6 +286,16 @@ struct LayoutTuning
     int hqSwitchSize = 45;
     int hqSwitchOffsetX = 0;
     int hqSwitchOffsetY = 0;
+    int hqSwitchOffsetXGreen = 0;
+    int hqSwitchOffsetXBlue = 0;
+    int hqSwitchOffsetXRed = 0;
+    int hqSwitchOffsetXPurple = 0;
+    int hqSwitchOffsetXBlack = 0;
+    int hqSwitchOffsetYGreen = 0;
+    int hqSwitchOffsetYBlue = 0;
+    int hqSwitchOffsetYRed = 0;
+    int hqSwitchOffsetYPurple = 0;
+    int hqSwitchOffsetYBlack = 0;
     int rateKnobVisualResponseMs = 100;
     int depthKnobVisualResponseMs = 150;
     int offsetKnobVisualResponseMs = 100;
@@ -312,6 +390,8 @@ struct LayoutTuning
     int mixValueReflectBlurPxTimes100 = 70;
     int mixValueReflectSquashPct = 35;
     int mixValueReflectMotionPct = 20;
+
+    MainValueAnimationByEngine mainValueAnimationsByEngine {};
 };
 
 class PluginEditorSetup

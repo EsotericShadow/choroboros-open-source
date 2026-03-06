@@ -20,17 +20,36 @@
 
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <array>
 
 class SmoothedSlider; // Forward declaration
 
 class CustomLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
+    struct ThemeAssetPack
+    {
+        juce::Image knobBaseImage;
+        juce::Image knobIndicatorImage;
+        juce::Image knobShadowOverlayImage;
+        juce::Image sliderTrackImage;
+        juce::Image sliderThumbImage;
+        juce::Image mixKnobImage;
+        juce::Image knobSpriteSheetRateImage;
+        juce::Image knobSpriteSheetDepthImage;
+        juce::Image knobSpriteSheetOffsetImage;
+        juce::Image knobSpriteSheetWidthImage;
+        juce::Image mixKnobSpriteSheetImage;
+    };
+
     CustomLookAndFeel();
     ~CustomLookAndFeel() override = default;
     
     // Set color theme: 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     void setColorTheme(int colorIndex);
+    bool isThemeCached(int colorIndex) const noexcept;
+    void installThemeAssetPack(int colorIndex, ThemeAssetPack&& pack);
+    static ThemeAssetPack decodeThemeAssetPack(int colorIndex);
     
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                          float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
@@ -81,25 +100,28 @@ private:
     juce::Typeface::Ptr uiTextTypeface;
     float popupMenuFontHeight = 0.0f;
     
-    int currentColorIndex = 0; // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
+    std::array<ThemeAssetPack, 5> cachedThemeAssets {};
+    std::array<bool, 5> cachedThemeValid { false, false, false, false, false };
+    int currentColorIndex = -1; // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     
     void loadImages(int colorIndex);
+    void applyThemeAssetPack(const ThemeAssetPack& pack);
     juce::Colour getThemeAccentColour() const;
     juce::Colour getThemePanelColour() const;
     juce::Colour getThemePanelOutlineColour() const;
     
     // Helper methods for loadImages
-    void getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,
-                              const char*& indicatorName, int& indicatorSize,
-                              const char*& shadowName, int& shadowSize,
-                              const char*& trackName, int& trackSize,
-                              const char*& thumbName, int& thumbSize,
-                              const char*& mixKnobName, int& mixKnobSize,
-                              const char*& knobSheetRateName, int& knobSheetRateSize,
-                              const char*& knobSheetDepthName, int& knobSheetDepthSize,
-                              const char*& knobSheetOffsetName, int& knobSheetOffsetSize,
-                              const char*& knobSheetWidthName, int& knobSheetWidthSize,
-                              const char*& mixKnobSpriteSheetName, int& mixKnobSpriteSheetSize);
+    static void getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,
+                                     const char*& indicatorName, int& indicatorSize,
+                                     const char*& shadowName, int& shadowSize,
+                                     const char*& trackName, int& trackSize,
+                                     const char*& thumbName, int& thumbSize,
+                                     const char*& mixKnobName, int& mixKnobSize,
+                                     const char*& knobSheetRateName, int& knobSheetRateSize,
+                                     const char*& knobSheetDepthName, int& knobSheetDepthSize,
+                                     const char*& knobSheetOffsetName, int& knobSheetOffsetSize,
+                                     const char*& knobSheetWidthName, int& knobSheetWidthSize,
+                                     const char*& mixKnobSpriteSheetName, int& mixKnobSpriteSheetSize);
     
     // Helper methods for drawLinearSlider
     void drawSliderTrack(juce::Graphics& g, int x, int y, int width, int height);

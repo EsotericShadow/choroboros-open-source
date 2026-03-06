@@ -1,11 +1,11 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 param(
     [string]$DumpDir = "$env:LOCALAPPDATA\CrashDumps",
     [int]$EventLookbackMinutes = 30,
     [switch]$KeepOldDumps
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 function Ensure-LocalDumpConfig {
     param(

@@ -46,19 +46,42 @@ static juce::Image makeImageFullyOpaque(const juce::Image& image)
     return copy;
 }
 
+static juce::Image loadImageFromBinary(const char* data, int size)
+{
+    if (data == nullptr || size <= 0)
+        return {};
+    return juce::ImageFileFormat::loadFrom(data, static_cast<size_t>(size));
+}
+
 CustomLookAndFeel::CustomLookAndFeel()
 {
-    loadImages(0); // Default to Green
 }
 
 void CustomLookAndFeel::setColorTheme(int colorIndex)
 {
     colorIndex = juce::jlimit(0, 4, colorIndex);
-    if (currentColorIndex != colorIndex)
-    {
-        currentColorIndex = colorIndex;
-        loadImages(colorIndex);
-    }
+    if (currentColorIndex == colorIndex && cachedThemeValid[static_cast<size_t>(colorIndex)])
+        return;
+
+    currentColorIndex = colorIndex;
+    loadImages(colorIndex);
+}
+
+bool CustomLookAndFeel::isThemeCached(int colorIndex) const noexcept
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    return cachedThemeValid[static_cast<size_t>(colorIndex)];
+}
+
+void CustomLookAndFeel::installThemeAssetPack(int colorIndex, ThemeAssetPack&& pack)
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    auto& cachedPack = cachedThemeAssets[static_cast<size_t>(colorIndex)];
+    cachedPack = std::move(pack);
+    cachedThemeValid[static_cast<size_t>(colorIndex)] = true;
+
+    if (currentColorIndex == colorIndex)
+        applyThemeAssetPack(cachedPack);
 }
 
 juce::Colour CustomLookAndFeel::getThemeAccentColour() const
@@ -88,6 +111,39 @@ juce::Colour CustomLookAndFeel::getThemePanelOutlineColour() const
 
 void CustomLookAndFeel::loadImages(int colorIndex)
 {
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    auto& cachedPack = cachedThemeAssets[static_cast<size_t>(colorIndex)];
+    auto& isCached = cachedThemeValid[static_cast<size_t>(colorIndex)];
+
+    if (!isCached)
+    {
+        cachedPack = decodeThemeAssetPack(colorIndex);
+        isCached = true;
+    }
+
+    applyThemeAssetPack(cachedPack);
+}
+
+void CustomLookAndFeel::applyThemeAssetPack(const ThemeAssetPack& pack)
+{
+    knobBaseImage = pack.knobBaseImage;
+    knobIndicatorImage = pack.knobIndicatorImage;
+    knobShadowOverlayImage = pack.knobShadowOverlayImage;
+    sliderTrackImage = pack.sliderTrackImage;
+    sliderThumbImage = pack.sliderThumbImage;
+    mixKnobImage = pack.mixKnobImage;
+    knobSpriteSheetRateImage = pack.knobSpriteSheetRateImage;
+    knobSpriteSheetDepthImage = pack.knobSpriteSheetDepthImage;
+    knobSpriteSheetOffsetImage = pack.knobSpriteSheetOffsetImage;
+    knobSpriteSheetWidthImage = pack.knobSpriteSheetWidthImage;
+    mixKnobSpriteSheetImage = pack.mixKnobSpriteSheetImage;
+}
+
+CustomLookAndFeel::ThemeAssetPack CustomLookAndFeel::decodeThemeAssetPack(int colorIndex)
+{
+    ThemeAssetPack pack;
+
+    colorIndex = juce::jlimit(0, 4, colorIndex);
     const char* knobBaseName = nullptr;
     int knobBaseSize = 0;
     const char* indicatorName = nullptr;
@@ -119,31 +175,18 @@ void CustomLookAndFeel::loadImages(int colorIndex)
                          knobSheetOffsetName, knobSheetOffsetSize,
                          knobSheetWidthName, knobSheetWidthSize,
                          mixKnobSpriteSheetName, mixKnobSpriteSheetSize);
-    
-    if (knobBaseName && knobBaseSize > 0)
-        knobBaseImage = juce::ImageCache::getFromMemory(knobBaseName, knobBaseSize);
 
-    if (indicatorName && indicatorSize > 0)
-        knobIndicatorImage = juce::ImageCache::getFromMemory(indicatorName, indicatorSize);
-
-    if (shadowName && shadowSize > 0)
-        knobShadowOverlayImage = juce::ImageCache::getFromMemory(shadowName, shadowSize);
-    
-    if (trackName && trackSize > 0)
-        sliderTrackImage = juce::ImageCache::getFromMemory(trackName, trackSize);
-    
-    if (thumbName && thumbSize > 0)
-        sliderThumbImage = juce::ImageCache::getFromMemory(thumbName, thumbSize);
-    
-    if (mixKnobName && mixKnobSize > 0)
-        mixKnobImage = juce::ImageCache::getFromMemory(mixKnobName, mixKnobSize);
+    pack.knobBaseImage = loadImageFromBinary(knobBaseName, knobBaseSize);
+    pack.knobIndicatorImage = loadImageFromBinary(indicatorName, indicatorSize);
+    pack.knobShadowOverlayImage = loadImageFromBinary(shadowName, shadowSize);
+    pack.sliderTrackImage = loadImageFromBinary(trackName, trackSize);
+    pack.sliderThumbImage = loadImageFromBinary(thumbName, thumbSize);
+    pack.mixKnobImage = loadImageFromBinary(mixKnobName, mixKnobSize);
 
     auto loadKnobSheet = [](const char* name, int size) -> juce::Image {
         if (!name || size <= 0)
             return {};
-        auto image = juce::ImageFileFormat::loadFrom(name, static_cast<size_t>(size));
-        if (!image.isValid())
-            image = juce::ImageCache::getFromMemory(name, size);
+        auto image = loadImageFromBinary(name, size);
         if (image.isValid() && image.getFormat() == juce::Image::ARGB)
         {
             const int sampleX = juce::jmin(192, image.getWidth() - 1);
@@ -158,11 +201,13 @@ void CustomLookAndFeel::loadImages(int colorIndex)
         return image;
     };
 
-    knobSpriteSheetRateImage = loadKnobSheet(knobSheetRateName, knobSheetRateSize);
-    knobSpriteSheetDepthImage = loadKnobSheet(knobSheetDepthName, knobSheetDepthSize);
-    knobSpriteSheetOffsetImage = loadKnobSheet(knobSheetOffsetName, knobSheetOffsetSize);
-    knobSpriteSheetWidthImage = loadKnobSheet(knobSheetWidthName, knobSheetWidthSize);
-    mixKnobSpriteSheetImage = loadKnobSheet(mixKnobSpriteSheetName, mixKnobSpriteSheetSize);
+    pack.knobSpriteSheetRateImage = loadKnobSheet(knobSheetRateName, knobSheetRateSize);
+    pack.knobSpriteSheetDepthImage = loadKnobSheet(knobSheetDepthName, knobSheetDepthSize);
+    pack.knobSpriteSheetOffsetImage = loadKnobSheet(knobSheetOffsetName, knobSheetOffsetSize);
+    pack.knobSpriteSheetWidthImage = loadKnobSheet(knobSheetWidthName, knobSheetWidthSize);
+    pack.mixKnobSpriteSheetImage = loadKnobSheet(mixKnobSpriteSheetName, mixKnobSpriteSheetSize);
+
+    return pack;
 }
 
 void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,

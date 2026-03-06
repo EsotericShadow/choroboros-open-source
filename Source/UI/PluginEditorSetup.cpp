@@ -92,10 +92,14 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
                                                  layout.offsetValueOffsetXPurple, layout.offsetValueOffsetXBlack, layout.offsetValueOffsetX));
     const int widthValueOffsetX = s(pickByColor(layout.widthValueOffsetXGreen, layout.widthValueOffsetXBlue, layout.widthValueOffsetXRed,
                                                 layout.widthValueOffsetXPurple, layout.widthValueOffsetXBlack, layout.widthValueOffsetX));
-    const int rateValueOffsetY = s(layout.rateValueOffsetY);
-    const int depthValueOffsetY = s(layout.depthValueOffsetY);
-    const int offsetValueOffsetY = s(layout.offsetValueOffsetY);
-    const int widthValueOffsetY = s(layout.widthValueOffsetY);
+    const int rateValueOffsetY = s(pickByColor(layout.rateValueOffsetYGreen, layout.rateValueOffsetYBlue, layout.rateValueOffsetYRed,
+                                               layout.rateValueOffsetYPurple, layout.rateValueOffsetYBlack, layout.rateValueOffsetY));
+    const int depthValueOffsetY = s(pickByColor(layout.depthValueOffsetYGreen, layout.depthValueOffsetYBlue, layout.depthValueOffsetYRed,
+                                                layout.depthValueOffsetYPurple, layout.depthValueOffsetYBlack, layout.depthValueOffsetY));
+    const int offsetValueOffsetY = s(pickByColor(layout.offsetValueOffsetYGreen, layout.offsetValueOffsetYBlue, layout.offsetValueOffsetYRed,
+                                                 layout.offsetValueOffsetYPurple, layout.offsetValueOffsetYBlack, layout.offsetValueOffsetY));
+    const int widthValueOffsetY = s(pickByColor(layout.widthValueOffsetYGreen, layout.widthValueOffsetYBlue, layout.widthValueOffsetYRed,
+                                                layout.widthValueOffsetYPurple, layout.widthValueOffsetYBlack, layout.widthValueOffsetY));
     const int colorValueWidth = s(layout.colorValueWidth);
     const int colorValueHeight = s(layout.colorValueHeight);
     const int colorValueY = s(pickByColor(layout.colorValueYGreen, layout.colorValueYBlue, layout.colorValueYRed,
@@ -178,19 +182,49 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     editor.mixValueLabel.setFont(mixValueFont);
     editor.updateValueLabelColors(colorIndex);
 
-    const bool mainFlipEnabled = layout.mainValueFlipEnabled != 0;
-    const int mainFlipDurationMs = layout.mainValueFlipDurationMs;
-    const float mainFlipTravelUpPx = static_cast<float>(layout.mainValueFlipTravelUpPxTimes100) * 0.01f;
-    const float mainFlipTravelDownPx = static_cast<float>(layout.mainValueFlipTravelDownPxTimes100) * 0.01f;
-    const float mainFlipTravelOutScale = static_cast<float>(layout.mainValueFlipTravelOutPct) * 0.01f;
-    const float mainFlipTravelInScale = static_cast<float>(layout.mainValueFlipTravelInPct) * 0.01f;
-    const float mainFlipShearAmount = static_cast<float>(layout.mainValueFlipShearPct) * 0.01f;
-    const float mainFlipScaleAmount = static_cast<float>(layout.mainValueFlipMinScalePct) * 0.01f;
-    const float mainFlipMinScale = 1.0f - juce::jlimit(0.0f, 1.0f, mainFlipScaleAmount);
-    editor.rateValueLabel.setFlipAnimationParams(mainFlipEnabled, mainFlipDurationMs, mainFlipTravelUpPx, mainFlipTravelDownPx, mainFlipTravelOutScale, mainFlipTravelInScale, mainFlipShearAmount, mainFlipMinScale);
-    editor.depthValueLabel.setFlipAnimationParams(mainFlipEnabled, mainFlipDurationMs, mainFlipTravelUpPx, mainFlipTravelDownPx, mainFlipTravelOutScale, mainFlipTravelInScale, mainFlipShearAmount, mainFlipMinScale);
-    editor.offsetValueLabel.setFlipAnimationParams(mainFlipEnabled, mainFlipDurationMs, mainFlipTravelUpPx, mainFlipTravelDownPx, mainFlipTravelOutScale, mainFlipTravelInScale, mainFlipShearAmount, mainFlipMinScale);
-    editor.widthValueLabel.setFlipAnimationParams(mainFlipEnabled, mainFlipDurationMs, mainFlipTravelUpPx, mainFlipTravelDownPx, mainFlipTravelOutScale, mainFlipTravelInScale, mainFlipShearAmount, mainFlipMinScale);
+    auto applyMainValueAnimation = [&](LabelWithContainer& label, int fieldIndex)
+    {
+        const auto& anim = layout.mainValueAnimationsByEngine[static_cast<std::size_t>(colorIndex)][static_cast<std::size_t>(fieldIndex)];
+
+        const bool flipEnabled = anim.flip.enabled != 0;
+        const int flipDurationMs = anim.flip.durationMs;
+        const float flipTravelUpPx = static_cast<float>(anim.flip.travelUpPxTimes100) * 0.01f;
+        const float flipTravelDownPx = static_cast<float>(anim.flip.travelDownPxTimes100) * 0.01f;
+        const float flipTravelOutScale = static_cast<float>(anim.flip.travelOutPct) * 0.01f;
+        const float flipTravelInScale = static_cast<float>(anim.flip.travelInPct) * 0.01f;
+        const float flipShearAmount = static_cast<float>(anim.flip.shearPct) * 0.01f;
+        const float flipScaleAmount = static_cast<float>(anim.flip.minScalePct) * 0.01f;
+        const float flipMinScale = 1.0f - juce::jlimit(0.0f, 1.0f, flipScaleAmount);
+        label.setFlipAnimationParams(flipEnabled, flipDurationMs, flipTravelUpPx, flipTravelDownPx, flipTravelOutScale, flipTravelInScale, flipShearAmount, flipMinScale);
+
+        const bool fxEnabled = anim.fx.enabled != 0;
+        const float glowAlpha = static_cast<float>(anim.fx.glowAlphaPct) * 0.01f;
+        const float glowSpreadPx = static_cast<float>(anim.fx.glowSpreadPxTimes100) * 0.01f;
+        const float perCharOffsetX = static_cast<float>(anim.fx.perCharOffsetXPxTimes100) * 0.01f;
+        const float perCharOffsetY = static_cast<float>(anim.fx.perCharOffsetYPxTimes100) * 0.01f;
+        const float topAlpha = static_cast<float>(anim.fx.topReflectAlphaPct) * 0.01f;
+        const float topOffsetX = static_cast<float>(anim.fx.topReflectOffsetXPxTimes100) * 0.01f;
+        const float topOffsetY = static_cast<float>(anim.fx.topReflectOffsetYPxTimes100) * 0.01f;
+        const float topShear = static_cast<float>(anim.fx.topReflectShearPct) * 0.01f;
+        const float topRotateDeg = static_cast<float>(anim.fx.topReflectRotateDeg);
+        const float bottomAlpha = static_cast<float>(anim.fx.bottomReflectAlphaPct) * 0.01f;
+        const float bottomOffsetX = static_cast<float>(anim.fx.bottomReflectOffsetXPxTimes100) * 0.01f;
+        const float bottomOffsetY = static_cast<float>(anim.fx.bottomReflectOffsetYPxTimes100) * 0.01f;
+        const float bottomShear = static_cast<float>(anim.fx.bottomReflectShearPct) * 0.01f;
+        const float bottomRotateDeg = static_cast<float>(anim.fx.bottomReflectRotateDeg);
+        const float reflectBlurPx = static_cast<float>(anim.fx.reflectBlurPxTimes100) * 0.01f;
+        const float reflectSquash = static_cast<float>(anim.fx.reflectSquashPct) * 0.01f;
+        const float reflectMotion = static_cast<float>(anim.fx.reflectMotionPct) * 0.01f;
+        label.setValueFxParams(fxEnabled, glowAlpha, glowSpreadPx, perCharOffsetX, perCharOffsetY,
+                               topAlpha, topOffsetX, topOffsetY, topShear, topRotateDeg,
+                               bottomAlpha, bottomOffsetX, bottomOffsetY, bottomShear, bottomRotateDeg,
+                               reflectBlurPx, reflectSquash, reflectMotion);
+    };
+
+    applyMainValueAnimation(editor.rateValueLabel, 0);
+    applyMainValueAnimation(editor.depthValueLabel, 1);
+    applyMainValueAnimation(editor.offsetValueLabel, 2);
+    applyMainValueAnimation(editor.widthValueLabel, 3);
 
     const bool colorFlipEnabled = layout.colorValueFlipEnabled != 0;
     const int colorFlipDurationMs = layout.colorValueFlipDurationMs;
@@ -213,25 +247,6 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     const float mixFlipScaleAmount = static_cast<float>(layout.mixValueFlipMinScalePct) * 0.01f;
     const float mixFlipMinScale = 1.0f - juce::jlimit(0.0f, 1.0f, mixFlipScaleAmount);
     editor.mixValueLabel.setFlipAnimationParams(mixFlipEnabled, mixFlipDurationMs, mixFlipTravelUpPx, mixFlipTravelDownPx, mixFlipTravelOutScale, mixFlipTravelInScale, mixFlipShearAmount, mixFlipMinScale);
-
-    const bool mainFxEnabled = layout.valueFxEnabled != 0;
-    const float mainGlowAlpha = static_cast<float>(layout.valueGlowAlphaPct) * 0.01f;
-    const float mainGlowSpreadPx = static_cast<float>(layout.valueGlowSpreadPxTimes100) * 0.01f;
-    const float mainPerCharOffsetX = static_cast<float>(layout.valueFxPerCharOffsetXPxTimes100) * 0.01f;
-    const float mainPerCharOffsetY = static_cast<float>(layout.valueFxPerCharOffsetYPxTimes100) * 0.01f;
-    const float mainTopAlpha = static_cast<float>(layout.valueTopReflectAlphaPct) * 0.01f;
-    const float mainTopOffsetX = static_cast<float>(layout.valueTopReflectOffsetXPxTimes100) * 0.01f;
-    const float mainTopOffsetY = static_cast<float>(layout.valueTopReflectOffsetYPxTimes100) * 0.01f;
-    const float mainTopShear = static_cast<float>(layout.valueTopReflectShearPct) * 0.01f;
-    const float mainTopRotateDeg = static_cast<float>(layout.valueTopReflectRotateDeg);
-    const float mainBottomAlpha = static_cast<float>(layout.valueBottomReflectAlphaPct) * 0.01f;
-    const float mainBottomOffsetX = static_cast<float>(layout.valueBottomReflectOffsetXPxTimes100) * 0.01f;
-    const float mainBottomOffsetY = static_cast<float>(layout.valueBottomReflectOffsetYPxTimes100) * 0.01f;
-    const float mainBottomShear = static_cast<float>(layout.valueBottomReflectShearPct) * 0.01f;
-    const float mainBottomRotateDeg = static_cast<float>(layout.valueBottomReflectRotateDeg);
-    const float mainReflectBlurPx = static_cast<float>(layout.valueReflectBlurPxTimes100) * 0.01f;
-    const float mainReflectSquash = static_cast<float>(layout.valueReflectSquashPct) * 0.01f;
-    const float mainReflectMotion = static_cast<float>(layout.valueReflectMotionPct) * 0.01f;
 
     const bool colorFxEnabled = layout.colorValueFxEnabled != 0;
     const float colorGlowAlpha = static_cast<float>(layout.colorValueGlowAlphaPct) * 0.01f;
@@ -271,10 +286,6 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     const float mixReflectSquash = static_cast<float>(layout.mixValueReflectSquashPct) * 0.01f;
     const float mixReflectMotion = static_cast<float>(layout.mixValueReflectMotionPct) * 0.01f;
 
-    editor.rateValueLabel.setValueFxParams(mainFxEnabled, mainGlowAlpha, mainGlowSpreadPx, mainPerCharOffsetX, mainPerCharOffsetY, mainTopAlpha, mainTopOffsetX, mainTopOffsetY, mainTopShear, mainTopRotateDeg, mainBottomAlpha, mainBottomOffsetX, mainBottomOffsetY, mainBottomShear, mainBottomRotateDeg, mainReflectBlurPx, mainReflectSquash, mainReflectMotion);
-    editor.depthValueLabel.setValueFxParams(mainFxEnabled, mainGlowAlpha, mainGlowSpreadPx, mainPerCharOffsetX, mainPerCharOffsetY, mainTopAlpha, mainTopOffsetX, mainTopOffsetY, mainTopShear, mainTopRotateDeg, mainBottomAlpha, mainBottomOffsetX, mainBottomOffsetY, mainBottomShear, mainBottomRotateDeg, mainReflectBlurPx, mainReflectSquash, mainReflectMotion);
-    editor.offsetValueLabel.setValueFxParams(mainFxEnabled, mainGlowAlpha, mainGlowSpreadPx, mainPerCharOffsetX, mainPerCharOffsetY, mainTopAlpha, mainTopOffsetX, mainTopOffsetY, mainTopShear, mainTopRotateDeg, mainBottomAlpha, mainBottomOffsetX, mainBottomOffsetY, mainBottomShear, mainBottomRotateDeg, mainReflectBlurPx, mainReflectSquash, mainReflectMotion);
-    editor.widthValueLabel.setValueFxParams(mainFxEnabled, mainGlowAlpha, mainGlowSpreadPx, mainPerCharOffsetX, mainPerCharOffsetY, mainTopAlpha, mainTopOffsetX, mainTopOffsetY, mainTopShear, mainTopRotateDeg, mainBottomAlpha, mainBottomOffsetX, mainBottomOffsetY, mainBottomShear, mainBottomRotateDeg, mainReflectBlurPx, mainReflectSquash, mainReflectMotion);
     editor.colorValueLabel.setValueFxParams(colorFxEnabled, colorGlowAlpha, colorGlowSpreadPx, colorPerCharOffsetX, colorPerCharOffsetY, colorTopAlpha, colorTopOffsetX, colorTopOffsetY, colorTopShear, colorTopRotateDeg, colorBottomAlpha, colorBottomOffsetX, colorBottomOffsetY, colorBottomShear, colorBottomRotateDeg, colorReflectBlurPx, colorReflectSquash, colorReflectMotion);
     editor.mixValueLabel.setValueFxParams(mixFxEnabled, mixGlowAlpha, mixGlowSpreadPx, mixPerCharOffsetX, mixPerCharOffsetY, mixTopAlpha, mixTopOffsetX, mixTopOffsetY, mixTopShear, mixTopRotateDeg, mixBottomAlpha, mixBottomOffsetX, mixBottomOffsetY, mixBottomShear, mixBottomRotateDeg, mixReflectBlurPx, mixReflectSquash, mixReflectMotion);
 
@@ -343,8 +354,12 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     editor.engineColorBox.setTooltip("Engine Selection: Choose between five distinct chorus algorithms. Green=Classic, Blue=Modern, Red=Vintage, Purple=Experimental, Black=Linear.");
 
     const int hqSize = s(layout.hqSwitchSize);
-    const int hqCenterX = s(350 + layout.hqSwitchOffsetX);
-    const int hqCenterY = s(152 + layout.hqSwitchOffsetY);
+    const int hqOffsetX = pickByColor(layout.hqSwitchOffsetXGreen, layout.hqSwitchOffsetXBlue, layout.hqSwitchOffsetXRed,
+                                      layout.hqSwitchOffsetXPurple, layout.hqSwitchOffsetXBlack, layout.hqSwitchOffsetX);
+    const int hqOffsetY = pickByColor(layout.hqSwitchOffsetYGreen, layout.hqSwitchOffsetYBlue, layout.hqSwitchOffsetYRed,
+                                      layout.hqSwitchOffsetYPurple, layout.hqSwitchOffsetYBlack, layout.hqSwitchOffsetY);
+    const int hqCenterX = s(350 + hqOffsetX);
+    const int hqCenterY = s(152 + hqOffsetY);
     editor.hqButton.setBounds(hqCenterX - (hqSize / 2), hqCenterY - (hqSize / 2), hqSize, hqSize);
 
     const juce::Font hqFont = editor.makeUiTextFont(12.25f * editor.getUiScale(), true);
