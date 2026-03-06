@@ -813,7 +813,10 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         const int savedColorIndex = static_cast<int>(engineColorParam->load());
         // Use the ComboBox's selected ID to ensure consistency
         const int actualColorIndex = engineColorBox.getSelectedId() - 1;
-        customLookAndFeel.setColorTheme(actualColorIndex);
+        if (CustomLookAndFeel::isThemeAssetPackCached(actualColorIndex))
+            customLookAndFeel.setColorTheme(actualColorIndex);
+        else
+            customLookAndFeel.setThemeColorIndexOnly(actualColorIndex);
         loadBackgroundImage(actualColorIndex);
         // Value labels will be updated after they're set up in constructor
     }
@@ -856,11 +859,11 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
 
     themePrewarmThread = std::thread([safeThis, stopFlag, activeColorIndex]()
     {
-        std::array<int, 5> prewarmOrder { 0, 1, 2, 3, 4 };
-        int orderCursor = 0;
-        for (int i = 0; i < 5; ++i)
+        std::array<int, 5> prewarmOrder { activeColorIndex, 0, 1, 2, 3 };
+        int orderCursor = 1;
+        for (int i = 0; i < 5 && orderCursor < 5; ++i)
         {
-            const int candidate = (activeColorIndex + 1 + i) % 5;
+            const int candidate = i;
             if (candidate == activeColorIndex)
                 continue;
             prewarmOrder[static_cast<size_t>(orderCursor++)] = candidate;
@@ -872,17 +875,25 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
                 return;
 
             const int colorIndex = prewarmOrder[static_cast<size_t>(i)];
-            auto pack = CustomLookAndFeel::decodeThemeAssetPack(colorIndex);
+            auto pack = CustomLookAndFeel::getOrDecodeThemeAssetPack(colorIndex);
 
             if (stopFlag->load())
                 return;
 
             juce::MessageManager::callAsync(
-                [safeThis, colorIndex, pack = std::move(pack)]() mutable
+                [safeThis, colorIndex, activeColorIndex, pack = std::move(pack)]() mutable
                 {
                     if (safeThis == nullptr)
                         return;
                     safeThis->customLookAndFeel.installThemeAssetPack(colorIndex, std::move(pack));
+                    if (colorIndex == activeColorIndex)
+                    {
+                        safeThis->audioProcessor.logLoadTraceEvent(
+                            "editor_active_theme_ready_ms",
+                            juce::Time::getMillisecondCounterHiRes() - safeThis->editorCtorStartMs,
+                            "engine=" + juce::String(activeColorIndex));
+                        safeThis->repaint();
+                    }
                 });
         }
     });

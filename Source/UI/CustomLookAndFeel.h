@@ -47,8 +47,11 @@ public:
     
     // Set color theme: 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     void setColorTheme(int colorIndex);
+    void setThemeColorIndexOnly(int colorIndex) noexcept;
     bool isThemeCached(int colorIndex) const noexcept;
+    static bool isThemeAssetPackCached(int colorIndex) noexcept;
     void installThemeAssetPack(int colorIndex, ThemeAssetPack&& pack);
+    static ThemeAssetPack getOrDecodeThemeAssetPack(int colorIndex);
     static ThemeAssetPack decodeThemeAssetPack(int colorIndex);
     
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,

@@ -136,6 +136,7 @@ $interesting = @(
     "processor_create_editor_ms",
     "editor_ctor_total_ms",
     "editor_theme_setup_ms",
+    "editor_active_theme_ready_ms",
     "editor_controls_setup_ms",
     "editor_first_paint_ms",
     "devpanel_tab_switch_ms",

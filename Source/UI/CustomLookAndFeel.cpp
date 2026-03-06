@@ -21,6 +21,7 @@
 #include "LabelWithContainer.h"
 #include "BinaryData.h"
 #include <cmath>
+#include <utility>
 
 // Returns a copy of the image with every non-transparent pixel set to full opacity (fixes PNGs exported at <100% opacity).
 static juce::Image makeImageFullyOpaque(const juce::Image& image)
@@ -53,6 +54,22 @@ static juce::Image loadImageFromBinary(const char* data, int size)
     return juce::ImageFileFormat::loadFrom(data, static_cast<size_t>(size));
 }
 
+namespace
+{
+struct SharedThemeAssetCache
+{
+    juce::CriticalSection lock;
+    std::array<CustomLookAndFeel::ThemeAssetPack, 5> packs {};
+    std::array<bool, 5> valid { false, false, false, false, false };
+};
+
+SharedThemeAssetCache& getSharedThemeAssetCache()
+{
+    static SharedThemeAssetCache cache;
+    return cache;
+}
+} // namespace
+
 CustomLookAndFeel::CustomLookAndFeel()
 {
 }
@@ -67,10 +84,49 @@ void CustomLookAndFeel::setColorTheme(int colorIndex)
     loadImages(colorIndex);
 }
 
+void CustomLookAndFeel::setThemeColorIndexOnly(int colorIndex) noexcept
+{
+    currentColorIndex = juce::jlimit(0, 4, colorIndex);
+}
+
 bool CustomLookAndFeel::isThemeCached(int colorIndex) const noexcept
 {
     colorIndex = juce::jlimit(0, 4, colorIndex);
     return cachedThemeValid[static_cast<size_t>(colorIndex)];
+}
+
+bool CustomLookAndFeel::isThemeAssetPackCached(int colorIndex) noexcept
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    const auto index = static_cast<size_t>(colorIndex);
+    const auto& cache = getSharedThemeAssetCache();
+    const juce::ScopedLock lock(cache.lock);
+    return cache.valid[index];
+}
+
+CustomLookAndFeel::ThemeAssetPack CustomLookAndFeel::getOrDecodeThemeAssetPack(int colorIndex)
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    const auto index = static_cast<size_t>(colorIndex);
+    auto& cache = getSharedThemeAssetCache();
+
+    {
+        const juce::ScopedLock lock(cache.lock);
+        if (cache.valid[index])
+            return cache.packs[index];
+    }
+
+    auto decoded = decodeThemeAssetPack(colorIndex);
+
+    {
+        const juce::ScopedLock lock(cache.lock);
+        if (!cache.valid[index])
+        {
+            cache.packs[index] = decoded;
+            cache.valid[index] = true;
+        }
+        return cache.packs[index];
+    }
 }
 
 void CustomLookAndFeel::installThemeAssetPack(int colorIndex, ThemeAssetPack&& pack)
@@ -79,6 +135,13 @@ void CustomLookAndFeel::installThemeAssetPack(int colorIndex, ThemeAssetPack&& p
     auto& cachedPack = cachedThemeAssets[static_cast<size_t>(colorIndex)];
     cachedPack = std::move(pack);
     cachedThemeValid[static_cast<size_t>(colorIndex)] = true;
+
+    {
+        auto& sharedCache = getSharedThemeAssetCache();
+        const juce::ScopedLock lock(sharedCache.lock);
+        sharedCache.packs[static_cast<size_t>(colorIndex)] = cachedPack;
+        sharedCache.valid[static_cast<size_t>(colorIndex)] = true;
+    }
 
     if (currentColorIndex == colorIndex)
         applyThemeAssetPack(cachedPack);
@@ -117,7 +180,7 @@ void CustomLookAndFeel::loadImages(int colorIndex)
 
     if (!isCached)
     {
-        cachedPack = decodeThemeAssetPack(colorIndex);
+        cachedPack = getOrDecodeThemeAssetPack(colorIndex);
         isCached = true;
     }
 
