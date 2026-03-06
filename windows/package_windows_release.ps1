@@ -35,10 +35,10 @@ function New-WindowsPackage {
     $srcStandalone = Join-Path $artefactsDir "Standalone\Choroboros.exe"
 
     if (-not (Test-Path $srcVst3)) {
-        throw "Missing VST3 bundle for $ArchLabel: $srcVst3"
+        throw "Missing VST3 bundle for ${ArchLabel}: $srcVst3"
     }
     if (-not (Test-Path $srcStandalone)) {
-        throw "Missing Standalone executable for $ArchLabel: $srcStandalone"
+        throw "Missing Standalone executable for ${ArchLabel}: $srcStandalone"
     }
 
     $packageName = "Choroboros-$PackageVersion-Windows-$ArchLabel"
