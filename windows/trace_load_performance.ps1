@@ -1,11 +1,11 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 param(
     [string]$LogPath = "$env:APPDATA\Choroboros\load_trace.ndjson",
     [int]$Tail = 20,
     [switch]$Reset
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 if ($Reset) {
     if (Test-Path $LogPath) {
