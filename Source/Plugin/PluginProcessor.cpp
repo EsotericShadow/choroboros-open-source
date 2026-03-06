@@ -118,6 +118,36 @@ void appendLoadTraceLine(const ChoroborosAudioProcessor& processor,
     logFile.appendText(juce::JSON::toString(payload, false) + "\n", false, false, nullptr);
 }
 
+juce::String buildStartupParamSnapshotNotes(ChoroborosAudioProcessor& processor, const juce::String& sourceTag)
+{
+    auto& valueTreeState = processor.getValueTreeState();
+    const auto readRaw = [&](const char* paramId, float fallback) -> float
+    {
+        if (const auto* raw = valueTreeState.getRawParameterValue(paramId))
+            return raw->load();
+        return fallback;
+    };
+
+    const int engine = juce::jlimit(0, 4,
+                                    static_cast<int>(std::round(readRaw(ChoroborosAudioProcessor::ENGINE_COLOR_ID, 0.0f))));
+    const int hq = readRaw(ChoroborosAudioProcessor::HQ_ID, 0.0f) >= 0.5f ? 1 : 0;
+    const float rate = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                   readRaw(ChoroborosAudioProcessor::RATE_ID, 0.5f));
+    const float depth = processor.mapParameterValue(ChoroborosAudioProcessor::DEPTH_ID,
+                                                    readRaw(ChoroborosAudioProcessor::DEPTH_ID, 0.5f));
+    const float offset = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
+                                                     readRaw(ChoroborosAudioProcessor::OFFSET_ID, 90.0f));
+    const float width = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID,
+                                                    readRaw(ChoroborosAudioProcessor::WIDTH_ID, 1.0f));
+    const float color = processor.mapParameterValue(ChoroborosAudioProcessor::COLOR_ID,
+                                                    readRaw(ChoroborosAudioProcessor::COLOR_ID, 0.5f));
+    const float mix = processor.mapParameterValue(ChoroborosAudioProcessor::MIX_ID,
+                                                  readRaw(ChoroborosAudioProcessor::MIX_ID, 0.5f));
+
+    return juce::String::formatted("%s,engine=%d,hq=%d,rate=%.4f,depth=%.4f,offset=%.4f,width=%.4f,color=%.4f,mix=%.4f",
+                                   sourceTag.toRawUTF8(), engine, hq, rate, depth, offset, width, color, mix);
+}
+
 double getNumberOrDefault(const juce::var& objectVar, const juce::Identifier& key, double fallback)
 {
     if (const auto* object = objectVar.getDynamicObject())
@@ -675,9 +705,8 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
     const bool activeHQ = processor.isHqEnabled();
     processor.syncEngineInternalsToActiveDsp(activeEngine, activeHQ);
 
-    // Engine parameter profiles are runtime skin-state memory and should boot from
-    // factory engine defaults each plugin load. Do not import persisted defaults
-    // profiles here, otherwise stale snapshots can override intended base presets.
+    if (root->hasProperty("engineParamProfiles"))
+        processor.loadEngineParamProfilesFromVar(root->getProperty("engineParamProfiles"));
 }
 
 void seedPersistedDefaultsFromBundledWindowsFactory()
@@ -836,6 +865,9 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
     logLoadTraceEvent("processor_apply_active_profile_ms",
                       juce::Time::getMillisecondCounterHiRes() - profileApplyStartMs);
+    logLoadTraceEvent("processor_startup_params",
+                      0.0,
+                      buildStartupParamSnapshotNotes(*this, "source=persisted_defaults"));
 
     parameters.addParameterListener(ENGINE_COLOR_ID, this);
     parameters.addParameterListener(RATE_ID, this);
@@ -1559,6 +1591,8 @@ void ChoroborosAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 
 void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
+    const double stateLoadStartMs = juce::Time::getMillisecondCounterHiRes();
+    bool stateApplied = false;
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
     if (xmlState.get() != nullptr)
@@ -1603,7 +1637,19 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
             setCoreAssignments(restoredAssignments);
 
             stateLoadInProgress = false;
+            stateApplied = true;
         }
+    }
+
+    logLoadTraceEvent("processor_set_state_information_ms",
+                      juce::Time::getMillisecondCounterHiRes() - stateLoadStartMs,
+                      juce::String("bytes=") + juce::String(sizeInBytes)
+                          + ",applied=" + (stateApplied ? "1" : "0"));
+    if (stateApplied)
+    {
+        logLoadTraceEvent("processor_post_state_params",
+                          0.0,
+                          buildStartupParamSnapshotNotes(*this, "source=host_state"));
     }
 }
 

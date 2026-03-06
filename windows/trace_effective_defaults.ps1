@@ -166,6 +166,22 @@ function Get-JsonPathValue {
     return [string]$current
 }
 
+function Get-FileMatchCount {
+    param(
+        [string]$PathValue,
+        [string]$Pattern
+    )
+
+    if (-not (Test-Path $PathValue)) { return 0 }
+    try {
+        $matches = Select-String -Path $PathValue -Pattern $Pattern -SimpleMatch -ErrorAction Stop
+        if ($null -eq $matches) { return 0 }
+        return @($matches).Count
+    } catch {
+        return 0
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $candidate = Resolve-PathSafe -PathValue (Join-Path $PSScriptRoot "..")
     if ($null -ne $candidate) {
@@ -187,6 +203,7 @@ $SourceJson = Resolve-PathSafe -PathValue $SourceJson
 
 $roamingCfg = Join-Path ([Environment]::GetFolderPath("ApplicationData")) "Choroboros"
 $localCfg = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "Choroboros"
+$reaperCfg = Join-Path ([Environment]::GetFolderPath("ApplicationData")) "REAPER"
 
 $paths = [ordered]@{
     EffectiveUser = Join-Path $roamingCfg "defaults_user.json"
@@ -291,6 +308,33 @@ if ($null -ne $effectiveObject -and $info.Factory.ValidJson) {
     if ($diffFactory.Count -gt 0) {
         $diffFactory | Select-Object -First 80 | Format-Table -AutoSize
     }
+}
+
+$reaperFiles = [ordered]@{
+    VstPresets64 = Join-Path $reaperCfg "reaper-vstpresets64.ini"
+    VstPresets32 = Join-Path $reaperCfg "reaper-vstpresets.ini"
+    VstPlugins64 = Join-Path $reaperCfg "reaper-vstplugins64.ini"
+    ReaperIni = Join-Path $reaperCfg "reaper.ini"
+}
+
+$reaperTable = foreach ($name in $reaperFiles.Keys) {
+    $pathValue = $reaperFiles[$name]
+    $exists = Test-Path $pathValue
+    [pscustomobject]@{
+        Name = $name
+        Exists = $exists
+        ChoroborosMentions = if ($exists) { Get-FileMatchCount -PathValue $pathValue -Pattern "Choroboros" } else { 0 }
+        Path = $pathValue
+    }
+}
+
+Write-Host ""
+Write-Host "REAPER host-state override scan (new inserts can inherit host default preset/state):"
+$reaperTable | Format-Table -AutoSize
+
+$presetMentions = ($reaperTable | Where-Object { $_.Name -like "VstPresets*" } | Measure-Object -Property ChoroborosMentions -Sum).Sum
+if ($presetMentions -gt 0) {
+    Write-Host "WARNING: REAPER preset files contain Choroboros entries. Host default preset/state may override JSON defaults on insert." -ForegroundColor Yellow
 }
 
 Write-Host ""
