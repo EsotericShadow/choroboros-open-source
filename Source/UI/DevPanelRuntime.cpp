@@ -916,21 +916,23 @@ void DevPanel::resized()
             juce::Rectangle<int> visibleAreaInContent(viewPos.x, viewPos.y, viewport.getViewWidth(), viewport.getViewHeight());
             visibleAreaInContent = visibleAreaInContent.reduced(10);
 
-            const int popupWidth = juce::jlimit(260, 380, static_cast<int>(std::round(visibleAreaInContent.getWidth() * 0.34)));
-            const int popupHeight = 94;
+            const int popupWidth = juce::jlimit(300, 430, static_cast<int>(std::round(visibleAreaInContent.getWidth() * 0.38)));
+            const int popupHeight = 122;
             auto popupBounds = juce::Rectangle<int>(visibleAreaInContent.getX() + 10,
                                                     visibleAreaInContent.getBottom() - popupHeight - 10,
                                                     popupWidth,
                                                     popupHeight);
             popupBounds = popupBounds.getIntersection(content.getLocalBounds());
             overviewTutorialPopup.setBounds(popupBounds);
+            overviewTutorialPopup.toFront(false);
 
             auto popupArea = overviewTutorialPopup.getLocalBounds().reduced(10, 8);
-            auto header = popupArea.removeFromTop(20);
+            auto header = popupArea.removeFromTop(24);
             const int closeW = 28;
             overviewTutorialPopupCloseButton.setBounds(header.removeFromRight(closeW));
-            overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::labelSmall, false));
-            overviewTutorialPopupLabel.setBounds(header.withTrimmedRight(6));
+            overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::description, false));
+            popupArea.removeFromTop(2);
+            overviewTutorialPopupLabel.setBounds(popupArea.removeFromTop(52));
 
             popupArea.removeFromTop(4);
             const int startW = 130;
@@ -981,6 +983,7 @@ void DevPanel::updateActiveProfileLabel()
     styleHackerTextButton(fxPresetSubtleButton, false);
     styleHackerTextButton(fxPresetMediumButton, false);
     styleHackerTextButton(engineFilterClearButton, false);
+    styleHackerTextButton(tutorialPreviousButton, false);
     styleHackerTextButton(tutorialNextButton, false);
     styleHackerTextButton(tutorialNextSectionButton, false);
     styleHackerTextButton(tutorialSkipButton, false);
@@ -1245,6 +1248,8 @@ void DevPanel::updateRightTabVisibility()
     saveDefaultsButton.setVisible(showSettings);
     copyJsonButton.setVisible(showSettings);
     overviewTutorialPopup.setVisible(showOverview && !tutorialActive && overviewTutorialPopupVisible);
+    if (overviewTutorialPopup.isVisible())
+        overviewTutorialPopup.toFront(false);
 
     internalsTitle.setVisible(false);
     internalsDescription.setVisible(false);
@@ -1433,6 +1438,7 @@ void DevPanel::applyUiPreferences()
     styleHackerTextButton(fxPresetSubtleButton, false);
     styleHackerTextButton(fxPresetMediumButton, false);
     styleHackerTextButton(engineFilterClearButton, false);
+    styleHackerTextButton(tutorialPreviousButton, false);
     styleHackerTextButton(tutorialNextButton, false);
     styleHackerTextButton(tutorialNextSectionButton, false);
     styleHackerTextButton(tutorialSkipButton, false);
@@ -1958,6 +1964,18 @@ void DevPanel::advanceTutorialStep()
     applyTutorialStep();
 }
 
+void DevPanel::retreatTutorialStep()
+{
+    if (!tutorialActive)
+        return;
+
+    if (tutorialStepIndex <= 0)
+        return;
+
+    --tutorialStepIndex;
+    applyTutorialStep();
+}
+
 void DevPanel::advanceTutorialSection()
 {
     if (!tutorialActive)
@@ -2075,9 +2093,12 @@ void DevPanel::applyTutorialStep()
         : juce::String();
     tutorialFocusHintLabel.setText(focusHintText,
                                    juce::dontSendNotification);
-    tutorialNextButton.setButtonText(finalStep ? "Got It" : "Next");
+    juce::ignoreUnused(finalStep);
+    tutorialPreviousButton.setEnabled(tutorialStepIndex > 0);
+    tutorialPreviousButton.setButtonText("<");
+    tutorialNextButton.setButtonText(">");
     tutorialNextSectionButton.setEnabled(hasNextSection);
-    tutorialNextSectionButton.setButtonText(hasNextSection ? "Next Section" : "Last Section");
+    tutorialNextSectionButton.setButtonText(">>");
 
     juce::Colour accent = hackerText();
     switch (activeTab)
@@ -2173,7 +2194,10 @@ void DevPanel::layoutTutorialOverlay()
     tutorialOverlay.setBounds(best);
 
     auto area = tutorialOverlay.getLocalBounds().reduced(12, 10);
-    tutorialStepLabel.setBounds(area.removeFromTop(18));
+    auto topRow = area.removeFromTop(20);
+    const int closeW = 28;
+    tutorialSkipButton.setBounds(topRow.removeFromRight(closeW));
+    tutorialStepLabel.setBounds(topRow);
     tutorialTitleLabel.setBounds(area.removeFromTop(28));
     area.removeFromTop(4);
 
@@ -2186,13 +2210,14 @@ void DevPanel::layoutTutorialOverlay()
         tutorialFocusHintLabel.setBounds(0, 0, 0, 0);
     auto buttons = footer.removeFromBottom(34);
     constexpr int gap = 8;
-    constexpr int skipW = 110;
-    constexpr int nextW = 96;
-    tutorialSkipButton.setBounds(buttons.removeFromLeft(skipW));
+    constexpr int prevW = 46;
+    constexpr int nextW = 46;
+    constexpr int nextSectionW = 58;
+    tutorialPreviousButton.setBounds(buttons.removeFromLeft(prevW));
     buttons.removeFromLeft(gap);
     tutorialNextButton.setBounds(buttons.removeFromRight(nextW));
     buttons.removeFromRight(gap);
-    tutorialNextSectionButton.setBounds(buttons);
+    tutorialNextSectionButton.setBounds(buttons.removeFromRight(nextSectionW));
 }
 
 void DevPanel::updateTutorialHighlight()

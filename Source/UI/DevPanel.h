@@ -211,6 +211,7 @@ private:
     juce::Label tutorialTitleLabel;
     juce::TextEditor tutorialBodyText;
     juce::Label tutorialFocusHintLabel;
+    juce::TextButton tutorialPreviousButton;
     juce::TextButton tutorialNextButton;
     juce::TextButton tutorialNextSectionButton;
     juce::TextButton tutorialSkipButton;
@@ -447,6 +448,7 @@ private:
     void cancelConsoleSweeps();
     bool startTutorial(const juce::String& requestedTopic, juce::String& statusMessage);
     bool stopTutorial(bool skipped, juce::String& statusMessage);
+    void retreatTutorialStep();
     void advanceTutorialStep();
     void advanceTutorialSection();
     void applyTutorialStep();

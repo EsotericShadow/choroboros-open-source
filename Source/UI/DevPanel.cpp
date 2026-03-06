@@ -404,6 +404,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     tutorialOverlay.addAndMakeVisible(tutorialTitleLabel);
     tutorialOverlay.addAndMakeVisible(tutorialBodyText);
     tutorialOverlay.addAndMakeVisible(tutorialFocusHintLabel);
+    tutorialOverlay.addAndMakeVisible(tutorialPreviousButton);
     tutorialOverlay.addAndMakeVisible(tutorialNextButton);
     tutorialOverlay.addAndMakeVisible(tutorialNextSectionButton);
     tutorialOverlay.addAndMakeVisible(tutorialSkipButton);
@@ -447,27 +448,32 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     tutorialFocusHintLabel.setColour(juce::Label::textColourId, hackerTextMuted());
     tutorialFocusHintLabel.setJustificationType(juce::Justification::centredLeft);
 
-    tutorialNextButton.setButtonText("Next");
+    tutorialPreviousButton.setButtonText("<");
+    tutorialPreviousButton.setTooltip("Go back to the previous tutorial step.");
+    tutorialPreviousButton.onClick = [this] { retreatTutorialStep(); };
+
+    tutorialNextButton.setButtonText(">");
     tutorialNextButton.setTooltip("Advance to the next tutorial step.");
     tutorialNextButton.onClick = [this] { advanceTutorialStep(); };
 
-    tutorialNextSectionButton.setButtonText("Next Section");
+    tutorialNextSectionButton.setButtonText(">>");
     tutorialNextSectionButton.setTooltip("Skip ahead to the next tutorial tab/subtab section.");
     tutorialNextSectionButton.onClick = [this] { advanceTutorialSection(); };
 
-    tutorialSkipButton.setButtonText("Skip Tutorial");
-    tutorialSkipButton.setTooltip("Abort the active tutorial.");
+    tutorialSkipButton.setButtonText("X");
+    tutorialSkipButton.setTooltip("Close tutorial.");
     tutorialSkipButton.onClick = [this]
     {
         juce::String status;
         stopTutorial(true, status);
     };
 
-    overviewTutorialPopupLabel.setText("Need a quick walkthrough? Start the Core DSP tutorial from here.",
+    overviewTutorialPopupLabel.setText("Need a quick walkthrough?\nStart the Core DSP tutorial here.",
                                        juce::dontSendNotification);
-    overviewTutorialPopupLabel.setJustificationType(juce::Justification::centredLeft);
+    overviewTutorialPopupLabel.setJustificationType(juce::Justification::topLeft);
+    overviewTutorialPopupLabel.setMinimumHorizontalScale(1.0f);
     overviewTutorialPopupLabel.setColour(juce::Label::textColourId, hackerText());
-    overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::description, false));
 
     overviewTutorialPopupStartButton.setButtonText("Start Tutorial");
     overviewTutorialPopupStartButton.setTooltip("Launch the core walkthrough tutorial.");
@@ -540,6 +546,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     styleActionButton(fxPresetSubtleButton);
     styleActionButton(fxPresetMediumButton);
     styleActionButton(engineFilterClearButton);
+    styleActionButton(tutorialPreviousButton);
     styleActionButton(tutorialNextButton);
     styleActionButton(tutorialNextSectionButton);
     styleActionButton(tutorialSkipButton);
