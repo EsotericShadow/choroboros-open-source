@@ -158,6 +158,7 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/fonts/titles/JetBrainsMono-ExtraBold.ttf
         Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLight.ttf
         Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLightItalic.ttf
+        json_defaults_dump.json
         windows/windows_factory_defaults.json
         EULA.md
 )

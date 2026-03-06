@@ -4,6 +4,7 @@
  */
 
 #include "DefaultsPersistence.h"
+#include "BinaryData.h"
 
 namespace
 {
@@ -152,24 +153,54 @@ bool DefaultsPersistence::saveFactory(const juce::String& json, juce::String* ou
     return writeJsonDocument(getFactoryDefaultsFile(), json, outError, false);
 }
 
+namespace
+{
+juce::String getEmbeddedFactoryDefaults()
+{
+#if JUCE_MAC
+    const char* resourceName = "json_defaults_dump_json";
+#elif JUCE_WINDOWS
+    const char* resourceName = "windows_factory_defaults_json";
+#else
+    return {};
+#endif
+
+#if JUCE_MAC || JUCE_WINDOWS
+    int dataSize = 0;
+    const char* data = BinaryData::getNamedResource(resourceName, dataSize);
+    if (data == nullptr || dataSize <= 0)
+        return {};
+    const juce::String json = juce::String::fromUTF8(data, dataSize);
+    return isValidJsonDocument(json) ? json : juce::String{};
+#else
+    return {};
+#endif
+}
+} // namespace
+
 juce::String DefaultsPersistence::loadFactory(juce::String* outError)
 {
     const auto file = getFactoryDefaultsFile();
-    if (!file.existsAsFile())
+    if (file.existsAsFile())
     {
-        if (outError != nullptr)
-            *outError = "Factory defaults file does not exist";
-        return {};
+        auto content = file.loadFileAsString();
+        if (content.isEmpty() && file.getSize() > 0)
+        {
+            if (outError != nullptr)
+                *outError = "Failed to read factory defaults file";
+            return {};
+        }
+        if (!content.isEmpty())
+            return content;
     }
 
-    auto content = file.loadFileAsString();
-    if (content.isEmpty() && file.getSize() > 0)
-    {
-        if (outError != nullptr)
-            *outError = "Failed to read factory defaults file";
-        return {};
-    }
-    return content;
+    const auto embedded = getEmbeddedFactoryDefaults();
+    if (!embedded.isEmpty())
+        return embedded;
+
+    if (outError != nullptr)
+        *outError = "Factory defaults file does not exist";
+    return {};
 }
 
 bool DefaultsPersistence::resetUserToFactory(juce::String* outError)

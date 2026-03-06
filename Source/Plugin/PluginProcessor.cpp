@@ -709,9 +709,9 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
         processor.loadEngineParamProfilesFromVar(root->getProperty("engineParamProfiles"));
 }
 
-void seedPersistedDefaultsFromBundledWindowsFactory()
+void seedPersistedDefaultsFromBundledFactory()
 {
-#if JUCE_WINDOWS
+#if JUCE_MAC || JUCE_WINDOWS
     const auto userFile = DefaultsPersistence::getUserDefaultsFile();
     const auto factoryFile = DefaultsPersistence::getFactoryDefaultsFile();
     const bool seedUser = !userFile.existsAsFile() || userFile.getSize() <= 0;
@@ -719,8 +719,14 @@ void seedPersistedDefaultsFromBundledWindowsFactory()
     if (!seedUser && !seedFactory)
         return;
 
+#if JUCE_MAC
+    const char* resourceName = "json_defaults_dump_json";
+#else
+    const char* resourceName = "windows_factory_defaults_json";
+#endif
+
     int dataSize = 0;
-    const char* data = BinaryData::getNamedResource("windows_factory_defaults_json", dataSize);
+    const char* data = BinaryData::getNamedResource(resourceName, dataSize);
     if (data == nullptr || dataSize <= 0)
         return;
 
@@ -851,8 +857,8 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
 
     const double bundledSeedStartMs = juce::Time::getMillisecondCounterHiRes();
-    seedPersistedDefaultsFromBundledWindowsFactory();
-    logLoadTraceEvent("processor_seed_windows_defaults_ms",
+    seedPersistedDefaultsFromBundledFactory();
+    logLoadTraceEvent("processor_seed_bundled_defaults_ms",
                       juce::Time::getMillisecondCounterHiRes() - bundledSeedStartMs);
 
     const double persistedDefaultsStartMs = juce::Time::getMillisecondCounterHiRes();
