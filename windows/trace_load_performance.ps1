@@ -145,7 +145,7 @@ $interesting = @(
 
 $rows = @()
 foreach ($eventName in $interesting) {
-    $samples = $events | Where-Object { $_.event -eq $eventName -and $_.elapsedMs -ne $null } | ForEach-Object { [double]$_.elapsedMs }
+    $samples = @($events | Where-Object { $_.event -eq $eventName -and $_.elapsedMs -ne $null } | ForEach-Object { [double]$_.elapsedMs })
     if ($samples.Count -eq 0) { continue }
     $rows += [pscustomobject]@{
         Event = $eventName
