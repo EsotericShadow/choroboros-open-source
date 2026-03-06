@@ -2102,7 +2102,9 @@ void DevPanel::layoutTutorialOverlay()
     if (auto* target = resolveTutorialFocusComponent(tutorialFocusTarget))
     {
         if (target->isVisible() && target->getWidth() > 0 && target->getHeight() > 0)
-            focusBounds = target->getBounds().expanded(10).getIntersection(content.getLocalBounds());
+            focusBounds = content.getLocalArea(target, target->getLocalBounds())
+                             .expanded(10)
+                             .getIntersection(content.getLocalBounds());
     }
 
     constexpr int margin = 10;
@@ -2167,7 +2169,7 @@ void DevPanel::updateTutorialHighlight()
         return;
     }
 
-    auto focusBounds = target->getBounds().expanded(8);
+    auto focusBounds = content.getLocalArea(target, target->getLocalBounds()).expanded(8);
     focusBounds = focusBounds.getIntersection(content.getLocalBounds());
     if (focusBounds.isEmpty() || focusBounds.getWidth() < 16 || focusBounds.getHeight() < 16)
     {
@@ -2250,7 +2252,9 @@ void DevPanel::revealTutorialFocusTarget()
     if (target == nullptr || !target->isVisible() || target->getWidth() <= 0 || target->getHeight() <= 0)
         return;
 
-    const auto focusBounds = target->getBounds().expanded(18).getIntersection(content.getLocalBounds());
+    const auto focusBounds = content.getLocalArea(target, target->getLocalBounds())
+                                .expanded(18)
+                                .getIntersection(content.getLocalBounds());
     if (focusBounds.isEmpty())
         return;
 
@@ -2281,6 +2285,74 @@ void DevPanel::revealTutorialFocusTarget()
 juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& focusTarget) const
 {
     const juce::String key = focusTarget.toLowerCase();
+    const auto findDeckRole = [](const juce::Array<juce::PropertyComponent*>& cards,
+                                 const juce::Identifier& roleKey,
+                                 const juce::String& roleValue,
+                                 bool requireVisible) -> juce::PropertyComponent*
+    {
+        juce::PropertyComponent* firstMatch = nullptr;
+        for (auto* card : cards)
+        {
+            if (card == nullptr)
+                continue;
+            if (!card->getProperties().contains(roleKey))
+                continue;
+            if (card->getProperties()[roleKey].toString() != roleValue)
+                continue;
+            if (firstMatch == nullptr)
+                firstMatch = card;
+            if (!requireVisible || card->isVisible())
+                return card;
+        }
+        return firstMatch;
+    };
+
+    const auto findToneControlsCard = [this](bool requireVisible) -> juce::PropertyComponent*
+    {
+        juce::PropertyComponent* firstMatch = nullptr;
+        for (auto* card : toneVisualDeckCards)
+        {
+            if (card == nullptr)
+                continue;
+            if (!card->getProperties().contains("devpanelSubTab"))
+                continue;
+            if (static_cast<int>(card->getProperties()["devpanelSubTab"]) != 1)
+                continue;
+
+            const bool looksLikeControlsCard =
+                card->getName().containsIgnoreCase("Transfer Controls")
+                || card->getName().containsIgnoreCase("Tone Controls")
+                || card->getName().containsIgnoreCase("Engine Response Controls")
+                || card->getName().containsIgnoreCase("Saturation Controls")
+                || card->getTooltip().containsIgnoreCase("transfer controls")
+                || card->getTooltip().containsIgnoreCase("response controls")
+                || card->getTooltip().containsIgnoreCase("Saturation control workbench");
+            if (!looksLikeControlsCard)
+                continue;
+
+            if (firstMatch == nullptr)
+                firstMatch = card;
+            if (!requireVisible || card->isVisible())
+                return card;
+        }
+        return firstMatch;
+    };
+
+    const auto findTraceMatrixCard = [this](bool requireVisible) -> juce::PropertyComponent*
+    {
+        juce::PropertyComponent* firstMatch = nullptr;
+        for (auto* card : validationVisualDeckCards)
+        {
+            if (card == nullptr || card == validationConsoleComponent)
+                continue;
+            if (firstMatch == nullptr)
+                firstMatch = card;
+            if (!requireVisible || card->isVisible())
+                return card;
+        }
+        return firstMatch;
+    };
+
     if (key == "active_profile") return const_cast<juce::Label*>(&activeProfileLabel);
     if (key == "dev_profile_controls") return const_cast<juce::ComboBox*>(&devEngineModeBox);
     if (key == "engine_selector") return const_cast<juce::ComboBox*>(&devEngineModeBox);
@@ -2292,18 +2364,28 @@ juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& foc
     if (key == "modulation_visual" || key == "lfo_scope") return const_cast<VisualDeckContent*>(&modulationVisualDeck);
     if (key == "tone_visual" || key == "spectrum_visual" || key == "transfer_visual") return const_cast<VisualDeckContent*>(&toneVisualDeck);
     if (key == "engine_visual" || key == "engine_signal_flow") return const_cast<VisualDeckContent*>(&engineVisualDeck);
-    if (key == "validation_visual" || key == "trace_matrix" || key == "validation_console")
+    if (key == "validation_visual")
         return const_cast<VisualDeckContent*>(&validationVisualDeck);
+    if (key == "trace_matrix")
+    {
+        if (auto* card = findTraceMatrixCard(true))
+            return card;
+        if (auto* card = findTraceMatrixCard(false))
+            return card;
+        return const_cast<VisualDeckContent*>(&validationVisualDeck);
+    }
+    if (key == "validation_console")
+    {
+        if (validationConsoleComponent != nullptr)
+            return validationConsoleComponent;
+        return const_cast<VisualDeckContent*>(&validationVisualDeck);
+    }
     if (key == "modulation_controls")
     {
-        for (auto* card : modulationVisualDeckCards)
-        {
-            if (card == nullptr || !card->isVisible())
-                continue;
-            if (card->getProperties().contains("devpanelModRole")
-                && card->getProperties()["devpanelModRole"].toString() == "lfo_workbench")
-                return card;
-        }
+        if (auto* card = findDeckRole(modulationVisualDeckCards, "devpanelModRole", "lfo_workbench", true))
+            return card;
+        if (auto* card = findDeckRole(modulationVisualDeckCards, "devpanelModRole", "lfo_workbench", false))
+            return card;
         return const_cast<VisualDeckContent*>(&modulationVisualDeck);
     }
     if (key == "modulation_inspector" || key == "modulation_readouts")
@@ -2312,23 +2394,10 @@ juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& foc
         return const_cast<juce::PropertyPanel*>(&tonePanel);
     if (key == "tone_controls")
     {
-        for (auto* card : toneVisualDeckCards)
-        {
-            if (card == nullptr || !card->isVisible())
-                continue;
-            if (card->getProperties().contains("devpanelSubTab")
-                && static_cast<int>(card->getProperties()["devpanelSubTab"]) == 1)
-            {
-                if (card->getName().containsIgnoreCase("Transfer Controls")
-                    || card->getName().containsIgnoreCase("Tone Controls")
-                    || card->getName().containsIgnoreCase("Engine Response Controls")
-                    || card->getName().containsIgnoreCase("Saturation Controls")
-                    || card->getTooltip().containsIgnoreCase("transfer controls")
-                    || card->getTooltip().containsIgnoreCase("response controls")
-                    || card->getTooltip().containsIgnoreCase("Saturation control workbench"))
-                    return card;
-            }
-        }
+        if (auto* card = findToneControlsCard(true))
+            return card;
+        if (auto* card = findToneControlsCard(false))
+            return card;
         return const_cast<juce::PropertyPanel*>(&tonePanel);
     }
     if (key == "engine_inspector" || key == "bbd_controls" || key == "tape_controls")
