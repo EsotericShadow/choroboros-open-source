@@ -1,0 +1,131 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+param(
+    [string]$LogPath = "$env:APPDATA\Choroboros\load_trace.ndjson",
+    [int]$Tail = 20,
+    [switch]$Reset
+)
+
+if ($Reset) {
+    if (Test-Path $LogPath) {
+        Remove-Item $LogPath -Force
+        Write-Host "Cleared load trace log: $LogPath" -ForegroundColor Yellow
+    } else {
+        Write-Host "No load trace log to clear at: $LogPath"
+    }
+    return
+}
+
+if (-not (Test-Path $LogPath)) {
+    Write-Host "Load trace log not found: $LogPath" -ForegroundColor Red
+    Write-Host "Open the plugin at least once, then re-run this script."
+    return
+}
+
+function Get-Percentile {
+    param(
+        [Parameter(Mandatory = $true)][double[]]$Values,
+        [Parameter(Mandatory = $true)][double]$P
+    )
+    if ($Values.Count -eq 0) { return [double]::NaN }
+    $sorted = $Values | Sort-Object
+    $idx = [math]::Round(($sorted.Count - 1) * $P)
+    return [double]$sorted[[int]$idx]
+}
+
+$invalidLines = 0
+$events = @()
+Get-Content -Path $LogPath -Encoding UTF8 | ForEach-Object {
+    $line = $_.Trim()
+    if ([string]::IsNullOrWhiteSpace($line)) { return }
+    try {
+        $events += ($line | ConvertFrom-Json)
+    } catch {
+        $invalidLines++
+    }
+}
+
+Write-Host ""
+Write-Host "=== Choroboros Load Performance Trace ===" -ForegroundColor Cyan
+Write-Host ("LogPath: {0}" -f $LogPath)
+Write-Host ("Events: {0} | Invalid lines: {1}" -f $events.Count, $invalidLines)
+
+if ($events.Count -eq 0) {
+    Write-Host "No parsable events found." -ForegroundColor Yellow
+    return
+}
+
+$instanceCount = ($events | Select-Object -ExpandProperty instanceId -Unique | Measure-Object).Count
+$hostCount = ($events | Select-Object -ExpandProperty host -Unique | Measure-Object).Count
+Write-Host ("Instances: {0} | Hosts: {1}" -f $instanceCount, $hostCount)
+
+$latest = $events | Sort-Object tsUtc -Descending | Select-Object -First 1
+Write-Host ""
+Write-Host "System / Host Snapshot (latest event):" -ForegroundColor Cyan
+[pscustomobject]@{
+    TimeUtc = $latest.tsUtc
+    Host = $latest.host
+    HostPath = $latest.hostPath
+    WrapperType = $latest.wrapperType
+    OS = $latest.os
+    IsOS64Bit = $latest.isOS64Bit
+    CpuVendor = $latest.cpuVendor
+    CpuModel = $latest.cpuModel
+    CpuSpeedMHz = $latest.cpuSpeedMHz
+    CpuCores = $latest.cpuCores
+    RamMB = $latest.ramMB
+    PluginVersion = $latest.pluginVersion
+    BuildConfig = $latest.buildConfig
+} | Format-List
+
+$interesting = @(
+    "processor_ctor_total_ms",
+    "processor_load_persisted_defaults_ms",
+    "processor_create_editor_ms",
+    "editor_ctor_total_ms",
+    "editor_theme_setup_ms",
+    "editor_controls_setup_ms",
+    "editor_first_paint_ms",
+    "devpanel_tab_switch_ms",
+    "devpanel_tab_build_ms"
+)
+
+$rows = @()
+foreach ($eventName in $interesting) {
+    $samples = $events | Where-Object { $_.event -eq $eventName -and $_.elapsedMs -ne $null } | ForEach-Object { [double]$_.elapsedMs }
+    if ($samples.Count -eq 0) { continue }
+    $rows += [pscustomobject]@{
+        Event = $eventName
+        Count = $samples.Count
+        MinMs = [math]::Round(($samples | Measure-Object -Minimum).Minimum, 3)
+        P50Ms = [math]::Round((Get-Percentile -Values $samples -P 0.50), 3)
+        P95Ms = [math]::Round((Get-Percentile -Values $samples -P 0.95), 3)
+        MaxMs = [math]::Round(($samples | Measure-Object -Maximum).Maximum, 3)
+        AvgMs = [math]::Round(($samples | Measure-Object -Average).Average, 3)
+    }
+}
+
+Write-Host ""
+Write-Host "Timing Summary (ms):" -ForegroundColor Cyan
+if ($rows.Count -gt 0) {
+    $rows | Sort-Object Event | Format-Table -AutoSize
+} else {
+    Write-Host "No matching timing events yet."
+}
+
+Write-Host ""
+Write-Host "Slowest events captured:" -ForegroundColor Cyan
+$events |
+    Where-Object { $_.elapsedMs -ne $null } |
+    Sort-Object {[double]$_.elapsedMs} -Descending |
+    Select-Object -First 15 tsUtc, event, elapsedMs, host, instanceId, notes |
+    Format-Table -AutoSize
+
+Write-Host ""
+Write-Host ("Recent {0} raw events:" -f $Tail) -ForegroundColor Cyan
+Get-Content -Path $LogPath -Tail $Tail
+
+Write-Host ""
+Write-Host "Tip: clear log before a controlled test run with:" -ForegroundColor DarkCyan
+Write-Host "  powershell -ExecutionPolicy Bypass -File .\windows\trace_load_performance.ps1 -Reset"

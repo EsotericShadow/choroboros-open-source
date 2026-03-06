@@ -58,6 +58,12 @@ powershell -ExecutionPolicy Bypass -File .\windows\trace_effective_defaults.ps1
 powershell -ExecutionPolicy Bypass -File .\windows\capture_reaper_crash.ps1
 ```
 
+9. Summarize plugin load/open timing from trace log (host + system context included):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\trace_load_performance.ps1
+```
+
 ## Presets
 
 Root `CMakePresets.json` includes:
@@ -84,6 +90,7 @@ Build presets:
 - `install_vst3_user.ps1` - install built VST3 to user plugin folder
 - `trace_effective_defaults.ps1` - runtime-equivalent defaults source trace + flattened diff
 - `capture_reaper_crash.ps1` - one-shot REAPER crash capture (LocalDumps + event log summary)
+- `trace_load_performance.ps1` - startup/load timing summary from `load_trace.ndjson`
 - `build_windows_x64.bat` / `build_windows_x86.bat` - wrappers for double-click flow
 
 ## Important Invariants

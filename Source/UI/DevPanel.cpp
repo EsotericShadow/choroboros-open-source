@@ -138,8 +138,9 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         button.getProperties().set("devpanelPrimaryTab", true);
         button.setClickingTogglesState(true);
         button.setRadioGroupId(0x445650); // "DVP"
-        button.onClick = [this, tabIndex]
+        button.onClick = [this, tabIndex, tabName = name]
         {
+            const double switchStartMs = juce::Time::getMillisecondCounterHiRes();
             selectedRightTab = tabIndex;
             selectedSubTabs[static_cast<size_t>(tabIndex)] =
                 juce::jlimit(0, juce::jmax(0, getSubTabCount(tabIndex) - 1),
@@ -149,6 +150,9 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             updateActiveProfileLabel();
             updateRightTabVisibility();
             resized();
+            processor.logLoadTraceEvent("devpanel_tab_switch_ms",
+                                        juce::Time::getMillisecondCounterHiRes() - switchStartMs,
+                                        "tab=" + tabName + ",index=" + juce::String(tabIndex));
         };
         content.addAndMakeVisible(button);
     };

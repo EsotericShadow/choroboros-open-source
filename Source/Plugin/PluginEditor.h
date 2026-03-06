@@ -27,6 +27,8 @@
 #include "../UI/AnimatedToggleButton.h"
 #include "../UI/PluginEditorSetup.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <atomic>
+#include <thread>
 
 //==============================================================================
 /**
@@ -133,6 +135,8 @@ private:
     void setupEngineColorSelector();
     void setupSliderAttachments();
     void setupSliderValueChangeListeners();
+    void startDeferredThemePrewarm(int activeColorIndex);
+    void stopDeferredThemePrewarm();
     double getHostBpm() const;
     void showRateSyncMenu(juce::Slider& rateControl);
     
@@ -143,6 +147,11 @@ private:
     float parseWidthValue(const juce::String& trimmed);
     float parseColorValue(const juce::String& trimmed);
     float parseMixValue(const juce::String& trimmed);
+
+    std::thread themePrewarmThread;
+    std::atomic<bool> stopThemePrewarm { false };
+    double editorCtorStartMs = 0.0;
+    bool firstPaintTimingLogged = false;
     
     // Make members accessible to setup helper
     friend class PluginEditorSetup;

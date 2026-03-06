@@ -257,6 +257,7 @@ void DevPanel::ensureTabBuilt(int mainTab)
         return;
     if (buildContext == nullptr)
         return;
+    const double tabBuildStartMs = juce::Time::getMillisecondCounterHiRes();
 
     switch (safeTab)
     {
@@ -286,6 +287,23 @@ void DevPanel::ensureTabBuilt(int mainTab)
     }
 
     rightTabBuilt[static_cast<size_t>(safeTab)] = true;
+    const auto tabNameForIndex = [](int tabIndex) -> juce::String
+    {
+        switch (tabIndex)
+        {
+            case 0: return "overview";
+            case 1: return "modulation";
+            case 2: return "tone";
+            case 3: return "engine";
+            case 4: return "look_feel";
+            case 5: return "validation";
+            case 6: return "settings";
+            default: return "unknown";
+        }
+    };
+    processor.logLoadTraceEvent("devpanel_tab_build_ms",
+                                juce::Time::getMillisecondCounterHiRes() - tabBuildStartMs,
+                                "tab=" + tabNameForIndex(safeTab) + ",index=" + juce::String(safeTab));
     registerPendingLockableMetadata();
     updateMetadataSummary();
     markLazyUiStateDirty();
@@ -2466,7 +2484,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  4, 3, -1, -1, "layout_active_inspector",
                                  "Global values affect multiple views."));
         steps.push_back(makeStep("Step 24: Look & Feel / Text Animations",
-                                 "Text Animations controls value text motion systems (glow, reflect, movement) for animated readouts.",
+                                 "Text Animations controls per-engine, per-value-field (Rate/Depth/Offset/Width) glow/reflect/flip behavior; right-click a control to propagate to all colours or a specific colour.",
                                  4, 4, -1, -1, "layout_active_inspector",
                                  "Tune animation intensity and behavior here."));
         steps.push_back(makeStep("Step 25: Validation / Telemetry",

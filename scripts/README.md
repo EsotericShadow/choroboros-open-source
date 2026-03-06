@@ -9,3 +9,4 @@ Run these from the project root, e.g. `./scripts/package.sh`.
 | `create_dmg.sh` | Create DMG installer for distribution |
 | `clear_plugin_cache.sh` | Clear DAW plugin caches |
 | `reinstall_plugin.sh` | Remove old installs and install from `Release/` |
+| `trace_load_performance_macos.sh` | Summarize startup/load timing trace (`load_trace.ndjson`) on macOS |

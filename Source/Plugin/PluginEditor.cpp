@@ -25,6 +25,7 @@
 #include "AboutDialog.h"
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/DevPanel.h"
+#include <array>
 #include <cmath>
 #include <vector>
 
@@ -244,9 +245,29 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.mixValueOffsetXPurple = getIntOrDefault(layoutVar, "mixValueOffsetXPurple", layout.mixValueOffsetX);
     layout.mixValueOffsetXBlack = getIntOrDefault(layoutVar, "mixValueOffsetXBlack", layout.mixValueOffsetX);
     layout.rateValueOffsetY = getIntOrDefault(layoutVar, "rateValueOffsetY", layout.rateValueOffsetY);
+    layout.rateValueOffsetYGreen = getIntOrDefault(layoutVar, "rateValueOffsetYGreen", layout.rateValueOffsetY);
+    layout.rateValueOffsetYBlue = getIntOrDefault(layoutVar, "rateValueOffsetYBlue", layout.rateValueOffsetY);
+    layout.rateValueOffsetYRed = getIntOrDefault(layoutVar, "rateValueOffsetYRed", layout.rateValueOffsetY);
+    layout.rateValueOffsetYPurple = getIntOrDefault(layoutVar, "rateValueOffsetYPurple", layout.rateValueOffsetY);
+    layout.rateValueOffsetYBlack = getIntOrDefault(layoutVar, "rateValueOffsetYBlack", layout.rateValueOffsetY);
     layout.depthValueOffsetY = getIntOrDefault(layoutVar, "depthValueOffsetY", layout.depthValueOffsetY);
+    layout.depthValueOffsetYGreen = getIntOrDefault(layoutVar, "depthValueOffsetYGreen", layout.depthValueOffsetY);
+    layout.depthValueOffsetYBlue = getIntOrDefault(layoutVar, "depthValueOffsetYBlue", layout.depthValueOffsetY);
+    layout.depthValueOffsetYRed = getIntOrDefault(layoutVar, "depthValueOffsetYRed", layout.depthValueOffsetY);
+    layout.depthValueOffsetYPurple = getIntOrDefault(layoutVar, "depthValueOffsetYPurple", layout.depthValueOffsetY);
+    layout.depthValueOffsetYBlack = getIntOrDefault(layoutVar, "depthValueOffsetYBlack", layout.depthValueOffsetY);
     layout.offsetValueOffsetY = getIntOrDefault(layoutVar, "offsetValueOffsetY", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYGreen = getIntOrDefault(layoutVar, "offsetValueOffsetYGreen", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYBlue = getIntOrDefault(layoutVar, "offsetValueOffsetYBlue", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYRed = getIntOrDefault(layoutVar, "offsetValueOffsetYRed", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYPurple = getIntOrDefault(layoutVar, "offsetValueOffsetYPurple", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYBlack = getIntOrDefault(layoutVar, "offsetValueOffsetYBlack", layout.offsetValueOffsetY);
     layout.widthValueOffsetY = getIntOrDefault(layoutVar, "widthValueOffsetY", layout.widthValueOffsetY);
+    layout.widthValueOffsetYGreen = getIntOrDefault(layoutVar, "widthValueOffsetYGreen", layout.widthValueOffsetY);
+    layout.widthValueOffsetYBlue = getIntOrDefault(layoutVar, "widthValueOffsetYBlue", layout.widthValueOffsetY);
+    layout.widthValueOffsetYRed = getIntOrDefault(layoutVar, "widthValueOffsetYRed", layout.widthValueOffsetY);
+    layout.widthValueOffsetYPurple = getIntOrDefault(layoutVar, "widthValueOffsetYPurple", layout.widthValueOffsetY);
+    layout.widthValueOffsetYBlack = getIntOrDefault(layoutVar, "widthValueOffsetYBlack", layout.widthValueOffsetY);
     layout.knobValueFontSize = getIntOrDefault(layoutVar, "knobValueFontSize", layout.knobValueFontSize);
     layout.colorValueFontSize = getIntOrDefault(layoutVar, "colorValueFontSize", layout.colorValueFontSize);
     layout.mixValueFontSize = getIntOrDefault(layoutVar, "mixValueFontSize", layout.mixValueFontSize);
@@ -278,6 +299,16 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.hqSwitchSize = getIntOrDefault(layoutVar, "hqSwitchSize", layout.hqSwitchSize);
     layout.hqSwitchOffsetX = getIntOrDefault(layoutVar, "hqSwitchOffsetX", layout.hqSwitchOffsetX);
     layout.hqSwitchOffsetY = getIntOrDefault(layoutVar, "hqSwitchOffsetY", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetXGreen = getIntOrDefault(layoutVar, "hqSwitchOffsetXGreen", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXBlue = getIntOrDefault(layoutVar, "hqSwitchOffsetXBlue", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXRed = getIntOrDefault(layoutVar, "hqSwitchOffsetXRed", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXPurple = getIntOrDefault(layoutVar, "hqSwitchOffsetXPurple", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXBlack = getIntOrDefault(layoutVar, "hqSwitchOffsetXBlack", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetYGreen = getIntOrDefault(layoutVar, "hqSwitchOffsetYGreen", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYBlue = getIntOrDefault(layoutVar, "hqSwitchOffsetYBlue", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYRed = getIntOrDefault(layoutVar, "hqSwitchOffsetYRed", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYPurple = getIntOrDefault(layoutVar, "hqSwitchOffsetYPurple", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYBlack = getIntOrDefault(layoutVar, "hqSwitchOffsetYBlack", layout.hqSwitchOffsetY);
     layout.rateKnobVisualResponseMs = getIntOrDefault(layoutVar, "rateKnobVisualResponseMs", layout.rateKnobVisualResponseMs);
     layout.depthKnobVisualResponseMs = getIntOrDefault(layoutVar, "depthKnobVisualResponseMs", layout.depthKnobVisualResponseMs);
     layout.offsetKnobVisualResponseMs = getIntOrDefault(layoutVar, "offsetKnobVisualResponseMs", layout.offsetKnobVisualResponseMs);
@@ -380,6 +411,49 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.mixValueReflectBlurPxTimes100 = getIntOrDefault(layoutVar, "mixValueReflectBlurPxTimes100", layout.valueReflectBlurPxTimes100);
     layout.mixValueReflectSquashPct = getIntOrDefault(layoutVar, "mixValueReflectSquashPct", layout.valueReflectSquashPct);
     layout.mixValueReflectMotionPct = getIntOrDefault(layoutVar, "mixValueReflectMotionPct", layout.valueReflectMotionPct);
+
+    const std::array<juce::String, LayoutTuning::engineCount> engineSuffixes { { "Green", "Blue", "Red", "Purple", "Black" } };
+    const std::array<juce::String, LayoutTuning::mainValueFieldCount> fieldPrefixes { { "Rate", "Depth", "Offset", "Width" } };
+    for (int engineIndex = 0; engineIndex < LayoutTuning::engineCount; ++engineIndex)
+    {
+        for (int fieldIndex = 0; fieldIndex < LayoutTuning::mainValueFieldCount; ++fieldIndex)
+        {
+            auto& anim = layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)];
+            const auto key = [&fieldPrefixes, &engineSuffixes, fieldIndex, engineIndex](const juce::String& suffix)
+            {
+                return juce::Identifier("mainValue" + fieldPrefixes[static_cast<std::size_t>(fieldIndex)] + suffix
+                                        + engineSuffixes[static_cast<std::size_t>(engineIndex)]);
+            };
+
+            anim.fx.enabled = getIntOrDefault(layoutVar, key("FxEnabled"), layout.valueFxEnabled);
+            anim.fx.glowAlphaPct = getIntOrDefault(layoutVar, key("GlowAlphaPct"), layout.valueGlowAlphaPct);
+            anim.fx.glowSpreadPxTimes100 = getIntOrDefault(layoutVar, key("GlowSpreadPxTimes100"), layout.valueGlowSpreadPxTimes100);
+            anim.fx.perCharOffsetXPxTimes100 = getIntOrDefault(layoutVar, key("PerCharOffsetXPxTimes100"), layout.valueFxPerCharOffsetXPxTimes100);
+            anim.fx.perCharOffsetYPxTimes100 = getIntOrDefault(layoutVar, key("PerCharOffsetYPxTimes100"), layout.valueFxPerCharOffsetYPxTimes100);
+            anim.fx.topReflectAlphaPct = getIntOrDefault(layoutVar, key("TopReflectAlphaPct"), layout.valueTopReflectAlphaPct);
+            anim.fx.topReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, key("TopReflectOffsetXPxTimes100"), layout.valueTopReflectOffsetXPxTimes100);
+            anim.fx.topReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, key("TopReflectOffsetYPxTimes100"), layout.valueTopReflectOffsetYPxTimes100);
+            anim.fx.topReflectShearPct = getIntOrDefault(layoutVar, key("TopReflectShearPct"), layout.valueTopReflectShearPct);
+            anim.fx.topReflectRotateDeg = getIntOrDefault(layoutVar, key("TopReflectRotateDeg"), layout.valueTopReflectRotateDeg);
+            anim.fx.bottomReflectAlphaPct = getIntOrDefault(layoutVar, key("BottomReflectAlphaPct"), layout.valueBottomReflectAlphaPct);
+            anim.fx.bottomReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, key("BottomReflectOffsetXPxTimes100"), layout.valueBottomReflectOffsetXPxTimes100);
+            anim.fx.bottomReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, key("BottomReflectOffsetYPxTimes100"), layout.valueBottomReflectOffsetYPxTimes100);
+            anim.fx.bottomReflectShearPct = getIntOrDefault(layoutVar, key("BottomReflectShearPct"), layout.valueBottomReflectShearPct);
+            anim.fx.bottomReflectRotateDeg = getIntOrDefault(layoutVar, key("BottomReflectRotateDeg"), layout.valueBottomReflectRotateDeg);
+            anim.fx.reflectBlurPxTimes100 = getIntOrDefault(layoutVar, key("ReflectBlurPxTimes100"), layout.valueReflectBlurPxTimes100);
+            anim.fx.reflectSquashPct = getIntOrDefault(layoutVar, key("ReflectSquashPct"), layout.valueReflectSquashPct);
+            anim.fx.reflectMotionPct = getIntOrDefault(layoutVar, key("ReflectMotionPct"), layout.valueReflectMotionPct);
+
+            anim.flip.enabled = getIntOrDefault(layoutVar, key("FlipEnabled"), layout.mainValueFlipEnabled);
+            anim.flip.durationMs = getIntOrDefault(layoutVar, key("FlipDurationMs"), layout.mainValueFlipDurationMs);
+            anim.flip.travelUpPxTimes100 = getIntOrDefault(layoutVar, key("FlipTravelUpPxTimes100"), layout.mainValueFlipTravelUpPxTimes100);
+            anim.flip.travelDownPxTimes100 = getIntOrDefault(layoutVar, key("FlipTravelDownPxTimes100"), layout.mainValueFlipTravelDownPxTimes100);
+            anim.flip.travelOutPct = getIntOrDefault(layoutVar, key("FlipTravelOutPct"), layout.mainValueFlipTravelOutPct);
+            anim.flip.travelInPct = getIntOrDefault(layoutVar, key("FlipTravelInPct"), layout.mainValueFlipTravelInPct);
+            anim.flip.shearPct = getIntOrDefault(layoutVar, key("FlipShearPct"), layout.mainValueFlipShearPct);
+            anim.flip.minScalePct = getIntOrDefault(layoutVar, key("FlipMinScalePct"), layout.mainValueFlipMinScalePct);
+        }
+    }
 }
 
 class DevPanelWindow : public juce::DocumentWindow
@@ -409,16 +483,29 @@ public:
 ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
+    editorCtorStartMs = juce::Time::getMillisecondCounterHiRes();
     setLookAndFeel(&customLookAndFeel);
+
+    const double fontSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     loadValueLabelTypeface();
     loadUiTextTypeface();
     customLookAndFeel.setUiTextTypeface(uiTextTypeface);
+    audioProcessor.logLoadTraceEvent("editor_font_setup_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - fontSetupStartMs);
+
+    const double layoutDefaultsStartMs = juce::Time::getMillisecondCounterHiRes();
     layoutTuning = PluginEditorSetup::makeDefaultLayout();
     loadPersistedLayoutDefaults(layoutTuning);
+    audioProcessor.logLoadTraceEvent("editor_layout_defaults_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - layoutDefaultsStartMs);
     
+    const double themeSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     setupEngineColorSelector();
     // Note: setupEngineColorSelector now reads the saved parameter value and updates UI
+    audioProcessor.logLoadTraceEvent("editor_theme_setup_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - themeSetupStartMs);
     
+    const double controlsSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     // Setup sliders with exact bounds
     setupSlider(rateSlider, rateLabel, rateValueLabel, "RATE", ChoroborosAudioProcessor::RATE_ID);
     setupSlider(depthSlider, depthLabel, depthValueLabel, "DEPTH", ChoroborosAudioProcessor::DEPTH_ID);
@@ -430,6 +517,8 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     PluginEditorSetup::setupSliders(*this);
     applyTuningToUI();
     setupSliderAttachments();
+    audioProcessor.logLoadTraceEvent("editor_controls_setup_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - controlsSetupStartMs);
     
     PluginEditorSetup::setupHQButton(*this);
     hqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -532,26 +621,40 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     setSize(uiScaleInt(700), uiScaleInt(363));
     applyLayout();
     setResizable(false, false);
+
+    const int activeEngineIndex = juce::jlimit(0, 4, engineColorBox.getSelectedId() - 1);
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, activeEngineIndex]()
+    {
+        if (safeThis == nullptr)
+            return;
+        safeThis->startDeferredThemePrewarm(activeEngineIndex);
+    });
+
+    audioProcessor.logLoadTraceEvent("editor_ctor_total_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
 }
 
 void ChoroborosPluginEditor::loadValueLabelTypeface()
 {
-    if (BinaryData::Technology_ttfSize > 0)
-    {
-        valueLabelTypeface = juce::Typeface::createSystemTypefaceFor(
-            BinaryData::Technology_ttf,
-            static_cast<size_t>(BinaryData::Technology_ttfSize));
-    }
+    if (BinaryData::Technology_ttfSize <= 0)
+        return;
+
+    static juce::Typeface::Ptr cachedValueLabelTypeface = juce::Typeface::createSystemTypefaceFor(
+        BinaryData::Technology_ttf,
+        static_cast<size_t>(BinaryData::Technology_ttfSize));
+    valueLabelTypeface = cachedValueLabelTypeface;
 }
 
 void ChoroborosPluginEditor::loadUiTextTypeface()
 {
-    if (BinaryData::Retroica_ttfSize > 0)
-    {
-        uiTextTypeface = juce::Typeface::createSystemTypefaceFor(
-            BinaryData::Retroica_ttf,
-            static_cast<size_t>(BinaryData::Retroica_ttfSize));
-    }
+    if (BinaryData::Retroica_ttfSize <= 0)
+        return;
+
+    static juce::Typeface::Ptr cachedUiTypeface = juce::Typeface::createSystemTypefaceFor(
+        BinaryData::Retroica_ttf,
+        static_cast<size_t>(BinaryData::Retroica_ttfSize));
+    uiTextTypeface = cachedUiTypeface;
 }
 
 juce::Font ChoroborosPluginEditor::makeValueLabelFont(float heightPx, bool bold) const
@@ -586,6 +689,7 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
+    stopDeferredThemePrewarm();
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
     setLookAndFeel(nullptr);
 }
@@ -606,6 +710,13 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
 //==============================================================================
 void ChoroborosPluginEditor::paint (juce::Graphics& g)
 {
+    if (!firstPaintTimingLogged)
+    {
+        firstPaintTimingLogged = true;
+        audioProcessor.logLoadTraceEvent("editor_first_paint_ms",
+                                         juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
+    }
+
     // Draw background
     if (backgroundImage.isValid())
     {
@@ -733,6 +844,55 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         mixSlider.repaint();
         repaint();
     };
+}
+
+void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
+{
+    stopDeferredThemePrewarm();
+
+    stopThemePrewarm.store(false);
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    std::atomic<bool>* stopFlag = &stopThemePrewarm;
+
+    themePrewarmThread = std::thread([safeThis, stopFlag, activeColorIndex]()
+    {
+        std::array<int, 5> prewarmOrder { 0, 1, 2, 3, 4 };
+        int orderCursor = 0;
+        for (int i = 0; i < 5; ++i)
+        {
+            const int candidate = (activeColorIndex + 1 + i) % 5;
+            if (candidate == activeColorIndex)
+                continue;
+            prewarmOrder[static_cast<size_t>(orderCursor++)] = candidate;
+        }
+
+        for (int i = 0; i < orderCursor; ++i)
+        {
+            if (stopFlag->load())
+                return;
+
+            const int colorIndex = prewarmOrder[static_cast<size_t>(i)];
+            auto pack = CustomLookAndFeel::decodeThemeAssetPack(colorIndex);
+
+            if (stopFlag->load())
+                return;
+
+            juce::MessageManager::callAsync(
+                [safeThis, colorIndex, pack = std::move(pack)]() mutable
+                {
+                    if (safeThis == nullptr)
+                        return;
+                    safeThis->customLookAndFeel.installThemeAssetPack(colorIndex, std::move(pack));
+                });
+        }
+    });
+}
+
+void ChoroborosPluginEditor::stopDeferredThemePrewarm()
+{
+    stopThemePrewarm.store(true);
+    if (themePrewarmThread.joinable())
+        themePrewarmThread.join();
 }
 
 void ChoroborosPluginEditor::setupSliderAttachments()

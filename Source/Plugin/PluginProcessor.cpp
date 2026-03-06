@@ -49,6 +49,75 @@ public:
     }
 };
 
+std::atomic<std::uint64_t>& getLoadTraceInstanceCounter()
+{
+    static std::atomic<std::uint64_t> counter { 1 };
+    return counter;
+}
+
+std::uint64_t nextLoadTraceInstanceId()
+{
+    return getLoadTraceInstanceCounter().fetch_add(1, std::memory_order_relaxed);
+}
+
+juce::CriticalSection& getLoadTraceFileLock()
+{
+    static juce::CriticalSection lock;
+    return lock;
+}
+
+juce::String getSafeHostDescription()
+{
+    const juce::PluginHostType hostType;
+    const juce::String hostDescription(hostType.getHostDescription());
+    return hostDescription.isNotEmpty() ? hostDescription : juce::String("Unknown");
+}
+
+void appendLoadTraceLine(const ChoroborosAudioProcessor& processor,
+                         const juce::String& eventName,
+                         double elapsedMs,
+                         const juce::String& notes)
+{
+    if (eventName.isEmpty())
+        return;
+
+    const juce::ScopedLock lock(getLoadTraceFileLock());
+    const auto logFile = ChoroborosAudioProcessor::getLoadTraceLogFile();
+    if (!logFile.getParentDirectory().createDirectory())
+        return;
+
+    juce::var payload(new juce::DynamicObject());
+    auto* object = payload.getDynamicObject();
+    if (object == nullptr)
+        return;
+
+    const auto wrapperType = juce::PluginHostType::getPluginLoadedAs();
+    object->setProperty("tsUtc", juce::Time::getCurrentTime().toISO8601(true));
+    object->setProperty("event", eventName);
+    object->setProperty("elapsedMs", juce::roundToInt(elapsedMs * 1000.0) / 1000.0);
+    object->setProperty("instanceId", static_cast<juce::int64>(processor.getInstanceId()));
+    object->setProperty("host", getSafeHostDescription());
+    object->setProperty("hostPath", juce::PluginHostType::getHostPath());
+    object->setProperty("wrapperType", juce::String(juce::AudioProcessor::getWrapperTypeDescription(wrapperType)));
+    object->setProperty("pluginVersion", juce::String(JucePlugin_VersionString));
+   #if JUCE_DEBUG
+    object->setProperty("buildConfig", "debug");
+   #else
+    object->setProperty("buildConfig", "release");
+   #endif
+    object->setProperty("os", juce::SystemStats::getOperatingSystemName());
+    object->setProperty("isOS64Bit", juce::SystemStats::isOperatingSystem64Bit());
+    object->setProperty("cpuVendor", juce::SystemStats::getCpuVendor());
+    object->setProperty("cpuModel", juce::SystemStats::getCpuModel());
+    object->setProperty("cpuSpeedMHz", juce::SystemStats::getCpuSpeedInMegahertz());
+    object->setProperty("cpuCores", juce::SystemStats::getNumCpus());
+    object->setProperty("ramMB", juce::SystemStats::getMemorySizeInMegabytes());
+    if (notes.isNotEmpty())
+        object->setProperty("notes", notes);
+
+    logFile.appendText(juce::JSON::toString(payload, false) + "\n", false, false, nullptr);
+}
+
 double getNumberOrDefault(const juce::var& objectVar, const juce::Identifier& key, double fallback)
 {
     if (const auto* object = objectVar.getDynamicObject())
@@ -737,14 +806,37 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     chorusDSP(std::make_unique<ChorusDSP>()),
     feedbackCollector(std::make_unique<FeedbackCollector>())
 {
+    instanceId = nextLoadTraceInstanceId();
+    const double ctorStartMs = juce::Time::getMillisecondCounterHiRes();
+
     initTuningDefaults();
+    logLoadTraceEvent("processor_init_tuning_ms",
+                      juce::Time::getMillisecondCounterHiRes() - ctorStartMs);
+
+    const double internalsInitStartMs = juce::Time::getMillisecondCounterHiRes();
     initializeEngineInternalProfiles();
+    logLoadTraceEvent("processor_init_internals_ms",
+                      juce::Time::getMillisecondCounterHiRes() - internalsInitStartMs);
+
     chorusDSP->setCoreAssignments(coreAssignments);
     chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
+
+    const double bundledSeedStartMs = juce::Time::getMillisecondCounterHiRes();
     seedPersistedDefaultsFromBundledWindowsFactory();
+    logLoadTraceEvent("processor_seed_windows_defaults_ms",
+                      juce::Time::getMillisecondCounterHiRes() - bundledSeedStartMs);
+
+    const double persistedDefaultsStartMs = juce::Time::getMillisecondCounterHiRes();
     loadPersistedDefaults(*this);
+    logLoadTraceEvent("processor_load_persisted_defaults_ms",
+                      juce::Time::getMillisecondCounterHiRes() - persistedDefaultsStartMs);
+
+    const double profileApplyStartMs = juce::Time::getMillisecondCounterHiRes();
     applyEngineParamProfile(getCurrentEngineColorIndex());
     saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
+    logLoadTraceEvent("processor_apply_active_profile_ms",
+                      juce::Time::getMillisecondCounterHiRes() - profileApplyStartMs);
+
     parameters.addParameterListener(ENGINE_COLOR_ID, this);
     parameters.addParameterListener(RATE_ID, this);
     parameters.addParameterListener(DEPTH_ID, this);
@@ -755,6 +847,9 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     parameters.addParameterListener(MIX_ID, this);
     lastEngineIndex = getCurrentEngineColorIndex();
     analyzerWorker = std::make_unique<AnalyzerWorker>(*this);
+
+    logLoadTraceEvent("processor_ctor_total_ms",
+                      juce::Time::getMillisecondCounterHiRes() - ctorStartMs);
 }
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
@@ -770,6 +865,20 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     parameters.removeParameterListener(COLOR_ID, this);
     parameters.removeParameterListener(HQ_ID, this);
     parameters.removeParameterListener(MIX_ID, this);
+}
+
+juce::File ChoroborosAudioProcessor::getLoadTraceLogFile()
+{
+    return DefaultsPersistence::getUserDefaultsFile()
+        .getParentDirectory()
+        .getChildFile("load_trace.ndjson");
+}
+
+void ChoroborosAudioProcessor::logLoadTraceEvent(const juce::String& eventName,
+                                                 double elapsedMs,
+                                                 const juce::String& notes) const
+{
+    appendLoadTraceLine(*this, eventName, elapsedMs, notes);
 }
 
 //==============================================================================
@@ -1431,7 +1540,11 @@ bool ChoroborosAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* ChoroborosAudioProcessor::createEditor()
 {
-    return new ChoroborosPluginEditor (*this);
+    const double editorCreateStartMs = juce::Time::getMillisecondCounterHiRes();
+    auto* editor = new ChoroborosPluginEditor(*this);
+    logLoadTraceEvent("processor_create_editor_ms",
+                      juce::Time::getMillisecondCounterHiRes() - editorCreateStartMs);
+    return editor;
 }
 
 //==============================================================================
