@@ -1,8 +1,8 @@
-# Known Issues (Beta)
+# Known Issues
 
-Issues known for Choroboros 2.03-beta. Please report additional issues via the Feedback button.
+Issues known for Choroboros 2.02.2. Please report additional issues via the Feedback button.
 
-## Beta Testers
+## Current Test Scope
 
 - **Platform:** macOS only (VST3, AU, Standalone). Windows and Linux builds not yet available.
 - **Dev Panel:** Built-in diagnostic and tuning suite. Click the **DEV** button (top-left of the plugin) to open. Intended for power users; some controls may be experimental.

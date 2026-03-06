@@ -1286,15 +1286,20 @@ private:
         void paintButton(juce::Graphics& g, bool isMouseOverButton, bool isButtonDown) override
         {
             auto r = getLocalBounds().toFloat();
+            const auto accent = hackerText();
+            const auto baseBg = hackerBgField();
+            juce::Colour arrowColour = isEnabled() ? accent : hackerTextMuted();
             if (isButtonDown)
             {
-                g.setColour(hackerBgActive());
+                g.setColour(accent.withAlpha(0.88f));
                 g.fillRect(r);
+                arrowColour = baseBg;
             }
             else if (isMouseOverButton)
             {
-                g.setColour(hackerWash());
+                g.setColour(accent.withAlpha(0.72f));
                 g.fillRect(r);
+                arrowColour = baseBg;
             }
 
             juce::Path arrow;
@@ -1315,7 +1320,7 @@ private:
                 arrow.lineTo(cx + w, cy - (h * 0.55f));
             }
 
-            g.setColour(isEnabled() ? hackerText() : hackerTextMuted());
+            g.setColour(arrowColour);
             g.strokePath(arrow, juce::PathStrokeType(1.15f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
@@ -1365,6 +1370,8 @@ private:
             g.drawRoundedRectangle(r, 3.0f, 1.0f);
 
             auto iconArea = r.reduced(1.8f, 1.8f);
+            iconArea = iconArea.withSizeKeepingCentre(iconArea.getWidth() * 0.8f,
+                                                      iconArea.getHeight() * 0.8f);
             if (const auto image = getLockImage(lockedState, icon); image.isValid())
             {
                 g.setOpacity(isEnabled() ? 0.95f : 0.45f);
@@ -2053,8 +2060,8 @@ public:
             return;
 
         constexpr int nominalGap = 8;
-        auto labelsRow = area.removeFromTop(16);
-        area.removeFromTop(4);
+        auto labelsRow = area.removeFromTop(14);
+        area.removeFromTop(1);
         auto controlsRow = area.removeFromTop(juce::jmax(24, area.getHeight()));
 
         const int availableWidth = juce::jmax(1, controlsRow.getWidth());
@@ -2289,6 +2296,13 @@ public:
         hudLabel.setFont(makeLabelFont(Typography::labelSmall, false));
         addAndMakeVisible(hudLabel);
 
+        autocompleteLabel.setTooltip("Command suggestions (Tab/Shift+Tab to cycle)");
+        autocompleteLabel.setJustificationType(juce::Justification::centredLeft);
+        autocompleteLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+        autocompleteLabel.setInterceptsMouseClicks(false, false);
+        autocompleteLabel.setVisible(false);
+        addAndMakeVisible(autocompleteLabel);
+
         outputEditor.setTooltip(tooltipText);
         outputEditor.setMultiLine(true);
         outputEditor.setReturnKeyStartsNewLine(false);
@@ -2301,7 +2315,7 @@ public:
         outputEditor.setBorder(juce::BorderSize<int>(6, 8, 6, 8));
         addAndMakeVisible(outputEditor);
 
-        inputEditor.setTooltip("Type command and press Enter. Use Up/Down for previous commands.");
+        inputEditor.setTooltip("Type command and press Enter. Use Tab for autocomplete and Up/Down for history.");
         inputEditor.setMultiLine(false);
         inputEditor.setReturnKeyStartsNewLine(false);
         inputEditor.setScrollbarsShown(false);
@@ -2309,14 +2323,44 @@ public:
         inputEditor.setFont(makeLabelFont(Typography::inspectorInput, false));
         inputEditor.setBorder(juce::BorderSize<int>(4, 8, 4, 8));
         inputEditor.setTextToShowWhenEmpty("Type command + Enter (help for command list)", hackerTextMuted());
+        inputEditor.onTextChange = [this]
+        {
+            historyCursor = -1;
+            updateAutocompleteSuggestions();
+        };
         inputEditor.onReturnKey = [this] { submitCommand(); };
         inputEditor.keyInterceptor = [this](const juce::KeyPress& key) { return handleHistoryKey(key); };
         addAndMakeVisible(inputEditor);
 
         refreshThemeColours();
         updateHudLine();
+        updateAutocompleteSuggestions();
         appendOutputLine(name + " ready. Type `help` and press Enter.");
         setPreferredHeight(256);
+    }
+
+    void setAutocompleteCommands(const juce::StringArray& commands)
+    {
+        autocompleteCommands.clear();
+        for (const auto& command : commands)
+        {
+            const juce::String trimmed = command.trim();
+            if (trimmed.isEmpty())
+                continue;
+
+            bool alreadyPresent = false;
+            for (const auto& existing : autocompleteCommands)
+            {
+                if (existing.equalsIgnoreCase(trimmed))
+                {
+                    alreadyPresent = true;
+                    break;
+                }
+            }
+            if (!alreadyPresent)
+                autocompleteCommands.add(trimmed);
+        }
+        updateAutocompleteSuggestions();
     }
 
     void setAutoScroll(bool enabled) { autoScrollEnabled = enabled; }
@@ -2351,8 +2395,11 @@ public:
         hudLabel.setFont(makeLabelFont(Typography::labelSmall, false));
         hudLabel.setBounds(hudArea.reduced(2, 2));
         area.removeFromTop(2);
+        constexpr int autocompleteHeight = 18;
         constexpr int inputHeight = 34;
-        auto inputArea = area.removeFromBottom(inputHeight);
+        auto inputArea = area.removeFromBottom(inputHeight + autocompleteHeight + 4);
+        autocompleteLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+        autocompleteLabel.setBounds(inputArea.removeFromTop(autocompleteHeight).reduced(2, 1));
         inputEditor.setFont(makeLabelFont(Typography::inspectorInput, false));
         outputEditor.setFont(makeLabelFont(Typography::consoleLog, false));
         outputEditor.setBounds(area);
@@ -2426,6 +2473,8 @@ private:
     {
         hudLabel.setColour(juce::Label::textColourId, hackerTextDim());
         hudLabel.setColour(juce::Label::backgroundColourId, hackerBgField().withAlpha(0.4f));
+        autocompleteLabel.setColour(juce::Label::textColourId, hackerTextMuted());
+        autocompleteLabel.setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
         outputEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff010301));
         outputEditor.setColour(juce::TextEditor::textColourId, hackerText());
         outputEditor.setColour(juce::TextEditor::outlineColourId, hackerBorder().withAlpha(0.85f));
@@ -2437,6 +2486,13 @@ private:
 
     bool handleHistoryKey(const juce::KeyPress& key)
     {
+        if (key.getKeyCode() == juce::KeyPress::tabKey)
+        {
+            const int direction = key.getModifiers().isShiftDown() ? -1 : 1;
+            applyAutocompleteMatch(direction);
+            return true;
+        }
+
         if (key.getKeyCode() == juce::KeyPress::upKey)
         {
             if (commandHistory.isEmpty())
@@ -2447,6 +2503,7 @@ private:
                 historyCursor = juce::jmax(0, historyCursor - 1);
             inputEditor.setText(commandHistory[historyCursor], juce::dontSendNotification);
             inputEditor.moveCaretToEnd();
+            updateAutocompleteSuggestions();
             return true;
         }
 
@@ -2467,6 +2524,7 @@ private:
                 inputEditor.setText(commandHistory[historyCursor], juce::dontSendNotification);
                 inputEditor.moveCaretToEnd();
             }
+            updateAutocompleteSuggestions();
             return true;
         }
 
@@ -2505,6 +2563,91 @@ private:
 
         updateHudLine();
         inputEditor.clear();
+        updateAutocompleteSuggestions();
+    }
+
+    void updateAutocompleteSuggestions()
+    {
+        const juce::String query = inputEditor.getText().trim().toLowerCase();
+        if (query != autocompleteLastQuery)
+            autocompleteMatchCursor = -1;
+        autocompleteLastQuery = query;
+
+        autocompleteMatches.clear();
+        if (query.isEmpty() || autocompleteCommands.isEmpty())
+        {
+            autocompleteLabel.setText({}, juce::dontSendNotification);
+            autocompleteLabel.setVisible(false);
+            return;
+        }
+
+        struct Candidate
+        {
+            juce::String command;
+            int score = 0;
+        };
+
+        std::vector<Candidate> candidates;
+        candidates.reserve(static_cast<size_t>(autocompleteCommands.size()));
+        for (const auto& command : autocompleteCommands)
+        {
+            const juce::String lower = command.toLowerCase();
+            int score = -1;
+            if (lower.startsWith(query))
+                score = 0;
+            else if (lower.contains(" " + query))
+                score = 1;
+            else if (lower.contains(query))
+                score = 2;
+
+            if (score >= 0)
+                candidates.push_back({ command, score });
+        }
+
+        std::sort(candidates.begin(), candidates.end(),
+                  [](const Candidate& a, const Candidate& b)
+                  {
+                      if (a.score != b.score)
+                          return a.score < b.score;
+                      if (a.command.length() != b.command.length())
+                          return a.command.length() < b.command.length();
+                      return a.command.compareIgnoreCase(b.command) < 0;
+                  });
+
+        constexpr int kMaxAutocompleteSuggestions = 8;
+        const int visible = juce::jmin(kMaxAutocompleteSuggestions, static_cast<int>(candidates.size()));
+        for (int i = 0; i < visible; ++i)
+            autocompleteMatches.add(candidates[static_cast<size_t>(i)].command);
+
+        if (autocompleteMatches.isEmpty())
+        {
+            autocompleteLabel.setText({}, juce::dontSendNotification);
+            autocompleteLabel.setVisible(false);
+            return;
+        }
+
+        autocompleteLabel.setText("Autocomplete: " + autocompleteMatches.joinIntoString("  | "),
+                                  juce::dontSendNotification);
+        autocompleteLabel.setVisible(true);
+    }
+
+    bool applyAutocompleteMatch(int direction)
+    {
+        if (autocompleteMatches.isEmpty())
+            updateAutocompleteSuggestions();
+        if (autocompleteMatches.isEmpty())
+            return false;
+
+        const int count = autocompleteMatches.size();
+        if (autocompleteMatchCursor < 0 || autocompleteMatchCursor >= count)
+            autocompleteMatchCursor = direction >= 0 ? 0 : (count - 1);
+        else
+            autocompleteMatchCursor = (autocompleteMatchCursor + direction + count) % count;
+
+        inputEditor.setText(autocompleteMatches[autocompleteMatchCursor], juce::dontSendNotification);
+        inputEditor.moveCaretToEnd();
+        updateAutocompleteSuggestions();
+        return true;
     }
 
     void maybeShowResetWaitIndicator(const juce::String& command)
@@ -2588,11 +2731,16 @@ private:
     CommandHandler commandHandler;
     HudProvider hudProvider;
     juce::Label hudLabel;
+    juce::Label autocompleteLabel;
     juce::TextEditor outputEditor;
     HistoryTextEditor inputEditor;
     juce::StringArray outputLines;
     juce::StringArray commandHistory;
+    juce::StringArray autocompleteCommands;
+    juce::StringArray autocompleteMatches;
+    juce::String autocompleteLastQuery;
     int historyCursor = -1;
+    int autocompleteMatchCursor = -1;
     int spinnerFrameIndex = 0;
     bool outputEditorHasText = false;
     bool autoScrollEnabled = true;
@@ -2655,7 +2803,7 @@ private:
             g.setColour(juce::Colour(HackerTheme::border));
             g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
 
-            auto content = area.reduced(6.0f);
+            auto content = area.reduced(6.0f, 4.0f);
             auto header = content.removeFromTop(18.0f);
             g.setColour(juce::Colour(HackerTheme::text));
             g.setFont(makeRetroFont(Typography::vizTitle, true));
@@ -3004,7 +3152,7 @@ private:
             g.setColour(juce::Colour(HackerTheme::border));
             g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
 
-            auto content = area.reduced(6.0f);
+            auto content = area.reduced(6.0f, 4.0f);
             auto header = content.removeFromTop(18.0f);
             g.setColour(juce::Colour(HackerTheme::text));
             g.setFont(makeRetroFont(Typography::vizTitle, true));
@@ -3249,7 +3397,7 @@ private:
             g.setColour(juce::Colour(HackerTheme::border));
             g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
 
-            auto content = area.reduced(6.0f);
+            auto content = area.reduced(6.0f, 4.0f);
             auto header = content.removeFromTop(20.0f);
             g.setColour(juce::Colour(HackerTheme::text));
             g.setFont(makeRetroFont(Typography::signalFlowHeader, true));
@@ -3584,6 +3732,10 @@ public:
     void refresh() override
     {
         plot.state = stateProvider();
+        const int rowCount = juce::jmax(1, static_cast<int>(plot.state.rows.size()));
+        const int sourceRow = plot.state.snapshotSource.isNotEmpty() ? 1 : 0;
+        const int desiredHeight = 24 + ((rowCount + sourceRow + 1) * 22) + 18;
+        setPreferredHeight(juce::jlimit(220, 420, desiredHeight));
         plot.repaint();
     }
 
@@ -3604,7 +3756,7 @@ private:
             g.setColour(juce::Colour(HackerTheme::border));
             g.drawRoundedRectangle(area.reduced(0.5f), 3.0f, 1.0f);
 
-            auto content = area.reduced(6.0f);
+            auto content = area.reduced(6.0f, 4.0f);
             const auto header = content.removeFromTop(18.0f);
             g.setColour(juce::Colour(HackerTheme::text));
             g.setFont(makeRetroFont(Typography::vizTitle, true));
@@ -3633,10 +3785,10 @@ private:
             const float xEffective = content.getX() + content.getWidth() * 0.68f;
             const float xStatus = content.getRight() - syncWidth - 8.0f;
             const float columnHeaderY = content.getY() + 0.5f;
-            const float availableRowsHeight = juce::jmax(28.0f, content.getBottom() - columnHeaderY);
+            const float availableRowsHeight = juce::jmax(24.0f, content.getBottom() - columnHeaderY - 1.0f);
             const float idealRowHeight = availableRowsHeight / (rowCount + 1.0f);
             const float rowHeight = juce::jlimit(traceMatrixCellFontSize + 2.0f,
-                                                 traceMatrixCellFontSize + 8.0f,
+                                                 28.0f,
                                                  idealRowHeight);
 
             auto columnWidth = [traceMatrixCellGap](float xStart, float xEnd)

@@ -1214,21 +1214,21 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     engineSignalFlowCard->setPreferredHeight(286);
     engineVisuals.add(engineSignalFlowCard);
 
-    auto* engineIdentityCard = makeMultiLineReadOnly("Engine Identity Guide", [this]() -> juce::String
+    auto* engineIdentityCard = makeMultiLineReadOnly("Active Core Identity", [this]() -> juce::String
     {
         const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
         const bool hq = processor.isHqEnabled();
         const auto coreId = processor.getCoreAssignments().get(engine, hq);
         const auto& descriptor = choroboros::descriptorForCore(coreId);
         const juce::String engineName(choroboros::kEngineColorDisplay[static_cast<std::size_t>(engine)]);
-        return "Slot: " + engineName + (hq ? " HQ" : " NQ")
+        return "Active Slot: " + engineName + (hq ? " HQ" : " NQ")
              + "\nCore: " + juce::String(descriptor.displayName) + " (" + juce::String(descriptor.token) + ")"
              + "\nMacro Label: " + juce::String(descriptor.macroLabel)
              + "\nSemantics: " + juce::String(descriptor.macroSemantics)
              + "\n\n" + juce::String(descriptor.notes)
              + "\n\nModular cores are " + juce::String(processor.isModularCoresEnabled() ? "enabled" : "disabled")
              + ". Disable modular mode to force legacy fixed mapping."
-             + "\n\nUse " + getSubTabName(3, 2) + " for engine-specific macro wiring controls.";
+             + "\n\nUse " + getSubTabName(3, 2) + " for active-core macro tuning.";
     });
     engineIdentityCard->getProperties().set("devpanelSubTab", 1);
     engineIdentityCard->getProperties().set("devpanelEngineRole", "routing_identity");
@@ -1236,8 +1236,8 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     engineVisuals.add(engineIdentityCard);
 
     auto* coreAssignmentCard = new HorizontalControlStripCard(
-        "Core Assignment (active engine slot)",
-        "Choose NQ/HQ core packages for the active color slot. Duplicate assignments are allowed and reported as warnings.");
+        "Core Assignment Workbench (Active Slot)",
+        "Choose NQ/HQ core packages for the active slot. Duplicate assignments are allowed and flagged below.");
     coreAssignmentCard->setName("Engine Core Assignment Card");
     coreAssignmentCard->getProperties().set("devpanelSubTab", 1);
     coreAssignmentCard->getProperties().set("devpanelEngineRole", "core_assignment");
@@ -1257,7 +1257,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     coreAssignmentCard->addControl("HQ Core", makeCoreAssignmentChoice("HQ Core", true));
     engineVisuals.add(coreAssignmentCard);
 
-    auto* duplicateWarningCard = makeMultiLineReadOnly("Core Assignment Warnings", [buildDuplicateWarningSummary]() -> juce::String
+    auto* duplicateWarningCard = makeMultiLineReadOnly("Assignment Warnings", [buildDuplicateWarningSummary]() -> juce::String
     {
         return buildDuplicateWarningSummary();
     });
@@ -1267,8 +1267,8 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     engineVisuals.add(duplicateWarningCard);
 
     auto* engineMacroWorkbenchCard = new HorizontalControlStripCard(
-        "Engine Macro Workbench (main UI macros)",
-        "Main UI macro controls for the active profile (Rate/Depth/Offset/Width/Color/Mix).");
+        "Main Macro Workbench (Active Slot)",
+        "Main UI macro controls for the active slot (Rate/Depth/Offset/Width/Color/Mix).");
     engineMacroWorkbenchCard->setName("Engine Macro Workbench Card");
     engineMacroWorkbenchCard->getProperties().set("devpanelSubTab", 2);
     engineMacroWorkbenchCard->getProperties().set("devpanelEngineRole", "macro_workbench");
@@ -1309,7 +1309,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     };
 
     addEngineSpecificMacroCard("Green Bloom Macros", 0, -1,
-                               "Engine-specific macro response controls for Green Bloom.",
+                               "Per-core macro controls for Green Bloom.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Bloom Exponent",
@@ -1335,7 +1335,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Blue Focus Macros", 1, -1,
-                               "Engine-specific macro response controls for Blue Focus.",
+                               "Per-core macro controls for Blue Focus.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Focus Exponent",
@@ -1361,7 +1361,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Red BBD Macros", 2, 0,
-                               "Engine-specific macro response controls for Red NQ BBD mode.",
+                               "Per-core macro controls for Red NQ BBD mode.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "BBD Depth (ms)",
@@ -1387,7 +1387,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Red Tape Macros", 2, 1,
-                               "Engine-specific macro response controls for Red HQ Tape mode.",
+                               "Per-core macro controls for Red HQ Tape mode.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Tape Drive Scale",
@@ -1413,7 +1413,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Purple Warp Macros", 3, 0,
-                               "Engine-specific macro response controls for Purple NQ Warp mode.",
+                               "Per-core macro controls for Purple NQ Warp mode.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Warp A",
@@ -1439,7 +1439,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Purple Orbit Macros", 3, 1,
-                               "Engine-specific macro response controls for Purple HQ Orbit mode.",
+                               "Per-core macro controls for Purple HQ Orbit mode.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Orbit Eccentricity",
@@ -1465,7 +1465,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Black Intensity Macros", 4, 0,
-                               "Engine-specific macro response controls for Black NQ Intensity mode.",
+                               "Per-core macro controls for Black NQ Intensity mode.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Intensity Depth Base",
@@ -1483,7 +1483,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                                });
 
     addEngineSpecificMacroCard("Black Ensemble Macros", 4, 1,
-                               "Engine-specific macro response controls for Black HQ Ensemble mode.",
+                               "Per-core macro controls for Black HQ Ensemble mode.",
                                [&](HorizontalControlStripCard& card)
                                {
                                    addInternalControlToCard(card, "Tap2 Mix Base",
@@ -1656,7 +1656,7 @@ void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
 
         return state;
     });
-    validationTraceMatrixCard->setPreferredHeight(500);
+    validationTraceMatrixCard->setPreferredHeight(320);
     if (validationVisualDeckCards.isEmpty())
         validationVisualDeckCards.add(nullptr); // Telemetry subview uses inspector-only readouts.
     validationVisualDeck.addAndMakeVisible(validationTraceMatrixCard);
@@ -1673,6 +1673,7 @@ void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
                                                                       return buildConsoleWatchHudText();
                                                                   });
     validationConsoleComponent = validationConsole;
+    validationConsole->setAutocompleteCommands(buildConsoleAutocompleteCommands());
     validationConsole->setPreferredHeight(264);
     liveReadoutProperties.add(validationConsole);
     validationVisualDeck.addAndMakeVisible(validationConsole);

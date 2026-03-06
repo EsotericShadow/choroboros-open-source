@@ -467,7 +467,86 @@ juce::String DevPanel::buildJson() const
     json << "    \"mixValueFlipTravelOutPct\": " << layout.mixValueFlipTravelOutPct << ",\n";
     json << "    \"mixValueFlipTravelInPct\": " << layout.mixValueFlipTravelInPct << ",\n";
     json << "    \"mixValueFlipShearPct\": " << layout.mixValueFlipShearPct << ",\n";
-    json << "    \"mixValueFlipMinScalePct\": " << layout.mixValueFlipMinScalePct << "\n";
+    json << "    \"mixValueFlipMinScalePct\": " << layout.mixValueFlipMinScalePct;
+
+    const auto appendLayoutInt = [&json](const juce::String& key, int value)
+    {
+        json << ",\n    \"" << key << "\": " << value;
+    };
+
+    appendLayoutInt("rateValueOffsetYGreen", layout.rateValueOffsetYGreen);
+    appendLayoutInt("rateValueOffsetYBlue", layout.rateValueOffsetYBlue);
+    appendLayoutInt("rateValueOffsetYRed", layout.rateValueOffsetYRed);
+    appendLayoutInt("rateValueOffsetYPurple", layout.rateValueOffsetYPurple);
+    appendLayoutInt("rateValueOffsetYBlack", layout.rateValueOffsetYBlack);
+    appendLayoutInt("depthValueOffsetYGreen", layout.depthValueOffsetYGreen);
+    appendLayoutInt("depthValueOffsetYBlue", layout.depthValueOffsetYBlue);
+    appendLayoutInt("depthValueOffsetYRed", layout.depthValueOffsetYRed);
+    appendLayoutInt("depthValueOffsetYPurple", layout.depthValueOffsetYPurple);
+    appendLayoutInt("depthValueOffsetYBlack", layout.depthValueOffsetYBlack);
+    appendLayoutInt("offsetValueOffsetYGreen", layout.offsetValueOffsetYGreen);
+    appendLayoutInt("offsetValueOffsetYBlue", layout.offsetValueOffsetYBlue);
+    appendLayoutInt("offsetValueOffsetYRed", layout.offsetValueOffsetYRed);
+    appendLayoutInt("offsetValueOffsetYPurple", layout.offsetValueOffsetYPurple);
+    appendLayoutInt("offsetValueOffsetYBlack", layout.offsetValueOffsetYBlack);
+    appendLayoutInt("widthValueOffsetYGreen", layout.widthValueOffsetYGreen);
+    appendLayoutInt("widthValueOffsetYBlue", layout.widthValueOffsetYBlue);
+    appendLayoutInt("widthValueOffsetYRed", layout.widthValueOffsetYRed);
+    appendLayoutInt("widthValueOffsetYPurple", layout.widthValueOffsetYPurple);
+    appendLayoutInt("widthValueOffsetYBlack", layout.widthValueOffsetYBlack);
+    appendLayoutInt("hqSwitchOffsetXGreen", layout.hqSwitchOffsetXGreen);
+    appendLayoutInt("hqSwitchOffsetXBlue", layout.hqSwitchOffsetXBlue);
+    appendLayoutInt("hqSwitchOffsetXRed", layout.hqSwitchOffsetXRed);
+    appendLayoutInt("hqSwitchOffsetXPurple", layout.hqSwitchOffsetXPurple);
+    appendLayoutInt("hqSwitchOffsetXBlack", layout.hqSwitchOffsetXBlack);
+    appendLayoutInt("hqSwitchOffsetYGreen", layout.hqSwitchOffsetYGreen);
+    appendLayoutInt("hqSwitchOffsetYBlue", layout.hqSwitchOffsetYBlue);
+    appendLayoutInt("hqSwitchOffsetYRed", layout.hqSwitchOffsetYRed);
+    appendLayoutInt("hqSwitchOffsetYPurple", layout.hqSwitchOffsetYPurple);
+    appendLayoutInt("hqSwitchOffsetYBlack", layout.hqSwitchOffsetYBlack);
+
+    const std::array<juce::String, LayoutTuning::engineCount> engineSuffixes { { "Green", "Blue", "Red", "Purple", "Black" } };
+    const std::array<juce::String, LayoutTuning::mainValueFieldCount> fieldPrefixes { { "Rate", "Depth", "Offset", "Width" } };
+    for (int engineIndex = 0; engineIndex < LayoutTuning::engineCount; ++engineIndex)
+    {
+        for (int fieldIndex = 0; fieldIndex < LayoutTuning::mainValueFieldCount; ++fieldIndex)
+        {
+            const auto& anim = layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)];
+            const auto key = [&fieldPrefixes, &engineSuffixes, fieldIndex, engineIndex](const juce::String& suffix)
+            {
+                return "mainValue" + fieldPrefixes[static_cast<std::size_t>(fieldIndex)] + suffix
+                       + juce::String(engineSuffixes[static_cast<std::size_t>(engineIndex)]);
+            };
+
+            appendLayoutInt(key("FxEnabled"), anim.fx.enabled);
+            appendLayoutInt(key("GlowAlphaPct"), anim.fx.glowAlphaPct);
+            appendLayoutInt(key("GlowSpreadPxTimes100"), anim.fx.glowSpreadPxTimes100);
+            appendLayoutInt(key("PerCharOffsetXPxTimes100"), anim.fx.perCharOffsetXPxTimes100);
+            appendLayoutInt(key("PerCharOffsetYPxTimes100"), anim.fx.perCharOffsetYPxTimes100);
+            appendLayoutInt(key("TopReflectAlphaPct"), anim.fx.topReflectAlphaPct);
+            appendLayoutInt(key("TopReflectOffsetXPxTimes100"), anim.fx.topReflectOffsetXPxTimes100);
+            appendLayoutInt(key("TopReflectOffsetYPxTimes100"), anim.fx.topReflectOffsetYPxTimes100);
+            appendLayoutInt(key("TopReflectShearPct"), anim.fx.topReflectShearPct);
+            appendLayoutInt(key("TopReflectRotateDeg"), anim.fx.topReflectRotateDeg);
+            appendLayoutInt(key("BottomReflectAlphaPct"), anim.fx.bottomReflectAlphaPct);
+            appendLayoutInt(key("BottomReflectOffsetXPxTimes100"), anim.fx.bottomReflectOffsetXPxTimes100);
+            appendLayoutInt(key("BottomReflectOffsetYPxTimes100"), anim.fx.bottomReflectOffsetYPxTimes100);
+            appendLayoutInt(key("BottomReflectShearPct"), anim.fx.bottomReflectShearPct);
+            appendLayoutInt(key("BottomReflectRotateDeg"), anim.fx.bottomReflectRotateDeg);
+            appendLayoutInt(key("ReflectBlurPxTimes100"), anim.fx.reflectBlurPxTimes100);
+            appendLayoutInt(key("ReflectSquashPct"), anim.fx.reflectSquashPct);
+            appendLayoutInt(key("ReflectMotionPct"), anim.fx.reflectMotionPct);
+            appendLayoutInt(key("FlipEnabled"), anim.flip.enabled);
+            appendLayoutInt(key("FlipDurationMs"), anim.flip.durationMs);
+            appendLayoutInt(key("FlipTravelUpPxTimes100"), anim.flip.travelUpPxTimes100);
+            appendLayoutInt(key("FlipTravelDownPxTimes100"), anim.flip.travelDownPxTimes100);
+            appendLayoutInt(key("FlipTravelOutPct"), anim.flip.travelOutPct);
+            appendLayoutInt(key("FlipTravelInPct"), anim.flip.travelInPct);
+            appendLayoutInt(key("FlipShearPct"), anim.flip.shearPct);
+            appendLayoutInt(key("FlipMinScalePct"), anim.flip.minScalePct);
+        }
+    }
+    json << "\n";
     json << "  }\n}\n";
 
     return json;
@@ -764,6 +843,32 @@ void DevPanel::applyValueFxPreset(int presetId)
         layout.mixValueReflectBlurPxTimes100 = layout.valueReflectBlurPxTimes100;
         layout.mixValueReflectSquashPct = layout.valueReflectSquashPct;
         layout.mixValueReflectMotionPct = layout.valueReflectMotionPct;
+    }
+
+    for (int engineIndex = 0; engineIndex < LayoutTuning::engineCount; ++engineIndex)
+    {
+        for (int fieldIndex = 0; fieldIndex < LayoutTuning::mainValueFieldCount; ++fieldIndex)
+        {
+            auto& fx = layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx;
+            fx.enabled = layout.valueFxEnabled;
+            fx.glowAlphaPct = layout.valueGlowAlphaPct;
+            fx.glowSpreadPxTimes100 = layout.valueGlowSpreadPxTimes100;
+            fx.perCharOffsetXPxTimes100 = layout.valueFxPerCharOffsetXPxTimes100;
+            fx.perCharOffsetYPxTimes100 = layout.valueFxPerCharOffsetYPxTimes100;
+            fx.topReflectAlphaPct = layout.valueTopReflectAlphaPct;
+            fx.topReflectOffsetXPxTimes100 = layout.valueTopReflectOffsetXPxTimes100;
+            fx.topReflectOffsetYPxTimes100 = layout.valueTopReflectOffsetYPxTimes100;
+            fx.topReflectShearPct = layout.valueTopReflectShearPct;
+            fx.topReflectRotateDeg = layout.valueTopReflectRotateDeg;
+            fx.bottomReflectAlphaPct = layout.valueBottomReflectAlphaPct;
+            fx.bottomReflectOffsetXPxTimes100 = layout.valueBottomReflectOffsetXPxTimes100;
+            fx.bottomReflectOffsetYPxTimes100 = layout.valueBottomReflectOffsetYPxTimes100;
+            fx.bottomReflectShearPct = layout.valueBottomReflectShearPct;
+            fx.bottomReflectRotateDeg = layout.valueBottomReflectRotateDeg;
+            fx.reflectBlurPxTimes100 = layout.valueReflectBlurPxTimes100;
+            fx.reflectSquashPct = layout.valueReflectSquashPct;
+            fx.reflectMotionPct = layout.valueReflectMotionPct;
+        }
     }
 
     layoutGlobalPanel.refreshAll();

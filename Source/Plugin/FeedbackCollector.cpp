@@ -74,12 +74,12 @@ void FeedbackCollector::trackSessionEnd()
 juce::String FeedbackCollector::getUsageSummary() const
 {
     juce::String summary;
-    summary << "Choroboros Beta Usage Summary\n";
+    summary << "Choroboros Usage Summary\n";
     summary << "============================\n\n";
 #ifdef CHOROBOROS_VERSION_STRING
-    summary << "Version: " << juce::String(CHOROBOROS_VERSION_STRING) << " (Beta)\n";
+    summary << "Version: " << juce::String(CHOROBOROS_VERSION_STRING) << "\n";
 #else
-    summary << "Version: 2.03 (Beta)\n";
+    summary << "Version: 2.02.2\n";
 #endif
     summary << "Date: " << juce::Time::getCurrentTime().toString(true, true) << "\n";
 #if defined(__APPLE__) && defined(__arm64__)

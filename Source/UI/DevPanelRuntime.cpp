@@ -787,6 +787,43 @@ void DevPanel::resized()
     {
         layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, engineTitle, engineDescription, visualSection);
         auto engineCards = selectedDeckCards(engineVisualDeckCards, selectedSubTab);
+
+        auto reorderByRole = [&](const std::initializer_list<const char*>& rolePriority)
+        {
+            juce::Array<juce::PropertyComponent*> ordered;
+            auto appendMatchingRole = [&](const juce::String& role)
+            {
+                for (auto* card : engineCards)
+                {
+                    if (card == nullptr || ordered.contains(card))
+                        continue;
+                    if (!card->getProperties().contains("devpanelEngineRole"))
+                        continue;
+                    if (card->getProperties()["devpanelEngineRole"].toString() == role)
+                        ordered.add(card);
+                }
+            };
+
+            for (const auto* role : rolePriority)
+                appendMatchingRole(role != nullptr ? juce::String(role) : juce::String());
+
+            for (auto* card : engineCards)
+            {
+                if (card != nullptr && !ordered.contains(card))
+                    ordered.add(card);
+            }
+            engineCards = std::move(ordered);
+        };
+
+        if (selectedSubTab == 1)
+        {
+            reorderByRole({ "core_assignment", "core_assignment_warnings", "routing_identity" });
+        }
+        else if (selectedSubTab == 2)
+        {
+            reorderByRole({ "macro_workbench", "engine_specific_macros" });
+        }
+
         layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, engineVisualDeck, engineCards, engineVisualDeckCards, engineDeckSpacing);
 
         const bool showInternalsSubTab = selectedSubTab == 3;
@@ -866,11 +903,44 @@ void DevPanel::resized()
         updateTutorialHighlight();
         tutorialFocusHighlight.toFront(false);
         tutorialOverlay.toFront(false);
+        overviewTutorialPopup.setVisible(false);
     }
     else
     {
         tutorialOverlay.setVisible(false);
         tutorialFocusHighlight.setVisible(false);
+
+        if (overviewTutorialPopup.isVisible())
+        {
+            const auto viewPos = viewport.getViewPosition();
+            juce::Rectangle<int> visibleAreaInContent(viewPos.x, viewPos.y, viewport.getViewWidth(), viewport.getViewHeight());
+            visibleAreaInContent = visibleAreaInContent.reduced(10);
+
+            const int popupWidth = juce::jlimit(260, 380, static_cast<int>(std::round(visibleAreaInContent.getWidth() * 0.34)));
+            const int popupHeight = 94;
+            auto popupBounds = juce::Rectangle<int>(visibleAreaInContent.getX() + 10,
+                                                    visibleAreaInContent.getBottom() - popupHeight - 10,
+                                                    popupWidth,
+                                                    popupHeight);
+            popupBounds = popupBounds.getIntersection(content.getLocalBounds());
+            overviewTutorialPopup.setBounds(popupBounds);
+
+            auto popupArea = overviewTutorialPopup.getLocalBounds().reduced(10, 8);
+            auto header = popupArea.removeFromTop(20);
+            const int closeW = 28;
+            overviewTutorialPopupCloseButton.setBounds(header.removeFromRight(closeW));
+            overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+            overviewTutorialPopupLabel.setBounds(header.withTrimmedRight(6));
+
+            popupArea.removeFromTop(4);
+            const int startW = 130;
+            const int startH = 28;
+            overviewTutorialPopupStartButton.setBounds(popupArea.removeFromBottom(startH).removeFromRight(startW));
+        }
+        else
+        {
+            overviewTutorialPopup.setBounds(0, 0, 0, 0);
+        }
     }
 }
 
@@ -1017,6 +1087,12 @@ void DevPanel::updateRightTabVisibility()
     const int selectedSubTab = getSelectedSubTab();
     refreshSecondaryTabButtons();
 
+    if (showOverview && !tutorialActive && !overviewTutorialPopupHasOpenedSession)
+    {
+        overviewTutorialPopupVisible = true;
+        overviewTutorialPopupHasOpenedSession = true;
+    }
+
     const int activeEngineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     setCurrentEngineSkinColour(activeEngineIndex);
     if (!(showOverview || showModulation || showTone || showEngine))
@@ -1064,6 +1140,9 @@ void DevPanel::updateRightTabVisibility()
     styleTabButton(tabLayoutButton, showLookFeel, layoutAccent);
     styleTabButton(tabValidationButton, showValidation, validationAccent);
     styleTabButton(tabSettingsButton, showSettings, visualNeutral());
+    styleHackerTextButton(overviewTutorialPopupStartButton, false);
+    styleHackerTextButton(overviewTutorialPopupCloseButton, false);
+    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, hackerText());
 
     const juce::Colour mutedAccent = hackerTextMuted();
     overviewVisualDeck.setAccentColour(showOverview ? overviewAccent : mutedAccent);
@@ -1072,6 +1151,7 @@ void DevPanel::updateRightTabVisibility()
     engineVisualDeck.setAccentColour(showEngine ? engineAccent : mutedAccent);
     lookFeelVisualDeck.setAccentColour(showLookFeel ? layoutAccent : mutedAccent);
     validationVisualDeck.setAccentColour(showValidation ? validationAccent : mutedAccent);
+    overviewTutorialPopup.setAccentColour(overviewAccent);
 
     auto setAllSectionsEnabled = [](juce::PropertyPanel& panel, bool panelVisible)
     {
@@ -1160,6 +1240,7 @@ void DevPanel::updateRightTabVisibility()
     resetFactoryButton.setVisible(showSettings);
     saveDefaultsButton.setVisible(showSettings);
     copyJsonButton.setVisible(showSettings);
+    overviewTutorialPopup.setVisible(showOverview && !tutorialActive && overviewTutorialPopupVisible);
 
     internalsTitle.setVisible(false);
     internalsDescription.setVisible(false);

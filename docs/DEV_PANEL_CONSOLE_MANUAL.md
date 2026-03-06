@@ -1,6 +1,6 @@
 # Choroboros Dev Panel: Interactive Console Manual
 
-*Version: 2.02.2-beta*
+*Version: 2.02.2*
 *Audience: Shell Enthusiasts, Headless Automated Testers, and Preset Designers.*
 
 Welcome to the command-line documentation for the **Choroboros Dev Panel**. If the standard interface of Choroboros is a simple 6-knob pedal, and the Dev Panel UI is an aircraft cockpit, then the **Interactive Console** is raw access to the flight computer's C++ shell memory.
@@ -41,6 +41,42 @@ Welcome to the command-line documentation for the **Choroboros Dev Panel**. If t
     *   8.2 Engine Specific Architectures (BBD, Tape, Orbit, Fast-Fourier Transforms)
 
 ---
+
+## 0. Canonical Command Matrix (Parser Source of Truth)
+
+This section is the authoritative syntax set mirrored from `DevPanel::executeConsoleCommand()`.
+
+### 0.1 Top-Level Actions
+`help`, `clear`, `alias`, `cp json`, `save defaults`, `tutorial`, `core`, `slot`, `engine`, `hq`, `view`, `bypass`, `set`, `add`, `sub`, `get`, `toggle`, `macro`, `solo`, `unsolo`, `sweep`, `reset`, `lock`, `unlock`, `undo`, `redo`, `history`, `watch`, `unwatch`, `fx`, `dump`, `diff factory`, `search`, `stats`, `list`, `export script`, `import script`
+
+### 0.2 Structured Commands
+* `core list`
+* `core show <core_id>`
+* `slot show`
+* `slot set <green|blue|red|purple|black> <nq|hq> <core_id>`
+* `list <green|blue|red|purple|black> [all] [full]`
+* `list globals [full]`
+* `tutorial`
+* `tutorial <topic>`
+* `tutorial next`
+* `tutorial next section`
+* `tutorial section`
+* `tutorial tab`
+* `tutorial next tab`
+* `tutorial skip`
+* `tutorial exit`
+
+### 0.3 Accepted Aliases / Alternate Tokens
+* `view modulation` == `view internals`
+* `view tone` == `view bbd`
+* `view engine` == `view tape`
+* `view layout` == `view look` == `view lookfeel`
+* `hq` and `bypass` accept `on/off`, `true/false`, `1/0`
+* `import script` accepts clipboard content by default, or a file path via `import script <path>`
+* Tutorial topic aliases:
+  * `core`, `full`, `walkthrough`, `tutorial`
+  * `bimodulation`, `bi-modulation`, `bimod`, `warp`
+  * `envelope`, `dynamic`, `dynamics`
 
 ## 1. Architecture & Parsing Mechanics
 
@@ -194,7 +230,10 @@ An alternative to `export script` focused purely on nested mapping variable arch
 
 ### 6.2 State Instantiation
 `import script`
-When triggered, a standard OS File Dialog appears. You can select any standard `.txt` or `.choroscript` file containing new-line separated CLI commands. The Console will lock the parser and run every line at hyper-speed, completely rebuilding the DSP and UI arrays sequentially based on the script rules.
+Without arguments, reads newline-separated commands from the OS clipboard.
+
+`import script <path_to_file>`
+With a path argument, reads a `.txt` / `.choroscript` file directly from disk (no file dialog). In both modes, lines execute sequentially with per-line error reporting.
 
 `save defaults`
 A hyper-specific alias of `cp json` that writes the JSON payload directly into `startup_prefs.xml`, replacing the application's base definitions upon boot logic.
@@ -213,19 +252,25 @@ When running, the HUD automatically invokes `view <tab>` commands, draws vector 
 *   `tutorial skip`: Forcefully terminates the active script logic, dumping the user back into unrestricted dev panel manipulation.
 
 ### 7.2 The Topic Index
-You can jump directly into specific lesson maps by supplying the correct path variables:
-1. `tutorial bbd`: Bucket-Brigade Limits & Filtering Constraints.
-2. `tutorial tape`: Mechanical wow/flutter offsets on Magnetic loops.
-3. `tutorial phase`: Dual LFO independent correlation structures.
-4. `tutorial bimodulation`: Asynchronous polynomial rendering on the Purple engine.
-5. `tutorial saturation`: Audio wave-limiting by hard and soft analog clipping architectures on Tone tabs.
-6. `tutorial envelope`: The Green transient follower equations and decay routing models.
+You can jump directly into specific lesson maps by supplying the correct topic:
+1. `tutorial core` (also `full`, `walkthrough`, `tutorial`)
+2. `tutorial overview`
+3. `tutorial modulation`
+4. `tutorial tone`
+5. `tutorial engine`
+6. `tutorial validation`
+7. `tutorial bbd`
+8. `tutorial tape`
+9. `tutorial phase`
+10. `tutorial bimodulation` (also `bi-modulation`, `bimod`, `warp`)
+11. `tutorial saturation`
+12. `tutorial envelope` (also `dynamic`, `dynamics`)
 
 ---
 
 ## 8. The Master Index: All Parameter Slugs
 
-The following lists are completely comprehensive as of `v2.02.2-beta`. Use these exact string titles to affect parameter tuning via console arrays.
+The following lists are completely comprehensive as of `v2.02.2`. Use these exact string titles to affect parameter tuning via console arrays.
 
 ### 8.1 Base Globals 
 These impact multi-variable smoothing and core macro routing interpolations.

@@ -166,7 +166,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     tabOverviewButton.setTooltip("Overview: signal flow and key diagnostics for the active profile selected above.");
     tabInternalsButton.setTooltip("Modulation: LFO scope and controls; writes to the active profile selected above.");
     tabBbdButton.setTooltip("Tone / Dynamics: spectral and transfer diagnostics for the active profile selected above.");
-    tabTapeButton.setTooltip("Engine: engine-specific macros, internals, and advanced sections.");
+    tabTapeButton.setTooltip("Engine: Signal Flow, Routing, Macros, and Internals for the active Profile/Core/HQ target.");
     tabLayoutButton.setTooltip("Look & Feel: mapping, UI response, and layout tuning controls.");
     tabValidationButton.setTooltip("Validation: wiring trace matrix, telemetry, and live diagnostic log.");
     tabSettingsButton.setTooltip("Dev Panel settings: actions, presets, reset/defaults, and JSON export.");
@@ -195,14 +195,14 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     configureSubTabButton(subTabButtonD, 3);
     configureSubTabButton(subTabButtonE, 4);
 
-    engineFilterLabel.setText("Engine Sections", juce::dontSendNotification);
+    engineFilterLabel.setText("Internals Filter", juce::dontSendNotification);
     engineFilterLabel.setFont(makeLabelFont(Typography::labelSmall, false));
     engineFilterLabel.setColour(juce::Label::textColourId, hackerTextDim());
     engineFilterLabel.setJustificationType(juce::Justification::centredLeft);
     content.addAndMakeVisible(engineFilterLabel);
 
-    engineFilterEditor.setTooltip("Filter visible engine internals sections by name.");
-    engineFilterEditor.setTextToShowWhenEmpty("type to focus engine sections (timing / tone / macro)", hackerTextMuted());
+    engineFilterEditor.setTooltip("Filter visible Engine -> Internals sections by name.");
+    engineFilterEditor.setTextToShowWhenEmpty("filter internals sections (timing / filtering / compressor)", hackerTextMuted());
     engineFilterEditor.setFont(makeLabelFont(Typography::labelSmall, false));
     engineFilterEditor.onTextChange = [this]
     {
@@ -238,9 +238,9 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     toneTitle.setTooltip("Step 3: spectral and nonlinear behavior.");
     toneDescription.setTooltip("Tone cards/readouts/controls are profile-scoped to the active selection above.");
     styleTitle(engineTitle, "Engine");
-    styleDescription(engineDescription, "Engine-specific internals with linked macro readouts and flow card.");
-    engineTitle.setTooltip("Step 4: engine-specific internals.");
-    engineDescription.setTooltip("Switch engine/HQ here and inspect only relevant internals.");
+    styleDescription(engineDescription, "Signal Flow, Routing, Macros, and Internals for the active target.");
+    engineTitle.setTooltip("Step 4: core-aware Engine views for the active Profile/Core/HQ.");
+    engineDescription.setTooltip("Use Routing for assignments, Macros for performance tuning, and Internals for low-level DSP.");
     styleTitle(validationTitle, "Validation");
     styleDescription(validationDescription, "Telemetry + trace matrix: verify UI raw -> mapped -> snapshot -> DSP effective.");
     validationTitle.setTooltip("Step 5: confirm full wiring integrity.");
@@ -399,6 +399,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(validationVisualDeck);
     content.addAndMakeVisible(tutorialFocusHighlight);
     content.addAndMakeVisible(tutorialOverlay);
+    content.addAndMakeVisible(overviewTutorialPopup);
     tutorialOverlay.addAndMakeVisible(tutorialStepLabel);
     tutorialOverlay.addAndMakeVisible(tutorialTitleLabel);
     tutorialOverlay.addAndMakeVisible(tutorialBodyText);
@@ -406,10 +407,15 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     tutorialOverlay.addAndMakeVisible(tutorialNextButton);
     tutorialOverlay.addAndMakeVisible(tutorialNextSectionButton);
     tutorialOverlay.addAndMakeVisible(tutorialSkipButton);
+    overviewTutorialPopup.addAndMakeVisible(overviewTutorialPopupLabel);
+    overviewTutorialPopup.addAndMakeVisible(overviewTutorialPopupStartButton);
+    overviewTutorialPopup.addAndMakeVisible(overviewTutorialPopupCloseButton);
     tutorialOverlay.setVisible(false);
+    overviewTutorialPopup.setVisible(false);
     tutorialFocusHighlight.setVisible(false);
     tutorialFocusHighlight.setInterceptsMouseClicks(false, false);
     tutorialOverlay.setInterceptsMouseClicks(true, true);
+    overviewTutorialPopup.setInterceptsMouseClicks(true, true);
 
     tutorialStepLabel.setText("Tutorial", juce::dontSendNotification);
     tutorialStepLabel.setFont(makeLabelFont(Typography::labelSmall, false));
@@ -455,6 +461,29 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         juce::String status;
         stopTutorial(true, status);
+    };
+
+    overviewTutorialPopupLabel.setText("Need a quick walkthrough? Start the Core DSP tutorial from here.",
+                                       juce::dontSendNotification);
+    overviewTutorialPopupLabel.setJustificationType(juce::Justification::centredLeft);
+    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, hackerText());
+    overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+
+    overviewTutorialPopupStartButton.setButtonText("Start Tutorial");
+    overviewTutorialPopupStartButton.setTooltip("Launch the core walkthrough tutorial.");
+    overviewTutorialPopupStartButton.onClick = [this]
+    {
+        juce::String status;
+        if (startTutorial("core", status))
+            overviewTutorialPopupVisible = false;
+    };
+
+    overviewTutorialPopupCloseButton.setButtonText("X");
+    overviewTutorialPopupCloseButton.setTooltip("Close this popup for now.");
+    overviewTutorialPopupCloseButton.onClick = [this]
+    {
+        overviewTutorialPopupVisible = false;
+        resized();
     };
 
     overviewVisualDeck.setAccentColour(visualOverview());
@@ -514,6 +543,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     styleActionButton(tutorialNextButton);
     styleActionButton(tutorialNextSectionButton);
     styleActionButton(tutorialSkipButton);
+    styleActionButton(overviewTutorialPopupStartButton);
+    styleActionButton(overviewTutorialPopupCloseButton);
 
     const int initialEngineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     const int initialSelectorAccent = (settingsAccentSource == 1)

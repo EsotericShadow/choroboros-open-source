@@ -214,6 +214,10 @@ private:
     juce::TextButton tutorialNextButton;
     juce::TextButton tutorialNextSectionButton;
     juce::TextButton tutorialSkipButton;
+    TutorialOverlayContainer overviewTutorialPopup;
+    juce::Label overviewTutorialPopupLabel;
+    juce::TextButton overviewTutorialPopupStartButton;
+    juce::TextButton overviewTutorialPopupCloseButton;
     juce::PropertyPanel mappingPanel;
     juce::PropertyPanel uiPanel;
     juce::PropertyPanel overviewPanel;
@@ -357,6 +361,8 @@ private:
     int tutorialStepIndex = -1;
     juce::String tutorialFocusTarget;
     int tutorialPulseTick = 0;
+    bool overviewTutorialPopupHasOpenedSession = false;
+    bool overviewTutorialPopupVisible = false;
     juce::File recentTouchesLogFile;
     int analyzerRefreshTickCounter = 0;
     int settingsTutorialTopicIndex = 0;
@@ -430,6 +436,7 @@ private:
     int refreshVisibleLiveReadouts();
     void registerConsoleTarget(juce::PropertyComponent* property, const juce::String& name);
     devpanel::ConsoleCommandResult executeConsoleCommand(const juce::String& command);
+    juce::StringArray buildConsoleAutocompleteCommands() const;
     void appendRecentTouchLogLine(const juce::String& line) const;
     juce::String buildConsoleWatchHudText() const;
     void updateConsoleSweeps();

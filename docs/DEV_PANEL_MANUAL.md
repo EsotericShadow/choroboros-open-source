@@ -1,6 +1,6 @@
 # Choroboros Dev Panel: The Comprehensive UI and Architecture Manual
 
-*Version: 2.02.2-beta*
+*Version: 2.02.2*
 *Audience: Advanced Sound Designers, DSP Developers, Audio Engineers, and the terminally curious.*
 
 Welcome to the ultimate guide for the **Choroboros Dev Panel**. If the standard interface of Choroboros is the dashboard of a luxury sports car, the Dev Panel is the act of opening the hood, dismantling the engine block, and reprogramming the Electronic Control Unit while driving at 100 mph. 

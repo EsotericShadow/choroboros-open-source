@@ -62,7 +62,7 @@ Intended for educators, sound designers, and power users who want to see under t
 
 ## Installation
 
-Download the macOS Universal package (`Choroboros-v2.02.2-beta-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
+Download the macOS Universal package (`Choroboros-v2.02.2-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
 
 ### VST3
 Copy `Choroboros.vst3` to:
@@ -96,7 +96,7 @@ After installation, rescan plugins in your DAW.
 
 ## Technical Details
 
-- **Version:** 2.02.2-beta
+- **Version:** 2.02.2
 - **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12

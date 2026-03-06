@@ -321,6 +321,88 @@ void DevPanel::registerConsoleTarget(juce::PropertyComponent* property, const ju
     consoleTargetIndexBySlug[slugKey] = consoleTargets.size() - 1;
     consoleListOutputCache.clear();
     consoleFactoryValuesReady = false;
+
+    if (validationConsoleComponent != nullptr)
+        validationConsoleComponent->setAutocompleteCommands(buildConsoleAutocompleteCommands());
+}
+
+juce::StringArray DevPanel::buildConsoleAutocompleteCommands() const
+{
+    juce::StringArray commands;
+    auto addCommand = [&commands](const juce::String& command)
+    {
+        const auto trimmed = command.trim();
+        if (trimmed.isEmpty())
+            return;
+
+        for (const auto& existing : commands)
+        {
+            if (existing.equalsIgnoreCase(trimmed))
+                return;
+        }
+        commands.add(trimmed);
+    };
+
+    const juce::StringArray baseCommands
+    {
+        "help", "clear", "stats", "diff factory", "export script", "import script", "import script C:\\path\\to\\script.choroscript",
+        "cp json", "save defaults", "history", "undo", "redo", "unsolo",
+        "undo 5", "redo 5", "reset all",
+        "core list", "core show lagrange3",
+        "slot show", "slot set green nq lagrange3",
+        "tutorial", "tutorial next", "tutorial next section", "tutorial section", "tutorial tab", "tutorial next tab",
+        "tutorial skip", "tutorial exit", "tutorial core", "tutorial overview", "tutorial modulation", "tutorial tone",
+        "tutorial engine", "tutorial validation", "tutorial bbd", "tutorial tape", "tutorial phase", "tutorial bimodulation",
+        "tutorial bi-modulation", "tutorial bimod", "tutorial warp", "tutorial saturation", "tutorial envelope",
+        "tutorial full", "tutorial walkthrough", "tutorial dynamic", "tutorial dynamics", "tutorial tutorial",
+        "engine green", "engine blue", "engine red", "engine purple", "engine black",
+        "hq on", "hq off", "hq true", "hq false", "hq 1", "hq 0",
+        "bypass on", "bypass off", "bypass true", "bypass false", "bypass 1", "bypass 0",
+        "toggle hq", "toggle bypass",
+        "view overview", "view modulation", "view internals", "view tone", "view bbd",
+        "view engine", "view tape", "view layout", "view look", "view lookfeel", "view validation", "view settings",
+        "macro rate", "macro depth", "macro offset", "macro width", "macro color", "macro mix",
+        "dump green", "dump blue", "dump red", "dump purple", "dump black",
+        "list green", "list blue", "list red", "list purple", "list black", "list globals",
+        "list green all", "list blue all", "list red all", "list purple all", "list black all",
+        "list green full", "list blue full", "list red full", "list purple full", "list black full", "list globals full",
+        "list green all full", "list blue all full", "list red all full", "list purple all full", "list black all full",
+        "fx 0", "fx 1", "fx 2", "search", "search rate", "alias", "alias mycmd set rate_smoothing_ms 20", "solo", "solo bbd_left",
+        "set <slug> <value>", "add <slug> <delta>", "sub <slug> <delta>", "get <slug>",
+        "sweep <slug> <start> <end> <ms>", "lock <slug>", "unlock <slug>", "watch <slug>", "unwatch <slug>", "reset <slug>"
+    };
+    for (const auto& cmd : baseCommands)
+        addCommand(cmd);
+
+    const auto& descriptors = ChorusDSP::getCorePackageDescriptors();
+    for (const auto& descriptor : descriptors)
+    {
+        addCommand("core show " + juce::String(descriptor.token));
+        for (int engine = 0; engine < 5; ++engine)
+        {
+            const juce::String engineName = engineNameForIndex(engine);
+            addCommand("slot set " + engineName + " nq " + juce::String(descriptor.token));
+            addCommand("slot set " + engineName + " hq " + juce::String(descriptor.token));
+        }
+    }
+
+    for (const auto& binding : consoleTargets)
+    {
+        const auto& slug = binding.slug;
+        addCommand("set " + slug);
+        addCommand("add " + slug);
+        addCommand("sub " + slug);
+        addCommand("get " + slug);
+        addCommand("toggle " + slug);
+        addCommand("sweep " + slug);
+        addCommand("lock " + slug);
+        addCommand("unlock " + slug);
+        addCommand("watch " + slug);
+        addCommand("unwatch " + slug);
+        addCommand("reset " + slug);
+    }
+
+    return commands;
 }
 
 void DevPanel::appendRecentTouchLogLine(const juce::String& line) const

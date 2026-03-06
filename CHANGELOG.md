@@ -2,7 +2,7 @@
 
 All notable changes to Choroboros are documented here.
 
-## [2.02.2-beta] - 2026-03-04
+## [2.02.2] - 2026-03-04
 
 ### Added
 - **Dev Panel Console:** Fully interactive command-line interface replacing static recent touches log.
