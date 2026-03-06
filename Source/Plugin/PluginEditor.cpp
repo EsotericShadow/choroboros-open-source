@@ -27,6 +27,7 @@
 #include "../UI/DevPanel.h"
 #include <array>
 #include <cmath>
+#include <future>
 #include <vector>
 
 namespace
@@ -581,6 +582,17 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     editorCtorStartMs = juce::Time::getMillisecondCounterHiRes();
     setLookAndFeel(&customLookAndFeel);
 
+    int initialEngineIndex = 0;
+    if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+        initialEngineIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
+
+    auto activeThemeDecode = std::async(std::launch::async, [initialEngineIndex]()
+    {
+        auto themePack = CustomLookAndFeel::getOrDecodeThemeAssetPack(initialEngineIndex);
+        auto backgroundPack = getOrDecodeBackgroundAssetPack(initialEngineIndex);
+        return std::make_pair(std::move(themePack), std::move(backgroundPack));
+    });
+
     const double fontSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     loadValueLabelTypeface();
     loadUiTextTypeface();
@@ -596,6 +608,10 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     
     const double themeSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     setupEngineColorSelector();
+    auto activeThemeAssets = activeThemeDecode.get();
+    customLookAndFeel.installThemeAssetPack(initialEngineIndex, std::move(activeThemeAssets.first));
+    backgroundImage = activeThemeAssets.second.off;
+    backgroundImageLit = activeThemeAssets.second.lit;
     // Note: setupEngineColorSelector now reads the saved parameter value and updates UI
     audioProcessor.logLoadTraceEvent("editor_theme_setup_ms",
                                      juce::Time::getMillisecondCounterHiRes() - themeSetupStartMs);
@@ -903,14 +919,9 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
     auto engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID);
     if (engineColorParam)
     {
-        const int savedColorIndex = static_cast<int>(engineColorParam->load());
         // Use the ComboBox's selected ID to ensure consistency
         const int actualColorIndex = engineColorBox.getSelectedId() - 1;
-        if (CustomLookAndFeel::isThemeAssetPackCached(actualColorIndex))
-            customLookAndFeel.setColorTheme(actualColorIndex);
-        else
-            customLookAndFeel.setThemeColorIndexOnly(actualColorIndex);
-        loadBackgroundImage(actualColorIndex);
+        customLookAndFeel.setThemeColorIndexOnly(actualColorIndex);
         // Value labels will be updated after they're set up in constructor
     }
     
