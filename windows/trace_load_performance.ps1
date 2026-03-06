@@ -25,11 +25,12 @@ if (-not (Test-Path $LogPath)) {
 
 function Get-Percentile {
     param(
-        [Parameter(Mandatory = $true)][double[]]$Values,
+        [Parameter(Mandatory = $true)][object]$Values,
         [Parameter(Mandatory = $true)][double]$P
     )
-    if ($Values.Count -eq 0) { return [double]::NaN }
-    $sorted = $Values | Sort-Object
+    $valueArray = @($Values | ForEach-Object { [double]$_ })
+    if ($valueArray.Count -eq 0) { return [double]::NaN }
+    $sorted = $valueArray | Sort-Object
     $idx = [math]::Round(($sorted.Count - 1) * $P)
     return [double]$sorted[[int]$idx]
 }
