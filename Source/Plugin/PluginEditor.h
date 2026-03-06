@@ -28,6 +28,7 @@
 #include "../UI/PluginEditorSetup.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
+#include <future>
 #include <thread>
 
 //==============================================================================
@@ -150,6 +151,9 @@ private:
 
     std::thread themePrewarmThread;
     std::atomic<bool> stopThemePrewarm { false };
+    std::future<CustomLookAndFeel::ThemeAssetPack> activeThemeDecodeFuture;
+    int activeThemeDecodeColorIndex = 0;
+    bool activeThemeInstalled = false;
     double editorCtorStartMs = 0.0;
     bool firstPaintTimingLogged = false;
     bool themePrewarmStarted = false;

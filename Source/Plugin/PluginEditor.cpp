@@ -586,11 +586,10 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
         initialEngineIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
 
-    auto activeThemeDecode = std::async(std::launch::async, [initialEngineIndex]()
+    activeThemeDecodeColorIndex = initialEngineIndex;
+    activeThemeDecodeFuture = std::async(std::launch::async, [initialEngineIndex]()
     {
-        auto themePack = CustomLookAndFeel::getOrDecodeThemeAssetPack(initialEngineIndex);
-        auto backgroundPack = getOrDecodeBackgroundAssetPack(initialEngineIndex);
-        return std::make_pair(std::move(themePack), std::move(backgroundPack));
+        return CustomLookAndFeel::getOrDecodeThemeAssetPack(initialEngineIndex);
     });
 
     const double fontSetupStartMs = juce::Time::getMillisecondCounterHiRes();
@@ -608,10 +607,11 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     
     const double themeSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     setupEngineColorSelector();
-    auto activeThemeAssets = activeThemeDecode.get();
-    customLookAndFeel.installThemeAssetPack(initialEngineIndex, std::move(activeThemeAssets.first));
-    backgroundImage = activeThemeAssets.second.off;
-    backgroundImageLit = activeThemeAssets.second.lit;
+    if (CustomLookAndFeel::isThemeAssetPackCached(initialEngineIndex))
+    {
+        customLookAndFeel.setColorTheme(initialEngineIndex);
+        activeThemeInstalled = true;
+    }
     // Note: setupEngineColorSelector now reads the saved parameter value and updates UI
     audioProcessor.logLoadTraceEvent("editor_theme_setup_ms",
                                      juce::Time::getMillisecondCounterHiRes() - themeSetupStartMs);
@@ -812,6 +812,18 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
 //==============================================================================
 void ChoroborosPluginEditor::paint (juce::Graphics& g)
 {
+    if (!activeThemeInstalled && activeThemeDecodeFuture.valid())
+    {
+        const double waitStartMs = juce::Time::getMillisecondCounterHiRes();
+        auto themePack = activeThemeDecodeFuture.get();
+        customLookAndFeel.installThemeAssetPack(activeThemeDecodeColorIndex, std::move(themePack));
+        activeThemeInstalled = true;
+
+        audioProcessor.logLoadTraceEvent("editor_theme_wait_before_first_paint_ms",
+                                         juce::Time::getMillisecondCounterHiRes() - waitStartMs,
+                                         "engine=" + juce::String(activeThemeDecodeColorIndex));
+    }
+
     if (!firstPaintTimingLogged)
     {
         firstPaintTimingLogged = true;
