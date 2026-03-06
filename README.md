@@ -62,25 +62,41 @@ Intended for educators, sound designers, and power users who want to see under t
 
 ## Installation
 
-Download the macOS Universal package (`Choroboros-v2.02.2-macOS-Universal.zip`) from Releases, or use `install.sh` from the distribution.
+**Downloads (v2.03-beta):**
 
-### VST3
+| Platform | File | Link |
+|----------|------|------|
+| macOS Universal | `Choroboros-v2.03-beta-macOS-Universal.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.03-beta/Choroboros-v2.03-beta-macOS-Universal.zip) |
+| Windows x64 | `Choroboros-v2.03-beta-Windows-x64.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.03-beta/Choroboros-v2.03-beta-Windows-x64.zip) |
+| Windows x86 | `Choroboros-v2.03-beta-Windows-x86-compat.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.03-beta/Choroboros-v2.03-beta-Windows-x86-compat.zip) |
+
+SHA256 checksums included for all builds. Or use `install.sh` from the distribution (macOS).
+
+### macOS — VST3
 Copy `Choroboros.vst3` to:
 - `/Library/Audio/Plug-Ins/VST3/` (system-wide)
 - `~/Library/Audio/Plug-Ins/VST3/` (user-specific)
 
-### AU
+### macOS — AU
 Copy `Choroboros.component` to:
 - `/Library/Audio/Plug-Ins/Components/` (system-wide)
 - `~/Library/Audio/Plug-Ins/Components/` (user-specific)
 
-### AAX (Pro Tools)
+### macOS — AAX (Pro Tools)
 Copy `Choroboros.aaxplugin` to:
 - `~/Library/Application Support/Avid/Audio/Plug-Ins/` (user)
 - `/Library/Application Support/Avid/Audio/Plug-Ins/` (system)
 
-### Standalone
+### macOS — Standalone
 Copy `Choroboros.app` to `/Applications/` or any location you prefer.
+
+### Windows — VST3
+Extract the zip and copy `VST3/Choroboros.vst3` to:
+- `C:\Program Files\Common Files\VST3\` (system-wide)
+- `%LOCALAPPDATA%\Programs\Common\VST3\` (user-specific)
+
+### Windows — Standalone
+Extract the zip and run `Standalone/Choroboros.exe` or place it in your preferred location.
 
 After installation, rescan plugins in your DAW.
 
@@ -90,19 +106,20 @@ After installation, rescan plugins in your DAW.
 
 ## System Requirements
 
-- **macOS:** 10.13 or later
+- **macOS:** 10.13 or later (Intel or Apple Silicon)
+- **Windows:** Windows 10 or later (x64 or x86)
 - **DAW:** Any DAW that supports VST3 or AU plugins
-- **CPU:** Intel or Apple Silicon
 
 ## Technical Details
 
-- **Version:** 2.02.2
+- **Version:** 2.03-beta
 - **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
 - **Sample Rate:** Up to 192 kHz
-- **Formats:** VST3, AU, AAX, Standalone
+- **Formats:** VST3, AU, AAX, Standalone (macOS); VST3, Standalone (Windows)
 - **macOS:** Universal binary (arm64 + x86_64)
+- **Windows:** x64 primary, x86-compat
 
 ## License
 
@@ -150,4 +167,4 @@ For issues, questions, or licensing inquiries:
 
 - **Plugins not appearing in DAW:** Make sure you've copied the plugin to the correct location and rescanned plugins in your DAW. Some DAWs require a full restart.
 - **macOS Security:** If macOS blocks the plugin, go to System Preferences > Security & Privacy and allow the plugin.
-- **Permission Issues:** For system-wide installation (`/Library/`), you may need administrator privileges. User-specific installation (`~/Library/`) is recommended.
+- **Permission Issues:** For system-wide installation (`/Library/` on macOS, `C:\Program Files\` on Windows), you may need administrator privileges. User-specific installation is recommended.

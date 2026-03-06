@@ -29,10 +29,10 @@ VST3, AU, Standalone · JUCE 8 · macOS (Intel + Apple Silicon) only · Windows 
 
 **Replace with:**
 ```
-VST3, AU, AAX, Standalone · JUCE 8 · macOS (Intel + Apple Silicon) only · Windows coming soon
+VST3, AU, AAX, Standalone · JUCE 8 · macOS (Intel + Apple Silicon) · Windows (x64 + x86-compat)
 ```
 
-**Reason:** AAX (Pro Tools) is built and supported.
+**Reason:** AAX (Pro Tools) is built and supported. Windows is ready as of v2.03-beta.
 
 ---
 
