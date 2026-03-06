@@ -1031,10 +1031,10 @@ void DevPanel::updateActiveProfileLabel()
     styleHackerTextButton(fxPresetSubtleButton, false);
     styleHackerTextButton(fxPresetMediumButton, false);
     styleHackerTextButton(engineFilterClearButton, false);
-    styleHackerTextButton(tutorialPreviousButton, false);
-    styleHackerTextButton(tutorialNextButton, false);
-    styleHackerTextButton(tutorialNextSectionButton, false);
-    styleHackerTextButton(tutorialSkipButton, false);
+    styleTutorialHighContrastButton(tutorialPreviousButton, false);
+    styleTutorialHighContrastButton(tutorialNextButton, true);
+    styleTutorialHighContrastButton(tutorialNextSectionButton, false);
+    styleTutorialHighContrastButton(tutorialSkipButton, false);
     styleHackerEditor(engineFilterEditor);
 
     activeProfileLabel.setText("Active Profile: " + profileName,
@@ -1195,13 +1195,13 @@ void DevPanel::updateRightTabVisibility()
     styleTabButton(tabLayoutButton, showLookFeel, layoutAccent);
     styleTabButton(tabValidationButton, showValidation, validationAccent);
     styleTabButton(tabSettingsButton, showSettings, visualNeutral());
-    styleHackerTextButton(overviewTutorialPopupStartButton, false);
-    styleHackerTextButton(overviewTutorialPopupCloseButton, false);
+    styleTutorialHighContrastButton(overviewTutorialPopupStartButton, true);
+    styleTutorialHighContrastButton(overviewTutorialPopupCloseButton, false);
     styleHackerTextButton(unlockWarningCancelButton, false);
     styleHackerTextButton(unlockWarningCloseButton, false);
     styleHackerTextButton(unlockWarningConfirmButton, true);
     styleHackerToggleButton(unlockWarningHideFutureToggle);
-    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, hackerText());
+    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, tutorialHighContrastText());
     unlockWarningTitleLabel.setColour(juce::Label::textColourId, hackerText());
     unlockWarningBodyText.setColour(juce::TextEditor::textColourId, hackerText());
 
@@ -1212,7 +1212,7 @@ void DevPanel::updateRightTabVisibility()
     engineVisualDeck.setAccentColour(showEngine ? engineAccent : mutedAccent);
     lookFeelVisualDeck.setAccentColour(showLookFeel ? layoutAccent : mutedAccent);
     validationVisualDeck.setAccentColour(showValidation ? validationAccent : mutedAccent);
-    overviewTutorialPopup.setAccentColour(overviewAccent);
+    overviewTutorialPopup.setAccentColour(tutorialHighContrastAccent());
     unlockWarningPopup.setAccentColour(overviewAccent);
 
     auto setAllSectionsEnabled = [](juce::PropertyPanel& panel, bool panelVisible)
@@ -1500,11 +1500,20 @@ void DevPanel::applyUiPreferences()
     styleHackerTextButton(fxPresetSubtleButton, false);
     styleHackerTextButton(fxPresetMediumButton, false);
     styleHackerTextButton(engineFilterClearButton, false);
-    styleHackerTextButton(tutorialPreviousButton, false);
-    styleHackerTextButton(tutorialNextButton, false);
-    styleHackerTextButton(tutorialNextSectionButton, false);
-    styleHackerTextButton(tutorialSkipButton, false);
+    styleTutorialHighContrastButton(tutorialPreviousButton, false);
+    styleTutorialHighContrastButton(tutorialNextButton, true);
+    styleTutorialHighContrastButton(tutorialNextSectionButton, false);
+    styleTutorialHighContrastButton(tutorialSkipButton, false);
+    styleTutorialHighContrastButton(overviewTutorialPopupStartButton, true);
+    styleTutorialHighContrastButton(overviewTutorialPopupCloseButton, false);
     styleHackerEditor(engineFilterEditor);
+
+    tutorialStepLabel.setColour(juce::Label::textColourId, tutorialHighContrastTextDim());
+    tutorialTitleLabel.setColour(juce::Label::textColourId, tutorialHighContrastText());
+    tutorialFocusHintLabel.setColour(juce::Label::textColourId, tutorialHighContrastTextMuted());
+    tutorialBodyText.setColour(juce::TextEditor::textColourId, tutorialHighContrastText());
+    tutorialBodyText.setColour(juce::TextEditor::highlightColourId, tutorialHighContrastAccent().withAlpha(0.42f));
+    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, tutorialHighContrastText());
 
     if (validationConsoleComponent != nullptr)
     {
@@ -2162,17 +2171,7 @@ void DevPanel::applyTutorialStep()
     tutorialNextSectionButton.setEnabled(hasNextSection);
     tutorialNextSectionButton.setButtonText(">>");
 
-    juce::Colour accent = hackerText();
-    switch (activeTab)
-    {
-        case 0: accent = visualOverview(); break;
-        case 1: accent = visualModulation(); break;
-        case 2: accent = visualTone(); break;
-        case 3: accent = visualEngine(); break;
-        case 4: accent = visualLayout(); break;
-        case 5: accent = visualValidation(); break;
-        case 6: default: accent = hackerText(); break;
-    }
+    const juce::Colour accent = tutorialHighContrastAccent();
     tutorialOverlay.setAccentColour(accent);
     tutorialFocusHighlight.setAccentColour(accent);
     tutorialFocusHighlight.setPulseAlpha(1.0f);

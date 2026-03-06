@@ -332,6 +332,12 @@ inline juce::Colour visualEngine() { return juce::Colour(VisualizerPalette::engi
 inline juce::Colour visualValidation() { return juce::Colour(VisualizerPalette::validation); }
 inline juce::Colour visualLayout() { return juce::Colour(VisualizerPalette::layout); }
 inline juce::Colour visualNeutral() { return juce::Colour(VisualizerPalette::neutral); }
+inline juce::Colour tutorialHighContrastAccent() { return juce::Colour(0xff8dff74); }
+inline juce::Colour tutorialHighContrastText() { return juce::Colour(0xfff3fff5); }
+inline juce::Colour tutorialHighContrastTextDim() { return juce::Colour(0xffd8f2dc); }
+inline juce::Colour tutorialHighContrastTextMuted() { return juce::Colour(0xffb6d7bd); }
+inline juce::Colour tutorialHighContrastButtonBg() { return juce::Colour(0xff102015); }
+inline juce::Colour tutorialHighContrastButtonBgOn() { return juce::Colour(0xff1f3d26); }
 
 inline void styleHackerTextButton(juce::TextButton& button, bool active)
 {
@@ -339,6 +345,14 @@ inline void styleHackerTextButton(juce::TextButton& button, bool active)
     button.setColour(juce::TextButton::buttonOnColourId, hackerBgActive());
     button.setColour(juce::TextButton::textColourOffId, active ? hackerText() : hackerTextDim());
     button.setColour(juce::TextButton::textColourOnId, hackerText());
+}
+
+inline void styleTutorialHighContrastButton(juce::TextButton& button, bool emphasised)
+{
+    button.setColour(juce::TextButton::buttonColourId, emphasised ? tutorialHighContrastButtonBgOn() : tutorialHighContrastButtonBg());
+    button.setColour(juce::TextButton::buttonOnColourId, tutorialHighContrastButtonBgOn());
+    button.setColour(juce::TextButton::textColourOffId, tutorialHighContrastText());
+    button.setColour(juce::TextButton::textColourOnId, tutorialHighContrastText());
 }
 
 inline void styleHackerToggleButton(juce::ToggleButton& toggle)

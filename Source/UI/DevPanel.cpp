@@ -447,12 +447,12 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
 
     tutorialStepLabel.setText("Tutorial", juce::dontSendNotification);
     tutorialStepLabel.setFont(makeLabelFont(Typography::labelSmall, false));
-    tutorialStepLabel.setColour(juce::Label::textColourId, hackerTextDim());
+    tutorialStepLabel.setColour(juce::Label::textColourId, tutorialHighContrastTextDim());
     tutorialStepLabel.setJustificationType(juce::Justification::centredLeft);
 
     tutorialTitleLabel.setText("DevPanel Tutorial", juce::dontSendNotification);
     tutorialTitleLabel.setFont(makeLabelFont(Typography::title, true));
-    tutorialTitleLabel.setColour(juce::Label::textColourId, hackerText());
+    tutorialTitleLabel.setColour(juce::Label::textColourId, tutorialHighContrastText());
     tutorialTitleLabel.setJustificationType(juce::Justification::centredLeft);
 
     tutorialBodyText.setReadOnly(true);
@@ -463,16 +463,16 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     tutorialBodyText.setPopupMenuEnabled(true);
     tutorialBodyText.setFont(makeLabelFont(Typography::description, false));
     tutorialBodyText.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0x00000000));
-    tutorialBodyText.setColour(juce::TextEditor::textColourId, hackerText());
+    tutorialBodyText.setColour(juce::TextEditor::textColourId, tutorialHighContrastText());
     tutorialBodyText.setColour(juce::TextEditor::outlineColourId, juce::Colour(0x00000000));
     tutorialBodyText.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x00000000));
-    tutorialBodyText.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.82f));
+    tutorialBodyText.setColour(juce::TextEditor::highlightColourId, tutorialHighContrastAccent().withAlpha(0.42f));
     tutorialBodyText.setBorder(juce::BorderSize<int>(0));
     tutorialBodyText.setText("", juce::dontSendNotification);
 
     tutorialFocusHintLabel.setText("", juce::dontSendNotification);
     tutorialFocusHintLabel.setFont(makeLabelFont(Typography::labelSmall, false));
-    tutorialFocusHintLabel.setColour(juce::Label::textColourId, hackerTextMuted());
+    tutorialFocusHintLabel.setColour(juce::Label::textColourId, tutorialHighContrastTextMuted());
     tutorialFocusHintLabel.setJustificationType(juce::Justification::centredLeft);
 
     tutorialPreviousButton.setButtonText("<");
@@ -499,7 +499,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
                                        juce::dontSendNotification);
     overviewTutorialPopupLabel.setJustificationType(juce::Justification::topLeft);
     overviewTutorialPopupLabel.setMinimumHorizontalScale(1.0f);
-    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, hackerText());
+    overviewTutorialPopupLabel.setColour(juce::Label::textColourId, tutorialHighContrastText());
     overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::description, false));
 
     overviewTutorialPopupStartButton.setButtonText("Start Tutorial");
@@ -627,6 +627,12 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     styleActionButton(tutorialSkipButton);
     styleActionButton(overviewTutorialPopupStartButton);
     styleActionButton(overviewTutorialPopupCloseButton);
+    styleTutorialHighContrastButton(tutorialPreviousButton, false);
+    styleTutorialHighContrastButton(tutorialNextButton, true);
+    styleTutorialHighContrastButton(tutorialNextSectionButton, false);
+    styleTutorialHighContrastButton(tutorialSkipButton, false);
+    styleTutorialHighContrastButton(overviewTutorialPopupStartButton, true);
+    styleTutorialHighContrastButton(overviewTutorialPopupCloseButton, false);
     styleActionButton(unlockWarningCancelButton);
     styleActionButton(unlockWarningCloseButton);
     unlockWarningConfirmButton.setLookAndFeel(&getDevPanelThemeLookAndFeel());
