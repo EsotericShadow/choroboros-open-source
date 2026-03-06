@@ -346,6 +346,9 @@ private:
     std::unordered_map<std::string, juce::String> consoleListOutputCache;
     std::unordered_map<std::string, double> consoleFactoryValues;
     std::unordered_map<std::string, juce::String> consoleAliases;
+    juce::StringArray cachedConsoleAutocompleteCommands;
+    bool consoleAutocompleteDirty = true;
+    bool consoleAutocompleteRefreshQueued = false;
     bool consoleFactoryValuesReady = false;
     juce::StringArray consoleWatchSlugs;
     juce::StringArray consoleCommandHistory;
@@ -435,6 +438,7 @@ private:
     void updateAnalyzerDemandFromVisibility();
     int refreshVisibleLiveReadouts();
     void registerConsoleTarget(juce::PropertyComponent* property, const juce::String& name);
+    void refreshConsoleAutocompleteIfNeeded(bool force = false);
     devpanel::ConsoleCommandResult executeConsoleCommand(const juce::String& command);
     juce::StringArray buildConsoleAutocompleteCommands() const;
     void appendRecentTouchLogLine(const juce::String& line) const;

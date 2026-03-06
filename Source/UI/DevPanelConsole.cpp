@@ -321,26 +321,46 @@ void DevPanel::registerConsoleTarget(juce::PropertyComponent* property, const ju
     consoleTargetIndexBySlug[slugKey] = consoleTargets.size() - 1;
     consoleListOutputCache.clear();
     consoleFactoryValuesReady = false;
+    consoleAutocompleteDirty = true;
 
+    if (validationConsoleComponent != nullptr && !consoleAutocompleteRefreshQueued)
+    {
+        consoleAutocompleteRefreshQueued = true;
+        juce::Component::SafePointer<DevPanel> safeThis(this);
+        juce::MessageManager::callAsync([safeThis]
+        {
+            if (safeThis != nullptr)
+                safeThis->refreshConsoleAutocompleteIfNeeded();
+        });
+    }
+}
+
+void DevPanel::refreshConsoleAutocompleteIfNeeded(bool force)
+{
+    consoleAutocompleteRefreshQueued = false;
+    if (!force && !consoleAutocompleteDirty)
+        return;
+
+    cachedConsoleAutocompleteCommands = buildConsoleAutocompleteCommands();
+    consoleAutocompleteDirty = false;
     if (validationConsoleComponent != nullptr)
-        validationConsoleComponent->setAutocompleteCommands(buildConsoleAutocompleteCommands());
+        validationConsoleComponent->setAutocompleteCommands(cachedConsoleAutocompleteCommands);
 }
 
 juce::StringArray DevPanel::buildConsoleAutocompleteCommands() const
 {
     juce::StringArray commands;
-    auto addCommand = [&commands](const juce::String& command)
+    std::unordered_set<std::string> seenLower;
+    seenLower.reserve(1024);
+    auto addCommand = [&commands, &seenLower](const juce::String& command)
     {
         const auto trimmed = command.trim();
         if (trimmed.isEmpty())
             return;
 
-        for (const auto& existing : commands)
-        {
-            if (existing.equalsIgnoreCase(trimmed))
-                return;
-        }
-        commands.add(trimmed);
+        const std::string key = trimmed.toLowerCase().toStdString();
+        if (seenLower.insert(key).second)
+            commands.add(trimmed);
     };
 
     const juce::StringArray baseCommands

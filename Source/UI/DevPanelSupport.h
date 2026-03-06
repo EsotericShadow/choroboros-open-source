@@ -2348,22 +2348,16 @@ public:
     void setAutocompleteCommands(const juce::StringArray& commands)
     {
         autocompleteCommands.clear();
+        std::unordered_set<std::string> seenLower;
+        seenLower.reserve(static_cast<size_t>(juce::jmax(16, commands.size())));
         for (const auto& command : commands)
         {
             const juce::String trimmed = command.trim();
             if (trimmed.isEmpty())
                 continue;
 
-            bool alreadyPresent = false;
-            for (const auto& existing : autocompleteCommands)
-            {
-                if (existing.equalsIgnoreCase(trimmed))
-                {
-                    alreadyPresent = true;
-                    break;
-                }
-            }
-            if (!alreadyPresent)
+            const std::string key = trimmed.toLowerCase().toStdString();
+            if (seenLower.insert(key).second)
                 autocompleteCommands.add(trimmed);
         }
         updateAutocompleteSuggestions();
