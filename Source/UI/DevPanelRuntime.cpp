@@ -102,7 +102,7 @@ int DevPanel::getSubTabCount(int mainTab) const
         case 0: return 2; // Overview
         case 1: return 0; // Modulation (unified deck, no secondary tabs)
         case 2: return 2; // Tone
-        case 3: return 3; // Engine
+        case 3: return 4; // Engine
         case 4: return 5; // Look & Feel
         case 5: return 3; // Validation
         case 6: return 1; // Settings
@@ -132,20 +132,13 @@ juce::String DevPanel::getSubTabName(int mainTab, int subTab) const
                 case 1: default: return "Engine Response";
             }
         case 3:
-        {
-            const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
-            const bool hq = processor.isHqEnabled();
-            const auto coreId = processor.getCoreAssignments().get(engine, hq);
-            juce::String macroLabel(choroboros::coreIdToMacroLabel(coreId));
-            if (macroLabel.isEmpty())
-                macroLabel = "Engine Macros";
             switch (safeSubTab)
             {
                 case 0: return "Signal Flow";
-                case 1: return "Engine Identity";
-                case 2: default: return macroLabel;
+                case 1: return "Routing";
+                case 2: return "Macros";
+                case 3: default: return "Internals";
             }
-        }
         case 4:
             switch (safeSubTab)
             {
@@ -793,29 +786,19 @@ void DevPanel::resized()
     else if (selectedRightTab == 3)
     {
         layoutSectionHeader(rightColumnX, rightColumnWidth, rightY, engineTitle, engineDescription, visualSection);
-        juce::Array<juce::PropertyComponent*> engineCards;
-        auto appendUnique = [&engineCards](const juce::Array<juce::PropertyComponent*>& source)
-        {
-            for (auto* card : source)
-            {
-                if (card == nullptr)
-                    continue;
-                if (!engineCards.contains(card))
-                    engineCards.add(card);
-            }
-        };
-
-        // Keep signal flow visible; show identity/macros only when their subtab is selected.
-        appendUnique(selectedDeckCards(engineVisualDeckCards, 0));
-        appendUnique(selectedDeckCards(engineVisualDeckCards, selectedSubTab));
+        auto engineCards = selectedDeckCards(engineVisualDeckCards, selectedSubTab);
         layoutVisualDeck(rightColumnX, rightColumnWidth, rightY, engineVisualDeck, engineCards, engineVisualDeckCards, engineDeckSpacing);
 
-        if (auto* activeInternalsPanel = getActiveEngineInternalsPanel())
-            layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, *activeInternalsPanel, compactSection);
-        if (bbdPanel.isVisible())
-            layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, bbdPanel, compactSection);
-        if (tapePanel.isVisible())
-            layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, tapePanel, compactSection);
+        const bool showInternalsSubTab = selectedSubTab == 3;
+        if (showInternalsSubTab)
+        {
+            if (auto* activeInternalsPanel = getActiveEngineInternalsPanel())
+                layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, *activeInternalsPanel, compactSection);
+            if (bbdPanel.isVisible())
+                layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, bbdPanel, compactSection);
+            if (tapePanel.isVisible())
+                layoutPanelOnly(rightColumnX, rightColumnWidth, rightY, tapePanel, compactSection);
+        }
     }
     else if (selectedRightTab == 4)
     {
@@ -977,6 +960,7 @@ void DevPanel::updateEngineSectionVisibility()
     const int colorIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     const bool hqEnabled = processor.isHqEnabled();
     const bool showEngine = selectedRightTab == 3;
+    const bool showEngineInternals = showEngine && getSelectedSubTab() == 3;
     setActiveEngineSectionPrefix({}, false);
     const bool isRedNQ = colorIndex == 2 && !hqEnabled;
     const bool isRedHQ = colorIndex == 2 && hqEnabled;
@@ -992,7 +976,7 @@ void DevPanel::updateEngineSectionVisibility()
         }
     };
 
-    juce::PropertyPanel* activePanel = showEngine ? getActiveEngineInternalsPanel() : nullptr;
+    juce::PropertyPanel* activePanel = showEngineInternals ? getActiveEngineInternalsPanel() : nullptr;
     setProfilePanelVisible(internalsGreenNqPanel, activePanel == &internalsGreenNqPanel);
     setProfilePanelVisible(internalsGreenHqPanel, activePanel == &internalsGreenHqPanel);
     setProfilePanelVisible(internalsBlueNqPanel, activePanel == &internalsBlueNqPanel);
@@ -1004,13 +988,12 @@ void DevPanel::updateEngineSectionVisibility()
     setProfilePanelVisible(internalsBlackNqPanel, activePanel == &internalsBlackNqPanel);
     setProfilePanelVisible(internalsBlackHqPanel, activePanel == &internalsBlackHqPanel);
 
-    bbdPanel.setVisible(showEngine && isRedNQ);
-    tapePanel.setVisible(showEngine && isRedHQ);
+    bbdPanel.setVisible(showEngineInternals && isRedNQ);
+    tapePanel.setVisible(showEngineInternals && isRedHQ);
 
     const juce::String sectionFilter = engineFilterEditor.getText().trim();
-    if (showEngine && sectionFilter.isNotEmpty())
+    if (showEngineInternals && sectionFilter.isNotEmpty())
     {
-        applySectionFilterToPanel(enginePanel, sectionFilter);
         if (activePanel != nullptr)
             applySectionFilterToPanel(*activePanel, sectionFilter);
         if (bbdPanel.isVisible())
@@ -1152,7 +1135,7 @@ void DevPanel::updateRightTabVisibility()
     devCoreModeLabel.setVisible(true);
     devCoreModeBox.setVisible(true);
     devHqModeToggle.setVisible(true);
-    const bool showEngineInternalsTools = showEngine;
+    const bool showEngineInternalsTools = showEngine && selectedSubTab == 3;
     engineFilterLabel.setVisible(showEngineInternalsTools);
     engineFilterEditor.setVisible(showEngineInternalsTools);
     engineFilterClearButton.setVisible(showEngineInternalsTools);
@@ -1217,7 +1200,8 @@ void DevPanel::updateRightTabVisibility()
         openAllSections(validationPanel);
     if (showSettings)
         openAllSections(settingsPanel);
-    const auto* activeInternalsPanel = showEngine ? getActiveEngineInternalsPanel() : nullptr;
+    const bool showEngineInternals = showEngine && selectedSubTab == 3;
+    const auto* activeInternalsPanel = showEngineInternals ? getActiveEngineInternalsPanel() : nullptr;
     auto setInternalsEnabled = [&](juce::PropertyPanel& panel)
     {
         setAllSectionsEnabled(panel, activeInternalsPanel == &panel);
@@ -1232,8 +1216,8 @@ void DevPanel::updateRightTabVisibility()
     setInternalsEnabled(internalsPurpleHqPanel);
     setInternalsEnabled(internalsBlackNqPanel);
     setInternalsEnabled(internalsBlackHqPanel);
-    setAllSectionsEnabled(bbdPanel, showEngine && activeInternalsPanel == &internalsRedNqPanel);
-    setAllSectionsEnabled(tapePanel, showEngine && activeInternalsPanel == &internalsRedHqPanel);
+    setAllSectionsEnabled(bbdPanel, showEngineInternals && activeInternalsPanel == &internalsRedNqPanel);
+    setAllSectionsEnabled(tapePanel, showEngineInternals && activeInternalsPanel == &internalsRedHqPanel);
 
     if (showEngine)
     {
@@ -2231,7 +2215,11 @@ void DevPanel::expandTutorialFocusSections()
                 openAllSections(layoutTextAnimationPanel);
         }
     }
-    else if (key == "engine_inspector" || key == "bbd_controls" || key == "tape_controls")
+    else if (key == "engine_inspector" || key == "engine_routing" || key == "engine_macros")
+    {
+        openAllSections(enginePanel);
+    }
+    else if (key == "engine_internals" || key == "bbd_controls" || key == "tape_controls")
     {
         openAllSections(enginePanel);
         if (auto* activeInternals = getActiveEngineInternalsPanel())
@@ -2307,8 +2295,11 @@ juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& foc
         return firstMatch;
     };
 
-    const auto findToneControlsCard = [this](bool requireVisible) -> juce::PropertyComponent*
+    const auto findToneControlsCard = [this, &findDeckRole](bool requireVisible) -> juce::PropertyComponent*
     {
+        if (auto* roleMatch = findDeckRole(toneVisualDeckCards, "devpanelToneRole", "transfer_controls", requireVisible))
+            return roleMatch;
+
         juce::PropertyComponent* firstMatch = nullptr;
         for (auto* card : toneVisualDeckCards)
         {
@@ -2338,6 +2329,11 @@ juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& foc
         return firstMatch;
     };
 
+    const auto findEngineRoleCard = [this, &findDeckRole](const juce::String& role, bool requireVisible) -> juce::PropertyComponent*
+    {
+        return findDeckRole(engineVisualDeckCards, "devpanelEngineRole", role, requireVisible);
+    };
+
     const auto findTraceMatrixCard = [this](bool requireVisible) -> juce::PropertyComponent*
     {
         juce::PropertyComponent* firstMatch = nullptr;
@@ -2363,7 +2359,45 @@ juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& foc
         return const_cast<juce::PropertyPanel*>(&overviewPanel);
     if (key == "modulation_visual" || key == "lfo_scope") return const_cast<VisualDeckContent*>(&modulationVisualDeck);
     if (key == "tone_visual" || key == "spectrum_visual" || key == "transfer_visual") return const_cast<VisualDeckContent*>(&toneVisualDeck);
-    if (key == "engine_visual" || key == "engine_signal_flow") return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    if (key == "engine_visual") return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    if (key == "engine_signal_flow")
+    {
+        if (auto* card = findEngineRoleCard("signal_flow", true))
+            return card;
+        if (auto* card = findEngineRoleCard("signal_flow", false))
+            return card;
+        return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    }
+    if (key == "engine_routing")
+    {
+        if (auto* card = findEngineRoleCard("core_assignment", true))
+            return card;
+        if (auto* card = findEngineRoleCard("routing_identity", true))
+            return card;
+        if (auto* card = findEngineRoleCard("core_assignment", false))
+            return card;
+        if (auto* card = findEngineRoleCard("routing_identity", false))
+            return card;
+        return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    }
+    if (key == "engine_macros")
+    {
+        if (auto* card = findEngineRoleCard("macro_workbench", true))
+            return card;
+        if (auto* card = findEngineRoleCard("engine_specific_macros", true))
+            return card;
+        if (auto* card = findEngineRoleCard("macro_workbench", false))
+            return card;
+        if (auto* card = findEngineRoleCard("engine_specific_macros", false))
+            return card;
+        return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    }
+    if (key == "engine_internals")
+    {
+        if (auto* active = const_cast<DevPanel*>(this)->getActiveEngineInternalsPanel())
+            return active;
+        return const_cast<VisualDeckContent*>(&engineVisualDeck);
+    }
     if (key == "validation_visual")
         return const_cast<VisualDeckContent*>(&validationVisualDeck);
     if (key == "trace_matrix")
@@ -2518,24 +2552,24 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  "Adjust controls while watching the curve."));
         steps.push_back(makeStep("Step 15: Engine / Signal Flow",
                                  "Engine tab always shows Signal Flow as your runtime path view. The Core row shows the active algorithm for current Profile/Core/HQ.",
-                                 3, 0, -1, -1, "engine_visual",
+                                 3, 0, -1, -1, "engine_signal_flow",
                                  "Confirm active core before making deep edits."));
-        steps.push_back(makeStep("Step 16: Engine / Engine Identity",
-                                 "Engine Identity adds guidance cards: current core identity, modular core toggle, NQ/HQ core assignment controls, duplicate warnings, and macro workbench.",
-                                 3, 1, -1, -1, "engine_visual",
-                                 "Identity subtab is the main control center for core routing."));
+        steps.push_back(makeStep("Step 16: Engine / Routing",
+                                 "Open Engine -> Routing. This subtab owns core routing: identity guide, modular-core toggle, NQ/HQ core assignment, and duplicate warnings.",
+                                 3, 1, -1, -1, "engine_routing",
+                                 "Routing is the source-of-truth for engine/core assignment."));
         steps.push_back(makeStep("Step 17: Macro Definition",
                                  "Macro means one high-level control that steers multiple lower-level behaviors. Use the Engine Macro Workbench for fast musical changes.",
-                                 3, 1, -1, -1, "engine_visual",
+                                 3, 2, -1, -1, "engine_macros",
                                  "Rate/Depth/Offset/Width/Color/Mix macro row."));
-        steps.push_back(makeStep("Step 18: Engine Macro Subtab",
-                                 "Open the third Engine subtab (name changes by active core). It contains engine-specific macro controls for the current core package.",
-                                 3, 2, -1, -1, "engine_visual",
-                                 "Third subtab is context-dependent by core."));
-        steps.push_back(makeStep("Step 19: Internals Meaning",
-                                 "Internals are low-level DSP controls. In this UI, internals are exposed through engine-specific cards and response controls, not as a separate main tab.",
-                                 3, 2, -1, -1, "engine_visual",
-                                 "Use internals only after macro-level tuning."));
+        steps.push_back(makeStep("Step 18: Engine / Macros",
+                                 "Engine -> Macros contains the macro workbench and the active engine's detailed macro wiring controls.",
+                                 3, 2, -1, -1, "engine_macros",
+                                 "Macros are split from routing and internals on purpose."));
+        steps.push_back(makeStep("Step 19: Engine / Internals",
+                                 "Engine -> Internals is the low-level DSP lane for the active Profile/Core/HQ target.",
+                                 3, 3, -1, -1, "engine_internals",
+                                 "Use internals after macro-level tuning."));
         steps.push_back(makeStep("Step 20: Look & Feel / Mapping",
                                  "Look & Feel -> Mapping changes UI mapping behavior, not core DSP algorithms.",
                                  4, 0, -1, -1, "layout_active_inspector",
@@ -2674,20 +2708,20 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  "These three controls define the active edit target."));
         steps.push_back(makeStep("Engine: Signal Flow Subtab",
                                  "Signal Flow shows the active path and core label for the current slot/mode.",
-                                 3, 0, -1, -1, "engine_visual",
+                                 3, 0, -1, -1, "engine_signal_flow",
                                  "Always confirm this before deep edits."));
-        steps.push_back(makeStep("Engine: Engine Identity Subtab",
-                                 "Engine Identity adds the identity guide, modular cores toggle, NQ/HQ core assignments, duplicate warnings, and macro workbench.",
-                                 3, 1, -1, -1, "engine_visual",
-                                 "Identity subtab is where routing decisions happen."));
-        steps.push_back(makeStep("Engine: Macro Workbench",
-                                 "Use macro workbench for top-level musical edits: Rate, Depth, Offset, Width, Color, Mix.",
-                                 3, 1, -1, -1, "engine_visual",
+        steps.push_back(makeStep("Engine: Routing Subtab",
+                                 "Routing owns identity and assignment controls: modular cores, NQ/HQ core assignment, and duplicate warnings.",
+                                 3, 1, -1, -1, "engine_routing",
+                                 "Use Routing for engine/core ownership decisions."));
+        steps.push_back(makeStep("Engine: Macros Subtab",
+                                 "Macros owns both the main macro workbench and engine-specific macro controls.",
+                                 3, 2, -1, -1, "engine_macros",
                                  "Macros are quick and broad."));
-        steps.push_back(makeStep("Engine: Third Subtab",
-                                 "Open the third Engine subtab (dynamic name). It contains engine-specific macro controls for the active core package.",
-                                 3, 2, -1, -1, "engine_visual",
-                                 "This is the detailed engine-specific lane."));
+        steps.push_back(makeStep("Engine: Internals Subtab",
+                                 "Internals is the low-level DSP panel for the active engine and HQ/NQ mode.",
+                                 3, 3, -1, -1, "engine_internals",
+                                 "Keep internals changes intentional and validated."));
         return steps;
     }
 
@@ -2724,12 +2758,12 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  "Core token must be bbd for this walkthrough."));
         steps.push_back(makeStep("Step 3: Signal Flow Check",
                                  "Go to Engine Signal Flow and confirm Core row reports BBD behavior for the active slot/mode.",
-                                 3, 0, -1, -1, "engine_visual",
+                                 3, 0, -1, -1, "engine_signal_flow",
                                  "Core row should match your selection."));
         steps.push_back(makeStep("Step 4: BBD Macro Controls",
-                                 "Open the third Engine subtab and tune BBD macro controls (depth, clock, filtering) while listening.",
-                                 3, 2, -1, -1, "engine_visual",
-                                 "Engine-specific macro tab for BBD."));
+                                 "Open Engine -> Macros and tune BBD macro controls (depth, clock, filtering) while listening.",
+                                 3, 2, -1, -1, "engine_macros",
+                                 "Macros subtab holds BBD macro controls."));
         steps.push_back(makeStep("Step 5: Spectrum Reality Check",
                                  "Move to Tone / Spectrum to watch brightness/noise changes while tuning BBD clock and filters.",
                                  2, 0, -1, -1, "spectrum_visual",
@@ -2754,9 +2788,9 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  3, 1, -1, -1, "core_selector",
                                  "Core token must be tape for this walkthrough."));
         steps.push_back(makeStep("Step 3: Tape Macro Controls",
-                                 "Open Engine third subtab and adjust tape macro controls (drive, tone, wow/flutter spread).",
-                                 3, 2, -1, -1, "engine_visual",
-                                 "Engine-specific tape macro card."));
+                                 "Open Engine -> Macros and adjust tape macro controls (drive, tone, wow/flutter spread).",
+                                 3, 2, -1, -1, "engine_macros",
+                                 "Macros subtab holds tape macro controls."));
         steps.push_back(makeStep("Step 4: Tone Response",
                                  "Go to Tone / Engine Response and watch the curve while changing tape drive controls.",
                                  2, 1, -1, -1, "transfer_visual",
@@ -2825,8 +2859,8 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  "Right/left LFO views for compound behavior."));
         steps.push_back(makeStep("Step 6: Organic Motion",
                                  "Use this mode for living, animated chorus textures where predictable whoosh would feel static.",
-                                 3, 2, -1, -1, "engine_visual",
-                                 "Use Purple-specific macro controls in Engine tab."));
+                                 3, 2, -1, -1, "engine_macros",
+                                 "Use Purple-specific macro controls in Engine -> Macros."));
         return steps;
     }
 
@@ -2870,12 +2904,12 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  3, 1, -1, -1, "core_selector",
                                  "Core choice changes dynamic behavior."));
         steps.push_back(makeStep("Step 3: Macro Baseline",
-                                 "Set a gentle macro baseline first (Rate/Depth/Mix) in Engine Identity macro workbench.",
-                                 3, 1, -1, -1, "engine_visual",
+                                 "Set a gentle macro baseline first (Rate/Depth/Mix) in Engine -> Macros workbench.",
+                                 3, 2, -1, -1, "engine_macros",
                                  "Create a stable starting point."));
         steps.push_back(makeStep("Step 4: Engine-Specific Dynamic Controls",
-                                 "Open the third Engine subtab and adjust the active core's dynamic macro controls in small steps.",
-                                 3, 2, -1, -1, "engine_visual",
+                                 "In Engine -> Macros, adjust the active core's dynamic macro controls in small steps.",
+                                 3, 2, -1, -1, "engine_macros",
                                  "Engine-specific macro controls drive the dynamic effect."));
         steps.push_back(makeStep("Step 5: Confirm in Modulation",
                                  "Check Modulation visuals to confirm movement changes follow your dynamic tuning intent.",

@@ -449,6 +449,7 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
         return s;
     }, LinkGroup::tone);
     spectrumOverlayCard->getProperties().set("devpanelSubTab", 0);
+    spectrumOverlayCard->getProperties().set("devpanelToneRole", "spectrum_overlay");
     spectrumOverlayCard->setPreferredHeight(256);
     toneVisuals.add(spectrumOverlayCard);
 
@@ -539,6 +540,7 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
         card->getProperties().set("devpanelSubTab", 1);
         card->getProperties().set("devpanelEngineIndex", engineIndex);
         card->getProperties().set("devpanelHqMode", hqMode);
+        card->getProperties().set("devpanelToneRole", "transfer_curve");
         card->setPreferredHeight(228);
         toneVisuals.add(card);
     };
@@ -554,6 +556,7 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
         card->getProperties().set("devpanelSubTab", 1);
         card->getProperties().set("devpanelEngineIndex", engineIndex);
         card->getProperties().set("devpanelHqMode", hqMode);
+        card->getProperties().set("devpanelToneRole", "transfer_controls");
         populate(*card);
         toneVisuals.add(card);
     };
@@ -961,6 +964,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
 
     auto makeCoreAssignmentChoice = [this, coreChoiceLabels, coreChoiceValues](const juce::String& label, bool hqEnabled) -> juce::PropertyComponent*
     {
+        juce::ignoreUnused(label);
         auto* prop = new juce::ChoicePropertyComponent(
             makeIntValue(
                 [this, hqEnabled]
@@ -978,7 +982,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
                     resized();
                     repaint();
                 }),
-            label,
+            "",
             coreChoiceLabels,
             coreChoiceValues);
         prop->setTooltip("Assign which chorus core algorithm this slot/mode runs. Duplicate assignments are allowed and surfaced as warnings.");
@@ -1206,6 +1210,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         return state;
     }, LinkGroup::engine);
     engineSignalFlowCard->getProperties().set("devpanelSubTab", 0);
+    engineSignalFlowCard->getProperties().set("devpanelEngineRole", "signal_flow");
     engineSignalFlowCard->setPreferredHeight(286);
     engineVisuals.add(engineSignalFlowCard);
 
@@ -1226,6 +1231,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
              + "\n\nUse " + getSubTabName(3, 2) + " for engine-specific macro wiring controls.";
     });
     engineIdentityCard->getProperties().set("devpanelSubTab", 1);
+    engineIdentityCard->getProperties().set("devpanelEngineRole", "routing_identity");
     engineIdentityCard->setPreferredHeight(212);
     engineVisuals.add(engineIdentityCard);
 
@@ -1234,6 +1240,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         "Choose NQ/HQ core packages for the active color slot. Duplicate assignments are allowed and reported as warnings.");
     coreAssignmentCard->setName("Engine Core Assignment Card");
     coreAssignmentCard->getProperties().set("devpanelSubTab", 1);
+    coreAssignmentCard->getProperties().set("devpanelEngineRole", "core_assignment");
     coreAssignmentCard->addControl("Modular Cores", new juce::BooleanPropertyComponent(
         makeBoolValue(
             [this] { return processor.isModularCoresEnabled(); },
@@ -1255,6 +1262,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         return buildDuplicateWarningSummary();
     });
     duplicateWarningCard->getProperties().set("devpanelSubTab", 1);
+    duplicateWarningCard->getProperties().set("devpanelEngineRole", "core_assignment_warnings");
     duplicateWarningCard->setPreferredHeight(140);
     engineVisuals.add(duplicateWarningCard);
 
@@ -1262,7 +1270,8 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         "Engine Macro Workbench (main UI macros)",
         "Main UI macro controls for the active profile (Rate/Depth/Offset/Width/Color/Mix).");
     engineMacroWorkbenchCard->setName("Engine Macro Workbench Card");
-    engineMacroWorkbenchCard->getProperties().set("devpanelSubTab", 1);
+    engineMacroWorkbenchCard->getProperties().set("devpanelSubTab", 2);
+    engineMacroWorkbenchCard->getProperties().set("devpanelEngineRole", "macro_workbench");
     engineMacroWorkbenchCard->addControl("Rate Macro (Hz)", createRateMacroControl());
     engineMacroWorkbenchCard->addControl("Depth Macro (%)", createDepthMacroControl());
     engineMacroWorkbenchCard->addControl("Offset Macro (deg)", createOffsetMacroControl());
@@ -1294,6 +1303,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         card->getProperties().set("devpanelSubTab", 2);
         card->getProperties().set("devpanelEngineIndex", engineIndex);
         card->getProperties().set("devpanelHqMode", hqMode);
+        card->getProperties().set("devpanelEngineRole", "engine_specific_macros");
         populate(*card);
         engineVisuals.add(card);
     };
@@ -1927,10 +1937,12 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     EngineLayoutGroups layoutPurpleGroups;
     EngineLayoutGroups layoutBlackGroups;
     juce::Array<juce::PropertyComponent*> layoutGlobalValueTypographyProps;
-    juce::Array<juce::PropertyComponent*> layoutGlobalValueFxProps;
+    juce::Array<juce::PropertyComponent*> layoutRateValueAnimationProps;
+    juce::Array<juce::PropertyComponent*> layoutDepthValueAnimationProps;
+    juce::Array<juce::PropertyComponent*> layoutOffsetValueAnimationProps;
+    juce::Array<juce::PropertyComponent*> layoutWidthValueAnimationProps;
     juce::Array<juce::PropertyComponent*> layoutColorValueFxProps;
     juce::Array<juce::PropertyComponent*> layoutMixValueFxProps;
-    juce::Array<juce::PropertyComponent*> layoutGlobalMainValueFlipProps;
     juce::Array<juce::PropertyComponent*> layoutGlobalColorValueFlipProps;
     juce::Array<juce::PropertyComponent*> layoutGlobalMixValueFlipProps;
     juce::Array<juce::PropertyComponent*> layoutGlobalTopButtonsProps;
@@ -1938,6 +1950,7 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     juce::Array<juce::PropertyComponent*> layoutGlobalKnobResponseProps;
     auto refreshLayoutEnginePanels = [this]()
     {
+        layoutTextAnimationPanel.refreshAll();
         layoutGreenPanel.refreshAll();
         layoutBluePanel.refreshAll();
         layoutRedPanel.refreshAll();
@@ -1966,25 +1979,40 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
         lockable->setContextMenuHandler([this, lockable, parameterName, targets, applyLayoutValueToColorScopes](LockableFloatPropertyComponent&, const juce::MouseEvent&)
         {
             juce::PopupMenu menu;
-            const bool hqMode = processor.isHqEnabled();
-            const juce::String qualityLabel = hqMode ? "HQ" : "NQ";
-            const juce::String sharedNote = " (shared with " + juce::String(hqMode ? "NQ" : "HQ") + ")";
+            static const std::array<juce::String, 5> colorNames { { "Green", "Blue", "Red", "Purple", "Black" } };
+            const int sourceEngine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
 
             menu.addSectionHeader("Propagate " + parameterName);
             menu.addItem(1, "Apply to all engine colours");
-            menu.addItem(2, "Apply to all " + qualityLabel + " profiles" + sharedNote);
+            menu.addSeparator();
+            for (int colourIndex = 0; colourIndex < static_cast<int>(colorNames.size()); ++colourIndex)
+            {
+                if (colourIndex == sourceEngine || targets[static_cast<std::size_t>(colourIndex)] == nullptr)
+                    continue;
+                menu.addItem(10 + colourIndex, "Apply to " + colorNames[static_cast<std::size_t>(colourIndex)]);
+            }
 
             juce::Component::SafePointer<LockableFloatPropertyComponent> safeLockable(lockable);
             menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(lockable),
                                [safeLockable, targets, applyLayoutValueToColorScopes](int selectedItemId)
                                {
-                                   if (selectedItemId != 1 && selectedItemId != 2)
-                                       return;
                                    if (safeLockable == nullptr)
                                        return;
 
                                    const int value = static_cast<int>(std::round(safeLockable->getCurrentValueForCommand()));
-                                   applyLayoutValueToColorScopes(targets, value);
+                                   if (selectedItemId == 1)
+                                   {
+                                       applyLayoutValueToColorScopes(targets, value);
+                                       return;
+                                   }
+
+                                   if (selectedItemId >= 10 && selectedItemId <= 14)
+                                   {
+                                       std::array<int*, 5> singleTarget { { nullptr, nullptr, nullptr, nullptr, nullptr } };
+                                       const int targetColour = selectedItemId - 10;
+                                       singleTarget[static_cast<std::size_t>(targetColour)] = targets[static_cast<std::size_t>(targetColour)];
+                                       applyLayoutValueToColorScopes(singleTarget, value);
+                                   }
                                });
         });
     };
@@ -2008,6 +2036,42 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     auto addLayoutGlobal = [&](const juce::String& name, int& target, int min, int max)
     {
         addLayoutToGroup(layoutGlobalValueTypographyProps, name, target, min, max);
+    };
+    using EngineLayoutTargetSelector = std::function<int*(int)>;
+    auto makeTargetsForSelector = [&](const EngineLayoutTargetSelector& selector)
+    {
+        std::array<int*, 5> targets { { nullptr, nullptr, nullptr, nullptr, nullptr } };
+        for (int engineIndex = 0; engineIndex < static_cast<int>(targets.size()); ++engineIndex)
+            targets[static_cast<std::size_t>(engineIndex)] = selector(engineIndex);
+        return targets;
+    };
+    auto addLayoutActiveEngine = [&](juce::Array<juce::PropertyComponent*>& props,
+                                     const juce::String& name,
+                                     const EngineLayoutTargetSelector& selector,
+                                     int min,
+                                     int max)
+    {
+        auto* property = makeLockable(
+            makeFloatValue([this, selector]
+                           {
+                               const int engineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+                               if (auto* target = selector(engineIndex))
+                                   return static_cast<float>(*target);
+                               return 0.0f;
+                           },
+                           [this, selector](float v)
+                           {
+                               const int engineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+                               if (auto* target = selector(engineIndex))
+                               {
+                                   *target = static_cast<int>(std::round(v));
+                                   editor.applyLayout();
+                               }
+                           }),
+            name, static_cast<double>(min), static_cast<double>(max), 1.0, 1.0);
+
+        props.add(property);
+        attachLayoutPropagationMenu(property, name, makeTargetsForSelector(selector));
     };
     auto addColourChannels = [&](juce::Array<juce::PropertyComponent*>& props, const juce::String& baseName, int& target)
     {
@@ -2152,10 +2216,22 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
                             layout.widthValueOffsetXGreen, layout.widthValueOffsetXBlue, layout.widthValueOffsetXRed, layout.widthValueOffsetXPurple, layout.widthValueOffsetXBlack,
                             -200, 200);
 
-    addLayoutGlobal("Rate Value Y Offset", layout.rateValueOffsetY, -200, 200);
-    addLayoutGlobal("Depth Value Y Offset", layout.depthValueOffsetY, -200, 200);
-    addLayoutGlobal("Offset Value Y Offset", layout.offsetValueOffsetY, -200, 200);
-    addLayoutGlobal("Width Value Y Offset", layout.widthValueOffsetY, -200, 200);
+    addLayoutByColorToGroup(&EngineLayoutGroups::mainValueProps,
+                            "Rate Value Y Offset",
+                            layout.rateValueOffsetYGreen, layout.rateValueOffsetYBlue, layout.rateValueOffsetYRed, layout.rateValueOffsetYPurple, layout.rateValueOffsetYBlack,
+                            -200, 200);
+    addLayoutByColorToGroup(&EngineLayoutGroups::mainValueProps,
+                            "Depth Value Y Offset",
+                            layout.depthValueOffsetYGreen, layout.depthValueOffsetYBlue, layout.depthValueOffsetYRed, layout.depthValueOffsetYPurple, layout.depthValueOffsetYBlack,
+                            -200, 200);
+    addLayoutByColorToGroup(&EngineLayoutGroups::mainValueProps,
+                            "Offset Value Y Offset",
+                            layout.offsetValueOffsetYGreen, layout.offsetValueOffsetYBlue, layout.offsetValueOffsetYRed, layout.offsetValueOffsetYPurple, layout.offsetValueOffsetYBlack,
+                            -200, 200);
+    addLayoutByColorToGroup(&EngineLayoutGroups::mainValueProps,
+                            "Width Value Y Offset",
+                            layout.widthValueOffsetYGreen, layout.widthValueOffsetYBlue, layout.widthValueOffsetYRed, layout.widthValueOffsetYPurple, layout.widthValueOffsetYBlack,
+                            -200, 200);
     addLayoutGlobal("Main Knobs Value Font Size", layout.knobValueFontSize, 8, 48);
     addLayoutGlobal("Color Value Font Size", layout.colorValueFontSize, 8, 48);
     addLayoutGlobal("Mix Value Font Size", layout.mixValueFontSize, 8, 48);
@@ -2163,24 +2239,118 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addLayoutGlobal("Value Text Colour Mode (0=Auto,1=Custom)", layout.valueTextColourMode, 0, 1);
     addColourChannels(layoutGlobalValueTypographyProps, "Value Text Colour", layout.valueTextColour);
 
-    addLayoutToGroup(layoutGlobalValueFxProps, "FX Enabled (0/1)", layout.valueFxEnabled, 0, 1);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Glow Alpha (%)", layout.valueGlowAlphaPct, 0, 40);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Glow Spread (x0.01 px)", layout.valueGlowSpreadPxTimes100, 0, 800);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Per-Char Offset X (x0.01 px)", layout.valueFxPerCharOffsetXPxTimes100, -600, 600);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Per-Char Offset Y (x0.01 px)", layout.valueFxPerCharOffsetYPxTimes100, -600, 600);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Top Reflect Alpha (%)", layout.valueTopReflectAlphaPct, 0, 40);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Top Reflect Offset X (x0.01 px)", layout.valueTopReflectOffsetXPxTimes100, -1200, 1200);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Top Reflect Offset Y (x0.01 px)", layout.valueTopReflectOffsetYPxTimes100, -1200, 1200);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Top Reflect Shear (%)", layout.valueTopReflectShearPct, -100, 100);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Top Reflect Rotate (deg)", layout.valueTopReflectRotateDeg, -180, 180);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Bottom Reflect Alpha (%)", layout.valueBottomReflectAlphaPct, 0, 40);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Bottom Reflect Offset X (x0.01 px)", layout.valueBottomReflectOffsetXPxTimes100, -1200, 1200);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Bottom Reflect Offset Y (x0.01 px)", layout.valueBottomReflectOffsetYPxTimes100, -1200, 1200);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Bottom Reflect Shear (%)", layout.valueBottomReflectShearPct, -100, 100);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Bottom Reflect Rotate (deg)", layout.valueBottomReflectRotateDeg, -180, 180);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Reflect Blur (x0.01 px)", layout.valueReflectBlurPxTimes100, 0, 800);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Reflect Squash (%)", layout.valueReflectSquashPct, 0, 95);
-    addLayoutToGroup(layoutGlobalValueFxProps, "Reflect Motion (%)", layout.valueReflectMotionPct, 0, 200);
+    auto addMainValueAnimationSection = [&](juce::Array<juce::PropertyComponent*>& props, int fieldIndex)
+    {
+        addLayoutActiveEngine(props, "FX Enabled (0/1)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.enabled;
+        }, 0, 1);
+        addLayoutActiveEngine(props, "Glow Alpha (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.glowAlphaPct;
+        }, 0, 40);
+        addLayoutActiveEngine(props, "Glow Spread (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.glowSpreadPxTimes100;
+        }, 0, 800);
+        addLayoutActiveEngine(props, "Per-Char Offset X (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.perCharOffsetXPxTimes100;
+        }, -600, 600);
+        addLayoutActiveEngine(props, "Per-Char Offset Y (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.perCharOffsetYPxTimes100;
+        }, -600, 600);
+        addLayoutActiveEngine(props, "Top Reflect Alpha (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectAlphaPct;
+        }, 0, 40);
+        addLayoutActiveEngine(props, "Top Reflect Offset X (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectOffsetXPxTimes100;
+        }, -1200, 1200);
+        addLayoutActiveEngine(props, "Top Reflect Offset Y (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectOffsetYPxTimes100;
+        }, -1200, 1200);
+        addLayoutActiveEngine(props, "Top Reflect Shear (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectShearPct;
+        }, -100, 100);
+        addLayoutActiveEngine(props, "Top Reflect Rotate (deg)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectRotateDeg;
+        }, -180, 180);
+        addLayoutActiveEngine(props, "Bottom Reflect Alpha (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectAlphaPct;
+        }, 0, 40);
+        addLayoutActiveEngine(props, "Bottom Reflect Offset X (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectOffsetXPxTimes100;
+        }, -1200, 1200);
+        addLayoutActiveEngine(props, "Bottom Reflect Offset Y (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectOffsetYPxTimes100;
+        }, -1200, 1200);
+        addLayoutActiveEngine(props, "Bottom Reflect Shear (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectShearPct;
+        }, -100, 100);
+        addLayoutActiveEngine(props, "Bottom Reflect Rotate (deg)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectRotateDeg;
+        }, -180, 180);
+        addLayoutActiveEngine(props, "Reflect Blur (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.reflectBlurPxTimes100;
+        }, 0, 800);
+        addLayoutActiveEngine(props, "Reflect Squash (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.reflectSquashPct;
+        }, 0, 95);
+        addLayoutActiveEngine(props, "Reflect Motion (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.reflectMotionPct;
+        }, 0, 200);
+        addLayoutActiveEngine(props, "Flip Enabled (0/1)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.enabled;
+        }, 0, 1);
+        addLayoutActiveEngine(props, "Flip Duration (ms)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.durationMs;
+        }, 20, 1000);
+        addLayoutActiveEngine(props, "Flip Travel Up (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.travelUpPxTimes100;
+        }, 0, 2000);
+        addLayoutActiveEngine(props, "Flip Travel Down (x0.01 px)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.travelDownPxTimes100;
+        }, 0, 2000);
+        addLayoutActiveEngine(props, "Flip Travel Out (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.travelOutPct;
+        }, 0, 400);
+        addLayoutActiveEngine(props, "Flip Travel In (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.travelInPct;
+        }, 0, 400);
+        addLayoutActiveEngine(props, "Flip Shear (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.shearPct;
+        }, 0, 100);
+        addLayoutActiveEngine(props, "Flip Scale Amount (%)", [&layout, fieldIndex](int engineIndex) -> int*
+        {
+            return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].flip.minScalePct;
+        }, 0, 95);
+    };
+
+    addMainValueAnimationSection(layoutRateValueAnimationProps, 0);
+    addMainValueAnimationSection(layoutDepthValueAnimationProps, 1);
+    addMainValueAnimationSection(layoutOffsetValueAnimationProps, 2);
+    addMainValueAnimationSection(layoutWidthValueAnimationProps, 3);
 
     addLayoutToGroup(layoutColorValueFxProps, "FX Enabled (0/1)", layout.colorValueFxEnabled, 0, 1);
     addLayoutToGroup(layoutColorValueFxProps, "Glow Alpha (%)", layout.colorValueGlowAlphaPct, 0, 40);
@@ -2219,15 +2389,6 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addLayoutToGroup(layoutMixValueFxProps, "Reflect Blur (x0.01 px)", layout.mixValueReflectBlurPxTimes100, 0, 800);
     addLayoutToGroup(layoutMixValueFxProps, "Reflect Squash (%)", layout.mixValueReflectSquashPct, 0, 95);
     addLayoutToGroup(layoutMixValueFxProps, "Reflect Motion (%)", layout.mixValueReflectMotionPct, 0, 200);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Enabled (0/1)", layout.mainValueFlipEnabled, 0, 1);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Duration (ms)", layout.mainValueFlipDurationMs, 20, 1000);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Travel Up (x0.01 px)", layout.mainValueFlipTravelUpPxTimes100, 0, 2000);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Travel Down (x0.01 px)", layout.mainValueFlipTravelDownPxTimes100, 0, 2000);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Travel Out (%)", layout.mainValueFlipTravelOutPct, 0, 400);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Travel In (%)", layout.mainValueFlipTravelInPct, 0, 400);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Shear (%)", layout.mainValueFlipShearPct, 0, 100);
-    addLayoutToGroup(layoutGlobalMainValueFlipProps, "Scale Amount (%)", layout.mainValueFlipMinScalePct, 0, 95);
-
     addLayoutToGroup(layoutGlobalColorValueFlipProps, "Enabled (0/1)", layout.colorValueFlipEnabled, 0, 1);
     addLayoutToGroup(layoutGlobalColorValueFlipProps, "Duration (ms)", layout.colorValueFlipDurationMs, 20, 1000);
     addLayoutToGroup(layoutGlobalColorValueFlipProps, "Travel Up (x0.01 px)", layout.colorValueFlipTravelUpPxTimes100, 0, 2000);
@@ -2271,8 +2432,14 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addColourChannels(layoutGlobalEngineSelectorProps, "Engine Popup Highlight Text", layout.engineSelectorPopupHighlightedTextColour);
 
     addSharedLayoutToGroup(&EngineLayoutGroups::sharedProps, "Flip Switch Size", layout.hqSwitchSize, 20, 180);
-    addSharedLayoutToGroup(&EngineLayoutGroups::sharedProps, "Flip Switch Offset X", layout.hqSwitchOffsetX, -300, 300);
-    addSharedLayoutToGroup(&EngineLayoutGroups::sharedProps, "Flip Switch Offset Y", layout.hqSwitchOffsetY, -300, 300);
+    addLayoutByColorToGroup(&EngineLayoutGroups::sharedProps,
+                            "Flip Switch Offset X",
+                            layout.hqSwitchOffsetXGreen, layout.hqSwitchOffsetXBlue, layout.hqSwitchOffsetXRed, layout.hqSwitchOffsetXPurple, layout.hqSwitchOffsetXBlack,
+                            -300, 300);
+    addLayoutByColorToGroup(&EngineLayoutGroups::sharedProps,
+                            "Flip Switch Offset Y",
+                            layout.hqSwitchOffsetYGreen, layout.hqSwitchOffsetYBlue, layout.hqSwitchOffsetYRed, layout.hqSwitchOffsetYPurple, layout.hqSwitchOffsetYBlack,
+                            -300, 300);
     addLayout(layoutGlobalKnobResponseProps, "Knob Drag Sensitivity (%)", layout.knobDragSensitivityPct, 10, 400);
     addLayout(layoutGlobalKnobResponseProps, "Knob Roll-Off Speed (%)", layout.knobRollOffSpeedPct, 10, 400);
     addLayout(layoutGlobalKnobResponseProps, "Rate Visual Response (ms)", layout.rateKnobVisualResponseMs, 1, 1000);
@@ -2303,10 +2470,12 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addPanelSection(layoutGlobalPanel, "Engine Selector (Combo + Popup)", layoutGlobalEngineSelectorProps, false);
     addPanelSection(layoutGlobalPanel, "Global Knob Response", layoutGlobalKnobResponseProps, false);
 
-    addPanelSection(layoutTextAnimationPanel, "Global Value FX - Main Knobs", layoutGlobalValueFxProps, true);
+    addPanelSection(layoutTextAnimationPanel, "Main Value - Rate (Active Engine)", layoutRateValueAnimationProps, true);
+    addPanelSection(layoutTextAnimationPanel, "Main Value - Depth (Active Engine)", layoutDepthValueAnimationProps, false);
+    addPanelSection(layoutTextAnimationPanel, "Main Value - Offset (Active Engine)", layoutOffsetValueAnimationProps, false);
+    addPanelSection(layoutTextAnimationPanel, "Main Value - Width (Active Engine)", layoutWidthValueAnimationProps, false);
     addPanelSection(layoutTextAnimationPanel, "Global Value FX - Color", layoutColorValueFxProps, false);
     addPanelSection(layoutTextAnimationPanel, "Global Value FX - Mix", layoutMixValueFxProps, false);
-    addPanelSection(layoutTextAnimationPanel, "Value Flip - Main Knobs", layoutGlobalMainValueFlipProps, false);
     addPanelSection(layoutTextAnimationPanel, "Value Flip - Color", layoutGlobalColorValueFlipProps, false);
     addPanelSection(layoutTextAnimationPanel, "Value Flip - Mix", layoutGlobalMixValueFlipProps, false);
 
@@ -2392,6 +2561,14 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
                                                        layout.offsetValueOffsetXPurple, layout.offsetValueOffsetXBlack, layout.offsetValueOffsetX);
             const int widthValueOffsetX = pickByColor(layout.widthValueOffsetXGreen, layout.widthValueOffsetXBlue, layout.widthValueOffsetXRed,
                                                       layout.widthValueOffsetXPurple, layout.widthValueOffsetXBlack, layout.widthValueOffsetX);
+            const int rateValueOffsetY = pickByColor(layout.rateValueOffsetYGreen, layout.rateValueOffsetYBlue, layout.rateValueOffsetYRed,
+                                                     layout.rateValueOffsetYPurple, layout.rateValueOffsetYBlack, layout.rateValueOffsetY);
+            const int depthValueOffsetY = pickByColor(layout.depthValueOffsetYGreen, layout.depthValueOffsetYBlue, layout.depthValueOffsetYRed,
+                                                      layout.depthValueOffsetYPurple, layout.depthValueOffsetYBlack, layout.depthValueOffsetY);
+            const int offsetValueOffsetY = pickByColor(layout.offsetValueOffsetYGreen, layout.offsetValueOffsetYBlue, layout.offsetValueOffsetYRed,
+                                                       layout.offsetValueOffsetYPurple, layout.offsetValueOffsetYBlack, layout.offsetValueOffsetY);
+            const int widthValueOffsetY = pickByColor(layout.widthValueOffsetYGreen, layout.widthValueOffsetYBlue, layout.widthValueOffsetYRed,
+                                                      layout.widthValueOffsetYPurple, layout.widthValueOffsetYBlack, layout.widthValueOffsetY);
 
             const int colorValueY = pickByColor(layout.colorValueYGreen, layout.colorValueYBlue, layout.colorValueYRed,
                                                 layout.colorValueYPurple, layout.colorValueYBlack, layout.colorValueY);
@@ -2443,19 +2620,19 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
                        mixColour, emphasizeEngineLayout);
 
             addElement("Rate Value", { static_cast<float>(rateCenterX - layout.valueLabelWidth / 2 + rateValueOffsetX),
-                                       static_cast<float>(valueLabelY + layout.rateValueOffsetY),
+                                       static_cast<float>(valueLabelY + rateValueOffsetY),
                                        static_cast<float>(layout.valueLabelWidth), static_cast<float>(layout.valueLabelHeight) },
                        valueColour, emphasizeValueLabels, false);
             addElement("Depth Value", { static_cast<float>(depthCenterX - layout.valueLabelWidth / 2 + depthValueOffsetX),
-                                        static_cast<float>(valueLabelY + layout.depthValueOffsetY),
+                                        static_cast<float>(valueLabelY + depthValueOffsetY),
                                         static_cast<float>(layout.valueLabelWidth), static_cast<float>(layout.valueLabelHeight) },
                        valueColour, emphasizeValueLabels, false);
             addElement("Offset Value", { static_cast<float>(offsetCenterX - layout.valueLabelWidth / 2 + offsetValueOffsetX),
-                                         static_cast<float>(valueLabelY + layout.offsetValueOffsetY),
+                                         static_cast<float>(valueLabelY + offsetValueOffsetY),
                                          static_cast<float>(layout.valueLabelWidth), static_cast<float>(layout.valueLabelHeight) },
                        valueColour, emphasizeValueLabels, false);
             addElement("Width Value", { static_cast<float>(widthCenterX - layout.valueLabelWidth / 2 + widthValueOffsetX),
-                                        static_cast<float>(valueLabelY + layout.widthValueOffsetY),
+                                        static_cast<float>(valueLabelY + widthValueOffsetY),
                                         static_cast<float>(layout.valueLabelWidth), static_cast<float>(layout.valueLabelHeight) },
                        valueColour, emphasizeValueLabels, false);
 
@@ -2488,8 +2665,12 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
                        globalColour, emphasizeGlobal);
 
             const int hqSize = layout.hqSwitchSize;
-            const int hqCenterX = 350 + layout.hqSwitchOffsetX;
-            const int hqCenterY = 152 + layout.hqSwitchOffsetY;
+            const int hqOffsetX = pickByColor(layout.hqSwitchOffsetXGreen, layout.hqSwitchOffsetXBlue, layout.hqSwitchOffsetXRed,
+                                              layout.hqSwitchOffsetXPurple, layout.hqSwitchOffsetXBlack, layout.hqSwitchOffsetX);
+            const int hqOffsetY = pickByColor(layout.hqSwitchOffsetYGreen, layout.hqSwitchOffsetYBlue, layout.hqSwitchOffsetYRed,
+                                              layout.hqSwitchOffsetYPurple, layout.hqSwitchOffsetYBlack, layout.hqSwitchOffsetY);
+            const int hqCenterX = 350 + hqOffsetX;
+            const int hqCenterY = 152 + hqOffsetY;
             addElement("HQ Switch", { static_cast<float>(hqCenterX - hqSize / 2), static_cast<float>(hqCenterY - hqSize / 2),
                                       static_cast<float>(hqSize), static_cast<float>(hqSize) },
                        knobColour, emphasizeEngineLayout);
