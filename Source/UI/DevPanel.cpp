@@ -415,6 +415,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(tutorialFocusHighlight);
     content.addAndMakeVisible(tutorialOverlay);
     content.addAndMakeVisible(overviewTutorialPopup);
+    content.addAndMakeVisible(unlockWarningScrim);
+    content.addAndMakeVisible(unlockWarningPopup);
     tutorialOverlay.addAndMakeVisible(tutorialStepLabel);
     tutorialOverlay.addAndMakeVisible(tutorialTitleLabel);
     tutorialOverlay.addAndMakeVisible(tutorialBodyText);
@@ -426,12 +428,22 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     overviewTutorialPopup.addAndMakeVisible(overviewTutorialPopupLabel);
     overviewTutorialPopup.addAndMakeVisible(overviewTutorialPopupStartButton);
     overviewTutorialPopup.addAndMakeVisible(overviewTutorialPopupCloseButton);
+    unlockWarningPopup.addAndMakeVisible(unlockWarningTitleLabel);
+    unlockWarningPopup.addAndMakeVisible(unlockWarningBodyText);
+    unlockWarningPopup.addAndMakeVisible(unlockWarningHideFutureToggle);
+    unlockWarningPopup.addAndMakeVisible(unlockWarningCancelButton);
+    unlockWarningPopup.addAndMakeVisible(unlockWarningConfirmButton);
+    unlockWarningPopup.addAndMakeVisible(unlockWarningCloseButton);
     tutorialOverlay.setVisible(false);
     overviewTutorialPopup.setVisible(false);
+    unlockWarningScrim.setVisible(false);
+    unlockWarningPopup.setVisible(false);
     tutorialFocusHighlight.setVisible(false);
     tutorialFocusHighlight.setInterceptsMouseClicks(false, false);
     tutorialOverlay.setInterceptsMouseClicks(true, true);
     overviewTutorialPopup.setInterceptsMouseClicks(true, true);
+    unlockWarningScrim.setInterceptsMouseClicks(true, true);
+    unlockWarningPopup.setInterceptsMouseClicks(true, true);
 
     tutorialStepLabel.setText("Tutorial", juce::dontSendNotification);
     tutorialStepLabel.setFont(makeLabelFont(Typography::labelSmall, false));
@@ -514,6 +526,47 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         resized();
     };
 
+    unlockWarningTitleLabel.setText("Unlock Editing Warning", juce::dontSendNotification);
+    unlockWarningTitleLabel.setJustificationType(juce::Justification::centredLeft);
+    unlockWarningTitleLabel.setMinimumHorizontalScale(1.0f);
+    unlockWarningTitleLabel.setColour(juce::Label::textColourId, hackerText());
+    unlockWarningTitleLabel.setFont(makeLabelFont(Typography::title, true));
+
+    unlockWarningBodyText.setReadOnly(true);
+    unlockWarningBodyText.setMultiLine(true);
+    unlockWarningBodyText.setReturnKeyStartsNewLine(true);
+    unlockWarningBodyText.setScrollbarsShown(true);
+    unlockWarningBodyText.setCaretVisible(false);
+    unlockWarningBodyText.setPopupMenuEnabled(false);
+    unlockWarningBodyText.setFont(makeLabelFont(Typography::description, false));
+    unlockWarningBodyText.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0x00000000));
+    unlockWarningBodyText.setColour(juce::TextEditor::textColourId, hackerText());
+    unlockWarningBodyText.setColour(juce::TextEditor::outlineColourId, juce::Colour(0x00000000));
+    unlockWarningBodyText.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x00000000));
+    unlockWarningBodyText.setBorder(juce::BorderSize<int>(0));
+    unlockWarningBodyText.setText(
+        "You are unlocking Dev Panel controls that can change the plugin's base configuration.\n\n"
+        "There are no safety protections against dangerous values.\n\n"
+        "If values become unstable, open Validation > Console and run:\n"
+        "  reset all\n\n"
+        "Use \"Set Current as Defaults\" only after confirming stable behavior.",
+        juce::dontSendNotification);
+
+    unlockWarningHideFutureToggle.setButtonText("Hide this message in the future");
+    unlockWarningHideFutureToggle.setToggleState(false, juce::dontSendNotification);
+
+    unlockWarningCancelButton.setButtonText("Cancel");
+    unlockWarningCancelButton.setTooltip("Cancel unlock and keep all controls locked.");
+    unlockWarningCancelButton.onClick = [this] { dismissUnlockWarningDialog(false); };
+
+    unlockWarningConfirmButton.setButtonText("Unlock");
+    unlockWarningConfirmButton.setTooltip("Unlock editing controls.");
+    unlockWarningConfirmButton.onClick = [this] { dismissUnlockWarningDialog(true); };
+
+    unlockWarningCloseButton.setButtonText("X");
+    unlockWarningCloseButton.setTooltip("Close warning.");
+    unlockWarningCloseButton.onClick = [this] { dismissUnlockWarningDialog(false); };
+
     overviewVisualDeck.setAccentColour(visualOverview());
     modulationVisualDeck.setAccentColour(visualModulation());
     toneVisualDeck.setAccentColour(visualTone());
@@ -574,6 +627,11 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     styleActionButton(tutorialSkipButton);
     styleActionButton(overviewTutorialPopupStartButton);
     styleActionButton(overviewTutorialPopupCloseButton);
+    styleActionButton(unlockWarningCancelButton);
+    styleActionButton(unlockWarningCloseButton);
+    unlockWarningConfirmButton.setLookAndFeel(&getDevPanelThemeLookAndFeel());
+    styleHackerTextButton(unlockWarningConfirmButton, true);
+    styleHackerToggleButton(unlockWarningHideFutureToggle);
 
     const int initialEngineIndex = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     const int initialSelectorAccent = (settingsAccentSource == 1)
@@ -1473,6 +1531,30 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     startTimerHz(kDevPanelTimerHz);
 }
 
+void DevPanel::dismissUnlockWarningDialog(bool accepted)
+{
+    if (!unlockWarningVisible)
+        return;
+
+    const bool hideFutureWarning = unlockWarningHideFutureToggle.getToggleState();
+    auto decision = std::move(unlockWarningDecisionCallback);
+
+    unlockWarningVisible = false;
+    unlockWarningUnlockingAll = false;
+    unlockWarningScrim.setVisible(false);
+    unlockWarningPopup.setVisible(false);
+    unlockWarningDecisionCallback = {};
+
+    if (accepted && hideFutureWarning)
+        settingsWarnOnUnlock = false;
+
+    updateRightTabVisibility();
+    resized();
+
+    if (decision)
+        decision(accepted);
+}
+
 void DevPanel::showUnlockWarningDialog(bool unlockingAll, std::function<void(bool)> onDecision)
 {
     if (!settingsWarnOnUnlock)
@@ -1482,55 +1564,20 @@ void DevPanel::showUnlockWarningDialog(bool unlockingAll, std::function<void(boo
         return;
     }
 
-    auto* warning = new juce::AlertWindow(
-        "Unlock Editing Warning",
-        "You are unlocking Dev Panel controls that can change the plugin's base configuration.\n\n"
-        "There are no safety protections against dangerous values.\n\n"
-        "If values become unstable, open Validation > Console and run:\n"
-        "  reset all\n\n"
-        "Use \"Set Current as Defaults\" only after confirming stable behavior.",
-        juce::AlertWindow::WarningIcon,
-        this);
+    if (unlockWarningVisible)
+    {
+        if (onDecision)
+            onDecision(false);
+        return;
+    }
 
-    warning->setLookAndFeel(&getDevPanelThemeLookAndFeel());
-    warning->setColour(juce::AlertWindow::backgroundColourId, hackerBgElevated());
-    warning->setColour(juce::AlertWindow::textColourId, hackerText());
-    warning->setColour(juce::TextButton::buttonColourId, hackerBgField());
-    warning->setColour(juce::TextButton::textColourOffId, hackerText());
-    warning->setColour(juce::TextButton::buttonOnColourId, hackerBgActive());
-    warning->setColour(juce::TextButton::textColourOnId, hackerText());
-    warning->setColour(juce::ToggleButton::textColourId, hackerText());
-
-    auto* hideFutureWarningToggle = new juce::ToggleButton("Hide this message in the future");
-    hideFutureWarningToggle->setSize(520, 28);
-    styleHackerToggleButton(*hideFutureWarningToggle);
-    hideFutureWarningToggle->setToggleState(false, juce::dontSendNotification);
-    warning->addCustomComponent(hideFutureWarningToggle);
-
-    warning->addButton(unlockingAll ? "Unlock All" : "Unlock", 1, juce::KeyPress(juce::KeyPress::returnKey));
-    warning->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
-    warning->centreAroundComponent(this, 560, 340);
-    warning->setAlwaysOnTop(true);
-
-    juce::Component::SafePointer<DevPanel> safeThis(this);
-    juce::Component::SafePointer<juce::AlertWindow> safeWarning(warning);
-    warning->enterModalState(
-        true,
-        juce::ModalCallbackFunction::create([safeThis, safeWarning, onDecision = std::move(onDecision)](int result) mutable
-        {
-            bool hideFutureWarning = false;
-            if (safeWarning != nullptr)
-            {
-                if (auto* toggle = dynamic_cast<juce::ToggleButton*>(safeWarning->getCustomComponent(0)))
-                    hideFutureWarning = toggle->getToggleState();
-                safeWarning->setLookAndFeel(nullptr);
-            }
-
-            if (result == 1 && hideFutureWarning && safeThis != nullptr)
-                safeThis->settingsWarnOnUnlock = false;
-
-            if (onDecision)
-                onDecision(result == 1);
-        }),
-        true);
+    unlockWarningVisible = true;
+    unlockWarningUnlockingAll = unlockingAll;
+    unlockWarningDecisionCallback = std::move(onDecision);
+    unlockWarningHideFutureToggle.setToggleState(false, juce::dontSendNotification);
+    unlockWarningConfirmButton.setButtonText(unlockWarningUnlockingAll ? "Unlock All" : "Unlock");
+    unlockWarningScrim.setVisible(true);
+    unlockWarningPopup.setVisible(true);
+    updateRightTabVisibility();
+    resized();
 }

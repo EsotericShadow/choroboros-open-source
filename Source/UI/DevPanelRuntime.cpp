@@ -944,6 +944,54 @@ void DevPanel::resized()
             overviewTutorialPopup.setBounds(0, 0, 0, 0);
         }
     }
+
+    if (unlockWarningVisible)
+    {
+        const auto viewPos = viewport.getViewPosition();
+        juce::Rectangle<int> visibleAreaInContent(viewPos.x, viewPos.y, viewport.getViewWidth(), viewport.getViewHeight());
+        visibleAreaInContent = visibleAreaInContent.reduced(4);
+
+        unlockWarningScrim.setBounds(visibleAreaInContent);
+        unlockWarningScrim.toFront(false);
+
+        const int maxPopupWidth = juce::jmax(300, visibleAreaInContent.getWidth() - 24);
+        const int targetPopupWidth = juce::jlimit(320, 640,
+                                                  static_cast<int>(std::round(visibleAreaInContent.getWidth() * 0.62f)));
+        const int popupWidth = juce::jmin(maxPopupWidth, targetPopupWidth);
+
+        const int maxPopupHeight = juce::jmax(240, visibleAreaInContent.getHeight() - 20);
+        const int popupHeight = juce::jmin(maxPopupHeight, 330);
+
+        auto popupBounds = juce::Rectangle<int>(0, 0, popupWidth, popupHeight);
+        popupBounds.setCentre(visibleAreaInContent.getCentre());
+        popupBounds = popupBounds.getIntersection(visibleAreaInContent.reduced(6));
+        unlockWarningPopup.setBounds(popupBounds);
+        unlockWarningPopup.toFront(false);
+
+        auto panelArea = unlockWarningPopup.getLocalBounds().reduced(14, 12);
+        auto header = panelArea.removeFromTop(28);
+        const int closeSize = 24;
+        unlockWarningCloseButton.setBounds(header.removeFromRight(closeSize));
+        unlockWarningTitleLabel.setBounds(header);
+
+        panelArea.removeFromTop(6);
+        auto buttonRow = panelArea.removeFromBottom(34);
+        panelArea.removeFromBottom(8);
+        unlockWarningHideFutureToggle.setBounds(panelArea.removeFromBottom(24));
+        panelArea.removeFromBottom(8);
+        unlockWarningBodyText.setBounds(panelArea);
+
+        const int buttonGap = 10;
+        const int buttonWidth = juce::jmax(90, (buttonRow.getWidth() - buttonGap) / 2);
+        unlockWarningCancelButton.setBounds(buttonRow.removeFromLeft(buttonWidth));
+        buttonRow.removeFromLeft(buttonGap);
+        unlockWarningConfirmButton.setBounds(buttonRow.removeFromLeft(buttonWidth));
+    }
+    else
+    {
+        unlockWarningScrim.setBounds(0, 0, 0, 0);
+        unlockWarningPopup.setBounds(0, 0, 0, 0);
+    }
 }
 
 void DevPanel::updateActiveProfileLabel()
@@ -1149,7 +1197,13 @@ void DevPanel::updateRightTabVisibility()
     styleTabButton(tabSettingsButton, showSettings, visualNeutral());
     styleHackerTextButton(overviewTutorialPopupStartButton, false);
     styleHackerTextButton(overviewTutorialPopupCloseButton, false);
+    styleHackerTextButton(unlockWarningCancelButton, false);
+    styleHackerTextButton(unlockWarningCloseButton, false);
+    styleHackerTextButton(unlockWarningConfirmButton, true);
+    styleHackerToggleButton(unlockWarningHideFutureToggle);
     overviewTutorialPopupLabel.setColour(juce::Label::textColourId, hackerText());
+    unlockWarningTitleLabel.setColour(juce::Label::textColourId, hackerText());
+    unlockWarningBodyText.setColour(juce::TextEditor::textColourId, hackerText());
 
     const juce::Colour mutedAccent = hackerTextMuted();
     overviewVisualDeck.setAccentColour(showOverview ? overviewAccent : mutedAccent);
@@ -1159,6 +1213,7 @@ void DevPanel::updateRightTabVisibility()
     lookFeelVisualDeck.setAccentColour(showLookFeel ? layoutAccent : mutedAccent);
     validationVisualDeck.setAccentColour(showValidation ? validationAccent : mutedAccent);
     overviewTutorialPopup.setAccentColour(overviewAccent);
+    unlockWarningPopup.setAccentColour(overviewAccent);
 
     auto setAllSectionsEnabled = [](juce::PropertyPanel& panel, bool panelVisible)
     {
@@ -1250,6 +1305,13 @@ void DevPanel::updateRightTabVisibility()
     overviewTutorialPopup.setVisible(showOverview && !tutorialActive && overviewTutorialPopupVisible);
     if (overviewTutorialPopup.isVisible())
         overviewTutorialPopup.toFront(false);
+    unlockWarningScrim.setVisible(unlockWarningVisible);
+    unlockWarningPopup.setVisible(unlockWarningVisible);
+    if (unlockWarningVisible)
+    {
+        unlockWarningScrim.toFront(false);
+        unlockWarningPopup.toFront(false);
+    }
 
     internalsTitle.setVisible(false);
     internalsDescription.setVisible(false);

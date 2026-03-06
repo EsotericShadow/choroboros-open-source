@@ -123,6 +123,22 @@ private:
     juce::Colour accentColour { juce::Colour(0xff80ef80) };
 };
 
+class ModalScrimOverlay final : public juce::Component
+{
+public:
+    void paint(juce::Graphics& g) override
+    {
+        auto area = getLocalBounds().toFloat();
+        juce::ColourGradient scrim(juce::Colour(0xdd010302),
+                                   area.getCentreX(), area.getY(),
+                                   juce::Colour(0xef010302),
+                                   area.getCentreX(), area.getBottom(),
+                                   false);
+        g.setGradientFill(scrim);
+        g.fillRect(area);
+    }
+};
+
 class TutorialFocusHighlight final : public juce::Component
 {
 public:
@@ -219,6 +235,14 @@ private:
     juce::Label overviewTutorialPopupLabel;
     juce::TextButton overviewTutorialPopupStartButton;
     juce::TextButton overviewTutorialPopupCloseButton;
+    ModalScrimOverlay unlockWarningScrim;
+    TutorialOverlayContainer unlockWarningPopup;
+    juce::Label unlockWarningTitleLabel;
+    juce::TextEditor unlockWarningBodyText;
+    juce::ToggleButton unlockWarningHideFutureToggle;
+    juce::TextButton unlockWarningCancelButton;
+    juce::TextButton unlockWarningConfirmButton;
+    juce::TextButton unlockWarningCloseButton;
     juce::PropertyPanel mappingPanel;
     juce::PropertyPanel uiPanel;
     juce::PropertyPanel overviewPanel;
@@ -367,6 +391,9 @@ private:
     int tutorialPulseTick = 0;
     bool overviewTutorialPopupHasOpenedSession = false;
     bool overviewTutorialPopupVisible = false;
+    bool unlockWarningVisible = false;
+    bool unlockWarningUnlockingAll = false;
+    std::function<void(bool)> unlockWarningDecisionCallback;
     juce::File recentTouchesLogFile;
     int analyzerRefreshTickCounter = 0;
     int settingsTutorialTopicIndex = 0;
@@ -419,6 +446,7 @@ private:
 
     juce::String buildJson() const;
     void setEditingLocked(bool shouldLock);
+    void dismissUnlockWarningDialog(bool accepted);
     void showUnlockWarningDialog(bool unlockingAll, std::function<void(bool)> onDecision);
     void saveCurrentAsDefaults();
     void resetToFactoryDefaults();
