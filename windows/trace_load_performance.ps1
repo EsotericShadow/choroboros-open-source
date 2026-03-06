@@ -30,7 +30,7 @@ function Get-Percentile {
     )
     $valueArray = @($Values | ForEach-Object { [double]$_ })
     if ($valueArray.Count -eq 0) { return [double]::NaN }
-    $sorted = $valueArray | Sort-Object
+    $sorted = @($valueArray | Sort-Object)
     $idx = [math]::Round(($sorted.Count - 1) * $P)
     return [double]$sorted[[int]$idx]
 }
