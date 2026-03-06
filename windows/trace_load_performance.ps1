@@ -34,22 +34,73 @@ function Get-Percentile {
     return [double]$sorted[[int]$idx]
 }
 
-$invalidLines = 0
+$invalidBlocks = 0
 $events = @()
+$currentBlock = New-Object System.Text.StringBuilder
+$braceDepth = 0
+$inString = $false
+$escaped = $false
+
 Get-Content -Path $LogPath -Encoding UTF8 | ForEach-Object {
-    $line = $_.Trim()
-    if ([string]::IsNullOrWhiteSpace($line)) { return }
-    try {
-        $events += ($line | ConvertFrom-Json)
-    } catch {
-        $invalidLines++
+    $line = $_
+    if ($braceDepth -eq 0 -and [string]::IsNullOrWhiteSpace($line)) {
+        return
     }
+
+    [void]$currentBlock.AppendLine($line)
+
+    foreach ($ch in $line.ToCharArray()) {
+        if ($escaped) {
+            $escaped = $false
+            continue
+        }
+
+        if ($ch -eq '\') {
+            if ($inString) {
+                $escaped = $true
+            }
+            continue
+        }
+
+        if ($ch -eq '"') {
+            $inString = -not $inString
+            continue
+        }
+
+        if ($inString) {
+            continue
+        }
+
+        if ($ch -eq '{') {
+            $braceDepth++
+        } elseif ($ch -eq '}') {
+            $braceDepth--
+        }
+    }
+
+    if ($braceDepth -eq 0 -and $currentBlock.Length -gt 0) {
+        $jsonBlock = $currentBlock.ToString().Trim()
+        if (-not [string]::IsNullOrWhiteSpace($jsonBlock)) {
+            try {
+                $events += ($jsonBlock | ConvertFrom-Json)
+            } catch {
+                $invalidBlocks++
+            }
+        }
+        [void]$currentBlock.Clear()
+        $inString = $false
+        $escaped = $false
+    }
+}
+
+if ($currentBlock.Length -gt 0) {
+    $invalidBlocks++
 }
 
 Write-Host ""
 Write-Host "=== Choroboros Load Performance Trace ===" -ForegroundColor Cyan
 Write-Host ("LogPath: {0}" -f $LogPath)
-Write-Host ("Events: {0} | Invalid lines: {1}" -f $events.Count, $invalidLines)
+Write-Host ("Events: {0} | Invalid blocks: {1}" -f $events.Count, $invalidBlocks)
 
 if ($events.Count -eq 0) {
     Write-Host "No parsable events found." -ForegroundColor Yellow
