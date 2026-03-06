@@ -290,6 +290,8 @@ juce::String DevPanel::buildJson() const
     json << "    \"mixKnobYOffsetRed\": " << layout.mixKnobYOffsetRed << ",\n";
     json << "    \"mixKnobYOffsetPurple\": " << layout.mixKnobYOffsetPurple << ",\n";
     json << "    \"mixKnobYOffsetBlack\": " << layout.mixKnobYOffsetBlack << ",\n";
+    json << "    \"valueLabelWidth\": " << layout.valueLabelWidth << ",\n";
+    json << "    \"valueLabelHeight\": " << layout.valueLabelHeight << ",\n";
     json << "    \"valueLabelY\": " << layout.valueLabelYGreen << ",\n";
     json << "    \"valueLabelYGreen\": " << layout.valueLabelYGreen << ",\n";
     json << "    \"valueLabelYBlue\": " << layout.valueLabelYBlue << ",\n";
@@ -321,6 +323,8 @@ juce::String DevPanel::buildJson() const
     json << "    \"widthValueOffsetXPurple\": " << layout.widthValueOffsetXPurple << ",\n";
     json << "    \"widthValueOffsetXBlack\": " << layout.widthValueOffsetXBlack << ",\n";
     json << "    \"colorValueCenterX\": " << layout.colorValueCenterX << ",\n";
+    json << "    \"colorValueWidth\": " << layout.colorValueWidth << ",\n";
+    json << "    \"colorValueHeight\": " << layout.colorValueHeight << ",\n";
     json << "    \"colorValueY\": " << layout.colorValueYGreen << ",\n";
     json << "    \"colorValueYGreen\": " << layout.colorValueYGreen << ",\n";
     json << "    \"colorValueYBlue\": " << layout.colorValueYBlue << ",\n";
@@ -339,6 +343,8 @@ juce::String DevPanel::buildJson() const
     json << "    \"mixValueYRed\": " << layout.mixValueYRed << ",\n";
     json << "    \"mixValueYPurple\": " << layout.mixValueYPurple << ",\n";
     json << "    \"mixValueYBlack\": " << layout.mixValueYBlack << ",\n";
+    json << "    \"mixValueWidth\": " << layout.mixValueWidth << ",\n";
+    json << "    \"mixValueHeight\": " << layout.mixValueHeight << ",\n";
     json << "    \"mixValueOffsetX\": " << layout.mixValueOffsetXGreen << ",\n";
     json << "    \"mixValueOffsetXGreen\": " << layout.mixValueOffsetXGreen << ",\n";
     json << "    \"mixValueOffsetXBlue\": " << layout.mixValueOffsetXBlue << ",\n";

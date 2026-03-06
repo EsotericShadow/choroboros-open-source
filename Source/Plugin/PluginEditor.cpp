@@ -209,6 +209,8 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.mixKnobYOffsetRed = getIntOrDefault(layoutVar, "mixKnobYOffsetRed", layout.mixKnobYOffset);
     layout.mixKnobYOffsetPurple = getIntOrDefault(layoutVar, "mixKnobYOffsetPurple", layout.mixKnobYOffset);
     layout.mixKnobYOffsetBlack = getIntOrDefault(layoutVar, "mixKnobYOffsetBlack", layout.mixKnobYOffset);
+    layout.valueLabelWidth = getIntOrDefault(layoutVar, "valueLabelWidth", layout.valueLabelWidth);
+    layout.valueLabelHeight = getIntOrDefault(layoutVar, "valueLabelHeight", layout.valueLabelHeight);
     layout.valueLabelY = getIntOrDefault(layoutVar, "valueLabelY", layout.valueLabelY);
     layout.valueLabelYGreen = getIntOrDefault(layoutVar, "valueLabelYGreen", layout.valueLabelY);
     layout.valueLabelYBlue = getIntOrDefault(layoutVar, "valueLabelYBlue", layout.valueLabelY);
@@ -246,6 +248,8 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.colorValueYPurple = getIntOrDefault(layoutVar, "colorValueYPurple", layout.colorValueY);
     layout.colorValueYBlack = getIntOrDefault(layoutVar, "colorValueYBlack", layout.colorValueY);
     layout.colorValueCenterX = getIntOrDefault(layoutVar, "colorValueCenterX", layout.colorValueCenterX);
+    layout.colorValueWidth = getIntOrDefault(layoutVar, "colorValueWidth", layout.colorValueWidth);
+    layout.colorValueHeight = getIntOrDefault(layoutVar, "colorValueHeight", layout.colorValueHeight);
     layout.colorValueXOffset = getIntOrDefault(layoutVar, "colorValueXOffset", layout.colorValueXOffset);
     layout.colorValueXOffsetGreen = getIntOrDefault(layoutVar, "colorValueXOffsetGreen", layout.colorValueXOffset);
     layout.colorValueXOffsetBlue = getIntOrDefault(layoutVar, "colorValueXOffsetBlue", layout.colorValueXOffset);
@@ -258,6 +262,8 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.mixValueYRed = getIntOrDefault(layoutVar, "mixValueYRed", layout.mixValueY);
     layout.mixValueYPurple = getIntOrDefault(layoutVar, "mixValueYPurple", layout.mixValueY);
     layout.mixValueYBlack = getIntOrDefault(layoutVar, "mixValueYBlack", layout.mixValueY);
+    layout.mixValueWidth = getIntOrDefault(layoutVar, "mixValueWidth", layout.mixValueWidth);
+    layout.mixValueHeight = getIntOrDefault(layoutVar, "mixValueHeight", layout.mixValueHeight);
     layout.mixValueOffsetX = getIntOrDefault(layoutVar, "mixValueOffsetX", layout.mixValueOffsetX);
     layout.mixValueOffsetXGreen = getIntOrDefault(layoutVar, "mixValueOffsetXGreen", layout.mixValueOffsetX);
     layout.mixValueOffsetXBlue = getIntOrDefault(layoutVar, "mixValueOffsetXBlue", layout.mixValueOffsetX);

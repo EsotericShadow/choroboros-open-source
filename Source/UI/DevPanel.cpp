@@ -63,14 +63,10 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
 
     content.addAndMakeVisible(copyJsonButton);
     copyJsonButton.setButtonText("Copy JSON");
-    copyJsonButton.setTooltip("Copies the active user defaults sheet JSON. If none exists yet, copies current in-memory values.");
+    copyJsonButton.setTooltip("Copies the current in-memory tuning, internals, and layout JSON snapshot.");
     copyJsonButton.onClick = [this]
     {
-        juce::String loadErr;
-        auto json = DefaultsPersistence::loadUser(&loadErr);
-        if (json.isEmpty())
-            json = buildJson();
-        juce::SystemClipboard::copyTextToClipboard(json);
+        juce::SystemClipboard::copyTextToClipboard(buildJson());
     };
 
     content.addAndMakeVisible(saveDefaultsButton);
