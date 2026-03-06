@@ -424,6 +424,11 @@ public:
         setColour(juce::ToggleButton::textColourId, hackerText());
         setColour(juce::ToggleButton::tickColourId, hackerText());
         setColour(juce::ToggleButton::tickDisabledColourId, hackerTextMuted());
+        setColour(juce::ComboBox::backgroundColourId, hackerBgField());
+        setColour(juce::ComboBox::buttonColourId, hackerBgField());
+        setColour(juce::ComboBox::textColourId, hackerText());
+        setColour(juce::ComboBox::outlineColourId, hackerBorderStrong());
+        setColour(juce::ComboBox::arrowColourId, hackerText());
         setColour(juce::PopupMenu::backgroundColourId, hackerBgElevated());
         setColour(juce::PopupMenu::textColourId, hackerText());
         setColour(juce::PopupMenu::highlightedBackgroundColourId, hackerBgActive());
@@ -463,31 +468,111 @@ public:
         return makeLabelFont(Typography::label, false);
     }
 
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button,
+                              const juce::Colour& /*backgroundColour*/,
+                              bool shouldDrawButtonAsHighlighted,
+                              bool shouldDrawButtonAsDown) override
+    {
+        auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+        auto base = button.findColour(button.getToggleState()
+                                          ? juce::TextButton::buttonOnColourId
+                                          : juce::TextButton::buttonColourId);
+        if (shouldDrawButtonAsDown)
+            base = base.brighter(0.20f);
+        else if (shouldDrawButtonAsHighlighted)
+            base = base.brighter(0.08f);
+
+        const float alpha = button.isEnabled() ? 1.0f : 0.55f;
+        g.setColour(base.withMultipliedAlpha(alpha));
+        g.fillRoundedRectangle(bounds, 5.0f);
+
+        g.setColour(hackerBorderStrong().withMultipliedAlpha((button.hasKeyboardFocus(true) ? 1.0f : 0.78f) * alpha));
+        g.drawRoundedRectangle(bounds, 5.0f, 1.0f);
+    }
+
     void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
                           bool shouldDrawButtonAsHighlighted,
                           bool shouldDrawButtonAsDown) override
     {
-        const auto fontSize = juce::jmin(15.0f, button.getHeight() * 0.75f);
-        const auto tickWidth = fontSize * 1.10f;
-        const float tickX = 4.0f;
-        const float tickY = (button.getHeight() - tickWidth) * 0.5f;
+        const auto boxSize = juce::jmin(16.0f, button.getHeight() * 0.62f);
+        const auto box = juce::Rectangle<float>(4.0f, (button.getHeight() - boxSize) * 0.5f, boxSize, boxSize);
+        auto boxFill = hackerBgField();
+        if (button.getToggleState())
+            boxFill = hackerBgActive();
+        if (shouldDrawButtonAsDown)
+            boxFill = boxFill.brighter(0.20f);
+        else if (shouldDrawButtonAsHighlighted)
+            boxFill = boxFill.brighter(0.08f);
 
-        drawTickBox(g, button, tickX, tickY, tickWidth, tickWidth,
-                    button.getToggleState(),
-                    button.isEnabled(),
-                    shouldDrawButtonAsHighlighted,
-                    shouldDrawButtonAsDown);
+        const float alpha = button.isEnabled() ? 1.0f : 0.55f;
+        g.setColour(boxFill.withMultipliedAlpha(alpha));
+        g.fillRoundedRectangle(box, 3.0f);
+        g.setColour((button.getToggleState() ? hackerBorderStrong() : hackerBorder()).withMultipliedAlpha(alpha));
+        g.drawRoundedRectangle(box, 3.0f, 1.0f);
+
+        if (button.getToggleState())
+        {
+            juce::Path check;
+            check.startNewSubPath(box.getX() + box.getWidth() * 0.20f, box.getCentreY());
+            check.lineTo(box.getX() + box.getWidth() * 0.43f, box.getBottom() - box.getHeight() * 0.20f);
+            check.lineTo(box.getRight() - box.getWidth() * 0.18f, box.getY() + box.getHeight() * 0.22f);
+            g.setColour(hackerText().withMultipliedAlpha(alpha));
+            g.strokePath(check, juce::PathStrokeType(1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
 
         g.setColour(button.findColour(juce::ToggleButton::textColourId)
-                        .withMultipliedAlpha(button.isEnabled() ? 1.0f : 0.55f));
+                        .withMultipliedAlpha(alpha));
         g.setFont(makeTitleFont(Typography::button, true));
         g.drawFittedText(button.getButtonText(),
-                         juce::Rectangle<int>(static_cast<int>(tickX + tickWidth + 6.0f),
+                         juce::Rectangle<int>(static_cast<int>(box.getRight() + 6.0f),
                                               0,
-                                              juce::jmax(1, button.getWidth() - static_cast<int>(tickX + tickWidth + 8.0f)),
+                                              juce::jmax(1, button.getWidth() - static_cast<int>(box.getRight() + 8.0f)),
                                               button.getHeight()),
                          juce::Justification::centredLeft,
                          1);
+    }
+
+    void drawComboBox(juce::Graphics& g, int width, int height, bool isButtonDown,
+                      int buttonX, int buttonY, int buttonW, int buttonH,
+                      juce::ComboBox& box) override
+    {
+        auto bounds = juce::Rectangle<float>(0.5f, 0.5f, static_cast<float>(width - 1), static_cast<float>(height - 1));
+        auto fill = box.findColour(juce::ComboBox::backgroundColourId);
+        if (isButtonDown)
+            fill = fill.brighter(0.20f);
+        else if (box.isMouseOverOrDragging())
+            fill = fill.brighter(0.08f);
+        if (!box.isEnabled())
+            fill = fill.withMultipliedAlpha(0.55f);
+
+        g.setColour(fill);
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(box.findColour(juce::ComboBox::outlineColourId).withMultipliedAlpha(box.isEnabled() ? 0.92f : 0.55f));
+        g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
+
+        auto arrowZone = juce::Rectangle<float>(static_cast<float>(buttonX), static_cast<float>(buttonY),
+                                                static_cast<float>(buttonW), static_cast<float>(buttonH)).reduced(4.0f, 4.0f);
+        juce::Path arrow;
+        const float cx = arrowZone.getCentreX();
+        const float cy = arrowZone.getCentreY();
+        const float aw = juce::jmin(8.0f, arrowZone.getWidth() * 0.35f);
+        const float ah = juce::jmin(5.0f, arrowZone.getHeight() * 0.35f);
+        arrow.startNewSubPath(cx - aw, cy - ah * 0.5f);
+        arrow.lineTo(cx, cy + ah * 0.5f);
+        arrow.lineTo(cx + aw, cy - ah * 0.5f);
+        g.setColour(box.findColour(juce::ComboBox::arrowColourId).withMultipliedAlpha(box.isEnabled() ? 0.95f : 0.55f));
+        g.strokePath(arrow, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override
+    {
+        label.setBounds(3, 1, juce::jmax(1, box.getWidth() - box.getHeight() - 4), juce::jmax(1, box.getHeight() - 2));
+        label.setFont(getComboBoxFont(box));
+        label.setJustificationType(juce::Justification::centredLeft);
+        label.setBorderSize(juce::BorderSize<int>(0, 6, 0, 4));
+        label.setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
+        label.setColour(juce::Label::textColourId,
+                        box.findColour(juce::ComboBox::textColourId).withMultipliedAlpha(box.isEnabled() ? 1.0f : 0.55f));
     }
 
     void drawPropertyComponentBackground(juce::Graphics& g, int width, int height, juce::PropertyComponent& component) override
@@ -599,6 +684,7 @@ public:
         setColour(juce::ToggleButton::tickColourId, hackerText());
         setColour(juce::ToggleButton::tickDisabledColourId, hackerTextMuted());
         setColour(juce::ComboBox::backgroundColourId, hackerBgField());
+        setColour(juce::ComboBox::buttonColourId, hackerBgField());
         setColour(juce::ComboBox::textColourId, hackerText());
         setColour(juce::ComboBox::outlineColourId, hackerBorderStrong());
         setColour(juce::ComboBox::arrowColourId, hackerText());
@@ -636,31 +722,111 @@ public:
         return makeLabelFont(Typography::label, false);
     }
 
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button,
+                              const juce::Colour& /*backgroundColour*/,
+                              bool shouldDrawButtonAsHighlighted,
+                              bool shouldDrawButtonAsDown) override
+    {
+        auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+        auto base = button.findColour(button.getToggleState()
+                                          ? juce::TextButton::buttonOnColourId
+                                          : juce::TextButton::buttonColourId);
+        if (shouldDrawButtonAsDown)
+            base = base.brighter(0.20f);
+        else if (shouldDrawButtonAsHighlighted)
+            base = base.brighter(0.08f);
+
+        const float alpha = button.isEnabled() ? 1.0f : 0.55f;
+        g.setColour(base.withMultipliedAlpha(alpha));
+        g.fillRoundedRectangle(bounds, 5.0f);
+
+        g.setColour(hackerBorderStrong().withMultipliedAlpha((button.hasKeyboardFocus(true) ? 1.0f : 0.78f) * alpha));
+        g.drawRoundedRectangle(bounds, 5.0f, 1.0f);
+    }
+
     void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
                           bool shouldDrawButtonAsHighlighted,
                           bool shouldDrawButtonAsDown) override
     {
-        const auto fontSize = juce::jmin(15.0f, button.getHeight() * 0.75f);
-        const auto tickWidth = fontSize * 1.10f;
-        const float tickX = 4.0f;
-        const float tickY = (button.getHeight() - tickWidth) * 0.5f;
+        const auto boxSize = juce::jmin(16.0f, button.getHeight() * 0.62f);
+        const auto box = juce::Rectangle<float>(4.0f, (button.getHeight() - boxSize) * 0.5f, boxSize, boxSize);
+        auto boxFill = hackerBgField();
+        if (button.getToggleState())
+            boxFill = hackerBgActive();
+        if (shouldDrawButtonAsDown)
+            boxFill = boxFill.brighter(0.20f);
+        else if (shouldDrawButtonAsHighlighted)
+            boxFill = boxFill.brighter(0.08f);
 
-        drawTickBox(g, button, tickX, tickY, tickWidth, tickWidth,
-                    button.getToggleState(),
-                    button.isEnabled(),
-                    shouldDrawButtonAsHighlighted,
-                    shouldDrawButtonAsDown);
+        const float alpha = button.isEnabled() ? 1.0f : 0.55f;
+        g.setColour(boxFill.withMultipliedAlpha(alpha));
+        g.fillRoundedRectangle(box, 3.0f);
+        g.setColour((button.getToggleState() ? hackerBorderStrong() : hackerBorder()).withMultipliedAlpha(alpha));
+        g.drawRoundedRectangle(box, 3.0f, 1.0f);
+
+        if (button.getToggleState())
+        {
+            juce::Path check;
+            check.startNewSubPath(box.getX() + box.getWidth() * 0.20f, box.getCentreY());
+            check.lineTo(box.getX() + box.getWidth() * 0.43f, box.getBottom() - box.getHeight() * 0.20f);
+            check.lineTo(box.getRight() - box.getWidth() * 0.18f, box.getY() + box.getHeight() * 0.22f);
+            g.setColour(hackerText().withMultipliedAlpha(alpha));
+            g.strokePath(check, juce::PathStrokeType(1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
 
         g.setColour(button.findColour(juce::ToggleButton::textColourId)
-                        .withMultipliedAlpha(button.isEnabled() ? 1.0f : 0.55f));
+                        .withMultipliedAlpha(alpha));
         g.setFont(makeTitleFont(Typography::button, true));
         g.drawFittedText(button.getButtonText(),
-                         juce::Rectangle<int>(static_cast<int>(tickX + tickWidth + 6.0f),
+                         juce::Rectangle<int>(static_cast<int>(box.getRight() + 6.0f),
                                               0,
-                                              juce::jmax(1, button.getWidth() - static_cast<int>(tickX + tickWidth + 8.0f)),
+                                              juce::jmax(1, button.getWidth() - static_cast<int>(box.getRight() + 8.0f)),
                                               button.getHeight()),
                          juce::Justification::centredLeft,
                          1);
+    }
+
+    void drawComboBox(juce::Graphics& g, int width, int height, bool isButtonDown,
+                      int buttonX, int buttonY, int buttonW, int buttonH,
+                      juce::ComboBox& box) override
+    {
+        auto bounds = juce::Rectangle<float>(0.5f, 0.5f, static_cast<float>(width - 1), static_cast<float>(height - 1));
+        auto fill = box.findColour(juce::ComboBox::backgroundColourId);
+        if (isButtonDown)
+            fill = fill.brighter(0.20f);
+        else if (box.isMouseOverOrDragging())
+            fill = fill.brighter(0.08f);
+        if (!box.isEnabled())
+            fill = fill.withMultipliedAlpha(0.55f);
+
+        g.setColour(fill);
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(box.findColour(juce::ComboBox::outlineColourId).withMultipliedAlpha(box.isEnabled() ? 0.92f : 0.55f));
+        g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
+
+        auto arrowZone = juce::Rectangle<float>(static_cast<float>(buttonX), static_cast<float>(buttonY),
+                                                static_cast<float>(buttonW), static_cast<float>(buttonH)).reduced(4.0f, 4.0f);
+        juce::Path arrow;
+        const float cx = arrowZone.getCentreX();
+        const float cy = arrowZone.getCentreY();
+        const float aw = juce::jmin(8.0f, arrowZone.getWidth() * 0.35f);
+        const float ah = juce::jmin(5.0f, arrowZone.getHeight() * 0.35f);
+        arrow.startNewSubPath(cx - aw, cy - ah * 0.5f);
+        arrow.lineTo(cx, cy + ah * 0.5f);
+        arrow.lineTo(cx + aw, cy - ah * 0.5f);
+        g.setColour(box.findColour(juce::ComboBox::arrowColourId).withMultipliedAlpha(box.isEnabled() ? 0.95f : 0.55f));
+        g.strokePath(arrow, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override
+    {
+        label.setBounds(3, 1, juce::jmax(1, box.getWidth() - box.getHeight() - 4), juce::jmax(1, box.getHeight() - 2));
+        label.setFont(getComboBoxFont(box));
+        label.setJustificationType(juce::Justification::centredLeft);
+        label.setBorderSize(juce::BorderSize<int>(0, 6, 0, 4));
+        label.setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
+        label.setColour(juce::Label::textColourId,
+                        box.findColour(juce::ComboBox::textColourId).withMultipliedAlpha(box.isEnabled() ? 1.0f : 0.55f));
     }
 
     void drawButtonText(juce::Graphics& g, juce::TextButton& button,
