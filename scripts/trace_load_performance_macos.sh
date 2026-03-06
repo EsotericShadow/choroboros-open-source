@@ -151,6 +151,8 @@ interesting = %w[
   editor_theme_setup_ms
   editor_theme_wait_before_first_paint_ms
   editor_active_theme_ready_ms
+  editor_devpanel_prewarm_ms
+  editor_devpanel_create_on_demand_ms
   editor_controls_setup_ms
   editor_first_paint_ms
   devpanel_tab_switch_ms

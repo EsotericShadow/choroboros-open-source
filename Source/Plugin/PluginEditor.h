@@ -104,6 +104,8 @@ private:
     juce::TextButton aboutButton;
     juce::TextButton devButton;
     std::unique_ptr<juce::DocumentWindow> devWindow;
+    bool devPanelPrewarmScheduled = false;
+    bool devPanelPrewarmComplete = false;
     
     // Tooltip window
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
@@ -138,6 +140,8 @@ private:
     void setupSliderValueChangeListeners();
     void startDeferredThemePrewarm(int activeColorIndex);
     void stopDeferredThemePrewarm();
+    void scheduleDeferredDevPanelPrewarm();
+    void ensureDevPanelWindowCreated(bool triggeredByUser);
     double getHostBpm() const;
     void showRateSyncMenu(juce::Slider& rateControl);
     

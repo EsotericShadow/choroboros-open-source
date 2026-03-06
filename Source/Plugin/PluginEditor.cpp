@@ -714,8 +714,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     devButton.setTooltip("Dev Panel: Built-in diagnostic and tuning suite. Parameter mapping, DSP internals, live readouts, validation.");
     devButton.onClick = [this]
     {
-        if (!devWindow)
-            devWindow = std::make_unique<DevPanelWindow>(*this, audioProcessor);
+        ensureDevPanelWindowCreated(true);
 
         const bool shouldShow = !devWindow->isVisible();
         devWindow->setVisible(shouldShow);
@@ -836,6 +835,8 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
             const int activeEngineIndex = juce::jlimit(0, 4, engineColorBox.getSelectedId() - 1);
             startDeferredThemePrewarm(activeEngineIndex);
         }
+
+        scheduleDeferredDevPanelPrewarm();
     }
 
     // Draw background
@@ -1023,6 +1024,38 @@ void ChoroborosPluginEditor::stopDeferredThemePrewarm()
     stopThemePrewarm.store(true);
     if (themePrewarmThread.joinable())
         themePrewarmThread.join();
+}
+
+void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)
+{
+    if (devWindow != nullptr)
+        return;
+
+    const double startMs = juce::Time::getMillisecondCounterHiRes();
+    devWindow = std::make_unique<DevPanelWindow>(*this, audioProcessor);
+
+    const juce::String eventName = triggeredByUser
+        ? "editor_devpanel_create_on_demand_ms"
+        : "editor_devpanel_prewarm_ms";
+    audioProcessor.logLoadTraceEvent(eventName,
+                                     juce::Time::getMillisecondCounterHiRes() - startMs);
+
+    devPanelPrewarmComplete = true;
+}
+
+void ChoroborosPluginEditor::scheduleDeferredDevPanelPrewarm()
+{
+    if (devPanelPrewarmScheduled || devPanelPrewarmComplete)
+        return;
+
+    devPanelPrewarmScheduled = true;
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    juce::Timer::callAfterDelay(1500, [safeThis]()
+    {
+        if (safeThis == nullptr)
+            return;
+        safeThis->ensureDevPanelWindowCreated(false);
+    });
 }
 
 void ChoroborosPluginEditor::setupSliderAttachments()
