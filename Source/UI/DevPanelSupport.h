@@ -1117,6 +1117,7 @@ class LockableFloatPropertyComponent : public juce::PropertyComponent
 {
 public:
     using ContextMenuHandler = std::function<void(LockableFloatPropertyComponent&, const juce::MouseEvent&)>;
+    using UnlockAttemptHandler = std::function<bool(LockableFloatPropertyComponent&)>;
 
     LockableFloatPropertyComponent(const juce::Value& valueToControl, const juce::String& name,
                                    double min, double max, double step, double skew,
@@ -1186,7 +1187,17 @@ public:
         lockButton.setToggleState(true, juce::dontSendNotification);
         lockButton.onClick = [this]
         {
-            setLocked(lockButton.getToggleState());
+            const bool shouldLock = lockButton.getToggleState();
+            if (!shouldLock && locked && unlockAttemptHandler)
+            {
+                if (!unlockAttemptHandler(*this))
+                {
+                    lockButton.setToggleState(true, juce::dontSendNotification);
+                    return;
+                }
+            }
+
+            setLocked(shouldLock);
         };
         addAndMakeVisible(lockButton);
 
@@ -1256,6 +1267,7 @@ public:
     double getMaximumForCommand() const { return maxValue; }
     double getStepForCommand() const { return stepValue; }
     void setContextMenuHandler(ContextMenuHandler handler) { contextMenuHandler = std::move(handler); }
+    void setUnlockAttemptHandler(UnlockAttemptHandler handler) { unlockAttemptHandler = std::move(handler); }
 
     void setValueFromCommand(double value)
     {
@@ -1741,6 +1753,7 @@ private:
     bool isDragging = false;
     bool locked = true;
     ContextMenuHandler contextMenuHandler;
+    UnlockAttemptHandler unlockAttemptHandler;
 };
 
 class ReadOnlyDiagnosticPropertyComponent : public juce::PropertyComponent

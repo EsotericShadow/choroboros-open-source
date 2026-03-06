@@ -389,6 +389,7 @@ private:
     bool settingsModularCoresEnabled = false;
     bool settingsConfirmResetFactory = true;
     bool settingsConfirmSetDefaults = true;
+    bool settingsWarnOnUnlock = true;
     bool lastModulationDemand = true;
     bool lastSpectrumDemand = true;
     bool lastTransferDemand = true;
@@ -418,6 +419,7 @@ private:
 
     juce::String buildJson() const;
     void setEditingLocked(bool shouldLock);
+    void showUnlockWarningDialog(bool unlockingAll, std::function<void(bool)> onDecision);
     void saveCurrentAsDefaults();
     void resetToFactoryDefaults();
     void applyValueFxPreset(int presetId);
