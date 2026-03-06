@@ -965,6 +965,8 @@ void DevPanel::updateActiveProfileLabel()
     activeProfileLabel.setColour(juce::Label::textColourId, profileAccent);
     devEngineModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
     devCoreModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
+    inspectorTitle.setColour(juce::Label::textColourId, hackerText());
+    inspectorDescription.setColour(juce::Label::textColourId, hackerTextDim());
     const int selectorAccentIndex = (settingsAccentSource == 1)
         ? juce::jlimit(0, 4, settingsManualAccent)
         : colorIndex;
@@ -1121,6 +1123,8 @@ void DevPanel::updateRightTabVisibility()
     applySectionTheme(layoutTitle, layoutDescription, showLookFeel, layoutAccent);
     applySectionTheme(validationTitle, validationDescription, showValidation, validationAccent);
     applySectionTheme(settingsTitle, settingsDescription, showSettings, visualNeutral());
+    inspectorTitle.setColour(juce::Label::textColourId, hackerText());
+    inspectorDescription.setColour(juce::Label::textColourId, hackerTextDim());
 
     auto styleTabButton = [](juce::TextButton& button, bool active, juce::Colour)
     {
@@ -1271,16 +1275,6 @@ void DevPanel::updateRightTabVisibility()
     setAllSectionsEnabled(layoutPurplePanel, showLayoutPurple);
     setAllSectionsEnabled(layoutBlackPanel, showLayoutBlack);
 
-    if (showOverview)
-        openAllSections(overviewPanel);
-    if (showModulation)
-        openAllSections(modulationPanel);
-    if (showTone)
-        openAllSections(tonePanel);
-    if (showValidation)
-        openAllSections(validationPanel);
-    if (showSettings)
-        openAllSections(settingsPanel);
     const bool showEngineInternals = showEngine && selectedSubTab == 3;
     const auto* activeInternalsPanel = showEngineInternals ? getActiveEngineInternalsPanel() : nullptr;
     auto setInternalsEnabled = [&](juce::PropertyPanel& panel)
@@ -1743,30 +1737,12 @@ void DevPanel::timerCallback()
         refreshVisibleLiveReadouts();
     }
 
-    auto enforceFixedOpenSections = [this]
-    {
-        // These inspector tabs are intentionally fixed-open to avoid tiny accordion sections.
-        if (selectedRightTab == 0)
-            openAllSections(overviewPanel);
-        else if (selectedRightTab == 1)
-            openAllSections(modulationPanel);
-        else if (selectedRightTab == 2)
-            openAllSections(tonePanel);
-        else if (selectedRightTab == 5)
-            openAllSections(validationPanel);
-    };
-
-    if (!settingsLazyUiEnabled)
-    {
-        enforceFixedOpenSections();
-    }
-    else
+    if (settingsLazyUiEnabled)
     {
         ++lazyUiSectionOpenCounter;
         if (lazyUiOpenSectionsDirty || lazyUiSectionOpenCounter >= kLazySectionOpenIntervalTicks)
         {
             lazyUiSectionOpenCounter = 0;
-            enforceFixedOpenSections();
             lazyUiOpenSectionsDirty = false;
         }
     }

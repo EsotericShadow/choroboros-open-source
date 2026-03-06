@@ -1271,6 +1271,12 @@ private:
         valueEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x00000000));
         valueEditor.setColour(juce::TextEditor::textColourId, hackerText());
         valueEditor.setColour(juce::TextEditor::highlightColourId, hackerBgActive().withAlpha(0.85f));
+        // TextEditor keeps existing text runs; force current value text to adopt new theme colour immediately.
+        valueEditor.applyColourToAllText(hackerText(), false);
+        valueEditor.repaint();
+        inputContainer.repaint();
+        stepUpButton.repaint();
+        stepDownButton.repaint();
         repaint();
     }
 
