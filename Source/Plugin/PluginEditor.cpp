@@ -681,10 +681,10 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // corner with a subtle dark container behind them.  Order left-to-right:
     //   DEV | ABOUT | HELP | FEEDBACK
     {
-        const int btnSize   = uiScaleInt (14);  // square icon area
-        const int gap       = uiScaleInt (2);   // spacing between icons
-        const int padH      = uiScaleInt (3);   // horizontal padding inside container
-        const int padV      = uiScaleInt (2);   // vertical padding inside container
+        const int btnSize   = uiScaleInt (18);  // square icon area (25% larger than 14)
+        const int gap       = uiScaleInt (5);   // spacing between icons
+        const int padH      = uiScaleInt (5);   // horizontal padding inside container
+        const int padV      = uiScaleInt (4);   // vertical padding inside container
         const int marginR   = uiScaleInt (4);   // margin from window right edge
         const int marginT   = uiScaleInt (3);   // margin from window top edge
 
@@ -925,7 +925,7 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
     if (! topBarContainerBounds.isEmpty())
     {
         g.setOpacity (1.0f);
-        g.setColour (juce::Colour (0x60000000));  // 38% black overlay
+        g.setColour (juce::Colour (0x99000000));  // 60% black overlay
         g.fillRoundedRectangle (topBarContainerBounds.toFloat(), 3.0f);
     }
 }

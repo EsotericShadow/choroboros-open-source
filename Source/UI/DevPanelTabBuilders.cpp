@@ -2650,10 +2650,10 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
             // by LayoutTuning.  Show a single "Icon Buttons" overlay for
             // the grouped row instead of individual legacy text-button rects.
             {
-                const int btnSz  = 14;
-                const int btnGap = 2;
-                const int padH   = 3;
-                const int padV   = 2;
+                const int btnSz  = 18;
+                const int btnGap = 5;
+                const int padH   = 5;
+                const int padV   = 4;
                 const int mR     = 4;
                 const int mT     = 3;
                 const int cW     = padH * 2 + btnSz * 4 + btnGap * 3;
