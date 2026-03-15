@@ -4,11 +4,15 @@ All notable changes to Choroboros are documented here.
 
 ## [2.04-dev] - 2026-03-14
 
-### Fixed
-- **BBD (Red NQ) phaser sweep:** S&H clock images aliased into audio band. Added first-order hold interpolation (~40 dB alias rejection). Fixed a1 coefficient sign in 5th-order Butterworth cascade. Raised bbdClockMinHz 2000→6000, bbdFilterCutoffMinHz 1200→3000.
-- **Tape (Red HQ) rate knob:** Undamped phase integrator caused DC drift (~73 samples). Added damping (tapePhaseDamping 1.0→0.99999). Widened LFO smoothing bandwidth (fc 10→56 Hz) so high rates track properly.
-- **Thiran (Blue HQ) zippering/noise:** Per-sample 5th-order coefficient recomputation caused DFII-T state transients. Added 32-sample linear coefficient interpolation (~30 dB transient reduction). Delay smoothing 0.998→0.9985.
-- **HQ toggle latency:** Quality switch reduced from ~146 ms to ~43 ms (18 ms warmup + 25 ms crossfade). Minimum severity floor 0.40→0.10 for quality toggles.
+### Added
+- **Session event log:** Lightweight ring buffer (last 64 events) tracks engine switches, HQ toggles, preset loads, DSP anomalies (NaN/Inf/clipping), and host info. Flushed to disk every 30 s so it survives crashes.
+- **Crash reporter:** Platform-specific signal handlers (macOS: SIGSEGV/SIGABRT/SIGFPE/SIGBUS/SIGILL; Windows: SetUnhandledExceptionFilter). On next launch, if a clean-shutdown marker is missing, the user is prompted to send the crash report.
+- **Send to Developer (in-app):** Feedback dialog now has a "Send to Developer" button that opens the user's mail client pre-filled with feedback, usage summary, session log, and system info addressed to info@kaizenstrategic.ai.
+- **DSP anomaly detection:** processBlock checks output for NaN, Inf, and sustained hard clipping (>2.0); logs to session log (throttled to 1 event per 2 s).
+- **Host info in feedback:** Usage summary now includes DAW name, format (VST3/AU/AAX), sample rate, buffer size, CPU, and RAM.
+- **Icon buttons:** Replaced text-based top-bar buttons (DEV, ABOUT, HELP, FEEDBACK) with 50×50 white-on-transparent PNG icons. Normal/hover/pressed states use 55%/100%/40% opacity. Richer descriptive tooltips on all four buttons.
+- **TopBarDrawer animated menu:** New `TopBarDrawer` component replaces the static button row. On load, only a small collapsed tab with a left-pointing chevron is visible in the top-right. Clicking the chevron expands the drawer leftward, revealing all four icon buttons with smooth ease-out cubic slide animation (350 ms), micro-bounce on button positions (easeOutBack with ~3.7% overshoot, completes at 65% of animation before the slide finishes), fade-in starting at 8% reaching full opacity by 50%, and arrow morphing (◀ → — → ▶). Collapsing reverses with smooth ease-in (no bounce) and fade-out. Mid-animation reversal is supported by flipping the `expanding_` flag without resetting progress. Buttons are non-interactive during animation. Hit-testing is clipped to the visible container region via `hitTest()` override.
+- **`.cursorrules` commit workflow:** 7-step verify-then-commit protocol for Cursor AI, including 8 hard rules (Red defaults sacred, async-signal-safe crash handler, PID-keyed files, process liveness checks, unconditional session logging, crash report preservation, UI scale factor, no force-push), DSP guidelines, code style, and architecture docs.
 
 ### Changed
 - **Signal chain:** Pre-emphasis moved inside processChorus (wet-path only). Legacy juce::dsp::Compressor replaced with transparent post-sum peak catcher (-2 dB / 2:1 / 4 dB knee / 1 ms attack / 100 ms release).
@@ -18,13 +22,22 @@ All notable changes to Choroboros are documented here.
 - **Engine profiles:** Added migrateKnownBadEngineParamProfiles() to detect and replace stale bundled profiles on load.
 - **HQ toggle UI:** Single click now toggles (was double-click only). Drag threshold 4→12 px. Slider drag sensitivity disabled to prevent accidental value changes.
 - **DevPanel UX:** Renamed "Profile"→"Engine", visually separated core assignment as advanced feature, improved tooltips. Factory reset loads from bundled factory sheet instead of regenerating.
+- **Top-bar button layout:** All four icon buttons (DEV, ABOUT, HELP, FEEDBACK) grouped into a single tight row anchored to top-right corner. Icons are 18 design-px with 5 px gaps inside a rounded dark container (60% black overlay, 5H/4V padding). Buttons bumped 25% larger (14→18 design-px) with wider spacing for better touch targets.
+- **Button ownership:** `applyLayout()` no longer touches icon button bounds — the PluginEditor constructor is the single layout owner. Legacy `LayoutTuning` struct fields retained for serialisation compatibility. DevPanel overlay updated to show grouped icon row instead of three separate legacy rects.
+- **Crash handler (async-signal-safe):** Signal/exception handler no longer calls `SessionLog::flushToDisk()` (which holds a mutex and allocates). Instead it only calls `unlink()` (POSIX) / `DeleteFileA()` (Windows) to remove the clean-shutdown marker — both are async-signal-safe. Session log on disk from the 30 s Timer flush is already there; worst case is losing the last 30 s of events.
+- **Session log PID-keyed files:** Session log files now keyed by PID (`session_log_{pid}.json`, `.clean_shutdown_{pid}`). Multiple plugin instances in the same DAW share one file (same process). Different DAWs get separate files.
+- **Crash reporter atomic refcount:** `CrashReporter::install()` / `uninstall()` use an `std::atomic<int>` refcount so uninstalling one `PluginProcessor` doesn't remove signal handlers while other instances in the same process are still alive.
+- **Crash report preserved until user acts:** `readPendingCrashReport()` no longer deletes the crash file. Separate `clearPendingCrashReport()` is called only after the user sends, saves, or dismisses the crash report dialog.
+- **Engine/HQ logging from processor:** Engine-switch and HQ-toggle events now logged in `PluginProcessor::parameterChanged()` which covers automation, preset loads, and state restores — not just editor combobox clicks. Removed duplicate logging from `FeedbackCollector::trackEngineSwitch()`.
+- **Unconditional session logging:** Engine-switch and HQ-toggle session-log events fire unconditionally in `parameterChanged()` before the `isBulkChange` early return. Previously, preset loads, state restores, and engine-profile applies set guard flags that caused the early return to skip the `sessionLog->log()` calls entirely.
 
-### Added
-- **Session event log:** Lightweight ring buffer (last 64 events) tracks engine switches, HQ toggles, preset loads, DSP anomalies (NaN/Inf/clipping), and host info. Flushed to disk every 30 s so it survives crashes.
-- **Crash reporter:** Platform-specific signal handlers (macOS: SIGSEGV/SIGABRT/SIGFPE/SIGBUS/SIGILL; Windows: SetUnhandledExceptionFilter) flush the session log on abnormal exit. On next launch, if a clean-shutdown marker is missing, the user is prompted to send the crash report.
-- **Send to Developer (in-app):** Feedback dialog now has a "Send to Developer" button that opens the user's mail client pre-filled with feedback, usage summary, session log, and system info addressed to info@kaizenstrategic.ai.
-- **DSP anomaly detection:** processBlock checks output for NaN, Inf, and sustained hard clipping (>2.0); logs to session log (throttled to 1 event per 2 s).
-- **Host info in feedback:** Usage summary now includes DAW name, format (VST3/AU/AAX), sample rate, buffer size, CPU, and RAM.
+### Fixed
+- **BBD (Red NQ) phaser sweep:** S&H clock images aliased into audio band. Added first-order hold interpolation (~40 dB alias rejection). Fixed a1 coefficient sign in 5th-order Butterworth cascade. Raised bbdClockMinHz 2000→6000, bbdFilterCutoffMinHz 1200→3000.
+- **Tape (Red HQ) rate knob:** Undamped phase integrator caused DC drift (~73 samples). Added damping (tapePhaseDamping 1.0→0.99999). Widened LFO smoothing bandwidth (fc 10→56 Hz) so high rates track properly.
+- **Thiran (Blue HQ) zippering/noise:** Per-sample 5th-order coefficient recomputation caused DFII-T state transients. Added 32-sample linear coefficient interpolation (~30 dB transient reduction). Delay smoothing 0.998→0.9985.
+- **HQ toggle latency:** Quality switch reduced from ~146 ms to ~43 ms (18 ms warmup + 25 ms crossfade). Minimum severity floor 0.40→0.10 for quality toggles.
+- **Orphan-log false positives:** Orphan-log scanner now checks process liveness (`kill(pid, 0)` on POSIX, `OpenProcess`/`GetExitCodeProcess` on Windows) before promoting a session log as a crash report. Previously, if REAPER was still running Choroboros and Ableton opened a new instance, Ableton's first-instance scan would misidentify REAPER's live log as a crash and delete it.
+- **Drawer buttons non-interactive after expand:** `updateButtonStates()` was called inside `timerCallback()` while `isTimerRunning()` was still true, so `setInterceptsMouseClicks(expanded_ && !isTimerRunning(), false)` always passed false. After `stopTimer()`, `updateButtonStates()` was never called again. Fix: re-run `updateButtonStates()` after `stopTimer()` in the animation-complete block.
 
 ---
 
