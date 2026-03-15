@@ -1,6 +1,6 @@
 # Technical Specs Corrections for Beta Site
 
-Use these corrections to update the Technical Specs section at [choro-beta-site.vercel.app](https://choro-beta-site.vercel.app/). Verified against the codebase (v2.03-beta).
+Use these corrections to update the Technical Specs section at [choro-beta-site.vercel.app](https://choro-beta-site.vercel.app/). Verified against the codebase (v2.03).
 
 ---
 
@@ -32,7 +32,7 @@ VST3, AU, Standalone · JUCE 8 · macOS (Intel + Apple Silicon) only · Windows 
 VST3, AU, AAX, Standalone · JUCE 8 · macOS (Intel + Apple Silicon) · Windows (x64 + x86-compat)
 ```
 
-**Reason:** AAX (Pro Tools) is built and supported. Windows is ready as of v2.03-beta.
+**Reason:** AAX (Pro Tools) is built and supported. Windows is ready as of v2.03.
 
 ---
 

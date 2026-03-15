@@ -36,15 +36,15 @@ Choroboros is a multi-engine chorus plugin with five distinct engines, each offe
 - **Width:** Stereo width (0–200%)
 - **Color:** Engine-specific (Bloom / Focus / Saturation / Tape / Warp / Mod intensity)
 - **Mix:** Dry/wet mix (0–100%)
-- **HQ:** High-quality mode toggle
+- **HQ:** Algorithm mode toggle - switches each engine to an alternate DSP algorithm. HQ modes use more sophisticated processing (ensemble, orbit, tape, higher-order interpolation) which typically produces wider stereo imaging and richer character, not just higher fidelity.
 
 ### Presets
 
-1. **Classic (Green)** — R=1.2 Hz, D=21%, O=33°, W=150%, M=50%, C=16%
+1. **Classic (Green)** — R=0.65 Hz, D=21%, O=33°, W=150%, M=50%, C=16%
 2. **Modern (Blue)** — R=0.26 Hz, D=53%, O=59°, W=100%, M=50%, C=41%
 3. **Vintage (Red)** — R=0.62 Hz, D=21%, O=56°, W=150%, M=50%, C=50%
 4. **Psychedelic (Purple)** — R=0.12 Hz, D=52%, O=52°, W=200%, M=69%, C=13%
-5. **Core (Black)** — R=1.2 Hz, D=35%, O=41°, W=159%, M=50%, C=28%
+5. **Core (Black)** — R=0.8 Hz, D=35%, O=41°, W=159%, M=50%, C=28%
 6. **Duck** — Purple HQ, fast modulation
 7. **Ouroboros** — Blue HQ, medium modulation
 
@@ -106,13 +106,15 @@ After installation, rescan plugins in your DAW.
 
 ## System Requirements
 
-- **macOS:** 10.13 or later (Intel or Apple Silicon)
+- **macOS:** 10.13 High Sierra or later (Intel or Apple Silicon)
 - **Windows:** Windows 10 or later (x64 or x86)
 - **DAW:** Any DAW that supports VST3 or AU plugins
 
+> **Note:** Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are not supported. The JUCE 8 framework requires 10.13 as a minimum deployment target. AU validation will fail on unsupported systems.
+
 ## Technical Details
 
-- **Version:** 2.03-beta
+- **Version:** 2.03
 - **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
@@ -166,5 +168,6 @@ For issues, questions, or licensing inquiries:
 ## Installation Troubleshooting
 
 - **Plugins not appearing in DAW:** Make sure you've copied the plugin to the correct location and rescanned plugins in your DAW. Some DAWs require a full restart.
-- **macOS Security:** If macOS blocks the plugin, go to System Preferences > Security & Privacy and allow the plugin.
-- **Permission Issues:** For system-wide installation (`/Library/` on macOS, `C:\Program Files\` on Windows), you may need administrator privileges. User-specific installation is recommended.
+- **macOS Gatekeeper (beta builds):** The beta is not yet code-signed. If macOS blocks the plugin, use the install script (`bash install.sh`) which handles quarantine removal automatically. Or manually run `xattr -cr` on each plugin file — see [KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for detailed steps.
+- **AU validation failure:** Ensure your Mac is running macOS 10.13 or later. If validation fails, try `killall -9 AudioComponentRegistrar` then rescan in Logic.
+- **Permission Issues:** For system-wide installation (`/Library/` on macOS, `C:\Program Files\` on Windows), you may need administrator privileges. User-specific installation (`~/Library/` on macOS) is recommended.

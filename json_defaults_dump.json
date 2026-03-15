@@ -1160,11 +1160,11 @@
       "black": {"nq": "linear", "hq": "ensemble"}
     },
     "engineParamProfiles": {
-      "green": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 1.0000, "color": 0.9900},
-      "blue": {"valid": true, "rate": 2.2600, "depth": 0.5600, "offset": 55.0000, "width": 1.1300, "mix": 0.5000, "color": 0.0000},
-      "red": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 1.0000, "color": 0.4400},
-      "purple": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 0.5000, "color": 1.0000},
-      "black": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 0.5000, "color": 1.0000}
+      "green": {"valid": true, "rate": 0.6500, "depth": 0.2100, "offset": 33.0000, "width": 1.5000, "mix": 0.5000, "color": 0.1600},
+      "blue": {"valid": true, "rate": 0.2600, "depth": 0.5300, "offset": 59.0000, "width": 1.0000, "mix": 0.5000, "color": 0.4100},
+      "red": {"valid": true, "rate": 0.6200, "depth": 0.2100, "offset": 56.0000, "width": 1.5000, "mix": 0.5000, "color": 0.5000},
+      "purple": {"valid": true, "rate": 0.1200, "depth": 0.5200, "offset": 52.0000, "width": 2.0000, "mix": 0.6900, "color": 0.1300},
+      "black": {"valid": true, "rate": 0.8000, "depth": 0.3500, "offset": 41.0000, "width": 1.5900, "mix": 0.5000, "color": 0.2800}
     },
     "layout": {
       "mainKnobSize": 145,

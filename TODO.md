@@ -14,6 +14,36 @@
 - [ ] Audit `Licenses/Third Party/` and separate:
   currently-used runtime dependencies vs archived/vendor bundle remnants.
 
+## Beta Feedback Sprint Plan
+
+See `feedback/ISSUES_MASTER.md` for full issue list with reporter details and priority.
+
+### Sprint 1: Stability (v2.04) — COMPLETE
+- [x] **C1** Fix DAW freeze on plugin close — stopTimer() added to 4 Timer-inheriting destructors (DevPanel, AnimatedToggleButton, LabelWithContainer, PluginProcessor)
+- [x] **H3** BBD Clock Min fix — raised from 2000→6000 Hz, filter cutoff 1200→3000 Hz (ChorusDSP.h + PluginProcessor.cpp factory defaults)
+- [x] **H4** Gain staging fix — moved pre-emphasis after pushDrySamples (wet-path only), reduced bloom/focus/tape wet gains
+- [x] **C2** Documented macOS 10.13 minimum — updated README.md, Release/README.md, INSTALL.txt, KNOWN_ISSUES.md
+- [x] **C4** Improved install.sh — added macOS version check, 3-step quarantine removal (source→copy→verify), sudo fallback, better troubleshooting output. Updated INSTALL.txt with full Gatekeeper workaround guide.
+
+### Sprint 2: DSP & Lifecycle (v2.05) — COMPLETE
+- [x] **H1/H2** Depth zipper fix — tightened depthSmoothingMs 150→50, depthRateLimit 0.25→2.0 (ChorusDSP.h). HQ clicks fix — immediate HQ callback in parameterChanged() (PluginProcessor.cpp), dryWet.reset() + crossfade buffer clear in switchCore() (ChorusDSP.cpp)
+- [x] **M3** SmoothedSlider drift fix — snapVisualToValue() on mouseUp, mouseWheelMove override with 50ms idle snap (SmoothedSlider.h/.cpp)
+- [x] **M5** Dev Panel labels — renamed "Profile"→"Engine", "Core"→"Core Assignment (Advanced)", added separator label, dimmed core row styling, updated tooltips (DevPanel.cpp, DevPanelRuntime.cpp)
+- [x] **M8** Factory preset protection — saveFactory() now write-once (no-op if file exists), added forceWriteFactory() for dev use, resetToFactoryDefaults() writes to user file only (DefaultsPersistence.h/.cpp, DevPanelPersistence.cpp)
+- [x] **M9** Feedback text clipping — dialog 500×440→500×540, flexible text editor layout via removeFromBottom, resizable with min 500×400 (FeedbackDialog.cpp)
+
+### Sprint 3: Refinement (v2.06)
+- [ ] **M10** Lower Green (1.2→0.65 Hz) and Black (1.2→0.8 Hz) default Rates + matching factory presets
+- [ ] **M11** Reduce centreDelaySmoothingMs (150→60) and tapeDelaySmoothingMs (180→90) for snappier knob response
+- [ ] **H5** Document HQ/NQ spread differences (by design — different DSP topologies, not a bug)
+- ~~**L2** "colour" spelling~~ — dropped, only 5% Canadian users
+- [ ] **C4** Code signing + notarization (BLOCKED — waiting on DUNS number)
+
+### Deferred / Manual
+- ~~**M1** Knob sensitivity~~ — tuning manually via dev panel defaults
+- ~~**M2/M4** Knob low-speed dropout / Depth sticking~~ — tuning manually via dev panel
+- ~~**M6** HQ button hit area~~ — tuning manually via dev panel
+
 ## Active Product Work
 
 - [ ] Tune all 10 engines (5 engines x 2 HQ/NQ variants) to final production targets.

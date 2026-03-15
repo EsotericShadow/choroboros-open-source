@@ -1,6 +1,6 @@
 # Choroboros Dev Panel: Interactive Console Manual
 
-*Version: 2.02.2*
+*Version: 2.03*
 *Audience: Shell Enthusiasts, Headless Automated Testers, and Preset Designers.*
 
 Welcome to the command-line documentation for the **Choroboros Dev Panel**. If the standard interface of Choroboros is a simple 6-knob pedal, and the Dev Panel UI is an aircraft cockpit, then the **Interactive Console** is raw access to the flight computer's C++ shell memory.
@@ -270,7 +270,7 @@ You can jump directly into specific lesson maps by supplying the correct topic:
 
 ## 8. The Master Index: All Parameter Slugs
 
-The following lists are completely comprehensive as of `v2.02.2`. Use these exact string titles to affect parameter tuning via console arrays.
+The following lists are completely comprehensive as of `v2.03`. Use these exact string titles to affect parameter tuning via console arrays.
 
 ### 8.1 Base Globals 
 These impact multi-variable smoothing and core macro routing interpolations.

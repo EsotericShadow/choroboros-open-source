@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Choroboros VERSION 2.0.2)
+project(Choroboros VERSION 2.0.3)
 
 # Version string for feedback/reports
-set(CHOROBOROS_VERSION_STRING "2.02.2" CACHE STRING "Version string for feedback and display")
+set(CHOROBOROS_VERSION_STRING "2.03" CACHE STRING "Version string for feedback and display")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,7 +35,7 @@ juce_add_plugin(Choroboros
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
     PRODUCT_NAME "Choroboros"
     DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms"
-    VERSION 2.0.2
+    VERSION 2.0.3
 )
 
 target_sources(Choroboros PRIVATE
@@ -200,6 +200,6 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins"
         COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.aaxplugin to Avid Plug-Ins..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Choroboros_artefacts/Release/AAX/Choroboros.aaxplugin" "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:Choroboros_AAX>" "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
         COMMENT "Copy Choroboros.aaxplugin to ~/Library/Application Support/Avid/Audio/Plug-Ins for Pro Tools Developer")
 endif()

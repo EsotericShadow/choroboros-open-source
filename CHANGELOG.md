@@ -2,6 +2,25 @@
 
 All notable changes to Choroboros are documented here.
 
+## [2.03] - 2026-03-06
+
+### Added
+- **Windows support:** First official Windows release — x64 and x86-compat VST3 + Standalone builds.
+- **Platform-specific factory defaults:** Mac and Windows each use bundled factory JSON; embedded fallback when config files absent.
+- **Unlock safety warning:** Modal with "Hide this message in the future" and Settings > Safety toggle.
+- **Release packaging:** Windows x64/x86 zip packaging script.
+
+### Changed
+- **Dev Panel:** Modularized; engine-adaptive theming; lazy tab build; command console replaced Validation tab.
+- **Performance:** Deferred Dev Panel creation; theme decode overlapped with host paint; shared theme cache.
+- **Editor scale:** Main editor scaled to 91%.
+
+### Fixed
+- **Windows:** MSVC lambda captures, BinaryData/getNamedResource, knob anti-aliasing, editor layout/theme APIs.
+- **Windows:** Load trace script PowerShell 5.1 compatibility; single-sample timing; percentile helper.
+
+---
+
 ## [2.02.2] - 2026-03-04
 
 ### Added

@@ -1,6 +1,6 @@
 # Engine Content for "More" Sections — Corrected
 
-Use this for EngineModal.tsx and the beta site. Aligned with whitepaper and implementation (v2.03-beta).
+Use this for EngineModal.tsx and the beta site. Aligned with whitepaper and implementation (v2.03).
 
 ---
 
