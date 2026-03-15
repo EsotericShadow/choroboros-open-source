@@ -1749,59 +1749,73 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
 
 void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    if (presetLoadInProgress || stateLoadInProgress || engineProfileApplyInProgress)
+    const bool isBulkChange = presetLoadInProgress
+                           || stateLoadInProgress
+                           || engineProfileApplyInProgress;
+
+    // ------------------------------------------------------------------
+    // Session-log events fire unconditionally so that preset loads, state
+    // restores, and automation all get recorded.
+    // ------------------------------------------------------------------
+    if (parameterID == ENGINE_COLOR_ID && sessionLog != nullptr)
+    {
+        static const char* names[] = { "Green", "Blue", "Red", "Purple", "Black" };
+        const int idx = juce::jlimit (0, 4, static_cast<int> (newValue));
+        bool hq = false;
+        if (auto* hqParam = parameters.getRawParameterValue (HQ_ID))
+            hq = hqParam->load() >= 0.5f;
+        sessionLog->log (SessionLog::EventType::EngineSwitch,
+                         juce::String (names[idx]) + (hq ? " HQ" : " NQ"));
+    }
+    else if (parameterID == HQ_ID && sessionLog != nullptr)
+    {
+        sessionLog->log (SessionLog::EventType::HqToggle,
+                         newValue >= 0.5f ? "HQ on" : "HQ off");
+    }
+
+    // ------------------------------------------------------------------
+    // During bulk changes (preset / state / engine-profile apply) we
+    // track the engine index but skip the full parameter-change handling
+    // to avoid recursive saves and profile applications.
+    // ------------------------------------------------------------------
+    if (isBulkChange)
     {
         if (parameterID == ENGINE_COLOR_ID)
-            lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
+            lastEngineIndex = juce::jlimit (0, 4, static_cast<int> (newValue));
         return;
     }
 
+    // ------------------------------------------------------------------
+    // Normal (non-bulk) parameter handling
+    // ------------------------------------------------------------------
     if (parameterID == ENGINE_COLOR_ID)
     {
-        liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
-        liveTelemetry.engineSwitchCount.fetch_add(1, std::memory_order_relaxed);
+        liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
+        liveTelemetry.engineSwitchCount.fetch_add (1, std::memory_order_relaxed);
         struct ScopedFlag
         {
             std::atomic<bool>& flagRef;
-            explicit ScopedFlag(std::atomic<bool>& flag) : flagRef(flag) { flagRef.store(true); }
-            ~ScopedFlag() { flagRef.store(false); }
-        } scopedApplyFlag(engineProfileApplyInProgress);
+            explicit ScopedFlag (std::atomic<bool>& flag) : flagRef (flag) { flagRef.store (true); }
+            ~ScopedFlag() { flagRef.store (false); }
+        } scopedApplyFlag (engineProfileApplyInProgress);
 
-        const int newEngine = juce::jlimit(0, 4, static_cast<int>(newValue));
+        const int newEngine = juce::jlimit (0, 4, static_cast<int> (newValue));
 
-        // Log engine switch from the processor (covers automation, preset
-        // loads, state restores — not just editor clicks).
-        if (sessionLog != nullptr)
-        {
-            static const char* names[] = { "Green", "Blue", "Red", "Purple", "Black" };
-            const char* name = (newEngine >= 0 && newEngine < 5) ? names[newEngine] : "?";
-            bool hq = false;
-            if (auto* hqParam = parameters.getRawParameterValue(HQ_ID))
-                hq = hqParam->load() >= 0.5f;
-            sessionLog->log(SessionLog::EventType::EngineSwitch,
-                            juce::String(name) + (hq ? " HQ" : " NQ"));
-        }
-
-        saveCurrentParamsToEngineProfile(lastEngineIndex);
+        saveCurrentParamsToEngineProfile (lastEngineIndex);
         lastEngineIndex = newEngine;
-        applyEngineParamProfile(newEngine);
+        applyEngineParamProfile (newEngine);
         return;
     }
 
     if (parameterID == HQ_ID)
     {
-        liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
-        liveTelemetry.hqToggleCount.fetch_add(1, std::memory_order_relaxed);
+        liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
+        liveTelemetry.hqToggleCount.fetch_add (1, std::memory_order_relaxed);
 
         const bool hqEnabled = (newValue >= 0.5f);
 
-        // Log HQ toggle from the processor (covers automation + state restore)
-        if (sessionLog != nullptr)
-            sessionLog->log(SessionLog::EventType::HqToggle,
-                            hqEnabled ? "HQ on" : "HQ off");
-
         if (chorusDSP != nullptr)
-            chorusDSP->setQualityEnabled(hqEnabled);
+            chorusDSP->setQualityEnabled (hqEnabled);
 
         return;
     }
@@ -1813,8 +1827,8 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         || parameterID == COLOR_ID
         || parameterID == MIX_ID)
     {
-        liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
-        saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
+        liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
+        saveCurrentParamsToEngineProfile (getCurrentEngineColorIndex());
     }
 }
 

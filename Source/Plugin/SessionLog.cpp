@@ -20,6 +20,7 @@
 
 #if JUCE_MAC || JUCE_LINUX
   #include <unistd.h>   // getpid()
+  #include <signal.h>   // kill() for liveness check
 #elif JUCE_WINDOWS
   #include <windows.h>  // GetCurrentProcessId()
 #endif
@@ -226,6 +227,33 @@ void SessionLog::markCleanShutdown()
 }
 
 //==============================================================================
+// Process liveness check — used by orphan scan to avoid stealing another
+// running DAW's live session log.
+//==============================================================================
+
+static bool isProcessAlive (int pid)
+{
+    if (pid <= 0) return false;
+
+#if JUCE_MAC || JUCE_LINUX
+    // kill(pid, 0) checks existence without sending a signal.
+    // Returns 0 if process exists, -1/ESRCH if it doesn't.
+    return kill (static_cast<pid_t> (pid), 0) == 0;
+#elif JUCE_WINDOWS
+    HANDLE h = OpenProcess (PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
+                            static_cast<DWORD> (pid));
+    if (h == nullptr)
+        return false;
+    DWORD exitCode = 0;
+    bool alive = GetExitCodeProcess (h, &exitCode) && exitCode == STILL_ACTIVE;
+    CloseHandle (h);
+    return alive;
+#else
+    return false;  // assume dead — safe side
+#endif
+}
+
+//==============================================================================
 // Orphaned log scanning — multi-instance / multi-process safe
 //==============================================================================
 
@@ -235,15 +263,16 @@ void SessionLog::promoteOrphanedLogs()
     if (! dataDir.isDirectory())
         return;
 
-    // Find all session_log_*.json files
     auto logFiles = dataDir.findChildFiles (
         juce::File::findFiles, false, "session_log_*.json");
+
+    const auto myPid = getProcessPidString();
 
     for (const auto& logFile : logFiles)
     {
         // Extract PID from filename: session_log_<pid>.json
-        auto name = logFile.getFileNameWithoutExtension();   // "session_log_12345"
-        auto pidStr = name.fromLastOccurrenceOf ("_", false, false); // "12345"
+        auto name   = logFile.getFileNameWithoutExtension();
+        auto pidStr = name.fromLastOccurrenceOf ("_", false, false);
 
         // Check if a matching clean-shutdown marker exists
         auto markerFile = dataDir.getChildFile (".clean_shutdown_" + pidStr);
@@ -255,17 +284,20 @@ void SessionLog::promoteOrphanedLogs()
             continue;
         }
 
-        // No clean marker — this PID crashed (or is still running).
-        // Skip if the PID matches our own process (we're still alive).
-        if (pidStr == getProcessPidString())
-        {
-            // Stale log from a previous run that reused our PID.
-            // (The marker was already cleaned up above if it existed.)
-            // Fall through to promote it.
-        }
+        // No clean marker — but this process might still be running.
+        // Skip our own PID (we're obviously alive).
+        if (pidStr == myPid)
+            continue;
 
-        // Promote to pending crash report (append, don't overwrite —
-        // there could be multiple crashed PIDs).
+        // Check whether that PID is still a live process.  If so, it's
+        // another DAW instance still running — leave its log alone.
+        const int pid = pidStr.getIntValue();
+        if (isProcessAlive (pid))
+            continue;
+
+        // PID is dead with no clean marker → genuine crash.
+        // Promote to pending crash report (append — there may be
+        // multiple crashed PIDs).
         auto pendingFile = getPendingCrashReportFile();
         auto oldLog = logFile.loadFileAsString();
         if (oldLog.isNotEmpty())
