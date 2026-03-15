@@ -25,7 +25,7 @@ class AnimatedToggleButton : public juce::Slider, public juce::Timer
 {
 public:
     AnimatedToggleButton();
-    ~AnimatedToggleButton() override = default;
+    ~AnimatedToggleButton() override;
 
     /** Returns 0..1 for animation progress toward ON state (1 = fully lit). Use to sync overlays. */
     float getAnimationProgress() const;
@@ -47,7 +47,8 @@ private:
     static constexpr int kNumFrames = 18;
     static constexpr int kCols = 5;
     static constexpr int kFramePx = 512;
-    static constexpr int kDragToggleThresholdPx = 4;
+    static constexpr int kDragToggleThresholdPx = 12;   // drag distance to toggle (was 4)
+    static constexpr int kClickMaxMovePx = 6;            // max move for a "click"
     float animatedFrame = 0.0f;
     float animationStartFrame = 0.0f;
     float animationEndFrame = 0.0f;
@@ -57,6 +58,7 @@ private:
     int dragStartScreenY = 0;
     int dragAnchorScreenY = 0;
     bool pointerIsDown = false;
+    bool dragToggled = false;  // true if drag already changed state during this gesture
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnimatedToggleButton)
 };

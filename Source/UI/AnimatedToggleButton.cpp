@@ -25,7 +25,9 @@ AnimatedToggleButton::AnimatedToggleButton()
     setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     // Inverted range: top = 1 (HQ on), bottom = 0 (HQ off) so drag up = ON, drag down = OFF
     setRange(1.0, 0.0, 1.0);
-    setMouseDragSensitivity(2);
+    // Very high sensitivity = effectively disables Slider's built-in drag behavior.
+    // All value changes go through commitToggleState() in our custom mouse handlers.
+    setMouseDragSensitivity(500);
     setScrollWheelEnabled(false);
     setWantsKeyboardFocus(false);
     onValueChange = [this]
@@ -33,6 +35,11 @@ AnimatedToggleButton::AnimatedToggleButton()
         const bool isOn = getValue() >= 0.5;
         startAnimationToState(isOn);
     };
+}
+
+AnimatedToggleButton::~AnimatedToggleButton()
+{
+    stopTimer();
 }
 
 float AnimatedToggleButton::getAnimationProgress() const
@@ -88,6 +95,7 @@ void AnimatedToggleButton::mouseDown(const juce::MouseEvent& e)
     dragStartScreenY = e.getScreenPosition().y;
     dragAnchorScreenY = dragStartScreenY;
     pointerIsDown = true;
+    dragToggled = false;
     if (!isTimerRunning())
         startTimerHz(120);
 }
@@ -100,7 +108,18 @@ void AnimatedToggleButton::mouseDrag(const juce::MouseEvent& e)
 void AnimatedToggleButton::mouseUp(const juce::MouseEvent& e)
 {
     tryCommitDragAtScreenY(e.getScreenPosition().y);
+
+    // Click-to-toggle: if the pointer barely moved and no drag toggle occurred,
+    // treat this as a simple click and toggle the state.
+    if (!dragToggled)
+    {
+        const int totalMove = std::abs(e.getScreenPosition().y - dragStartScreenY);
+        if (totalMove < kClickMaxMovePx)
+            commitToggleState(getValue() < 0.5, juce::sendNotificationSync);
+    }
+
     pointerIsDown = false;
+    dragToggled = false;
     juce::Slider::mouseUp(e);
 }
 
@@ -149,6 +168,7 @@ void AnimatedToggleButton::tryCommitDragAtScreenY(int screenY)
     if (deltaY <= -kDragToggleThresholdPx && getValue() < 0.5)
     {
         dragAnchorScreenY = screenY;
+        dragToggled = true;
         commitToggleState(true, juce::sendNotificationSync);
         return;
     }
@@ -156,6 +176,7 @@ void AnimatedToggleButton::tryCommitDragAtScreenY(int screenY)
     if (deltaY >= kDragToggleThresholdPx && getValue() >= 0.5)
     {
         dragAnchorScreenY = screenY;
+        dragToggled = true;
         commitToggleState(false, juce::sendNotificationSync);
         return;
     }

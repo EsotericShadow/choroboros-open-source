@@ -453,6 +453,8 @@ void ChorusDSP::reset()
     widthSideFilter1.reset();
     widthSideFilter2.reset();
     compressor.reset();
+    for (auto& comp : wetCompressors)
+        comp.envelope = 0.0f;
     
     inputLevel = 0.0f;
     coreSwitchCrossfadeActive = false;
@@ -758,13 +760,13 @@ void ChorusDSP::process(const juce::dsp::AudioBlock<float>& block)
     hpf.process(context);
     // applyRuntimeTuning() removed from audio path - contains heap allocation (IIR coeffs).
     // Called from prepare() and processor timer on message thread only.
-    ChorusDSPProcess::processPreEmphasis(*this, nonConstBlock);
     ChorusDSPProcess::processPreChorusSaturation(*this, nonConstBlock);
     ChorusDSPProcess::processChorus(*this, nonConstBlock);
     lpf.process(context);
     if (nonConstBlock.getNumChannels() >= 2)
         processWidth(nonConstBlock);
-    compressor.process(context);
+    // Legacy full-output compression is bypassed. A transparent post-sum peak
+    // catcher runs inside processChorus after dry/wet mixing instead.
 }
 
 void ChorusDSP::setRate(float rateHz_)
@@ -910,7 +912,7 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     if (engineFamilySwitch)
         switchSeverity = juce::jmax(switchSeverity, 0.55f);
     else if (qualityToggleOnly)
-        switchSeverity = juce::jmax(switchSeverity, 0.40f);
+        switchSeverity = juce::jmax(switchSeverity, 0.10f);
     switchSeverity = juce::jlimit(0.0f, 1.0f, switchSeverity);
 
     // Warm up the target core silently before audible crossfade to avoid residual-state zippering
@@ -928,11 +930,29 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
 
     if (spec.sampleRate > 0.0)
     {
-        const float warmupMs = juce::jmap(switchSeverity, 22.0f, 95.0f);
-        const float crossfadeMs = juce::jmap(switchSeverity, 45.0f, 170.0f);
+        float warmupMs, crossfadeMs;
+        if (qualityToggleOnly)
+        {
+            // Quality toggles stay within the same engine family (e.g. BBD↔Tape,
+            // Cubic↔Thiran) so the delay characteristics are similar.  Use a short
+            // transition that feels instantaneous but is still long enough for a
+            // click-free equal-power crossfade.
+            warmupMs  = 18.0f;   // populate ~18ms of delay buffer
+            crossfadeMs = 25.0f; // fast equal-power crossfade
+        }
+        else
+        {
+            warmupMs = juce::jmap(switchSeverity, 22.0f, 95.0f);
+            crossfadeMs = juce::jmap(switchSeverity, 45.0f, 170.0f);
+        }
         coreSwitchWarmupTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * warmupMs * 0.001f)));
         coreSwitchTargetCrossfadeSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * crossfadeMs * 0.001f)));
         coreSwitchWarmupSamplesRemaining = coreSwitchWarmupTotalSamples;
+        dryWet.reset();
+        if (coreCrossfadeBufferA.getNumSamples() > 0)
+            coreCrossfadeBufferA.clear();
+        if (coreCrossfadeBufferB.getNumSamples() > 0)
+            coreCrossfadeBufferB.clear();
     }
     else
     {
