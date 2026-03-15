@@ -96,11 +96,12 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> hqAttachment;
     LabelWithContainer hqLabel;
     
-    // Top-bar icon buttons
+    // Top-bar icon buttons (grouped top-right)
     juce::ImageButton feedbackButton;
     juce::ImageButton helpButton;
     juce::ImageButton aboutButton;
     juce::ImageButton devButton;
+    juce::Rectangle<int> topBarContainerBounds;  // painted behind buttons
     std::unique_ptr<juce::DocumentWindow> devWindow;
     bool devPanelPrewarmScheduled = false;
     bool devPanelPrewarmComplete = false;

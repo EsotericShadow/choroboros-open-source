@@ -676,81 +676,96 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Setup tooltip window
     tooltipWindow = std::make_unique<juce::TooltipWindow>(this, 700);
     
-    // ---- Top-bar icon buttons ------------------------------------------------
-    // Icon images are 50x50 white-on-transparent PNGs packed in BinaryData.
-    // ImageButton::setImages(resizeToFit, rescaleForDpi,
-    //     bgColour, normalImage, normalOpacity, normalOverlay,
-    //     overImage, overOpacity, overOverlay,
-    //     downImage, downOpacity, downOverlay)
+    // ---- Top-bar icon buttons (all grouped top-right) -------------------------
+    // Four 14x14 (design-space) icon buttons packed tight in the top-right
+    // corner with a subtle dark container behind them.  Order left-to-right:
+    //   DEV | ABOUT | HELP | FEEDBACK
     {
-        const int btnSize = uiScaleInt(16);  // square icon buttons
-        const int topY    = uiScaleInt(3);   // y-offset from top
-        const int gap     = uiScaleInt(4);   // gap between right-side buttons
-        const int rightEdge = uiScaleInt(693);
+        const int btnSize   = uiScaleInt (14);  // square icon area
+        const int gap       = uiScaleInt (2);   // spacing between icons
+        const int padH      = uiScaleInt (3);   // horizontal padding inside container
+        const int padV      = uiScaleInt (2);   // vertical padding inside container
+        const int marginR   = uiScaleInt (4);   // margin from window right edge
+        const int marginT   = uiScaleInt (3);   // margin from window top edge
+
+        // Container dimensions (4 buttons + 3 gaps + padding each side)
+        const int containerW = padH * 2 + btnSize * 4 + gap * 3;
+        const int containerH = padV * 2 + btnSize;
+        const int windowW    = uiScaleInt (700);  // known fixed width
+        const int containerX = windowW - containerW - marginR;
+        const int containerY = marginT;
+
+        // Paint the container in the paint() override — store bounds for it
+        topBarContainerBounds = { containerX, containerY, containerW, containerH };
+
+        // Button X positions inside the container (left to right)
+        const int btn0X = containerX + padH;                       // DEV
+        const int btn1X = btn0X + btnSize + gap;                   // ABOUT
+        const int btn2X = btn1X + btnSize + gap;                   // HELP
+        const int btn3X = btn2X + btnSize + gap;                   // FEEDBACK
+        const int btnY  = containerY + padV;
 
         // Load icon images from BinaryData
-        auto feedbackIcon = juce::ImageCache::getFromMemory(
+        auto feedbackIcon = juce::ImageCache::getFromMemory (
             BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
-        auto helpIcon = juce::ImageCache::getFromMemory(
+        auto helpIcon = juce::ImageCache::getFromMemory (
             BinaryData::help_png, BinaryData::help_pngSize);
-        auto aboutIcon = juce::ImageCache::getFromMemory(
+        auto aboutIcon = juce::ImageCache::getFromMemory (
             BinaryData::about_png, BinaryData::about_pngSize);
-        auto devIcon = juce::ImageCache::getFromMemory(
+        auto devIcon = juce::ImageCache::getFromMemory (
             BinaryData::dev_png, BinaryData::dev_pngSize);
 
-        // Feedback button (rightmost)
-        feedbackButton.setImages(true, true, true,
-            feedbackIcon, 0.7f, {},   // normal: 70% opacity
-            feedbackIcon, 1.0f, {},   // hover: full opacity
-            feedbackIcon, 0.5f, {});  // pressed: dimmed
-        feedbackButton.onClick = [this] {
-            if (audioProcessor.feedbackCollector)
-                FeedbackDialog::show(*audioProcessor.feedbackCollector);
-        };
-        feedbackButton.setTooltip("Feedback");
-        addAndMakeVisible(feedbackButton);
-        feedbackButton.setBounds(rightEdge - btnSize, topY, btnSize, btnSize);
-
-        // Help button
-        helpButton.setImages(true, true, true,
-            helpIcon, 0.7f, {},
-            helpIcon, 1.0f, {},
-            helpIcon, 0.5f, {});
-        helpButton.onClick = [] {
-            juce::URL("https://kaizenstrategic.ai/choroboros/docs").launchInDefaultBrowser();
-        };
-        helpButton.setTooltip("Help");
-        addAndMakeVisible(helpButton);
-        helpButton.setBounds(rightEdge - btnSize * 2 - gap, topY, btnSize, btnSize);
-
-        // About button
-        aboutButton.setImages(true, true, true,
-            aboutIcon, 0.7f, {},
-            aboutIcon, 1.0f, {},
-            aboutIcon, 0.5f, {});
-        aboutButton.onClick = [] {
-            AboutDialog::show();
-        };
-        aboutButton.setTooltip("About");
-        addAndMakeVisible(aboutButton);
-        aboutButton.setBounds(rightEdge - btnSize * 3 - gap * 2, topY, btnSize, btnSize);
-
-        // Dev button (left side)
-        devButton.setImages(true, true, true,
-            devIcon, 0.7f, {},
-            devIcon, 1.0f, {},
-            devIcon, 0.5f, {});
-        devButton.setTooltip("Dev Panel");
+        // DEV (leftmost in group)
+        devButton.setImages (true, true, true,
+            devIcon, 0.55f, {},    // normal: subtle
+            devIcon, 1.0f,  {},    // hover: full
+            devIcon, 0.4f,  {});   // pressed: dim
+        devButton.setTooltip ("Developer Panel — diagnostics, parameter mapping, DSP internals");
         devButton.onClick = [this]
         {
-            ensureDevPanelWindowCreated(true);
+            ensureDevPanelWindowCreated (true);
             const bool shouldShow = !devWindow->isVisible();
-            devWindow->setVisible(shouldShow);
+            devWindow->setVisible (shouldShow);
             if (shouldShow)
-                devWindow->toFront(true);
+                devWindow->toFront (true);
         };
-        addAndMakeVisible(devButton);
-        devButton.setBounds(uiScaleInt(5), topY, btnSize, btnSize);
+        addAndMakeVisible (devButton);
+        devButton.setBounds (btn0X, btnY, btnSize, btnSize);
+
+        // ABOUT
+        aboutButton.setImages (true, true, true,
+            aboutIcon, 0.55f, {},
+            aboutIcon, 1.0f,  {},
+            aboutIcon, 0.4f,  {});
+        aboutButton.setTooltip ("About Choroboros — version info, credits");
+        aboutButton.onClick = [] { AboutDialog::show(); };
+        addAndMakeVisible (aboutButton);
+        aboutButton.setBounds (btn1X, btnY, btnSize, btnSize);
+
+        // HELP
+        helpButton.setImages (true, true, true,
+            helpIcon, 0.55f, {},
+            helpIcon, 1.0f,  {},
+            helpIcon, 0.4f,  {});
+        helpButton.setTooltip ("Documentation & support");
+        helpButton.onClick = [] {
+            juce::URL ("https://kaizenstrategic.ai/choroboros/docs").launchInDefaultBrowser();
+        };
+        addAndMakeVisible (helpButton);
+        helpButton.setBounds (btn2X, btnY, btnSize, btnSize);
+
+        // FEEDBACK (rightmost)
+        feedbackButton.setImages (true, true, true,
+            feedbackIcon, 0.55f, {},
+            feedbackIcon, 1.0f,  {},
+            feedbackIcon, 0.4f,  {});
+        feedbackButton.setTooltip ("Send feedback or report a bug");
+        feedbackButton.onClick = [this] {
+            if (audioProcessor.feedbackCollector)
+                FeedbackDialog::show (*audioProcessor.feedbackCollector);
+        };
+        addAndMakeVisible (feedbackButton);
+        feedbackButton.setBounds (btn3X, btnY, btnSize, btnSize);
     }
     
     // Listen for engine color changes (preset load or manual) to update value label colors
@@ -904,6 +919,14 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
             g.drawImage(backgroundImageLit, 0, 0, getWidth(), getHeight(), 0, 0,
                         backgroundImageLit.getWidth(), backgroundImageLit.getHeight());
         }
+    }
+
+    // Draw subtle dark container behind the top-bar icon buttons
+    if (! topBarContainerBounds.isEmpty())
+    {
+        g.setOpacity (1.0f);
+        g.setColour (juce::Colour (0x60000000));  // 38% black overlay
+        g.fillRoundedRectangle (topBarContainerBounds.toFloat(), 3.0f);
     }
 }
 
