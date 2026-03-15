@@ -294,7 +294,8 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     // grouped row.  The legacy topButtons* layout fields are retained in
     // LayoutTuning for serialisation compat but no longer drive placement.
 
-    editor.engineColorBox.setBounds(s(layout.engineSelectorX), s(layout.engineSelectorY), s(layout.engineSelectorW), s(layout.engineSelectorH));
+    // Force top-left position — ignore any stale Y from saved layouts
+    editor.engineColorBox.setBounds(s(layout.engineSelectorX), s(5), s(layout.engineSelectorW), s(layout.engineSelectorH));
     const auto selectorText = makeColour(layout.engineSelectorTextColour);
     const auto selectorBackground = makeColour(layout.engineSelectorBackgroundColour);
     const auto selectorOutline = makeColour(layout.engineSelectorOutlineColour);
