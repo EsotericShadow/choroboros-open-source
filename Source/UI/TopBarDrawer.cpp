@@ -202,6 +202,10 @@ void TopBarDrawer::timerCallback()
         stopTimer();
         if (! expanding_)
             expanded_ = false;
+
+        // Re-run after stopTimer so isTimerRunning() is false and
+        // buttons become interactive (expand) or hidden (collapse).
+        updateButtonStates();
     }
 }
 
