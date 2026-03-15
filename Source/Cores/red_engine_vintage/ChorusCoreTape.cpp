@@ -270,8 +270,7 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             // Keep Color at 0 as a neutral tape path and scale tone darkening with Color.
             wet = wet + toneAmount * (toned - wet);
             
-            // Mild makeup gain so tape modulation remains present at lower wet mixes.
-            samples[i] = wet * tuning.tapeWetGain;
+            samples[i] = wet;
 
             // 6. Write to Buffer (Saturate input)
             // Tape saturation happens on record (write)

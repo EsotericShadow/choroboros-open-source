@@ -35,6 +35,7 @@ public:
 
     float getGuardSamples() const override { return 4.0f; }
     float getMaxDelaySamples() const override;
+    float getOutputTrim() const override { return 1.0f; }
 
 private:
     struct ResamplerState
