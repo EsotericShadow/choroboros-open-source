@@ -676,59 +676,82 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Setup tooltip window
     tooltipWindow = std::make_unique<juce::TooltipWindow>(this, 700);
     
-    // Setup feedback button (beta version)
-    feedbackButton.setButtonText("Feedback");
-    feedbackButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
-    feedbackButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
-    feedbackButton.onClick = [this] {
-        if (audioProcessor.feedbackCollector)
-        {
-            FeedbackDialog::show(*audioProcessor.feedbackCollector);
-        }
-    };
-    feedbackButton.setTooltip("Send Feedback: Share your thoughts, bug reports, or feature requests. Usage statistics included automatically.");
-    addAndMakeVisible(feedbackButton);
-    feedbackButton.setBounds(uiScaleInt(645), uiScaleInt(5), uiScaleInt(45), uiScaleInt(10)); // Top right, small button
-    
-    // Setup Help button
-    helpButton.setButtonText("Help");
-    helpButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
-    helpButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
-    helpButton.onClick = [] {
-        // Open help/documentation (for now, just open email - can be updated to PDF link later)
-        juce::URL("mailto:Greenalderson@gmail.com?subject=Choroboros%20Help").launchInDefaultBrowser();
-    };
-    helpButton.setTooltip("Help: Get documentation and information");
-    addAndMakeVisible(helpButton);
-    helpButton.setBounds(uiScaleInt(600), uiScaleInt(5), uiScaleInt(40), uiScaleInt(10));
-    
-    // Setup About button
-    aboutButton.setButtonText("About");
-    aboutButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
-    aboutButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
-    aboutButton.onClick = [] {
-        AboutDialog::show();
-    };
-    aboutButton.setTooltip("About: View version information and company details");
-    addAndMakeVisible(aboutButton);
-    aboutButton.setBounds(uiScaleInt(555), uiScaleInt(5), uiScaleInt(40), uiScaleInt(10));
-
-    // Setup Dev button
-    devButton.setButtonText("DEV");
-    devButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
-    devButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
-    devButton.setTooltip("Dev Panel: Built-in diagnostic and tuning suite. Parameter mapping, DSP internals, live readouts, validation.");
-    devButton.onClick = [this]
+    // ---- Top-bar icon buttons ------------------------------------------------
+    // Icon images are 50x50 white-on-transparent PNGs packed in BinaryData.
+    // ImageButton::setImages(resizeToFit, rescaleForDpi,
+    //     bgColour, normalImage, normalOpacity, normalOverlay,
+    //     overImage, overOpacity, overOverlay,
+    //     downImage, downOpacity, downOverlay)
     {
-        ensureDevPanelWindowCreated(true);
+        const int btnSize = uiScaleInt(16);  // square icon buttons
+        const int topY    = uiScaleInt(3);   // y-offset from top
+        const int gap     = uiScaleInt(4);   // gap between right-side buttons
+        const int rightEdge = uiScaleInt(693);
 
-        const bool shouldShow = !devWindow->isVisible();
-        devWindow->setVisible(shouldShow);
-        if (shouldShow)
-            devWindow->toFront(true);
-    };
-    addAndMakeVisible(devButton);
-    devButton.setBounds(uiScaleInt(5), uiScaleInt(5), uiScaleInt(50), uiScaleInt(12));
+        // Load icon images from BinaryData
+        auto feedbackIcon = juce::ImageCache::getFromMemory(
+            BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
+        auto helpIcon = juce::ImageCache::getFromMemory(
+            BinaryData::help_png, BinaryData::help_pngSize);
+        auto aboutIcon = juce::ImageCache::getFromMemory(
+            BinaryData::about_png, BinaryData::about_pngSize);
+        auto devIcon = juce::ImageCache::getFromMemory(
+            BinaryData::dev_png, BinaryData::dev_pngSize);
+
+        // Feedback button (rightmost)
+        feedbackButton.setImages(true, true, true,
+            feedbackIcon, 0.7f, {},   // normal: 70% opacity
+            feedbackIcon, 1.0f, {},   // hover: full opacity
+            feedbackIcon, 0.5f, {});  // pressed: dimmed
+        feedbackButton.onClick = [this] {
+            if (audioProcessor.feedbackCollector)
+                FeedbackDialog::show(*audioProcessor.feedbackCollector);
+        };
+        feedbackButton.setTooltip("Feedback");
+        addAndMakeVisible(feedbackButton);
+        feedbackButton.setBounds(rightEdge - btnSize, topY, btnSize, btnSize);
+
+        // Help button
+        helpButton.setImages(true, true, true,
+            helpIcon, 0.7f, {},
+            helpIcon, 1.0f, {},
+            helpIcon, 0.5f, {});
+        helpButton.onClick = [] {
+            juce::URL("https://kaizenstrategic.ai/choroboros/docs").launchInDefaultBrowser();
+        };
+        helpButton.setTooltip("Help");
+        addAndMakeVisible(helpButton);
+        helpButton.setBounds(rightEdge - btnSize * 2 - gap, topY, btnSize, btnSize);
+
+        // About button
+        aboutButton.setImages(true, true, true,
+            aboutIcon, 0.7f, {},
+            aboutIcon, 1.0f, {},
+            aboutIcon, 0.5f, {});
+        aboutButton.onClick = [] {
+            AboutDialog::show();
+        };
+        aboutButton.setTooltip("About");
+        addAndMakeVisible(aboutButton);
+        aboutButton.setBounds(rightEdge - btnSize * 3 - gap * 2, topY, btnSize, btnSize);
+
+        // Dev button (left side)
+        devButton.setImages(true, true, true,
+            devIcon, 0.7f, {},
+            devIcon, 1.0f, {},
+            devIcon, 0.5f, {});
+        devButton.setTooltip("Dev Panel");
+        devButton.onClick = [this]
+        {
+            ensureDevPanelWindowCreated(true);
+            const bool shouldShow = !devWindow->isVisible();
+            devWindow->setVisible(shouldShow);
+            if (shouldShow)
+                devWindow->toFront(true);
+        };
+        addAndMakeVisible(devButton);
+        devButton.setBounds(uiScaleInt(5), topY, btnSize, btnSize);
+    }
     
     // Listen for engine color changes (preset load or manual) to update value label colors
     audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);

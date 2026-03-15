@@ -155,6 +155,10 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/switch_a_spritesheet.png
         Assets/gui_icons/lock.svg
         Assets/gui_icons/unlock.svg
+        Assets/gui_icons/about.png
+        Assets/gui_icons/dev.png
+        Assets/gui_icons/help.png
+        Assets/gui_icons/bug_feedback_button.png
         Assets/fonts/Technology.ttf
         Assets/fonts/Retroica.ttf
         Assets/fonts/labels/JetBrainsMonoNL-Thin.ttf

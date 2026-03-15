@@ -96,13 +96,11 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> hqAttachment;
     LabelWithContainer hqLabel;
     
-    // Feedback button (alpha version)
-    juce::TextButton feedbackButton;
-    
-    // Help and About buttons
-    juce::TextButton helpButton;
-    juce::TextButton aboutButton;
-    juce::TextButton devButton;
+    // Top-bar icon buttons
+    juce::ImageButton feedbackButton;
+    juce::ImageButton helpButton;
+    juce::ImageButton aboutButton;
+    juce::ImageButton devButton;
     std::unique_ptr<juce::DocumentWindow> devWindow;
     bool devPanelPrewarmScheduled = false;
     bool devPanelPrewarmComplete = false;
