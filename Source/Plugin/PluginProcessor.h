@@ -25,6 +25,8 @@
 #include <vector>
 #include "../DSP/ChorusDSP.h"
 #include "FeedbackCollector.h"
+#include "SessionLog.h"
+#include "CrashReporter.h"
 
 //==============================================================================
 /**
@@ -206,6 +208,9 @@ public:
     
     // Feedback collector (public for editor access)
     std::unique_ptr<FeedbackCollector> feedbackCollector;
+
+    // Session log (public for editor crash-report check)
+    std::unique_ptr<SessionLog> sessionLog;
     
     // Parameter IDs (public for editor access)
     static constexpr const char* RATE_ID = "rate";
@@ -269,6 +274,7 @@ private:
     std::atomic<bool> stateLoadInProgress { false };
     std::atomic<bool> engineProfileApplyInProgress { false };
     LiveTelemetry liveTelemetry;
+    std::atomic<juce::int64> lastAnomalyLogTimeMs { 0 };  // throttle DSP anomaly logging
 
     class AnalyzerWorker;
     struct StereoTapRingBuffer

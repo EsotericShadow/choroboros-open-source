@@ -19,6 +19,13 @@ All notable changes to Choroboros are documented here.
 - **HQ toggle UI:** Single click now toggles (was double-click only). Drag threshold 4→12 px. Slider drag sensitivity disabled to prevent accidental value changes.
 - **DevPanel UX:** Renamed "Profile"→"Engine", visually separated core assignment as advanced feature, improved tooltips. Factory reset loads from bundled factory sheet instead of regenerating.
 
+### Added
+- **Session event log:** Lightweight ring buffer (last 64 events) tracks engine switches, HQ toggles, preset loads, DSP anomalies (NaN/Inf/clipping), and host info. Flushed to disk every 30 s so it survives crashes.
+- **Crash reporter:** Platform-specific signal handlers (macOS: SIGSEGV/SIGABRT/SIGFPE/SIGBUS/SIGILL; Windows: SetUnhandledExceptionFilter) flush the session log on abnormal exit. On next launch, if a clean-shutdown marker is missing, the user is prompted to send the crash report.
+- **Send to Developer (in-app):** Feedback dialog now has a "Send to Developer" button that opens the user's mail client pre-filled with feedback, usage summary, session log, and system info addressed to info@kaizenstrategic.ai.
+- **DSP anomaly detection:** processBlock checks output for NaN, Inf, and sustained hard clipping (>2.0); logs to session log (throttled to 1 event per 2 s).
+- **Host info in feedback:** Usage summary now includes DAW name, format (VST3/AU/AAX), sample rate, buffer size, CPU, and RAM.
+
 ---
 
 ## [2.03] - 2026-03-06

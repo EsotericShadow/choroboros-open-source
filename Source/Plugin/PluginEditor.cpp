@@ -740,6 +740,19 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
 
     audioProcessor.logLoadTraceEvent("editor_ctor_total_ms",
                                      juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
+
+    // Check for pending crash report from a previous unclean shutdown.
+    // Deferred so the editor is fully visible before the dialog appears.
+    if (SessionLog::hasPendingCrashReport())
+    {
+        juce::Timer::callAfterDelay(1500, [safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]
+        {
+            if (safeThis == nullptr) return;
+            auto crashReport = SessionLog::consumePendingCrashReport();
+            if (crashReport.isNotEmpty() && safeThis->audioProcessor.feedbackCollector)
+                FeedbackDialog::showCrashReport(*safeThis->audioProcessor.feedbackCollector, crashReport);
+        });
+    }
 }
 
 void ChoroborosPluginEditor::loadValueLabelTypeface()

@@ -25,25 +25,47 @@ class FeedbackDialog : public juce::Component,
                        public juce::Button::Listener
 {
 public:
-    FeedbackDialog(FeedbackCollector& collector);
+    /** Normal feedback mode. */
+    FeedbackDialog (FeedbackCollector& collector);
+
+    /** Crash report mode — pre-fills with crash context. */
+    FeedbackDialog (FeedbackCollector& collector, const juce::String& crashReport);
+
     ~FeedbackDialog() override = default;
-    
-    void paint(juce::Graphics& g) override;
+
+    void paint (juce::Graphics& g) override;
     void resized() override;
-    void buttonClicked(juce::Button* button) override;
-    
-    static void show(FeedbackCollector& collector);
-    
+    void buttonClicked (juce::Button* button) override;
+
+    /** Launch feedback dialog (normal mode). */
+    static void show (FeedbackCollector& collector);
+
+    /** Launch crash report dialog (pre-filled with crash log). */
+    static void showCrashReport (FeedbackCollector& collector,
+                                 const juce::String& crashReport);
+
 private:
     FeedbackCollector& feedbackCollector;
+    bool crashReportMode = false;
+    juce::String crashReportText;
+
     juce::TextEditor feedbackText;
-    juce::TextButton saveButton;
-    juce::TextButton formButton;
+    juce::TextButton sendButton;       // "Send to Developer" — mailto:
+    juce::TextButton saveButton;       // "Save to File"
+    juce::TextButton formButton;       // "Open Feedback Form"
     juce::TextButton cancelButton;
     juce::Label titleLabel;
     juce::Label infoLabel;
     juce::HyperlinkButton betaSignUpLink;
-    
+
+    void initCommon();
+    void sendToDeveloper();
     void saveFeedback();
     void openFeedbackForm();
+    void closeDialog();
+
+    /** Build the mailto: body from user text + session/crash data. */
+    juce::String buildEmailBody() const;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FeedbackDialog)
 };

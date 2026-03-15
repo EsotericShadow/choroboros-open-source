@@ -50,7 +50,11 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/FeedbackDialog.h
     Source/Plugin/AboutDialog.cpp
     Source/Plugin/AboutDialog.h
-    
+    Source/Plugin/SessionLog.cpp
+    Source/Plugin/SessionLog.h
+    Source/Plugin/CrashReporter.cpp
+    Source/Plugin/CrashReporter.h
+
     # DSP engine
     Source/DSP/ChorusDSP.cpp
     Source/DSP/ChorusDSP.h

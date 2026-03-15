@@ -868,8 +868,15 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 #endif
     parameters(*this, nullptr, juce::Identifier("Choroboros"), createParameterLayout()),
     chorusDSP(std::make_unique<ChorusDSP>()),
-    feedbackCollector(std::make_unique<FeedbackCollector>())
+    feedbackCollector(std::make_unique<FeedbackCollector>()),
+    sessionLog(std::make_unique<SessionLog>())
 {
+    // Link session log to feedback collector for richer diagnostics
+    feedbackCollector->setSessionLog(sessionLog.get());
+
+    // Install crash handlers so the session log is flushed on abnormal exit
+    CrashReporter::install(sessionLog.get());
+
     instanceId = nextLoadTraceInstanceId();
     const double ctorStartMs = juce::Time::getMillisecondCounterHiRes();
 
@@ -934,6 +941,13 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     parameters.removeParameterListener(COLOR_ID, this);
     parameters.removeParameterListener(HQ_ID, this);
     parameters.removeParameterListener(MIX_ID, this);
+
+    // Uninstall crash handlers before the session log is destroyed.
+    // The sessionLog destructor writes a clean-shutdown marker.
+    CrashReporter::uninstall();
+    // feedbackCollector must be destroyed before sessionLog (it holds a raw pointer)
+    feedbackCollector.reset();
+    sessionLog.reset();
 }
 
 juce::File ChoroborosAudioProcessor::getLoadTraceLogFile()
@@ -1217,6 +1231,20 @@ void ChoroborosAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     if (analyzerWorker != nullptr && !analyzerWorker->isThreadRunning())
         analyzerWorker->startThread(juce::Thread::Priority::low);
 
+    // Log host/session info for diagnostics
+    if (sessionLog != nullptr)
+    {
+        auto hostDesc = juce::PluginHostType().getHostDescription();
+        auto wrapperDesc = juce::AudioProcessor::getWrapperTypeDescription(wrapperType);
+        sessionLog->log(SessionLog::EventType::HostInfo,
+                        juce::String(hostDesc) + " (" + wrapperDesc + ") "
+                        + juce::String(sampleRate, 0) + " Hz / "
+                        + juce::String(samplesPerBlock) + " samp");
+
+        if (feedbackCollector)
+            feedbackCollector->setHostInfo(hostDesc, wrapperDesc, sampleRate, samplesPerBlock);
+    }
+
     startTimerHz(10);  // Apply runtime tuning on message thread, 10 Hz
 }
 
@@ -1307,6 +1335,33 @@ void ChoroborosAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float processMs = static_cast<float>(juce::Time::highResolutionTicksToSeconds(elapsedTicks) * 1000.0);
     const float outputPeakL = (totalNumOutputChannels > 0) ? buffer.getMagnitude(0, 0, numSamples) : 0.0f;
     const float outputPeakR = (totalNumOutputChannels > 1) ? buffer.getMagnitude(1, 0, numSamples) : outputPeakL;
+
+    // DSP anomaly detection — log NaN/Inf or sustained hard clipping (non-blocking).
+    // Throttled to at most once per 2 seconds to avoid flooding the ring buffer.
+    if (sessionLog != nullptr)
+    {
+        const bool hasNan   = std::isnan(outputPeakL) || std::isnan(outputPeakR);
+        const bool hasInf   = std::isinf(outputPeakL) || std::isinf(outputPeakR);
+        const bool hardClip = (outputPeakL > 2.0f || outputPeakR > 2.0f);
+
+        if (hasNan || hasInf || hardClip)
+        {
+            const auto now = juce::Time::currentTimeMillis();
+            const auto last = lastAnomalyLogTimeMs.load(std::memory_order_relaxed);
+            if (now - last > 2000)
+            {
+                lastAnomalyLogTimeMs.store(now, std::memory_order_relaxed);
+                if (hasNan)
+                    sessionLog->tryLog(SessionLog::EventType::DspAnomaly, "NaN in output");
+                else if (hasInf)
+                    sessionLog->tryLog(SessionLog::EventType::DspAnomaly, "Inf in output");
+                else
+                    sessionLog->tryLog(SessionLog::EventType::DspAnomaly,
+                                       "Hard clip: L=" + juce::String(outputPeakL, 2)
+                                     + " R=" + juce::String(outputPeakR, 2));
+            }
+        }
+    }
 
     if (needAnalyzerAudioTaps && tapSamples > 0)
     {
