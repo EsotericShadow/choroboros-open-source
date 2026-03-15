@@ -289,36 +289,10 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     editor.colorValueLabel.setValueFxParams(colorFxEnabled, colorGlowAlpha, colorGlowSpreadPx, colorPerCharOffsetX, colorPerCharOffsetY, colorTopAlpha, colorTopOffsetX, colorTopOffsetY, colorTopShear, colorTopRotateDeg, colorBottomAlpha, colorBottomOffsetX, colorBottomOffsetY, colorBottomShear, colorBottomRotateDeg, colorReflectBlurPx, colorReflectSquash, colorReflectMotion);
     editor.mixValueLabel.setValueFxParams(mixFxEnabled, mixGlowAlpha, mixGlowSpreadPx, mixPerCharOffsetX, mixPerCharOffsetY, mixTopAlpha, mixTopOffsetX, mixTopOffsetY, mixTopShear, mixTopRotateDeg, mixBottomAlpha, mixBottomOffsetX, mixBottomOffsetY, mixBottomShear, mixBottomRotateDeg, mixReflectBlurPx, mixReflectSquash, mixReflectMotion);
 
-    const int topButtonW = s(layout.topButtonsWidth);
-    const int topButtonH = s(layout.topButtonsHeight);
-    const int topButtonGap = s(layout.topButtonsGap);
-    const int topButtonY = s(layout.topButtonsTopY);
-    const int rightMargin = s(layout.topButtonsRightMargin);
-    const int rightEdge = editor.getWidth() - rightMargin;
-    editor.feedbackButton.setBounds(rightEdge - topButtonW, topButtonY, topButtonW, topButtonH);
-    editor.helpButton.setBounds(rightEdge - (2 * topButtonW) - topButtonGap, topButtonY, topButtonW, topButtonH);
-    editor.aboutButton.setBounds(rightEdge - (3 * topButtonW) - (2 * topButtonGap), topButtonY, topButtonW, topButtonH);
-
-    const float topButtonFontHeight = static_cast<float>(layout.topButtonsFontSize) * editor.getUiScale();
-    editor.feedbackButton.getProperties().set("customFontHeight", topButtonFontHeight);
-    editor.helpButton.getProperties().set("customFontHeight", topButtonFontHeight);
-    editor.aboutButton.getProperties().set("customFontHeight", topButtonFontHeight);
-
-    const auto buttonBg = makeColour(layout.topButtonsBackgroundColour);
-    const auto buttonBgOn = makeColour(layout.topButtonsOnBackgroundColour);
-    const auto buttonText = makeColour(layout.topButtonsTextColour);
-    editor.feedbackButton.setColour(juce::TextButton::buttonColourId, buttonBg);
-    editor.feedbackButton.setColour(juce::TextButton::buttonOnColourId, buttonBgOn);
-    editor.feedbackButton.setColour(juce::TextButton::textColourOffId, buttonText);
-    editor.feedbackButton.setColour(juce::TextButton::textColourOnId, buttonText);
-    editor.helpButton.setColour(juce::TextButton::buttonColourId, buttonBg);
-    editor.helpButton.setColour(juce::TextButton::buttonOnColourId, buttonBgOn);
-    editor.helpButton.setColour(juce::TextButton::textColourOffId, buttonText);
-    editor.helpButton.setColour(juce::TextButton::textColourOnId, buttonText);
-    editor.aboutButton.setColour(juce::TextButton::buttonColourId, buttonBg);
-    editor.aboutButton.setColour(juce::TextButton::buttonOnColourId, buttonBgOn);
-    editor.aboutButton.setColour(juce::TextButton::textColourOffId, buttonText);
-    editor.aboutButton.setColour(juce::TextButton::textColourOnId, buttonText);
+    // NOTE: Top-bar icon buttons (dev, about, help, feedback) are now
+    // positioned exclusively in the PluginEditor constructor as a single
+    // grouped row.  The legacy topButtons* layout fields are retained in
+    // LayoutTuning for serialisation compat but no longer drive placement.
 
     editor.engineColorBox.setBounds(s(layout.engineSelectorX), s(layout.engineSelectorY), s(layout.engineSelectorW), s(layout.engineSelectorH));
     const auto selectorText = makeColour(layout.engineSelectorTextColour);

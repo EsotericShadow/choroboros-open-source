@@ -2646,20 +2646,24 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
                                       static_cast<float>(layout.mixValueWidth), static_cast<float>(layout.mixValueHeight) },
                        valueColour, emphasizeValueLabels, false);
 
-            const int rightEdge = 700 - layout.topButtonsRightMargin;
-            const int topButtonW = layout.topButtonsWidth;
-            const int topButtonH = layout.topButtonsHeight;
-            const int topButtonGap = layout.topButtonsGap;
-            const int topButtonY = layout.topButtonsTopY;
-            addElement("Feedback", { static_cast<float>(rightEdge - topButtonW), static_cast<float>(topButtonY),
-                                     static_cast<float>(topButtonW), static_cast<float>(topButtonH) },
-                       globalColour, emphasizeGlobal);
-            addElement("Help", { static_cast<float>(rightEdge - (2 * topButtonW) - topButtonGap), static_cast<float>(topButtonY),
-                                 static_cast<float>(topButtonW), static_cast<float>(topButtonH) },
-                       globalColour, emphasizeGlobal);
-            addElement("About", { static_cast<float>(rightEdge - (3 * topButtonW) - (2 * topButtonGap)), static_cast<float>(topButtonY),
-                                  static_cast<float>(topButtonW), static_cast<float>(topButtonH) },
-                       globalColour, emphasizeGlobal);
+            // Icon buttons are positioned by the editor constructor, not
+            // by LayoutTuning.  Show a single "Icon Buttons" overlay for
+            // the grouped row instead of individual legacy text-button rects.
+            {
+                const int btnSz  = 14;
+                const int btnGap = 2;
+                const int padH   = 3;
+                const int padV   = 2;
+                const int mR     = 4;
+                const int mT     = 3;
+                const int cW     = padH * 2 + btnSz * 4 + btnGap * 3;
+                const int cH     = padV * 2 + btnSz;
+                const int cX     = 700 - cW - mR;
+                const int cY     = mT;
+                addElement("Icon Buttons", { static_cast<float>(cX), static_cast<float>(cY),
+                                             static_cast<float>(cW), static_cast<float>(cH) },
+                           globalColour, emphasizeGlobal);
+            }
 
             addElement("Engine Selector", { static_cast<float>(layout.engineSelectorX), static_cast<float>(layout.engineSelectorY),
                                             static_cast<float>(layout.engineSelectorW), static_cast<float>(layout.engineSelectorH) },
