@@ -49,4 +49,8 @@ public:
     
     // Get the maximum delay in samples (for clamping)
     virtual float getMaxDelaySamples() const = 0;
+
+    // Gain trim applied to wet output to normalize this core's passband gain.
+    // Override in cores with intentional non-unity wet gain.
+    virtual float getOutputTrim() const { return 1.0f; }
 };

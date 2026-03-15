@@ -152,6 +152,76 @@ void ChorusDSPProcess::processPostChorusSaturation(ChorusDSP& chorusDSP, juce::d
     }
 }
 
+void ChorusDSPProcess::processOutputPeakCatch(ChorusDSP& chorusDSP,
+                                               juce::dsp::AudioBlock<float>& block)
+{
+    const int numChannels = static_cast<int>(block.getNumChannels());
+    const int numSamples = static_cast<int>(block.getNumSamples());
+    if (numChannels <= 0 || numSamples <= 0)
+        return;
+
+    if (static_cast<size_t>(numChannels) > chorusDSP.wetCompressors.size())
+    {
+        jassertfalse;
+        return;
+    }
+
+    // Post-sum peak catcher: transparent limiter that only tames chorus peaks
+    // in the final dry+wet mix. Dry signal stays untouched at normal levels.
+    using Comp = ChorusDSP::WetCompressorState;
+    constexpr float kneeHalfDb = Comp::kneeDb * 0.5f;
+    constexpr float threshLow = Comp::thresholdDb - kneeHalfDb;
+    constexpr float threshHigh = Comp::thresholdDb + kneeHalfDb;
+    const float threshLowLin = std::pow(10.0f, threshLow / 20.0f);
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto* data = block.getChannelPointer(ch);
+        auto& comp = chorusDSP.wetCompressors[static_cast<size_t>(ch)];
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            float sample = data[i];
+
+            const float inputAbs = std::abs(sample);
+            if (inputAbs > comp.envelope)
+                comp.envelope = comp.attackCoeff * comp.envelope
+                    + (1.0f - comp.attackCoeff) * inputAbs;
+            else
+                comp.envelope = comp.releaseCoeff * comp.envelope
+                    + (1.0f - comp.releaseCoeff) * inputAbs;
+
+            if (comp.envelope > threshLowLin)
+            {
+                const float envDb = (comp.envelope > 1.0e-10f)
+                    ? 20.0f * std::log10(comp.envelope)
+                    : -200.0f;
+
+                float gainReductionDb = 0.0f;
+                if (envDb > threshHigh)
+                {
+                    gainReductionDb =
+                        (envDb - Comp::thresholdDb) * (1.0f - 1.0f / Comp::ratio);
+                }
+                else if (envDb > threshLow)
+                {
+                    const float x = envDb - threshLow;
+                    gainReductionDb =
+                        (1.0f - 1.0f / Comp::ratio) * x * x / (2.0f * Comp::kneeDb);
+                }
+
+                if (gainReductionDb > 0.0f)
+                {
+                    const float gainLin = std::pow(10.0f, -gainReductionDb / 20.0f);
+                    sample *= gainLin;
+                }
+            }
+
+            data[i] = sample;
+        }
+    }
+}
+
 void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNumSamples, float& currentDepth, float& currentRate, float& currentCentreDelayMs)
 {
     // Map depth to engine-specific range (Purple uses compressed range)
@@ -282,6 +352,7 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     processChorusLFO(chorusDSP, blockNumSamples, numChannels, currentRate, currentDepth);
     
     chorusDSP.dryWet.pushDrySamples(block);
+    processPreEmphasis(chorusDSP, block);
 
     bool pendingCoreReady = false;
     if (chorusDSP.pendingCore != nullptr)
@@ -379,6 +450,11 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
         const int totalSamples = juce::jmax(1, chorusDSP.coreSwitchCrossfadeTotalSamples);
         int remaining = chorusDSP.coreSwitchCrossfadeSamplesRemaining;
 
+        const float currentCoreTrim = (chorusDSP.currentCore != nullptr)
+            ? chorusDSP.currentCore->getOutputTrim() : 1.0f;
+        const float previousCoreTrim = (chorusDSP.previousCore != nullptr)
+            ? chorusDSP.previousCore->getOutputTrim() : 1.0f;
+
         for (int i = 0; i < blockNumSamples; ++i)
         {
             const float progress = 1.0f - (static_cast<float>(juce::jmax(remaining, 0)) / static_cast<float>(totalSamples));
@@ -399,8 +475,10 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
             const float duckGain = edgeDuckGain * midDuckGain;
             for (int ch = 0; ch < numChannels; ++ch)
             {
-                const float wetNew = chorusDSP.coreCrossfadeBufferA.getSample(ch, i);
-                const float wetOld = chorusDSP.coreCrossfadeBufferB.getSample(ch, i);
+                const float wetNew = chorusDSP.coreCrossfadeBufferA.getSample(ch, i)
+                    * currentCoreTrim;
+                const float wetOld = chorusDSP.coreCrossfadeBufferB.getSample(ch, i)
+                    * previousCoreTrim;
                 block.setSample(ch, i, (wetOld * oldGain + wetNew * newGain) * duckGain);
             }
             remaining = juce::jmax(remaining - 1, 0);
@@ -453,4 +531,5 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     processWetCharacter(chorusDSP, block);
     processPostChorusSaturation(chorusDSP, block);
     chorusDSP.dryWet.mixWetSamples(block);
+    processOutputPeakCatch(chorusDSP, block);
 }

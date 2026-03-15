@@ -18,6 +18,7 @@
 
 #include "ChorusDSPPrepare.h"
 #include "ChorusDSP.h"
+#include <cmath>
 
 void ChorusDSPPrepare::prepareLFOs(ChorusDSP& chorusDSP, const juce::dsp::ProcessSpec& spec)
 {
@@ -79,4 +80,14 @@ void ChorusDSPPrepare::prepareBuffers(ChorusDSP& chorusDSP, const juce::dsp::Pro
     chorusDSP.dryWet.setMixingRule(juce::dsp::DryWetMixingRule::linear);
     chorusDSP.dryWet.prepare(spec);
     chorusDSP.dryWet.setWetMixProportion(0.5f);
+
+    chorusDSP.wetCompressors.resize(static_cast<size_t>(spec.numChannels));
+    for (auto& comp : chorusDSP.wetCompressors)
+    {
+        comp.envelope = 0.0f;
+        comp.attackCoeff = std::exp(-1.0f / (ChorusDSP::WetCompressorState::attackMs * 0.001f
+                                             * static_cast<float>(spec.sampleRate)));
+        comp.releaseCoeff = std::exp(-1.0f / (ChorusDSP::WetCompressorState::releaseMs * 0.001f
+                                              * static_cast<float>(spec.sampleRate)));
+    }
 }
