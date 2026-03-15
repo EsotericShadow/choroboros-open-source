@@ -53,14 +53,9 @@ void FeedbackCollector::trackEngineSwitch (int engineIndex, bool hq)
     if (hq)
         stats.hqEnabledCount++;
 
-    // Log to session log
-    if (sessionLog != nullptr)
-    {
-        static const char* names[] = { "Green", "Blue", "Red", "Purple", "Black" };
-        const char* name = (engineIndex >= 0 && engineIndex < 5) ? names[engineIndex] : "?";
-        sessionLog->log (SessionLog::EventType::EngineSwitch,
-                         juce::String (name) + (hq ? " HQ" : " NQ"));
-    }
+    // Note: session log events for engine switches are now written by
+    // PluginProcessor::parameterChanged(), which covers automation,
+    // preset loads, and state restores — not just editor clicks.
 
     saveStats();
 }

@@ -17,9 +17,11 @@
  */
 
 #include "CrashReporter.h"
+#include <atomic>
 
 #if JUCE_MAC || JUCE_LINUX
   #include <signal.h>
+  #include <unistd.h>   // unlink() — async-signal-safe per POSIX
   #include <cstring>
 #elif JUCE_WINDOWS
   #include <windows.h>
@@ -29,25 +31,31 @@
 // Global state — intentionally simple, lives for process lifetime.
 //==============================================================================
 
-static SessionLog* g_sessionLog = nullptr;
+static std::atomic<int> g_refCount { 0 };
+
+// Path to the clean-shutdown marker that will be deleted on crash.
+// Stored as a C-string so the signal handler needs no juce::String.
+static constexpr int kMaxPathLen = 1024;
+static char g_markerPath[kMaxPathLen] = {};
 
 #if JUCE_MAC || JUCE_LINUX
 
-// Signals we intercept
+//==============================================================================
+// macOS / Linux — signal handlers (async-signal-safe)
+//==============================================================================
+
 static constexpr int kCrashSignals[] = { SIGSEGV, SIGABRT, SIGFPE, SIGBUS, SIGILL };
 static constexpr int kNumCrashSignals = 5;
-
-// Saved original handlers so we can chain / restore
 static struct sigaction g_oldActions[kNumCrashSignals];
-static bool g_installed = false;
+static bool g_handlersInstalled = false;
 
-static void crashSignalHandler (int sig, siginfo_t* info, void* context)
+static void crashSignalHandler (int sig, siginfo_t* /*info*/, void* /*context*/)
 {
-    // Minimal work — no allocation, no locks if possible.
-    // flushToDisk() does hold a mutex briefly; acceptable in a crash handler
-    // since we're about to die anyway and the alternative is losing the log.
-    if (g_sessionLog != nullptr)
-        g_sessionLog->flushToDisk();
+    // Async-signal-safe: unlink() is guaranteed safe by POSIX.
+    // This removes the clean-shutdown marker so next launch knows we crashed.
+    // The session log on disk (flushed by the 30 s timer) is already there.
+    if (g_markerPath[0] != '\0')
+        unlink (g_markerPath);
 
     // Restore the original handler and re-raise so the OS crash reporter runs
     for (int i = 0; i < kNumCrashSignals; ++i)
@@ -62,12 +70,21 @@ static void crashSignalHandler (int sig, siginfo_t* info, void* context)
     raise (sig);
 }
 
-void CrashReporter::install (SessionLog* sessionLog)
+void CrashReporter::install (const juce::File& cleanShutdownMarker)
 {
-    if (g_installed)
-        return;
+    // Store path as C-string (once, on first install)
+    const int prev = g_refCount.fetch_add (1, std::memory_order_acq_rel);
+    if (prev > 0)
+        return;  // already installed — just bump refcount
 
-    g_sessionLog = sessionLog;
+    auto pathStr = cleanShutdownMarker.getFullPathName();
+    auto pathUtf8 = pathStr.toRawUTF8();
+    auto len = std::strlen (pathUtf8);
+    if (len < kMaxPathLen)
+        std::memcpy (g_markerPath, pathUtf8, len + 1);
+
+    if (g_handlersInstalled)
+        return;
 
     struct sigaction sa;
     std::memset (&sa, 0, sizeof (sa));
@@ -78,32 +95,39 @@ void CrashReporter::install (SessionLog* sessionLog)
     for (int i = 0; i < kNumCrashSignals; ++i)
         sigaction (kCrashSignals[i], &sa, &g_oldActions[i]);
 
-    g_installed = true;
+    g_handlersInstalled = true;
 }
 
 void CrashReporter::uninstall()
 {
-    if (! g_installed)
+    const int remaining = g_refCount.fetch_sub (1, std::memory_order_acq_rel) - 1;
+    if (remaining > 0)
+        return;  // other instances still alive
+
+    if (! g_handlersInstalled)
         return;
 
     for (int i = 0; i < kNumCrashSignals; ++i)
         sigaction (kCrashSignals[i], &g_oldActions[i], nullptr);
 
-    g_sessionLog = nullptr;
-    g_installed  = false;
+    g_markerPath[0]    = '\0';
+    g_handlersInstalled = false;
 }
 
 #elif JUCE_WINDOWS
 
+//==============================================================================
+// Windows — SetUnhandledExceptionFilter
+//==============================================================================
+
 static LPTOP_LEVEL_EXCEPTION_FILTER g_oldFilter = nullptr;
-static bool g_installed = false;
+static bool g_handlersInstalled = false;
 
 static LONG WINAPI crashExceptionFilter (EXCEPTION_POINTERS* exInfo)
 {
-    (void) exInfo;
-
-    if (g_sessionLog != nullptr)
-        g_sessionLog->flushToDisk();
+    // DeleteFileA is safe from an exception filter context.
+    if (g_markerPath[0] != '\0')
+        DeleteFileA (g_markerPath);
 
     if (g_oldFilter != nullptr)
         return g_oldFilter (exInfo);
@@ -111,31 +135,44 @@ static LONG WINAPI crashExceptionFilter (EXCEPTION_POINTERS* exInfo)
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-void CrashReporter::install (SessionLog* sessionLog)
+void CrashReporter::install (const juce::File& cleanShutdownMarker)
 {
-    if (g_installed)
+    const int prev = g_refCount.fetch_add (1, std::memory_order_acq_rel);
+    if (prev > 0)
         return;
 
-    g_sessionLog = sessionLog;
-    g_oldFilter  = SetUnhandledExceptionFilter (crashExceptionFilter);
-    g_installed  = true;
+    auto pathStr = cleanShutdownMarker.getFullPathName();
+    auto pathUtf8 = pathStr.toRawUTF8();
+    auto len = std::strlen (pathUtf8);
+    if (len < kMaxPathLen)
+        std::memcpy (g_markerPath, pathUtf8, len + 1);
+
+    if (g_handlersInstalled)
+        return;
+
+    g_oldFilter = SetUnhandledExceptionFilter (crashExceptionFilter);
+    g_handlersInstalled = true;
 }
 
 void CrashReporter::uninstall()
 {
-    if (! g_installed)
+    const int remaining = g_refCount.fetch_sub (1, std::memory_order_acq_rel) - 1;
+    if (remaining > 0)
+        return;
+
+    if (! g_handlersInstalled)
         return;
 
     SetUnhandledExceptionFilter (g_oldFilter);
-    g_oldFilter  = nullptr;
-    g_sessionLog = nullptr;
-    g_installed  = false;
+    g_oldFilter         = nullptr;
+    g_markerPath[0]     = '\0';
+    g_handlersInstalled = false;
 }
 
 #else
 
 // Unsupported platform — no-op
-void CrashReporter::install (SessionLog*) {}
+void CrashReporter::install (const juce::File&) {}
 void CrashReporter::uninstall() {}
 
 #endif

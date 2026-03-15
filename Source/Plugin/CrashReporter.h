@@ -18,31 +18,36 @@
 
 #pragma once
 
-#include "SessionLog.h"
+#include <juce_core/juce_core.h>
 
 /**
- * Installs platform-specific crash signal handlers that flush the SessionLog
- * to disk before the process terminates.
+ * Installs platform-specific crash signal handlers that delete the
+ * clean-shutdown marker so the next launch detects the crash.
  *
- * On macOS/Linux: catches SIGSEGV, SIGABRT, SIGFPE, SIGBUS, SIGILL.
- * On Windows: installs SetUnhandledExceptionFilter.
+ * Design rationale — async-signal-safety:
+ *   The crash handler does NOT call flushToDisk(), take mutexes, or allocate.
+ *   The session log is already periodically flushed to disk by a 30 s Timer,
+ *   so the on-disk copy is always at most 30 s stale. The handler's only job
+ *   is to remove the clean-shutdown marker file so that next launch can
+ *   distinguish a crash from a clean exit.
  *
- * The handler does minimal work (no allocation):
- *   1. Calls SessionLog::flushToDisk() on the global instance
- *   2. Re-raises the original signal so the OS crash reporter still fires
+ *   On macOS/Linux: unlink() is async-signal-safe per POSIX.
+ *   On Windows: DeleteFileA() is safe from an exception filter.
  *
- * Usage:
- *   CrashReporter::install(&mySessionLog);   // once, during processor init
- *   CrashReporter::uninstall();              // optional, during shutdown
+ * Multi-instance safety:
+ *   Uses a static refcount. install() only installs signal handlers on the
+ *   first call; uninstall() only removes them when the last instance exits.
+ *   The crash flag path is set once on first install and never changes.
  */
 class CrashReporter
 {
 public:
-    /** Install crash handlers. Call once during PluginProcessor construction.
-        The sessionLog pointer must remain valid for the lifetime of the plugin. */
-    static void install (SessionLog* sessionLog);
+    /** Install crash handlers. Pass the path to the clean-shutdown marker
+        that should be deleted on crash. Refcounted — safe to call from
+        multiple PluginProcessor instances. */
+    static void install (const juce::File& cleanShutdownMarker);
 
-    /** Remove crash handlers (optional — safe to skip if process is exiting). */
+    /** Decrement refcount; only removes signal handlers when count hits zero. */
     static void uninstall();
 
 private:

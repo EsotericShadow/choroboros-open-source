@@ -17,6 +17,7 @@
  */
 
 #include "FeedbackDialog.h"
+#include "SessionLog.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
 
@@ -238,7 +239,13 @@ void FeedbackDialog::buttonClicked (juce::Button* button)
     else if (button == &formButton)
         openFeedbackForm();
     else if (button == &cancelButton)
+    {
+        // User chose to dismiss — clear the crash report so it doesn't
+        // nag on every launch, but they chose not to send it.
+        if (crashReportMode)
+            SessionLog::clearPendingCrashReport();
         closeDialog();
+    }
 }
 
 //==============================================================================
@@ -268,6 +275,10 @@ void FeedbackDialog::sendToDeveloper()
 
     // Also save a local copy
     feedbackCollector.saveFeedbackToFile (body);
+
+    // Clear crash report now that the user has acted on it
+    if (crashReportMode)
+        SessionLog::clearPendingCrashReport();
 
     closeDialog();
 }
@@ -310,7 +321,11 @@ void FeedbackDialog::saveFeedback()
 {
     auto body = buildEmailBody();
     if (feedbackCollector.saveFeedbackToFile (body))
+    {
+        if (crashReportMode)
+            SessionLog::clearPendingCrashReport();
         closeDialog();
+    }
     // If save failed, dialog stays open
 }
 

@@ -748,9 +748,11 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         juce::Timer::callAfterDelay(1500, [safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]
         {
             if (safeThis == nullptr) return;
-            auto crashReport = SessionLog::consumePendingCrashReport();
+            auto crashReport = SessionLog::readPendingCrashReport();
             if (crashReport.isNotEmpty() && safeThis->audioProcessor.feedbackCollector)
                 FeedbackDialog::showCrashReport(*safeThis->audioProcessor.feedbackCollector, crashReport);
+            // Crash report file is NOT deleted here — FeedbackDialog clears
+            // it after the user sends, saves, or dismisses.
         });
     }
 }

@@ -18,12 +18,42 @@
 
 #include "SessionLog.h"
 
+#if JUCE_MAC || JUCE_LINUX
+  #include <unistd.h>   // getpid()
+#elif JUCE_WINDOWS
+  #include <windows.h>  // GetCurrentProcessId()
+#endif
+
 //==============================================================================
-// File paths — all under ~/Library/Application Support/Choroboros/ (macOS)
-// or %APPDATA%/Choroboros/ (Windows)
+// Static members
 //==============================================================================
 
-static juce::File getChoroborosDataDir()
+std::atomic<int> SessionLog::s_instanceCount { 0 };
+
+//==============================================================================
+// PID helper
+//==============================================================================
+
+static juce::String getProcessPidString()
+{
+#if JUCE_MAC || JUCE_LINUX
+    return juce::String (static_cast<int> (getpid()));
+#elif JUCE_WINDOWS
+    return juce::String (static_cast<int> (GetCurrentProcessId()));
+#else
+    return "0";
+#endif
+}
+
+//==============================================================================
+// File paths — all under ~/Library/Application Support/Choroboros/ (macOS)
+// or %APPDATA%/Choroboros/ (Windows).
+// Live log and clean-shutdown marker are keyed by PID so multiple DAW
+// processes each get their own file, while multiple instances *inside*
+// the same DAW correctly share one.
+//==============================================================================
+
+juce::File SessionLog::getDataDir()
 {
     return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
                .getChildFile ("Choroboros");
@@ -31,17 +61,17 @@ static juce::File getChoroborosDataDir()
 
 juce::File SessionLog::getLiveLogFile()
 {
-    return getChoroborosDataDir().getChildFile ("session_log.json");
+    return getDataDir().getChildFile ("session_log_" + getProcessPidString() + ".json");
 }
 
 juce::File SessionLog::getCleanShutdownMarker()
 {
-    return getChoroborosDataDir().getChildFile (".clean_shutdown");
+    return getDataDir().getChildFile (".clean_shutdown_" + getProcessPidString());
 }
 
 juce::File SessionLog::getPendingCrashReportFile()
 {
-    return getChoroborosDataDir().getChildFile ("crash_report_pending.txt");
+    return getDataDir().getChildFile ("crash_report_pending.txt");
 }
 
 //==============================================================================
@@ -50,37 +80,21 @@ juce::File SessionLog::getPendingCrashReportFile()
 
 SessionLog::SessionLog()
 {
-    // If there is a live log but no clean-shutdown marker, the previous
-    // session crashed. Promote the live log to a pending crash report
-    // before we start overwriting it.
-    auto liveLog = getLiveLogFile();
-    auto marker  = getCleanShutdownMarker();
+    const int prevCount = s_instanceCount.fetch_add (1, std::memory_order_acq_rel);
 
-    if (liveLog.existsAsFile() && ! marker.existsAsFile())
+    if (prevCount == 0)
     {
-        auto pendingFile = getPendingCrashReportFile();
-        if (! pendingFile.existsAsFile())
-        {
-            // Read the old live log and write it as the pending crash report
-            auto oldLog = liveLog.loadFileAsString();
-            if (oldLog.isNotEmpty())
-            {
-                pendingFile.getParentDirectory().createDirectory();
-                juce::String report;
-                report << "=== Choroboros Crash Report ===\n";
-                report << "Previous session did not shut down cleanly.\n";
-                report << "Recovered session log follows:\n\n";
-                report << oldLog;
-                pendingFile.replaceWithText (report);
-            }
-        }
+        // First instance in this process — scan for orphaned logs from
+        // previous crashed sessions (any PID) and promote to crash report.
+        promoteOrphanedLogs();
+
+        // Delete any stale clean-shutdown marker for our PID (shouldn't
+        // exist if we just launched, but handle PID reuse).
+        getCleanShutdownMarker().deleteFile();
     }
 
-    // Delete the old clean-shutdown marker (we'll write a new one on exit)
-    marker.deleteFile();
-
     // Log session start
-    log (EventType::SessionStart, "Session started");
+    log (EventType::SessionStart, "Session started (instance " + juce::String (prevCount + 1) + ")");
 
     // Start periodic flush timer (every 30 seconds)
     startTimer (30000);
@@ -90,8 +104,20 @@ SessionLog::~SessionLog()
 {
     stopTimer();
     log (EventType::SessionEnd, "Session ended");
-    flushToDisk();
-    markCleanShutdown();
+
+    const int remaining = s_instanceCount.fetch_sub (1, std::memory_order_acq_rel) - 1;
+
+    if (remaining <= 0)
+    {
+        // Last instance in this process — final flush and clean marker.
+        flushToDisk();
+        markCleanShutdown();
+    }
+    else
+    {
+        // Other instances still alive — just flush, don't mark clean.
+        flushToDisk();
+    }
 }
 
 //==============================================================================
@@ -151,10 +177,7 @@ juce::String SessionLog::formatLog() const
     juce::String out;
 
     const int total = juce::jmin (eventCount, kRingSize);
-    // Start from the oldest event in the ring
-    const int start = (eventCount >= kRingSize)
-                          ? writeIndex          // ring has wrapped
-                          : 0;
+    const int start = (eventCount >= kRingSize) ? writeIndex : 0;
 
     for (int i = 0; i < total; ++i)
     {
@@ -203,7 +226,70 @@ void SessionLog::markCleanShutdown()
 }
 
 //==============================================================================
-// Crash report detection
+// Orphaned log scanning — multi-instance / multi-process safe
+//==============================================================================
+
+void SessionLog::promoteOrphanedLogs()
+{
+    auto dataDir = getDataDir();
+    if (! dataDir.isDirectory())
+        return;
+
+    // Find all session_log_*.json files
+    auto logFiles = dataDir.findChildFiles (
+        juce::File::findFiles, false, "session_log_*.json");
+
+    for (const auto& logFile : logFiles)
+    {
+        // Extract PID from filename: session_log_<pid>.json
+        auto name = logFile.getFileNameWithoutExtension();   // "session_log_12345"
+        auto pidStr = name.fromLastOccurrenceOf ("_", false, false); // "12345"
+
+        // Check if a matching clean-shutdown marker exists
+        auto markerFile = dataDir.getChildFile (".clean_shutdown_" + pidStr);
+        if (markerFile.existsAsFile())
+        {
+            // Clean shutdown — delete both and move on
+            logFile.deleteFile();
+            markerFile.deleteFile();
+            continue;
+        }
+
+        // No clean marker — this PID crashed (or is still running).
+        // Skip if the PID matches our own process (we're still alive).
+        if (pidStr == getProcessPidString())
+        {
+            // Stale log from a previous run that reused our PID.
+            // (The marker was already cleaned up above if it existed.)
+            // Fall through to promote it.
+        }
+
+        // Promote to pending crash report (append, don't overwrite —
+        // there could be multiple crashed PIDs).
+        auto pendingFile = getPendingCrashReportFile();
+        auto oldLog = logFile.loadFileAsString();
+        if (oldLog.isNotEmpty())
+        {
+            pendingFile.getParentDirectory().createDirectory();
+
+            juce::String report;
+            report << "=== Choroboros Crash Report (PID " << pidStr << ") ===\n";
+            report << "Previous session did not shut down cleanly.\n";
+            report << "Recovered session log follows:\n\n";
+            report << oldLog << "\n";
+
+            if (pendingFile.existsAsFile())
+                pendingFile.appendText (report);
+            else
+                pendingFile.replaceWithText (report);
+        }
+
+        logFile.deleteFile();
+    }
+}
+
+//==============================================================================
+// Crash report access — read without deleting, separate clear step
 //==============================================================================
 
 bool SessionLog::hasPendingCrashReport()
@@ -211,15 +297,17 @@ bool SessionLog::hasPendingCrashReport()
     return getPendingCrashReportFile().existsAsFile();
 }
 
-juce::String SessionLog::consumePendingCrashReport()
+juce::String SessionLog::readPendingCrashReport()
 {
     auto file = getPendingCrashReportFile();
     if (! file.existsAsFile())
         return {};
+    return file.loadFileAsString();
+}
 
-    auto content = file.loadFileAsString();
-    file.deleteFile();
-    return content;
+void SessionLog::clearPendingCrashReport()
+{
+    getPendingCrashReportFile().deleteFile();
 }
 
 //==============================================================================

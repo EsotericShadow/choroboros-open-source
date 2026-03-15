@@ -28,12 +28,17 @@
  *
  * Maintains a fixed-size ring buffer of recent plugin events (engine switches,
  * HQ toggles, preset loads, DSP anomalies, errors). Periodically flushed to
- * disk so the log survives crashes. On clean shutdown a "clean" marker is
- * written; if absent on next launch the previous session is treated as a crash.
+ * disk so the log survives crashes.
+ *
+ * Multi-instance safe: each SessionLog keys its live log and clean-shutdown
+ * marker by the host process PID, so multiple plugin instances in the same
+ * DAW share one log file (correct — they share one process) and instances in
+ * different DAWs don't collide. On startup the *first* instance to construct
+ * scans for orphaned logs from dead PIDs and promotes them to crash reports.
  *
  * Thread-safe: the ring buffer is guarded by a mutex. Audio-thread callers
- * use tryLog() which does a try_lock and silently drops the event on contention
- * rather than blocking the realtime thread.
+ * use tryLog() which does a try_lock and silently drops the event on
+ * contention rather than blocking the realtime thread.
  */
 class SessionLog : private juce::Timer
 {
@@ -76,18 +81,23 @@ public:
     /** Write a clean-shutdown marker so next launch knows we exited OK. */
     void markCleanShutdown();
 
-    /** Returns true if the previous session did NOT shut down cleanly. */
+    /** Returns true if there is at least one pending crash report. */
     static bool hasPendingCrashReport();
 
     /** Read the pending crash log and return it as a human-readable string.
-        Deletes the pending file after reading. */
-    static juce::String consumePendingCrashReport();
+        Does NOT delete the file — call clearPendingCrashReport() after
+        the user has successfully sent or dismissed it. */
+    static juce::String readPendingCrashReport();
+
+    /** Delete the pending crash report file (call after user action). */
+    static void clearPendingCrashReport();
 
     /** Get a concise summary of the current session log (for feedback email body). */
     juce::String getSessionSummary() const;
 
     //--------------------------------------------------------------------------
-    // Paths
+    // Paths (PID-keyed for multi-instance safety)
+    static juce::File getDataDir();
     static juce::File getLiveLogFile();
     static juce::File getCleanShutdownMarker();
     static juce::File getPendingCrashReportFile();
@@ -101,8 +111,16 @@ private:
     int eventCount = 0;          // total events written (may exceed kRingSize)
     mutable std::mutex mtx;
 
+    /** Instance ref-count: first ctor in this process scans for orphaned logs;
+        last dtor writes the clean-shutdown marker. */
+    static std::atomic<int> s_instanceCount;
+
     void pushEvent (EventType type, const juce::String& detail);
     juce::String formatLog() const;   // caller must hold mtx
+
+    /** Scan for session_log_*.json files with no matching .clean_shutdown_*
+        and promote them to crash reports. Only runs once per process. */
+    static void promoteOrphanedLogs();
 
     // Timer callback — periodic flush
     void timerCallback() override;

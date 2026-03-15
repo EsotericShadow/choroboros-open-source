@@ -874,8 +874,10 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     // Link session log to feedback collector for richer diagnostics
     feedbackCollector->setSessionLog(sessionLog.get());
 
-    // Install crash handlers so the session log is flushed on abnormal exit
-    CrashReporter::install(sessionLog.get());
+    // Install crash handlers — on crash, the handler deletes the clean-shutdown
+    // marker (using async-signal-safe unlink()) so next launch detects the crash.
+    // The session log itself is already on disk thanks to the 30s flush timer.
+    CrashReporter::install(SessionLog::getCleanShutdownMarker());
 
     instanceId = nextLoadTraceInstanceId();
     const double ctorStartMs = juce::Time::getMillisecondCounterHiRes();
@@ -1766,6 +1768,20 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         } scopedApplyFlag(engineProfileApplyInProgress);
 
         const int newEngine = juce::jlimit(0, 4, static_cast<int>(newValue));
+
+        // Log engine switch from the processor (covers automation, preset
+        // loads, state restores — not just editor clicks).
+        if (sessionLog != nullptr)
+        {
+            static const char* names[] = { "Green", "Blue", "Red", "Purple", "Black" };
+            const char* name = (newEngine >= 0 && newEngine < 5) ? names[newEngine] : "?";
+            bool hq = false;
+            if (auto* hqParam = parameters.getRawParameterValue(HQ_ID))
+                hq = hqParam->load() >= 0.5f;
+            sessionLog->log(SessionLog::EventType::EngineSwitch,
+                            juce::String(name) + (hq ? " HQ" : " NQ"));
+        }
+
         saveCurrentParamsToEngineProfile(lastEngineIndex);
         lastEngineIndex = newEngine;
         applyEngineParamProfile(newEngine);
@@ -1776,11 +1792,17 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
     {
         liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
         liveTelemetry.hqToggleCount.fetch_add(1, std::memory_order_relaxed);
+
+        const bool hqEnabled = (newValue >= 0.5f);
+
+        // Log HQ toggle from the processor (covers automation + state restore)
+        if (sessionLog != nullptr)
+            sessionLog->log(SessionLog::EventType::HqToggle,
+                            hqEnabled ? "HQ on" : "HQ off");
+
         if (chorusDSP != nullptr)
-        {
-            if (auto* hqParam = parameters.getRawParameterValue(HQ_ID))
-                chorusDSP->setQualityEnabled(hqParam->load() >= 0.5f);
-        }
+            chorusDSP->setQualityEnabled(hqEnabled);
+
         return;
     }
 
