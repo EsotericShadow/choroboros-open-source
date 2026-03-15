@@ -615,30 +615,27 @@ void DevPanel::resized()
     rightY += scopeHintH + 12;
 
     const int toolsH = 32;
-    const int modeLabelW = 48;
-    const int modeComboW = 136;
-    const int coreLabelW = 34;
+    const int modeLabelW = 52;
     const int modeHqW = 64;
     const int modeGap = 8;
     const int modeComboX = rightColumnX + modeLabelW + modeGap;
     const int hqX = rightColumnX + rightColumnWidth - modeHqW;
-    const int minCoreComboW = 188;
-    const int coreComboMaxW = juce::jmax(minCoreComboW, rightColumnWidth / 3);
-    int coreComboW = juce::jmin(coreComboMaxW, juce::jmax(minCoreComboW, hqX - modeGap - (modeComboX + modeComboW + modeGap + coreLabelW + modeGap)));
-    int coreComboX = hqX - modeGap - coreComboW;
-    const int coreLabelX = coreComboX - modeGap - coreLabelW;
-    if (coreLabelX < modeComboX + modeComboW + modeGap)
-    {
-        const int maxCoreComboW = juce::jmax(120, hqX - modeGap - (modeComboX + modeComboW + modeGap + coreLabelW + modeGap));
-        coreComboW = juce::jmax(120, juce::jmin(coreComboW, maxCoreComboW));
-        coreComboX = hqX - modeGap - coreComboW;
-    }
+    const int modeComboW = juce::jmax(120, juce::jmin(160, hqX - modeGap - modeComboX));
 
     devEngineModeLabel.setBounds(rightColumnX, rightY + 4, modeLabelW, toolsH - 4);
     devEngineModeBox.setBounds(modeComboX, rightY, modeComboW, toolsH);
-    devCoreModeLabel.setBounds(coreComboX - modeGap - coreLabelW, rightY + 4, coreLabelW, toolsH - 4);
-    devCoreModeBox.setBounds(coreComboX, rightY, coreComboW, toolsH);
     devHqModeToggle.setBounds(hqX, rightY, modeHqW, toolsH);
+    rightY += toolsH + 6;
+
+    const int warningH = 18;
+    coreAssignmentWarningLabel.setBounds(rightColumnX, rightY, rightColumnWidth, warningH);
+    rightY += warningH + 4;
+
+    const int coreLabelW = 180;
+    const int coreComboX = rightColumnX + coreLabelW + modeGap;
+    const int coreComboW = juce::jmax(160, rightColumnWidth - coreLabelW - modeGap);
+    devCoreModeLabel.setBounds(rightColumnX, rightY + 4, coreLabelW, toolsH - 4);
+    devCoreModeBox.setBounds(coreComboX, rightY, coreComboW, toolsH);
     rightY += toolsH + 14;
 
     const bool showRightTools = selectedRightTab == 3;
@@ -1014,7 +1011,8 @@ void DevPanel::updateActiveProfileLabel()
 
     activeProfileLabel.setColour(juce::Label::textColourId, profileAccent);
     devEngineModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
-    devCoreModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
+    coreAssignmentWarningLabel.setColour(juce::Label::textColourId, hackerTextDim().withAlpha(0.4f));
+    devCoreModeLabel.setColour(juce::Label::textColourId, hackerTextDim().withAlpha(0.6f));
     inspectorTitle.setColour(juce::Label::textColourId, hackerText());
     inspectorDescription.setColour(juce::Label::textColourId, hackerTextDim());
     const int selectorAccentIndex = (settingsAccentSource == 1)
@@ -1022,6 +1020,7 @@ void DevPanel::updateActiveProfileLabel()
         : colorIndex;
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
     styleProfileSelectorComboBox(devCoreModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
+    devCoreModeBox.setColour(juce::ComboBox::outlineColourId, hackerTextDim().withAlpha(0.3f));
     styleHackerToggleButton(devHqModeToggle);
     styleHackerTextButton(copyJsonButton, false);
     styleHackerTextButton(saveDefaultsButton, false);
@@ -1039,9 +1038,10 @@ void DevPanel::updateActiveProfileLabel()
 
     activeProfileLabel.setText("Active Profile: " + profileName,
                                juce::dontSendNotification);
-    devCoreModeBox.setTooltip("Active core: " + juce::String(choroboros::coreIdToDisplayName(coreId))
+    devCoreModeBox.setTooltip("ADVANCED: Assign a different DSP core to this engine slot. This is a modular remapping feature - not the same as switching engines. Active core: "
+                              + juce::String(choroboros::coreIdToDisplayName(coreId))
                               + " (" + juce::String(choroboros::coreIdToToken(coreId))
-                              + "). Duplicate assignments are allowed.");
+                              + "). Duplicate assignments are allowed. Use the Engine dropdown above for normal engine switching.");
 
     juce::String scopeText;
     const juce::String subView = getSubTabName(selectedRightTab, getSelectedSubTab());
@@ -1274,6 +1274,7 @@ void DevPanel::updateRightTabVisibility()
         activeScopeHintLabel.setVisible(false);
     devEngineModeLabel.setVisible(true);
     devEngineModeBox.setVisible(true);
+    coreAssignmentWarningLabel.setVisible(true);
     devCoreModeLabel.setVisible(true);
     devCoreModeBox.setVisible(true);
     devHqModeToggle.setVisible(true);
@@ -1478,6 +1479,7 @@ void DevPanel::applyUiPreferences()
     activeProfileLabel.setFont(makeLabelFont(Typography::description, false));
     activeScopeHintLabel.setFont(makeLabelFont(Typography::description, false));
     devEngineModeLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    coreAssignmentWarningLabel.setFont(makeLabelFont(Typography::labelSmall, false));
     devCoreModeLabel.setFont(makeLabelFont(Typography::labelSmall, false));
     engineFilterLabel.setFont(makeLabelFont(Typography::labelSmall, false));
     tutorialStepLabel.setFont(makeLabelFont(Typography::labelSmall, false));
@@ -1491,6 +1493,7 @@ void DevPanel::applyUiPreferences()
         : currentEngine;
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
     styleProfileSelectorComboBox(devCoreModeBox, profileSelectorColourForEngineIndex(selectorAccentIndex));
+    devCoreModeBox.setColour(juce::ComboBox::outlineColourId, hackerTextDim().withAlpha(0.3f));
     styleHackerToggleButton(devHqModeToggle);
     styleHackerTextButton(copyJsonButton, false);
     styleHackerTextButton(saveDefaultsButton, false);

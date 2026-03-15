@@ -24,7 +24,7 @@ class LabelWithContainer : public juce::Label, private juce::Timer
 {
 public:
     LabelWithContainer() = default;
-    ~LabelWithContainer() override = default;
+    ~LabelWithContainer() override;
     
     void paint(juce::Graphics& g) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;

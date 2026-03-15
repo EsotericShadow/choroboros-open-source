@@ -28,6 +28,8 @@ using namespace devpanel;
 
 DevPanel::~DevPanel()
 {
+    stopTimer();
+
     if (tooltipWindow != nullptr)
         tooltipWindow->setLookAndFeel(nullptr);
     devEngineModeBox.setLookAndFeel(nullptr);
@@ -92,7 +94,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
 
     content.addAndMakeVisible(resetFactoryButton);
     resetFactoryButton.setButtonText("Reset to Factory");
-    resetFactoryButton.setTooltip("Resets runtime tuning/layout to factory baseline, writes factory sheet, then replaces user defaults with factory.");
+    resetFactoryButton.setTooltip("Resets runtime tuning/layout to factory baseline and replaces user defaults from the factory source without overwriting the factory sheet.");
     resetFactoryButton.onClick = [this]
     {
         if (settingsConfirmResetFactory)
@@ -278,7 +280,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     activeScopeHintLabel.setColour(juce::Label::textColourId, hackerTextDim());
     activeScopeHintLabel.setJustificationType(juce::Justification::centredLeft);
     activeScopeHintLabel.setTooltip("Changing Engine/HQ changes which profile is being edited.");
-    devEngineModeLabel.setText("Profile", juce::dontSendNotification);
+    devEngineModeLabel.setText("Engine", juce::dontSendNotification);
     devEngineModeLabel.setFont(makeLabelFont(Typography::labelSmall, false));
     devEngineModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
     devEngineModeLabel.setJustificationType(juce::Justification::centredLeft);
@@ -316,11 +318,16 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         repaint();
     };
 
-    devCoreModeLabel.setText("Core", juce::dontSendNotification);
+    coreAssignmentWarningLabel.setText("--- Advanced Core Mapping ---", juce::dontSendNotification);
+    coreAssignmentWarningLabel.setFont(makeLabelFont(Typography::labelSmall, false));
+    coreAssignmentWarningLabel.setColour(juce::Label::textColourId, hackerTextDim().withAlpha(0.4f));
+    coreAssignmentWarningLabel.setJustificationType(juce::Justification::centred);
+
+    devCoreModeLabel.setText("Core Assignment (Advanced)", juce::dontSendNotification);
     devCoreModeLabel.setFont(makeLabelFont(Typography::labelSmall, false));
-    devCoreModeLabel.setColour(juce::Label::textColourId, hackerTextDim());
+    devCoreModeLabel.setColour(juce::Label::textColourId, hackerTextDim().withAlpha(0.6f));
     devCoreModeLabel.setJustificationType(juce::Justification::centredLeft);
-    devCoreModeLabel.setTooltip("Assign the active core package for the selected Profile + HQ/NQ slot.");
+    devCoreModeLabel.setTooltip("ADVANCED: Reassigns which DSP algorithm runs in the current engine slot. This does NOT switch engines - it remaps the underlying core package. Most users should use the Engine dropdown above instead.");
 
     for (std::size_t i = 0; i < choroboros::coreIdCount(); ++i)
     {
@@ -328,7 +335,8 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         const juce::String coreLabel(choroboros::coreIdToToken(coreId));
         devCoreModeBox.addItem(coreLabel, static_cast<int>(i) + 1);
     }
-    devCoreModeBox.setTooltip("Assign active slot core. List includes all 10 core packages (duplicates warn but are allowed).");
+    devCoreModeBox.setTooltip("ADVANCED: Assign a different DSP core to this engine slot. This is a modular remapping feature - not the same as switching engines. Use the Engine dropdown above for normal engine switching.");
+    devCoreModeBox.setColour(juce::ComboBox::outlineColourId, hackerTextDim().withAlpha(0.3f));
     devCoreModeBox.onChange = [this]
     {
         if (suppressDevModeControlCallbacks)
@@ -351,7 +359,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     };
 
     devHqModeToggle.setButtonText("HQ");
-    devHqModeToggle.setTooltip("Toggle NQ/HQ directly from the Dev Panel.");
+    devHqModeToggle.setTooltip("Toggle NQ/HQ algorithm. HQ uses a different DSP topology per engine (ensemble, orbit, tape, higher-order interpolation) - expect wider stereo imaging and different character, not just higher fidelity.");
     devHqModeToggle.onClick = [this]
     {
         if (suppressDevModeControlCallbacks)
@@ -399,6 +407,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     content.addAndMakeVisible(activeScopeHintLabel);
     content.addAndMakeVisible(devEngineModeLabel);
     content.addAndMakeVisible(devEngineModeBox);
+    content.addAndMakeVisible(coreAssignmentWarningLabel);
     content.addAndMakeVisible(devCoreModeLabel);
     content.addAndMakeVisible(devCoreModeBox);
     content.addAndMakeVisible(devHqModeToggle);
@@ -641,6 +650,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         : initialEngineIndex;
     styleProfileSelectorComboBox(devEngineModeBox, profileSelectorColourForEngineIndex(initialSelectorAccent));
     styleProfileSelectorComboBox(devCoreModeBox, profileSelectorColourForEngineIndex(initialSelectorAccent));
+    devCoreModeBox.setColour(juce::ComboBox::outlineColourId, hackerTextDim().withAlpha(0.3f));
     styleHackerToggleButton(devHqModeToggle);
     styleHackerEditor(engineFilterEditor);
 

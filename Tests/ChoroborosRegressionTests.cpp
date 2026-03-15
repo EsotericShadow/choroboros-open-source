@@ -165,6 +165,77 @@ static void testMaxBlockChannels()
     REGRESS_ASSERT(!hasNaNOrInf(buf), "Max block 2ch produced NaN/Inf");
 }
 
+static void testKnownBadBundledEngineProfilesMigrateToDefaults()
+{
+    const juce::String knownBadProfilesJson = R"JSON({
+  "engineParamProfiles": {
+    "green": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 1.0000, "color": 0.9900},
+    "blue": {"valid": true, "rate": 2.2600, "depth": 0.5600, "offset": 55.0000, "width": 1.1300, "mix": 0.5000, "color": 0.0000},
+    "red": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 1.0000, "color": 0.4400},
+    "purple": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 0.5000, "color": 1.0000},
+    "black": {"valid": true, "rate": 10.0000, "depth": 1.0000, "offset": 180.0000, "width": 2.0000, "mix": 0.5000, "color": 1.0000}
+  }
+})JSON";
+
+    ChoroborosAudioProcessor proc;
+    const juce::var parsed = juce::JSON::parse(knownBadProfilesJson);
+    REGRESS_ASSERT(!parsed.isVoid(), "Known-bad engine profile JSON failed to parse");
+    const auto* root = parsed.getDynamicObject();
+    REGRESS_ASSERT(root != nullptr, "Known-bad engine profile JSON missing root object");
+    REGRESS_ASSERT(root != nullptr && root->hasProperty("engineParamProfiles"),
+                   "Known-bad engine profile JSON missing engineParamProfiles");
+
+    if (root == nullptr || !root->hasProperty("engineParamProfiles"))
+        return;
+
+    proc.loadEngineParamProfilesFromVar(root->getProperty("engineParamProfiles"));
+
+    struct ExpectedMappedProfile
+    {
+        float rate;
+        float depth;
+        float offset;
+        float width;
+        float mix;
+        float color;
+    };
+
+    static constexpr std::array<ExpectedMappedProfile, 5> expectedProfiles {{
+        { 0.65f, 0.21f, 33.0f, 1.5f, 0.5f, 0.16f },
+        { 0.26f, 0.53f, 59.0f, 1.0f, 0.5f, 0.41f },
+        { 0.62f, 0.21f, 56.0f, 1.5f, 0.5f, 0.5f },
+        { 0.12f, 0.52f, 52.0f, 2.0f, 0.69f, 0.13f },
+        { 0.8f, 0.35f, 41.0f, 1.59f, 0.5f, 0.28f }
+    }};
+
+    const auto& profiles = proc.getEngineParamProfiles();
+    auto expectNear = [](float actual, float expected, const juce::String& label)
+    {
+        REGRESS_ASSERT(std::abs(actual - expected) < 0.0005f,
+                       (label + " expected " + juce::String(expected, 4)
+                        + ", got " + juce::String(actual, 4)).toStdString());
+    };
+
+    for (int i = 0; i < static_cast<int>(expectedProfiles.size()); ++i)
+    {
+        const auto& expected = expectedProfiles[static_cast<size_t>(i)];
+        const auto& actual = profiles[static_cast<size_t>(i)];
+        REGRESS_ASSERT(actual.valid, ("Engine " + juce::String(i) + " migrated profile should remain valid").toStdString());
+        expectNear(actual.rate, proc.unmapParameterValue(ChoroborosAudioProcessor::RATE_ID, expected.rate),
+                   "Engine " + juce::String(i) + " profile rate mismatch");
+        expectNear(actual.depth, proc.unmapParameterValue(ChoroborosAudioProcessor::DEPTH_ID, expected.depth),
+                   "Engine " + juce::String(i) + " profile depth mismatch");
+        expectNear(actual.offset, proc.unmapParameterValue(ChoroborosAudioProcessor::OFFSET_ID, expected.offset),
+                   "Engine " + juce::String(i) + " profile offset mismatch");
+        expectNear(actual.width, proc.unmapParameterValue(ChoroborosAudioProcessor::WIDTH_ID, expected.width),
+                   "Engine " + juce::String(i) + " profile width mismatch");
+        expectNear(actual.mix, proc.unmapParameterValue(ChoroborosAudioProcessor::MIX_ID, expected.mix),
+                   "Engine " + juce::String(i) + " profile mix mismatch");
+        expectNear(actual.color, proc.unmapParameterValue(ChoroborosAudioProcessor::COLOR_ID, expected.color),
+                   "Engine " + juce::String(i) + " profile color mismatch");
+    }
+}
+
 static devpanel::CommandConsolePropertyComponent* findConsoleComponentRecursive(juce::Component& root)
 {
     if (auto* console = dynamic_cast<devpanel::CommandConsolePropertyComponent*>(&root))
@@ -515,6 +586,7 @@ int main(int argc, char** argv)
     testEngineHQTorture();
     testStateRoundTrip();
     testMaxBlockChannels();
+    testKnownBadBundledEngineProfilesMigrateToDefaults();
     if (runGuiSuite)
         testConsoleCommandLatencyUnderAudioLoad();
     else

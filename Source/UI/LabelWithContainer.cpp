@@ -31,6 +31,11 @@ bool tryParseNumericValue(const juce::String& text, double& out)
 }
 }
 
+LabelWithContainer::~LabelWithContainer()
+{
+    stopTimer();
+}
+
 void LabelWithContainer::setAnimatedValueText(const juce::String& text)
 {
     if (!isValueLabelStyle || !flipAnimationEnabled || !flipHasVisualEffect)

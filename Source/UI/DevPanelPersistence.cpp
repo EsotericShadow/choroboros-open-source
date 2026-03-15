@@ -621,11 +621,10 @@ void DevPanel::resetToFactoryDefaults()
     processor.resetToFactoryDefaults();
     editor.resetLayoutToFactoryDefaults();
 
-    const auto factoryJson = buildJson();
     juce::String factoryErr;
     juce::String userErr;
-    const bool factoryOk = DefaultsPersistence::saveFactory(factoryJson, &factoryErr);
-    const bool userOk = DefaultsPersistence::saveUser(factoryJson, &userErr);
+    const auto factoryJson = DefaultsPersistence::loadFactory(&factoryErr);
+    const bool userOk = !factoryJson.isEmpty() && DefaultsPersistence::saveUser(factoryJson, &userErr);
 
     auto refreshPanel = [](juce::PropertyPanel& panel) { panel.refreshAll(); };
     refreshPanel(mappingPanel);
@@ -660,10 +659,10 @@ void DevPanel::resetToFactoryDefaults()
     refreshSecondaryTabButtons();
     resized();
 
-    if (factoryOk && userOk)
+    if (userOk)
         resetFactoryButton.setButtonText("Factory Reset (Saved)");
-    else if (userOk)
-        resetFactoryButton.setButtonText("Factory Save Failed");
+    else if (factoryJson.isEmpty())
+        resetFactoryButton.setButtonText("Factory Load Failed");
     else
         resetFactoryButton.setButtonText("Reset Failed");
 

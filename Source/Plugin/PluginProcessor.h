@@ -245,6 +245,7 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void applyEngineParamProfile(int engineIndex);
     void saveCurrentParamsToEngineProfile(int engineIndex);
+    bool migrateKnownBadEngineParamProfiles();
     EngineParamProfile getEngineDefaults(int engineIndex) const;
     void initializeEngineInternalProfiles();
     void persistActiveEngineInternalsFromDsp();

@@ -338,7 +338,7 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.rateSmoothingMs.store(23.1f);
     r.depthSmoothingMs.store(43.2f);
     r.depthRateLimit.store(5.0f);
-    r.centreDelaySmoothingMs.store(152.4f);
+    r.centreDelaySmoothingMs.store(60.0f);
     r.centreDelayBaseMs.store(9.3f);
     r.centreDelayScale.store(1.6f);
     r.colorSmoothingMs.store(127.4f);
@@ -366,14 +366,14 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.bbdDepthMs.store(13.2f);
     r.bbdClockSmoothingMs.store(41.7f);
     r.bbdFilterSmoothingMs.store(46.7f);
-    r.bbdFilterCutoffMinHz.store(900.0f);
+    r.bbdFilterCutoffMinHz.store(3000.0f);
     r.bbdFilterCutoffMaxHz.store(16000.0f);
     r.bbdFilterCutoffScale.store(0.62f);
-    r.bbdClockMinHz.store(1200.0f);
+    r.bbdClockMinHz.store(6000.0f);
     r.bbdClockMaxRatio.store(1.0f);
     r.bbdStages.store(1024.0f);
     r.bbdFilterMaxRatio.store(0.42f);
-    r.tapeDelaySmoothingMs.store(180.0f);
+    r.tapeDelaySmoothingMs.store(90.0f);
     r.tapeCentreBaseMs.store(16.0f);
     r.tapeCentreScale.store(2.0f);
     r.tapeToneMaxHz.store(16000.0f);
@@ -394,7 +394,7 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.tapeFlutterDepthSpread.store(0.0001f);
     r.tapeRatioMin.store(0.96f);
     r.tapeRatioMax.store(1.04f);
-    r.tapeWetGain.store(1.15f);
+    r.tapeWetGain.store(1.05f);
     r.tapeHermiteTension.store(0.75f);
 }
 
@@ -403,7 +403,7 @@ void setRedHQDefaults(ChorusDSP::RuntimeTuning& r)
     r.rateSmoothingMs.store(23.1f);
     r.depthSmoothingMs.store(43.2f);
     r.depthRateLimit.store(5.0f);
-    r.centreDelaySmoothingMs.store(152.4f);
+    r.centreDelaySmoothingMs.store(60.0f);
     r.centreDelayBaseMs.store(9.3f);
     r.centreDelayScale.store(1.6f);
     r.colorSmoothingMs.store(110.0f);
@@ -431,14 +431,14 @@ void setRedHQDefaults(ChorusDSP::RuntimeTuning& r)
     r.bbdDepthMs.store(13.2f);
     r.bbdClockSmoothingMs.store(41.7f);
     r.bbdFilterSmoothingMs.store(46.7f);
-    r.bbdFilterCutoffMinHz.store(900.0f);
+    r.bbdFilterCutoffMinHz.store(3000.0f);
     r.bbdFilterCutoffMaxHz.store(16000.0f);
     r.bbdFilterCutoffScale.store(0.62f);
-    r.bbdClockMinHz.store(1200.0f);
+    r.bbdClockMinHz.store(6000.0f);
     r.bbdClockMaxRatio.store(1.0f);
     r.bbdStages.store(1024.0f);
     r.bbdFilterMaxRatio.store(0.42f);
-    r.tapeDelaySmoothingMs.store(140.0f);
+    r.tapeDelaySmoothingMs.store(90.0f);
     r.tapeCentreBaseMs.store(15.0f);
     r.tapeCentreScale.store(2.6f);
     r.tapeToneMaxHz.store(20000.0f);
@@ -459,7 +459,7 @@ void setRedHQDefaults(ChorusDSP::RuntimeTuning& r)
     r.tapeFlutterDepthSpread.store(0.0001f);
     r.tapeRatioMin.store(0.97f);
     r.tapeRatioMax.store(1.03f);
-    r.tapeWetGain.store(1.08f);
+    r.tapeWetGain.store(1.05f);
     r.tapeHermiteTension.store(0.75f);
 }
 
@@ -472,6 +472,35 @@ bool isKnownBadRedNQProfile(const ChorusDSP::RuntimeTuning& r)
         && r.bbdClockMinHz.load() <= 250.0f
         && r.bbdDelayMaxMs.load() >= 120.0f
         && r.bbdDelaySmoothingMs.load() >= 150.0f;
+}
+
+bool nearlyEqualProfileValue(float a, float b)
+{
+    return std::abs(a - b) < 0.0005f;
+}
+
+bool matchesEngineProfile(const EngineParamProfile& actual,
+                          const EngineParamProfile& expected)
+{
+    return actual.valid == expected.valid
+        && nearlyEqualProfileValue(actual.rate, expected.rate)
+        && nearlyEqualProfileValue(actual.depth, expected.depth)
+        && nearlyEqualProfileValue(actual.offset, expected.offset)
+        && nearlyEqualProfileValue(actual.width, expected.width)
+        && nearlyEqualProfileValue(actual.mix, expected.mix)
+        && nearlyEqualProfileValue(actual.color, expected.color);
+}
+
+const std::array<EngineParamProfile, 5>& getKnownBadBundledEngineProfiles()
+{
+    static const std::array<EngineParamProfile, 5> profiles {{
+        { true, 10.0f, 1.0f, 180.0f, 2.0f, 1.0f, 0.99f },
+        { true, 2.26f, 0.56f, 55.0f, 1.13f, 0.5f, 0.0f },
+        { true, 10.0f, 1.0f, 180.0f, 2.0f, 1.0f, 0.44f },
+        { true, 10.0f, 1.0f, 180.0f, 2.0f, 0.5f, 1.0f },
+        { true, 10.0f, 1.0f, 180.0f, 2.0f, 0.5f, 1.0f }
+    }};
+    return profiles;
 }
 
 void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::RuntimeTuning& dst)
@@ -892,6 +921,8 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
+    stopTimer();
+
     if (analyzerWorker != nullptr)
         analyzerWorker->stopThread(1500);
 
@@ -994,9 +1025,9 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
     };
     
     // Apply preset values
-    if (index == 0) // Classic (Green): NQ, R=1.2Hz, D=21%, O=33°, W=150%, M=50%, C=16%
+    if (index == 0) // Classic (Green): NQ, R=0.65Hz, D=21%, O=33°, W=150%, M=50%, C=16%
     {
-        setMappedParam(RATE_ID, 1.2f);
+        setMappedParam(RATE_ID, 0.65f);
         setMappedParam(DEPTH_ID, 0.21f);
         setMappedParam(OFFSET_ID, 33.0f);
         setMappedParam(WIDTH_ID, 1.5f);
@@ -1046,9 +1077,9 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
         if (auto* param = parameters.getParameter(HQ_ID))
             param->setValueNotifyingHost(0.0f);
     }
-    else if (index == 4) // Core (Black): HQ, R=1.2Hz, D=35%, O=41°, W=159%, M=50%, C=28%
+    else if (index == 4) // Core (Black): HQ, R=0.8Hz, D=35%, O=41°, W=159%, M=50%, C=28%
     {
-        setMappedParam(RATE_ID, 1.2f);
+        setMappedParam(RATE_ID, 0.8f);
         setMappedParam(DEPTH_ID, 0.35f);
         setMappedParam(OFFSET_ID, 41.0f);
         setMappedParam(WIDTH_ID, 1.59f);
@@ -1690,6 +1721,11 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
     {
         liveTelemetry.parameterWriteCount.fetch_add(1, std::memory_order_relaxed);
         liveTelemetry.hqToggleCount.fetch_add(1, std::memory_order_relaxed);
+        if (chorusDSP != nullptr)
+        {
+            if (auto* hqParam = parameters.getRawParameterValue(HQ_ID))
+                chorusDSP->setQualityEnabled(hqParam->load() >= 0.5f);
+        }
         return;
     }
 
@@ -2081,6 +2117,29 @@ void ChoroborosAudioProcessor::loadEngineParamProfilesFromVar(const juce::var& p
         p.mix = getNum(engVar, "mix", p.mix);
         p.color = getNum(engVar, "color", p.color);
     }
+
+    if (migrateKnownBadEngineParamProfiles())
+    {
+        logLoadTraceEvent("engine_profile_defaults_migrated",
+                          0.0,
+                          "source=known_bad_bundled_profiles");
+    }
+}
+
+bool ChoroborosAudioProcessor::migrateKnownBadEngineParamProfiles()
+{
+    const auto& knownBadProfiles = getKnownBadBundledEngineProfiles();
+    for (int i = 0; i < 5; ++i)
+    {
+        if (!matchesEngineProfile(engineParamProfiles[static_cast<size_t>(i)],
+                                  knownBadProfiles[static_cast<size_t>(i)]))
+            return false;
+    }
+
+    for (int i = 0; i < 5; ++i)
+        engineParamProfiles[static_cast<size_t>(i)] = getEngineDefaults(i);
+
+    return true;
 }
 
 EngineParamProfile ChoroborosAudioProcessor::getEngineDefaults(int engineIndex) const
@@ -2089,11 +2148,11 @@ EngineParamProfile ChoroborosAudioProcessor::getEngineDefaults(int engineIndex) 
     mappedDefaults.valid = true;
     switch (engineIndex)
     {
-        case 0: mappedDefaults.rate = 1.2f;  mappedDefaults.depth = 0.21f; mappedDefaults.offset = 33.0f; mappedDefaults.width = 1.5f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.16f; break;
+        case 0: mappedDefaults.rate = 0.65f; mappedDefaults.depth = 0.21f; mappedDefaults.offset = 33.0f; mappedDefaults.width = 1.5f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.16f; break;
         case 1: mappedDefaults.rate = 0.26f; mappedDefaults.depth = 0.53f; mappedDefaults.offset = 59.0f; mappedDefaults.width = 1.0f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.41f; break;
         case 2: mappedDefaults.rate = 0.62f; mappedDefaults.depth = 0.21f; mappedDefaults.offset = 56.0f; mappedDefaults.width = 1.5f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.5f;  break;
         case 3: mappedDefaults.rate = 0.12f; mappedDefaults.depth = 0.52f; mappedDefaults.offset = 52.0f; mappedDefaults.width = 2.0f;  mappedDefaults.mix = 0.69f; mappedDefaults.color = 0.13f; break;
-        case 4: mappedDefaults.rate = 1.2f;  mappedDefaults.depth = 0.35f; mappedDefaults.offset = 41.0f; mappedDefaults.width = 1.59f; mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.28f; break;
+        case 4: mappedDefaults.rate = 0.8f;  mappedDefaults.depth = 0.35f; mappedDefaults.offset = 41.0f; mappedDefaults.width = 1.59f; mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.28f; break;
         default: mappedDefaults.rate = 0.5f; mappedDefaults.depth = 0.5f; mappedDefaults.offset = 90.0f; mappedDefaults.width = 1.0f; mappedDefaults.mix = 0.5f; mappedDefaults.color = 0.5f;
     }
 

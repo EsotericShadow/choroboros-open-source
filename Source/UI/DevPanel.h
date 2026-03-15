@@ -211,6 +211,7 @@ private:
     juce::Label activeProfileLabel;
     juce::Label activeScopeHintLabel;
     juce::Label devEngineModeLabel;
+    juce::Label coreAssignmentWarningLabel;
     juce::Label devCoreModeLabel;
     juce::Label engineFilterLabel;
     juce::Label inspectorTitle;

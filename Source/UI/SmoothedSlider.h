@@ -39,6 +39,7 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
+    void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
     void setSmoothingTime(float timeMs);
     void setUseExponential(bool useExp);
@@ -61,7 +62,9 @@ private:
     bool useExponential = false;
     bool needsRepaint = false;
     float dragSensitivityScale = 1.0f;
+    int64_t lastScrollTimeMs = 0;
     
     float getSampleRate() const { return 120.0f; } // 120 FPS for visual updates (smoother animation)
     void updateSmoothingCoeff();
+    void snapVisualToValue();
 };

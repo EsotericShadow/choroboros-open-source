@@ -38,9 +38,9 @@ public:
     struct RuntimeTuning
     {
         std::atomic<float> rateSmoothingMs { 20.0f };
-        std::atomic<float> depthSmoothingMs { 150.0f };
-        std::atomic<float> depthRateLimit { 0.25f };
-        std::atomic<float> centreDelaySmoothingMs { 150.0f };
+        std::atomic<float> depthSmoothingMs { 50.0f };
+        std::atomic<float> depthRateLimit { 2.0f };
+        std::atomic<float> centreDelaySmoothingMs { 60.0f };
         std::atomic<float> colorSmoothingMs { 20.0f };
         std::atomic<float> widthSmoothingMs { 20.0f };
         std::atomic<float> centreDelayBaseMs { 8.0f };
@@ -69,7 +69,7 @@ public:
         std::atomic<float> greenBloomCutoffMaxHz { 18000.0f };
         std::atomic<float> greenBloomCutoffMinHz { 2600.0f };
         std::atomic<float> greenBloomWetBlend { 0.48f };
-        std::atomic<float> greenBloomGain { 0.10f };
+        std::atomic<float> greenBloomGain { 0.05f };
 
         // Blue (Focus) wet-character internals.
         std::atomic<float> blueFocusExponent { 1.35f };
@@ -83,7 +83,7 @@ public:
         std::atomic<float> bluePresenceQMax { 1.10f };
         std::atomic<float> bluePresenceGainMaxDb { 4.8f };
         std::atomic<float> blueFocusWetBlend { 0.68f };
-        std::atomic<float> blueFocusOutputGain { 0.08f };
+        std::atomic<float> blueFocusOutputGain { 0.04f };
 
         // Purple NQ (Phase Warped) character internals.
         std::atomic<float> purpleWarpA { 0.35f };
@@ -123,15 +123,15 @@ public:
         std::atomic<float> bbdDepthMs { 12.0f };
         std::atomic<float> bbdClockSmoothingMs { 20.0f };
         std::atomic<float> bbdFilterSmoothingMs { 10.0f };
-        std::atomic<float> bbdFilterCutoffMinHz { 1200.0f };
+        std::atomic<float> bbdFilterCutoffMinHz { 3000.0f };
         std::atomic<float> bbdFilterCutoffMaxHz { 9000.0f };
         std::atomic<float> bbdFilterCutoffScale { 0.45f };
-        std::atomic<float> bbdClockMinHz { 2000.0f };
+        std::atomic<float> bbdClockMinHz { 6000.0f };
         std::atomic<float> bbdClockMaxRatio { 0.9f };
         std::atomic<float> bbdStages { 1024.0f };
         std::atomic<float> bbdFilterMaxRatio { 0.22f };
 
-        std::atomic<float> tapeDelaySmoothingMs { 180.0f };
+        std::atomic<float> tapeDelaySmoothingMs { 90.0f };
         std::atomic<float> tapeCentreBaseMs { 16.0f };
         std::atomic<float> tapeCentreScale { 2.0f };
         std::atomic<float> tapeToneMaxHz { 16000.0f };
@@ -139,9 +139,9 @@ public:
         std::atomic<float> tapeToneSmoothingCoeff { 0.08f };
         std::atomic<float> tapeDriveScale { 0.35f };
         std::atomic<float> tapeLfoRatioScale { 0.05f };
-        std::atomic<float> tapeLfoModSmoothingCoeff { 0.0015f };
+        std::atomic<float> tapeLfoModSmoothingCoeff { 0.008f };
         std::atomic<float> tapeRatioSmoothingCoeff { 0.004f };
-        std::atomic<float> tapePhaseDamping { 1.0f };
+        std::atomic<float> tapePhaseDamping { 0.99999f };
         std::atomic<float> tapeWowFreqBase { 0.33f };
         std::atomic<float> tapeWowFreqSpread { 0.03f };
         std::atomic<float> tapeFlutterFreqBase { 5.8f };
@@ -152,7 +152,7 @@ public:
         std::atomic<float> tapeFlutterDepthSpread { 0.0001f };
         std::atomic<float> tapeRatioMin { 0.96f };
         std::atomic<float> tapeRatioMax { 1.04f };
-        std::atomic<float> tapeWetGain { 1.15f };
+        std::atomic<float> tapeWetGain { 1.05f };
         std::atomic<float> tapeHermiteTension { 0.75f };
     };
 
@@ -211,9 +211,9 @@ private:
     struct RuntimeTuningSnapshot
     {
         float rateSmoothingMs = 20.0f;
-        float depthSmoothingMs = 150.0f;
-        float depthRateLimit = 0.25f;
-        float centreDelaySmoothingMs = 150.0f;
+        float depthSmoothingMs = 50.0f;
+        float depthRateLimit = 2.0f;
+        float centreDelaySmoothingMs = 60.0f;
         float colorSmoothingMs = 20.0f;
         float widthSmoothingMs = 20.0f;
         float centreDelayBaseMs = 8.0f;
@@ -241,7 +241,7 @@ private:
         float greenBloomCutoffMaxHz = 18000.0f;
         float greenBloomCutoffMinHz = 2600.0f;
         float greenBloomWetBlend = 0.48f;
-        float greenBloomGain = 0.10f;
+        float greenBloomGain = 0.05f;
 
         float blueFocusExponent = 1.35f;
         float blueFocusHpMinHz = 70.0f;
@@ -254,7 +254,7 @@ private:
         float bluePresenceQMax = 1.10f;
         float bluePresenceGainMaxDb = 4.8f;
         float blueFocusWetBlend = 0.68f;
-        float blueFocusOutputGain = 0.08f;
+        float blueFocusOutputGain = 0.04f;
 
         float purpleWarpA = 0.35f;
         float purpleWarpB = 0.18f;
@@ -290,15 +290,15 @@ private:
         float bbdDepthMs = 12.0f;
         float bbdClockSmoothingMs = 20.0f;
         float bbdFilterSmoothingMs = 10.0f;
-        float bbdFilterCutoffMinHz = 1200.0f;
+        float bbdFilterCutoffMinHz = 3000.0f;
         float bbdFilterCutoffMaxHz = 9000.0f;
         float bbdFilterCutoffScale = 0.45f;
-        float bbdClockMinHz = 2000.0f;
+        float bbdClockMinHz = 6000.0f;
         float bbdClockMaxRatio = 0.9f;
         float bbdStages = 1024.0f;
         float bbdFilterMaxRatio = 0.22f;
 
-        float tapeDelaySmoothingMs = 180.0f;
+        float tapeDelaySmoothingMs = 90.0f;
         float tapeCentreBaseMs = 16.0f;
         float tapeCentreScale = 2.0f;
         float tapeToneMaxHz = 16000.0f;
@@ -306,9 +306,9 @@ private:
         float tapeToneSmoothingCoeff = 0.08f;
         float tapeDriveScale = 0.35f;
         float tapeLfoRatioScale = 0.05f;
-        float tapeLfoModSmoothingCoeff = 0.0015f;
+        float tapeLfoModSmoothingCoeff = 0.008f;
         float tapeRatioSmoothingCoeff = 0.004f;
-        float tapePhaseDamping = 1.0f;
+        float tapePhaseDamping = 0.99999f;
         float tapeWowFreqBase = 0.33f;
         float tapeWowFreqSpread = 0.03f;
         float tapeFlutterFreqBase = 5.8f;
@@ -319,7 +319,7 @@ private:
         float tapeFlutterDepthSpread = 0.0001f;
         float tapeRatioMin = 0.96f;
         float tapeRatioMax = 1.04f;
-        float tapeWetGain = 1.15f;
+        float tapeWetGain = 1.05f;
         float tapeHermiteTension = 0.75f;
     };
 
@@ -413,9 +413,8 @@ private:
     float depthSmoothingCoeff = 0.0f;  // One-pole filter coefficient
     
     // Rate limiter for depth - prevents rapid changes that overwhelm the smoother
-    // Maximum change rate: 0.25 per second (full range in 4 seconds, reduced for ultra-smooth catch-up)
-    // This ensures smooth transitions even during rapid 0-100% changes
-    float depthRateLimit = 0.25f;  // Maximum change per second
+    // Maximum change rate: 2.0 per second (full range in 0.5 seconds)
+    float depthRateLimit = 2.0f;  // Maximum change per second
     float depthRateLimitPerSample = 0.0f;  // Calculated per-sample limit
     float currentDepthTarget = 0.5f;  // Current rate-limited target
     
@@ -459,6 +458,22 @@ private:
     std::vector<float> blueWetHPState;
     std::vector<float> blueWetLPState;
     std::vector<BiquadState> bluePresenceState;
+
+    // Post-sum peak compressor state. Catches chorus peaks in the final
+    // dry+wet mix so the output stays close to unity without pumping.
+    struct WetCompressorState
+    {
+        float envelope = 0.0f;
+        float attackCoeff = 0.0f;
+        float releaseCoeff = 0.0f;
+
+        static constexpr float thresholdDb = -2.0f;
+        static constexpr float ratio = 2.0f;
+        static constexpr float kneeDb = 4.0f;
+        static constexpr float attackMs = 1.0f;
+        static constexpr float releaseMs = 100.0f;
+    };
+    std::vector<WetCompressorState> wetCompressors;
 
     // Blue Focus peaking filter coefficients (Direct Form I, normalized).
     float bluePresenceB0 = 1.0f;

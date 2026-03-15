@@ -69,9 +69,16 @@ void SmoothedSlider::mouseDrag(const juce::MouseEvent& e)
 
 void SmoothedSlider::mouseUp(const juce::MouseEvent& e)
 {
+    snapVisualToValue();
     juce::Slider::mouseUp(e);
     if (onMouseUpCallback)
         onMouseUpCallback(e);
+}
+
+void SmoothedSlider::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+{
+    juce::Slider::mouseWheelMove(e, wheel);
+    lastScrollTimeMs = juce::Time::currentTimeMillis();
 }
 
 void SmoothedSlider::valueChanged()
@@ -108,6 +115,13 @@ void SmoothedSlider::timerCallback()
         // This ensures smooth interpolation without jankiness
         visualValueLinear.skip(2);
         isSmoothing = visualValueLinear.isSmoothing();
+    }
+
+    if (lastScrollTimeMs > 0 && (juce::Time::currentTimeMillis() - lastScrollTimeMs) > 50)
+    {
+        snapVisualToValue();
+        lastScrollTimeMs = 0;
+        isSmoothing = false;
     }
     
     if (needsRepaint || isSmoothing)
@@ -170,4 +184,14 @@ void SmoothedSlider::updateSmoothingCoeff()
     // Calculate one-pole filter coefficient for exponential smoothing
     // Time constant = smoothingTimeMs
     smoothingCoeff = std::exp(-1.0f / (smoothingTimeMs * 0.001f * getSampleRate()));
+}
+
+void SmoothedSlider::snapVisualToValue()
+{
+    if (useExponential)
+        visualValueExp = static_cast<float>(getValue());
+    else
+        visualValueLinear.setCurrentAndTargetValue(static_cast<float>(getValue()));
+
+    needsRepaint = true;
 }

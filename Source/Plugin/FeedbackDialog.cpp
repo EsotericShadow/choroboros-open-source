@@ -42,7 +42,7 @@ juce::Font makeRetroFont(float height, bool bold)
 FeedbackDialog::FeedbackDialog(FeedbackCollector& collector)
     : feedbackCollector(collector)
 {
-    setSize(500, 440);
+    setSize(500, 540);
 
     const auto accent = juce::Colour(0xff9dbd78);
     const auto bodyText = juce::Colour(0xffe8ecf1);
@@ -99,7 +99,7 @@ FeedbackDialog::FeedbackDialog(FeedbackCollector& collector)
     cancelButton.addListener(this);
     addAndMakeVisible(cancelButton);
 
-    betaSignUpLink.setButtonText("Choroboros v2.02.2 Sign-up");
+    betaSignUpLink.setButtonText("Choroboros v2.03 Sign-up");
     betaSignUpLink.setURL(juce::URL("https://docs.google.com/forms/d/e/1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform"));
     betaSignUpLink.setFont(makeRetroFont(12.0f, false), false);
     betaSignUpLink.setColour(juce::HyperlinkButton::textColourId, accent.brighter(0.18f));
@@ -135,10 +135,10 @@ void FeedbackDialog::resized()
     betaSignUpLink.setBounds(area.removeFromTop(22));
     area.removeFromTop(10);
 
-    feedbackText.setBounds(area.removeFromTop(200));
-    area.removeFromTop(20);
-    
-    auto buttonArea = area.removeFromTop(30);
+    auto buttonArea = area.removeFromBottom(30);
+    area.removeFromBottom(10);
+    feedbackText.setBounds(area);
+
     saveButton.setBounds(buttonArea.removeFromLeft(140));
     buttonArea.removeFromLeft(10);
     formButton.setBounds(buttonArea.removeFromLeft(160));
@@ -198,12 +198,13 @@ void FeedbackDialog::show(FeedbackCollector& collector)
     
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(dialog);
-    options.content->setSize(500, 440);
+    options.content->setSize(500, 540);
     options.dialogTitle = "Feedback";
     options.dialogBackgroundColour = juce::Colour(0xff2a2a2a);
-    options.resizable = false;
+    options.resizable = true;
     options.useNativeTitleBar = true;
     
     auto* window = options.launchAsync();
-    (void)window; // Suppress unused variable warning
+    if (window != nullptr)
+        window->setResizeLimits(500, 400, 800, 800);
 }

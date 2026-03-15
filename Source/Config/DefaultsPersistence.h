@@ -22,8 +22,10 @@ struct DefaultsPersistence
     static bool saveUser(const juce::String& json, juce::String* outError = nullptr);
     /** Read user defaults. Migrates legacy defaults.json if needed. */
     static juce::String loadUser(juce::String* outError = nullptr);
-    /** Write JSON to factory defaults sheet. */
+    /** Write JSON to factory defaults sheet if it has not been created yet. */
     static bool saveFactory(const juce::String& json, juce::String* outError = nullptr);
+    /** Force-write factory defaults, overwriting any existing file. Developer use only. */
+    static bool forceWriteFactory(const juce::String& json, juce::String* outError = nullptr);
     /** Read factory defaults sheet. */
     static juce::String loadFactory(juce::String* outError = nullptr);
     /** Copy factory defaults sheet over user defaults sheet. */

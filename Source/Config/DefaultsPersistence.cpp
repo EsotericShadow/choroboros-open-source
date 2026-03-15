@@ -150,6 +150,20 @@ juce::String DefaultsPersistence::loadUser(juce::String* outError)
 
 bool DefaultsPersistence::saveFactory(const juce::String& json, juce::String* outError)
 {
+    const auto factoryFile = getFactoryDefaultsFile();
+
+    if (factoryFile.existsAsFile() && factoryFile.getSize() > 0)
+    {
+        if (outError != nullptr)
+            *outError = "Factory defaults already exist and are write-protected";
+        return false;
+    }
+
+    return writeJsonDocument(factoryFile, json, outError, false);
+}
+
+bool DefaultsPersistence::forceWriteFactory(const juce::String& json, juce::String* outError)
+{
     return writeJsonDocument(getFactoryDefaultsFile(), json, outError, false);
 }
 
