@@ -109,6 +109,8 @@ target_sources(Choroboros PRIVATE
     Source/UI/DevPanelSupport.h
     Source/UI/PluginEditorSetup.cpp
     Source/UI/PluginEditorSetup.h
+    Source/UI/TopBarDrawer.cpp
+    Source/UI/TopBarDrawer.h
 )
 
 target_compile_definitions(Choroboros

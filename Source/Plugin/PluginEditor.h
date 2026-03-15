@@ -26,6 +26,7 @@
 #include "../UI/SmoothedSlider.h"
 #include "../UI/AnimatedToggleButton.h"
 #include "../UI/PluginEditorSetup.h"
+#include "../UI/TopBarDrawer.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <future>
@@ -96,12 +97,8 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> hqAttachment;
     LabelWithContainer hqLabel;
     
-    // Top-bar icon buttons (grouped top-right)
-    juce::ImageButton feedbackButton;
-    juce::ImageButton helpButton;
-    juce::ImageButton aboutButton;
-    juce::ImageButton devButton;
-    juce::Rectangle<int> topBarContainerBounds;  // painted behind buttons
+    // Top-bar sliding icon-button drawer
+    TopBarDrawer topBarDrawer;
     std::unique_ptr<juce::DocumentWindow> devWindow;
     bool devPanelPrewarmScheduled = false;
     bool devPanelPrewarmComplete = false;

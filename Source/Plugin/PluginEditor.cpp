@@ -676,52 +676,24 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Setup tooltip window
     tooltipWindow = std::make_unique<juce::TooltipWindow>(this, 700);
     
-    // ---- Top-bar icon buttons (all grouped top-right) -------------------------
-    // Four 14x14 (design-space) icon buttons packed tight in the top-right
-    // corner with a subtle dark container behind them.  Order left-to-right:
-    //   DEV | ABOUT | HELP | FEEDBACK
+    // ---- Top-bar sliding icon-button drawer -----------------------------------
     {
-        const int btnSize   = uiScaleInt (18);  // square icon area (25% larger than 14)
-        const int gap       = uiScaleInt (5);   // spacing between icons
-        const int padH      = uiScaleInt (5);   // horizontal padding inside container
-        const int padV      = uiScaleInt (4);   // vertical padding inside container
-        const int marginR   = uiScaleInt (4);   // margin from window right edge
-        const int marginT   = uiScaleInt (3);   // margin from window top edge
-
-        // Container dimensions (4 buttons + 3 gaps + padding each side)
-        const int containerW = padH * 2 + btnSize * 4 + gap * 3;
-        const int containerH = padV * 2 + btnSize;
-        const int windowW    = uiScaleInt (700);  // known fixed width
-        const int containerX = windowW - containerW - marginR;
-        const int containerY = marginT;
-
-        // Paint the container in the paint() override — store bounds for it
-        topBarContainerBounds = { containerX, containerY, containerW, containerH };
-
-        // Button X positions inside the container (left to right)
-        const int btn0X = containerX + padH;                       // DEV
-        const int btn1X = btn0X + btnSize + gap;                   // ABOUT
-        const int btn2X = btn1X + btnSize + gap;                   // HELP
-        const int btn3X = btn2X + btnSize + gap;                   // FEEDBACK
-        const int btnY  = containerY + padV;
-
-        // Load icon images from BinaryData
-        auto feedbackIcon = juce::ImageCache::getFromMemory (
-            BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
-        auto helpIcon = juce::ImageCache::getFromMemory (
-            BinaryData::help_png, BinaryData::help_pngSize);
-        auto aboutIcon = juce::ImageCache::getFromMemory (
-            BinaryData::about_png, BinaryData::about_pngSize);
         auto devIcon = juce::ImageCache::getFromMemory (
             BinaryData::dev_png, BinaryData::dev_pngSize);
+        auto aboutIcon = juce::ImageCache::getFromMemory (
+            BinaryData::about_png, BinaryData::about_pngSize);
+        auto helpIcon = juce::ImageCache::getFromMemory (
+            BinaryData::help_png, BinaryData::help_pngSize);
+        auto feedbackIcon = juce::ImageCache::getFromMemory (
+            BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
 
-        // DEV (leftmost in group)
-        devButton.setImages (true, true, true,
-            devIcon, 0.55f, {},    // normal: subtle
-            devIcon, 1.0f,  {},    // hover: full
-            devIcon, 0.4f,  {});   // pressed: dim
-        devButton.setTooltip ("Developer Panel — diagnostics, parameter mapping, DSP internals");
-        devButton.onClick = [this]
+        topBarDrawer.setupIcons (devIcon, aboutIcon, helpIcon, feedbackIcon);
+        topBarDrawer.setupLayout (kUiScale);
+
+        // Wire up button callbacks
+        topBarDrawer.devButton.setTooltip (
+            "Developer Panel \u2014 diagnostics, parameter mapping, DSP internals");
+        topBarDrawer.devButton.onClick = [this]
         {
             ensureDevPanelWindowCreated (true);
             const bool shouldShow = !devWindow->isVisible();
@@ -729,43 +701,29 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             if (shouldShow)
                 devWindow->toFront (true);
         };
-        addAndMakeVisible (devButton);
-        devButton.setBounds (btn0X, btnY, btnSize, btnSize);
 
-        // ABOUT
-        aboutButton.setImages (true, true, true,
-            aboutIcon, 0.55f, {},
-            aboutIcon, 1.0f,  {},
-            aboutIcon, 0.4f,  {});
-        aboutButton.setTooltip ("About Choroboros — version info, credits");
-        aboutButton.onClick = [] { AboutDialog::show(); };
-        addAndMakeVisible (aboutButton);
-        aboutButton.setBounds (btn1X, btnY, btnSize, btnSize);
+        topBarDrawer.aboutButton.setTooltip ("About Choroboros \u2014 version info, credits");
+        topBarDrawer.aboutButton.onClick = [] { AboutDialog::show(); };
 
-        // HELP
-        helpButton.setImages (true, true, true,
-            helpIcon, 0.55f, {},
-            helpIcon, 1.0f,  {},
-            helpIcon, 0.4f,  {});
-        helpButton.setTooltip ("Documentation & support");
-        helpButton.onClick = [] {
+        topBarDrawer.helpButton.setTooltip ("Documentation & support");
+        topBarDrawer.helpButton.onClick = [] {
             juce::URL ("https://kaizenstrategic.ai/choroboros/docs").launchInDefaultBrowser();
         };
-        addAndMakeVisible (helpButton);
-        helpButton.setBounds (btn2X, btnY, btnSize, btnSize);
 
-        // FEEDBACK (rightmost)
-        feedbackButton.setImages (true, true, true,
-            feedbackIcon, 0.55f, {},
-            feedbackIcon, 1.0f,  {},
-            feedbackIcon, 0.4f,  {});
-        feedbackButton.setTooltip ("Send feedback or report a bug");
-        feedbackButton.onClick = [this] {
+        topBarDrawer.feedbackButton.setTooltip ("Send feedback or report a bug");
+        topBarDrawer.feedbackButton.onClick = [this] {
             if (audioProcessor.feedbackCollector)
                 FeedbackDialog::show (*audioProcessor.feedbackCollector);
         };
-        addAndMakeVisible (feedbackButton);
-        feedbackButton.setBounds (btn3X, btnY, btnSize, btnSize);
+
+        // Position drawer (always at expanded-size bounds; it clips internally)
+        const int windowW = uiScaleInt (700);
+        const int marginR = uiScaleInt (4);
+        const int marginT = uiScaleInt (3);
+        const int dw = topBarDrawer.getExpandedWidth();
+        const int dh = topBarDrawer.getDrawerHeight();
+        topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh);
+        addAndMakeVisible (topBarDrawer);
     }
     
     // Listen for engine color changes (preset load or manual) to update value label colors
@@ -921,13 +879,7 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
         }
     }
 
-    // Draw subtle dark container behind the top-bar icon buttons
-    if (! topBarContainerBounds.isEmpty())
-    {
-        g.setOpacity (1.0f);
-        g.setColour (juce::Colour (0x99000000));  // 60% black overlay
-        g.fillRoundedRectangle (topBarContainerBounds.toFloat(), 3.0f);
-    }
+    // (Top-bar container is now painted by the TopBarDrawer component)
 }
 
 void ChoroborosPluginEditor::resized()
