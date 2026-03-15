@@ -134,7 +134,7 @@ inline constexpr std::array<CorePackageDescriptor, coreIdCount()> kCorePackageDe
     { CoreId::lagrange3, "lagrange3", "Lagrange 3rd", "Bloom Macros", "green bloom", "Classic interpolation with bloom behavior.", false, true, false, false, false, true, true },
     { CoreId::lagrange5, "lagrange5", "Lagrange 5th", "Bloom Macros", "green bloom", "HQ classic interpolation with bloom behavior.", false, true, false, false, false, true, true },
     { CoreId::cubic, "cubic", "Cubic", "Focus Macros", "blue focus", "Modern cubic interpolation with focus behavior.", false, false, true, false, false, false, false },
-    { CoreId::thiran, "thiran", "Thiran Allpass", "Focus Macros", "blue focus", "HQ allpass interpolation with focus behavior.", false, false, true, false, false, false, false },
+    { CoreId::thiran, "thiran", "Thiran Allpass", "Focus Macros", "blue focus", "5th-order Thiran allpass fractional delay with maximally flat group delay. Focus wet-character.", false, false, true, false, false, false, false },
     { CoreId::bbd, "bbd", "BBD", "BBD Macros", "red vintage bbd", "Bucket-brigade style mode with post saturation.", true, false, false, true, false, false, false },
     { CoreId::tape, "tape", "Tape", "Tape Macros", "red vintage tape", "Tape-style mode with wow/flutter and tone drive.", false, false, false, false, false, false, false },
     { CoreId::phase_warp, "phase_warp", "Phase Warp", "Warp Macros", "purple warp", "Nonlinear phase-warp motion.", false, false, false, false, true, false, false },
