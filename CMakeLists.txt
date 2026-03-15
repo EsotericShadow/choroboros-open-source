@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Choroboros VERSION 2.0.4)
 
-# Version string for feedback/reports
-set(CHOROBOROS_VERSION_STRING "2.04" CACHE STRING "Version string for feedback and display")
+# Version string for feedback/reports.
+# Keep this as a normal variable so the checked-in source of truth wins over any
+# stale value left behind in an existing CMake cache.
+set(CHOROBOROS_VERSION_STRING "2.04")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
