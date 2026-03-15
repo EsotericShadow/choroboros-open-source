@@ -654,8 +654,8 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
     
     const int engineColorWidth = 80;
     const int engineColorHeight = 14;
-    // Position at bottom left (scaled 50%)
-    engineColorBox.setBounds(uiScaleInt(20), uiScaleInt(335), uiScaleInt(engineColorWidth), uiScaleInt(engineColorHeight));
+    // Position at top left
+    engineColorBox.setBounds(uiScaleInt(20), uiScaleInt(5), uiScaleInt(engineColorWidth), uiScaleInt(engineColorHeight));
     
     // Remove background color - make it transparent
     engineColorBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);

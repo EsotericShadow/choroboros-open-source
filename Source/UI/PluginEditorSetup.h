@@ -271,7 +271,7 @@ struct LayoutTuning
     int topButtonsOnBackgroundColour = static_cast<int>(0xff5a5a5a);
 
     int engineSelectorX = 20;
-    int engineSelectorY = 335;
+    int engineSelectorY = 5;
     int engineSelectorW = 80;
     int engineSelectorH = 14;
     int engineSelectorFontSize = 10;

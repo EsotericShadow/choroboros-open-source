@@ -707,7 +707,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
 
         topBarDrawer.helpButton.setTooltip ("Documentation & support");
         topBarDrawer.helpButton.onClick = [] {
-            juce::URL ("https://kaizenstrategic.ai/choroboros/docs").launchInDefaultBrowser();
+            juce::URL ("https://choroboros.kaizenstrategic.ai/docs").launchInDefaultBrowser();
         };
 
         topBarDrawer.feedbackButton.setTooltip ("Send feedback or report a bug");
@@ -935,8 +935,8 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
     
     const int engineColorWidth = 80;
     const int engineColorHeight = 14;
-    // Position at bottom left (scaled 50%)
-    engineColorBox.setBounds(uiScaleInt(20), uiScaleInt(335), uiScaleInt(engineColorWidth), uiScaleInt(engineColorHeight));
+    // Position at top left
+    engineColorBox.setBounds(uiScaleInt(20), uiScaleInt(5), uiScaleInt(engineColorWidth), uiScaleInt(engineColorHeight));
     
     // Remove background color - make it transparent
     engineColorBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
