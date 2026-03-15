@@ -1,6 +1,6 @@
 # Known Issues
 
-Issues known for Choroboros 2.03. Please report additional issues via the Feedback button.
+Issues known for Choroboros v2.04-dev. Please report additional issues via the Feedback button.
 
 ## Current Test Scope
 
@@ -16,31 +16,40 @@ Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are **no
 
 ## Audio / DSP
 
-- **Red engine (BBD) at Depth 0%:** Earlier builds could produce distortion artifacts when BBD clock minimum was set too low. Fixed in v2.03-beta (Sprint 1).
-- **Gain staging:** Earlier builds could add ~1–1.5 dB of volume when the plugin was engaged at 50% mix. Fixed in v2.03-beta (Sprint 1) — pre-emphasis now applies only to the wet path.
+### Fixed in v2.04-dev
+
+- **BBD (Red NQ) phaser-like sweep:** S&H clock images aliased into audio band and swept with LFO. Fixed with first-order hold interpolation (~40 dB alias rejection). Also fixed a1 coefficient sign in the Butterworth cascade filter and raised clock/filter frequency floors.
+- **Tape (Red HQ) rate knob unresponsive at high rates:** Undamped phase integrator caused DC drift; LFO smoothing bandwidth was too narrow (fc≈10 Hz). Fixed with damped integrator and widened smoothing (fc≈56 Hz).
+- **Thiran (Blue HQ) zippering and noise:** Per-sample 5th-order allpass coefficient recomputation caused DFII-T state transients. Fixed with 32-sample linear coefficient interpolation (~30 dB transient reduction).
+- **Gain staging:** Pre-emphasis now applies only to wet path. Legacy full-output compressor replaced with transparent post-sum peak catcher (-2 dB threshold, 2:1 ratio, 4 dB soft knee).
+
+### Fixed in v2.03
+
+- **Red engine (BBD) at Depth 0%:** BBD clock minimum was set too low, causing distortion artifacts.
+- **Volume boost at 50% mix:** ~1–1.5 dB added volume when plugin engaged. Fixed with wet-path-only pre-emphasis.
 
 ## HQ vs NQ Mode Differences
 
-HQ mode is not just a fidelity toggle - each engine's HQ algorithm is a fundamentally different DSP topology:
+HQ mode is not just a fidelity toggle — each engine's HQ algorithm is a fundamentally different DSP topology:
 
 - **Green:** NQ uses 3rd-order Lagrange interpolation; HQ uses 5th-order Lagrange (smoother, preserves more HF stereo content)
-- **Blue:** NQ uses cubic interpolation; HQ uses Thiran allpass (phase-accurate, wider imaging)
+- **Blue:** NQ uses cubic interpolation; HQ uses 5th-order Thiran allpass (phase-accurate, wider imaging)
 - **Red:** NQ emulates a BBD chip (bucket brigade saturation); HQ emulates tape (tone + drive + stereo width)
 - **Purple:** NQ uses phase-warped LFO; HQ uses 2D orbital modulation (inherently wider stereo field)
 - **Black:** NQ is a single-tap linear delay; HQ is a dual-tap ensemble with independent stereo decorrelation
 
-This means HQ modes will generally sound wider and more spacious than NQ - this is intentional. The Width knob affects both modes equally; the difference comes from the algorithms themselves.
+This means HQ modes will generally sound wider and more spacious than NQ — this is intentional. The Width knob affects both modes equally; the difference comes from the algorithms themselves.
+
+HQ toggle now switches in ~43 ms (18 ms warmup + 25 ms crossfade) and supports single-click toggling.
 
 ## UI / UX
 
 - **Knob sensitivity:** Default knob sensitivity may feel too high or too low depending on your mouse/trackpad. Use the Dev Panel to fine-tune sensitivity per-knob.
-- **Feedback form text field:** The feedback text box in the Google Form may clip long responses on some screens. If this happens, write your feedback in a text editor and paste it in.
 
 ## Compatibility
 
 - **DAWs tested:** Reaper (macOS + Windows), Logic Pro (macOS), Ableton Live (Windows), FL Studio (Windows), Samplitude (Windows). Additional DAW reports welcome.
-- **DAW freeze on close (Windows):** Earlier builds could freeze FL Studio, Samplitude, and Fender Studio Pro when removing or closing the plugin. Fixed in v2.03-beta (Sprint 1) — timer lifecycle issue in destructors.
-- **Ardour 8.10 (Windows):** One report of VST3 crash on load. The same build works in other VST3 hosts. This appears to be an Ardour VST3 hosting issue — other plugins also crash in Ardour for this user.
+- **Ardour 8.10 (Windows):** One report of VST3 crash on load. Appears to be an Ardour VST3 hosting issue — other plugins also crash for this user.
 - **Sample rates:** Supports up to 192 kHz. Report any issues at extreme sample rates.
 
 ## macOS Gatekeeper (Unsigned Beta)
@@ -62,7 +71,7 @@ Choroboros is not yet code-signed or notarized (pending Apple Developer enrollme
    xattr -cr /Applications/Choroboros.app
    ```
 
-3. **"Open Anyway" in System Settings:** Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the Choroboros warning. Note: this button only appears **after** you've attempted to open the blocked file.
+3. **"Open Anyway" in System Settings:** Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the Choroboros warning. This button only appears **after** you've attempted to open the blocked file.
 
 4. **If "Open Anyway" doesn't appear:** Some macOS versions (especially Ventura+) hide this option. Use the Terminal xattr method above instead.
 

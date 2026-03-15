@@ -32,17 +32,20 @@ See `feedback/ISSUES_MASTER.md` for full issue list with reporter details and pr
 - [x] **M8** Factory preset protection — saveFactory() now write-once (no-op if file exists), added forceWriteFactory() for dev use, resetToFactoryDefaults() writes to user file only (DefaultsPersistence.h/.cpp, DevPanelPersistence.cpp)
 - [x] **M9** Feedback text clipping — dialog 500×440→500×540, flexible text editor layout via removeFromBottom, resizable with min 500×400 (FeedbackDialog.cpp)
 
-### Sprint 3: Refinement (v2.06)
-- [ ] **M10** Lower Green (1.2→0.65 Hz) and Black (1.2→0.8 Hz) default Rates + matching factory presets
-- [ ] **M11** Reduce centreDelaySmoothingMs (150→60) and tapeDelaySmoothingMs (180→90) for snappier knob response
-- [ ] **H5** Document HQ/NQ spread differences (by design — different DSP topologies, not a bug)
-- ~~**L2** "colour" spelling~~ — dropped, only 5% Canadian users
-- [ ] **C4** Code signing + notarization (BLOCKED — waiting on DUNS number)
+### Sprint 3: Refinement (v2.06) — COMPLETE
+- [x] **M10** Lower Green (1.2→0.65 Hz) and Black (1.2→0.8 Hz) default Rates + matching factory presets
+- [x] **M11** Reduce centreDelaySmoothingMs (150→60) and tapeDelaySmoothingMs (180→90) for snappier knob response
+- [x] **H5** Document HQ/NQ spread differences (by design — different DSP topologies, not a bug) — see KNOWN_ISSUES.md
 
-### Deferred / Manual
-- ~~**M1** Knob sensitivity~~ — tuning manually via dev panel defaults
-- ~~**M2/M4** Knob low-speed dropout / Depth sticking~~ — tuning manually via dev panel
-- ~~**M6** HQ button hit area~~ — tuning manually via dev panel
+### Sprint 4: Core DSP Fixes (v2.04-dev) — COMPLETE
+- [x] **BBD (Red NQ):** First-order hold interpolation eliminates S&H clock aliasing (phaser-like sweep); a1 sign fix in Butterworth cascade; raised clock/filter minimums
+- [x] **Tape (Red HQ):** Damped phase integrator (DC drift fix); widened LFO smoothing bandwidth (rate knob responsiveness)
+- [x] **Thiran (Blue HQ):** 32-sample linear coefficient interpolation eliminates zippering and broadband noise from per-sample DFII-T state transients
+- [x] **HQ toggle:** Fast 43 ms quality switch (18 ms warmup + 25 ms crossfade); click-to-toggle UI; less sensitive drag (4→12 px threshold)
+- [x] **Post-sum compressor:** Transparent peak catcher replaces legacy full-output compressor; per-core output trim during crossfade
+
+### Blocked
+- [ ] **C4** Code signing + notarization (BLOCKED — waiting on DUNS number)
 
 ## Active Product Work
 

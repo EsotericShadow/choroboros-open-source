@@ -2,6 +2,25 @@
 
 All notable changes to Choroboros are documented here.
 
+## [2.04-dev] - 2026-03-14
+
+### Fixed
+- **BBD (Red NQ) phaser sweep:** S&H clock images aliased into audio band. Added first-order hold interpolation (~40 dB alias rejection). Fixed a1 coefficient sign in 5th-order Butterworth cascade. Raised bbdClockMinHz 2000→6000, bbdFilterCutoffMinHz 1200→3000.
+- **Tape (Red HQ) rate knob:** Undamped phase integrator caused DC drift (~73 samples). Added damping (tapePhaseDamping 1.0→0.99999). Widened LFO smoothing bandwidth (fc 10→56 Hz) so high rates track properly.
+- **Thiran (Blue HQ) zippering/noise:** Per-sample 5th-order coefficient recomputation caused DFII-T state transients. Added 32-sample linear coefficient interpolation (~30 dB transient reduction). Delay smoothing 0.998→0.9985.
+- **HQ toggle latency:** Quality switch reduced from ~146 ms to ~43 ms (18 ms warmup + 25 ms crossfade). Minimum severity floor 0.40→0.10 for quality toggles.
+
+### Changed
+- **Signal chain:** Pre-emphasis moved inside processChorus (wet-path only). Legacy juce::dsp::Compressor replaced with transparent post-sum peak catcher (-2 dB / 2:1 / 4 dB knee / 1 ms attack / 100 ms release).
+- **Per-core output trim:** Added virtual getOutputTrim() to ChorusCore base class; applied during crossfade blending.
+- **Runtime tuning:** depthSmoothingMs 150→50, depthRateLimit 0.25→2.0, centreDelaySmoothingMs 150→60, tapeDelaySmoothingMs 180→90, tapeWetGain 1.15→1.05, greenBloomGain 0.10→0.05, blueFocusOutputGain 0.08→0.04.
+- **Presets:** Green default rate 1.2→0.65 Hz, Black default rate 1.2→0.8 Hz.
+- **Engine profiles:** Added migrateKnownBadEngineParamProfiles() to detect and replace stale bundled profiles on load.
+- **HQ toggle UI:** Single click now toggles (was double-click only). Drag threshold 4→12 px. Slider drag sensitivity disabled to prevent accidental value changes.
+- **DevPanel UX:** Renamed "Profile"→"Engine", visually separated core assignment as advanced feature, improved tooltips. Factory reset loads from bundled factory sheet instead of regenerating.
+
+---
+
 ## [2.03] - 2026-03-06
 
 ### Added
