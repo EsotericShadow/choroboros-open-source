@@ -1,0 +1,137 @@
+# Choroboros — Cursor Rules for v2.04-dev
+# JUCE 8.0.12 audio plugin (VST3/AU/AAX/Standalone)
+# Copyright (C) 2026 Kaizen Strategic AI Inc. / Green DSP
+
+## Project Overview
+
+Choroboros is a multi-engine chorus plugin built on JUCE 8.0.12. Five
+selectable "color" engines (Green, Blue, Red, Purple, Black) each with
+distinct DSP cores (BBD, Tape, Thiran, Digital, Hybrid). Targets macOS
+(AU/VST3/Standalone), Windows (VST3/Standalone), and AAX where applicable.
+
+Repository layout:
+- `Source/Plugin/`          — PluginProcessor, PluginEditor, parameter wiring
+- `Source/DSP/`             — All DSP cores and signal-chain code
+- `Source/UI/`              — Custom look-and-feel, sliders, panels
+- `Source/Presets/`         — Preset management and factory defaults
+- `Tests/`                  — ChoroborosRegressionTests harness
+- `Assets/`                 — GUI images, icons, binary resources
+- `Installers/`            — Platform packaging (pkgbuild, Inno Setup)
+
+## Commit Workflow — VERIFY BEFORE YOU COMMIT
+
+Every commit on `v2.04-dev` must follow this protocol. Do not skip steps.
+
+### 1. Build first
+```bash
+cmake --build build-release --target ChoroborosRegressionTests -j4
+```
+If the build fails, fix the errors. Do not commit broken code.
+
+### 2. Run the DSP regression tests
+```bash
+./build-release/ChoroborosRegressionTests --dsp-only
+```
+All tests must pass. If a test fails, investigate and fix before committing.
+
+### 3. Run the full regression harness
+```bash
+./build-release/ChoroborosRegressionTests
+```
+The one known pre-existing failure is the GUI test:
+`ChoroborosRegressionTests.cpp ~line 364 — "DevPanel console component not found"`
+This is a known issue and is acceptable. Any OTHER new failures must be fixed.
+
+### 4. Review the diff
+```bash
+git diff --stat
+git diff
+```
+Read the actual diff. Check for:
+- Accidental debug prints or `DBG()` left in
+- Hardcoded paths or credentials
+- Unintended whitespace-only changes
+- Files that shouldn't be committed (build artifacts, .DS_Store)
+
+### 5. Commit with conventional-commit messages
+Format: `type(scope): concise description`
+
+Types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
+Scopes: `dsp`, `ui`, `plugin`, `feedback`, `preset`, `installer`, `build`
+
+If the commit addresses a specific review finding, say so in the body
+(e.g., "P1 — crash handler was not async-signal-safe").
+
+Multi-line body for anything non-trivial. Keep the subject under 72 chars.
+
+### 6. Verify clean state
+```bash
+git status
+git log --oneline -3
+```
+
+## Hard Rules — DO NOT VIOLATE
+
+1. **Never touch user-facing macros that set Red defaults (mix/color).**
+   The Red engine defaults are intentionally set and must not be modified.
+
+2. **Async-signal-safe crash handler.** `CrashReporter.cpp` signal/exception
+   handlers must ONLY call async-signal-safe functions: `unlink()` on POSIX,
+   `DeleteFileA()` on Windows. No `juce::String`, no `std::mutex`, no heap
+   allocation, no file I/O beyond the marker deletion.
+
+3. **Multi-instance safety.** Session logs and crash markers are keyed by
+   PID (`session_log_{pid}.json`, `.clean_shutdown_{pid}`). The
+   `CrashReporter` uses an atomic refcount — handlers install on first
+   instance (0→1) and uninstall only when the last instance destructs (1→0).
+
+4. **Orphan-log scanner must check process liveness** before promoting a
+   log as a crash report. Use `kill(pid, 0)` on POSIX or
+   `OpenProcess`/`GetExitCodeProcess` on Windows. Never assume a missing
+   clean-shutdown marker means the process crashed — it may be another
+   DAW still running.
+
+5. **Session-log events fire unconditionally** in `parameterChanged()`,
+   before the bulk-change early return. Preset loads, state restores, and
+   engine-profile applies must still be logged.
+
+6. **Crash reports are preserved until the user acts.** Use
+   `readPendingCrashReport()` (read-only) to display, and only call
+   `clearPendingCrashReport()` after the user sends, saves, or dismisses.
+
+7. **UI scale factor** is `kUiScale = 0.91f`. Use `uiScaleInt()` for all
+   pixel calculations in the editor. Don't hardcode pixel values without
+   scaling.
+
+8. **No force-push to `v2.04-dev`.** Create new commits, don't amend
+   shared history.
+
+## DSP Guidelines
+
+- All DSP changes require `--dsp-only` regression test pass
+- Oversampling changes need careful latency compensation verification
+- Filter coefficient changes: check for denormals and stability at
+  extreme sample rates (22050 Hz – 192000 Hz)
+- `processBlock` anomaly detection: NaN/Inf/hard-clip checks are
+  throttled to 1 event per 2 seconds via atomic timestamp — don't
+  remove the throttle
+- Audio-thread code: no allocation, no locks (use `tryLog()` for
+  session events from the audio thread)
+
+## File Conventions
+
+- Copyright header on every source file (GPL-3.0+)
+- JUCE coding style: spaces not tabs, braces on same line for
+  single-statement blocks, `juce::` prefix (no `using namespace juce`)
+- BinaryData assets declared in `CMakeLists.txt` under
+  `juce_add_binary_data` — filenames become C identifiers with
+  non-alphanumeric chars replaced by underscores
+  (e.g., `bug_feedback_button.png` → `BinaryData::bug_feedback_button_png`)
+
+## Known Issues (do not "fix" these without discussion)
+
+- DevPanel console component not found in regression test (GUI test)
+- Knob sensitivity / SmoothedSlider 1px drift (partially addressed)
+- Code signing blocked on DUNS number (C4)
+- Alt+click 1px drift, color slider glitch, dev button misalignment,
+  pyramid centering — logged but low priority
