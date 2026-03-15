@@ -52,7 +52,8 @@ void ChorusCoreBBD::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP
     const float minClockHz = static_cast<float>(stages) / (2.0f * maxDelaySec);
     const float cutoffHz = juce::jlimit(500.0f, static_cast<float>(spec.sampleRate) * 0.4f, 0.5f * minClockHz);
 
-    filterCoeffs = choroboros::designBBD5thOrderButterworth(cutoffHz, static_cast<float>(spec.sampleRate));
+    const auto prepareCoeffs =
+        choroboros::designBBD5thOrderButterworth(cutoffHz, static_cast<float>(spec.sampleRate));
 
     for (size_t ch = 0; ch < channels.size(); ++ch)
     {
@@ -60,11 +61,12 @@ void ChorusCoreBBD::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP
         chan.stages.assign(static_cast<size_t>(BBD_STAGES_MAX), 0.0f);
         chan.head = 0;
         chan.clockPhase = 0.0;
-        chan.heldPrev = 0.0f;
-        chan.heldNext = 0.0f;
+        chan.heldOutput = 0.0f;
+        chan.prevHeldOutput = 0.0f;
         chan.prevFilteredInput = 0.0f;
-        chan.inputFilter.setCoeffs(filterCoeffs);
-        chan.outputFilter.setCoeffs(filterCoeffs);
+        chan.filterUpdateCounter = 0;
+        chan.inputFilter.setCoeffs(prepareCoeffs);
+        chan.outputFilter.setCoeffs(prepareCoeffs);
         chan.smoothedDelayMs.reset(spec.sampleRate, 0.02f);
         chan.smoothedDelayMs.setCurrentAndTargetValue(20.0f);
         chan.smoothedFilterCutoffHz = cutoffHz;
@@ -79,13 +81,15 @@ void ChorusCoreBBD::reset()
         std::fill(chan.stages.begin(), chan.stages.end(), 0.0f);
         chan.head = 0;
         chan.clockPhase = 0.0;
-        chan.heldPrev = 0.0f;
-        chan.heldNext = 0.0f;
+        chan.heldOutput = 0.0f;
+        chan.prevHeldOutput = 0.0f;
         chan.prevFilteredInput = 0.0f;
         chan.inputFilter.reset();
         chan.outputFilter.reset();
         chan.smoothedClockFreq = 5000.0f;
         chan.smoothedDelayMs.setCurrentAndTargetValue(20.0f);
+        chan.filterUpdateCounter = 0;
+        chan.smoothedFilterCutoffHz = 0.0f;
         chan.lastDesignedFilterCutoffHz = -1.0f;
     }
 }
@@ -100,44 +104,59 @@ float ChorusCoreBBD::processBBDChannel(int channel, float input, float clockFreq
 {
     auto& chan = channels[static_cast<size_t>(channel)];
 
-    chan.smoothedClockFreq = clockSmoothCoeff * chan.smoothedClockFreq + (1.0f - clockSmoothCoeff) * clockFreq;
-    const float smoothClockFreq = chan.smoothedClockFreq;
+    // One-pole smoothing on the BBD clock prevents discontinuities when the
+    // modulated delay moves quickly.
+    chan.smoothedClockFreq = clockSmoothCoeff * chan.smoothedClockFreq
+        + (1.0f - clockSmoothCoeff) * clockFreq;
 
-    // 5th-order Butterworth anti-aliasing
+    // Real BBD signal path: input lowpass -> sample-and-hold stage chain ->
+    // reconstruction lowpass. The filters are updated in processDelay().
     const float filteredInput = chan.inputFilter.processSample(input);
-
     const int delayStages = effectiveStages / 2;
 
-    const double clockPhaseInc = static_cast<double>(smoothClockFreq) / static_cast<double>(spec.sampleRate);
+    // Advance the two-phase BBD clock in audio-sample units.
+    const double clockPhaseInc = static_cast<double>(chan.smoothedClockFreq)
+        / static_cast<double>(spec.sampleRate);
+    const double phaseBeforeInc = chan.clockPhase;
     chan.clockPhase += clockPhaseInc;
 
-    while (chan.clockPhase >= 1.0)
-    {
-        // Input interpolation (Raffel): delta*cur + (1-delta)*prev
-        // delta = fraction of sample when tick occurred
-        const int tickCount = static_cast<int>(chan.clockPhase);
-        const float delta = static_cast<float>((static_cast<double>(tickCount) - (chan.clockPhase - clockPhaseInc)) / clockPhaseInc);
-        const float toWrite = delta * filteredInput + (1.0f - delta) * chan.prevFilteredInput;
+    // Count exact clock-boundary crossings inside this audio sample so each
+    // fired tick gets its own interpolated write position.
+    const int intBefore = static_cast<int>(phaseBeforeInc);
+    const int intAfter = static_cast<int>(chan.clockPhase);
+    const int numTicks = intAfter - intBefore;
 
-        chan.clockPhase -= 1.0;
+    for (int tick = 0; tick < numTicks; ++tick)
+    {
+        // Raffel-style interpolation: sample the anti-aliased input at the
+        // exact fractional position where this BBD tick landed.
+        const double tickBoundary = static_cast<double>(intBefore + tick + 1);
+        double fracInSample = (tickBoundary - phaseBeforeInc) / clockPhaseInc;
+        fracInSample = juce::jlimit(0.0, 1.0, fracInSample);
+        const float frac = static_cast<float>(fracInSample);
+        const float toWrite = frac * filteredInput + (1.0f - frac) * chan.prevFilteredInput;
 
         chan.stages[static_cast<size_t>(chan.head)] = toWrite;
         chan.head = (chan.head + 1) % effectiveStages;
 
-        int readPos = (chan.head - delayStages + effectiveStages) % effectiveStages;
-        chan.heldPrev = chan.heldNext;
-        chan.heldNext = chan.stages[static_cast<size_t>(readPos)];
-
-        chan.prevFilteredInput = filteredInput;
+        const int readPos = (chan.head - delayStages + effectiveStages) % effectiveStages;
+        chan.prevHeldOutput = chan.heldOutput;
+        chan.heldOutput = chan.stages[static_cast<size_t>(readPos)];
     }
 
-    // When we don't tick, prevFilteredInput still updates for next tick's interpolation
+    chan.clockPhase -= static_cast<double>(numTicks);
     chan.prevFilteredInput = filteredInput;
 
-    const float t = static_cast<float>(chan.clockPhase);
-    const float held = chan.heldPrev + t * (chan.heldNext - chan.heldPrev);
-
-    return chan.outputFilter.processSample(held);
+    // First-order hold: linearly interpolate between the previous and current
+    // held values using the fractional clock phase. This converts the S&H
+    // staircase into a piecewise-linear signal, attenuating the clock's
+    // spectral images by ~40 dB at the 2nd harmonic (2*fClock). Without this,
+    // 2*fClock aliases into the 3–10 kHz band and sweeps with the LFO,
+    // producing an audible phaser-like artifact.
+    const float fracPhase = static_cast<float>(chan.clockPhase);
+    const float interpOutput = chan.prevHeldOutput
+        + fracPhase * (chan.heldOutput - chan.prevHeldOutput);
+    return chan.outputFilter.processSample(interpOutput);
 }
 
 void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& block, float currentCentreDelayMs)
@@ -194,12 +213,6 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
     approxClockHz = juce::jlimit(clockMinHz, maxClockFreq, approxClockHz);
     const float targetFilterCutoffHz = juce::jlimit(filterMinHz, effectiveFilterMaxHz, filterScale * approxClockHz);
 
-    const float filterSmoothMs = juce::jmax(0.0f, tuning.bbdFilterSmoothingMs);
-    const float blockSeconds = static_cast<float>(blockNumSamples) / fs;
-    const float filterBlockCoeff = (filterSmoothMs > 0.0f)
-        ? std::exp(-blockSeconds / (filterSmoothMs * 0.001f))
-        : 0.0f;
-
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* inputSamples = block.getChannelPointer(ch);
@@ -208,21 +221,17 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
 
         auto& chan = channels[static_cast<size_t>(ch)];
 
-        if (chan.smoothedFilterCutoffHz <= 0.0f || !std::isfinite(chan.smoothedFilterCutoffHz))
-            chan.smoothedFilterCutoffHz = targetFilterCutoffHz;
-
-        if (filterSmoothMs > 0.0f)
-            chan.smoothedFilterCutoffHz = filterBlockCoeff * chan.smoothedFilterCutoffHz + (1.0f - filterBlockCoeff) * targetFilterCutoffHz;
-        else
-            chan.smoothedFilterCutoffHz = targetFilterCutoffHz;
-
-        if (chan.lastDesignedFilterCutoffHz < 0.0f
-            || std::abs(chan.smoothedFilterCutoffHz - chan.lastDesignedFilterCutoffHz) >= 1.0f)
+        if (chan.lastDesignedFilterCutoffHz <= 0.0f
+            || !std::isfinite(chan.lastDesignedFilterCutoffHz)
+            || chan.smoothedFilterCutoffHz <= 0.0f
+            || !std::isfinite(chan.smoothedFilterCutoffHz))
         {
-            filterCoeffs = choroboros::designBBD5thOrderButterworth(chan.smoothedFilterCutoffHz, fs);
-            chan.inputFilter.setCoeffs(filterCoeffs);
-            chan.outputFilter.setCoeffs(filterCoeffs);
-            chan.lastDesignedFilterCutoffHz = chan.smoothedFilterCutoffHz;
+            const auto initCoeffs =
+                choroboros::designBBD5thOrderButterworth(targetFilterCutoffHz, fs);
+            chan.inputFilter.setCoeffs(initCoeffs);
+            chan.outputFilter.setCoeffs(initCoeffs);
+            chan.lastDesignedFilterCutoffHz = targetFilterCutoffHz;
+            chan.smoothedFilterCutoffHz = targetFilterCutoffHz;
         }
 
         for (int i = 0; i < blockNumSamples; ++i)
@@ -240,6 +249,25 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
             clockFreq = juce::jmin(clockFreq, fs);
 
             clockFreq = juce::jlimit(clockMinHz, maxClockFreq, clockFreq);
+
+            // Track the instantaneous BBD Nyquist limit with a light-weight
+            // coefficient refresh. Redesigning every 32 samples is cheap and
+            // avoids a stale cutoff when the LFO moves the clock inside a block.
+            if (++chan.filterUpdateCounter >= 32)
+            {
+                chan.filterUpdateCounter = 0;
+                const float targetCutoff = juce::jlimit(
+                    filterMinHz, effectiveFilterMaxHz, filterScale * clockFreq);
+                chan.smoothedFilterCutoffHz = targetCutoff;
+                if (std::abs(targetCutoff - chan.lastDesignedFilterCutoffHz) >= 10.0f)
+                {
+                    const auto newCoeffs =
+                        choroboros::designBBD5thOrderButterworth(targetCutoff, fs);
+                    chan.inputFilter.setCoeffs(newCoeffs);
+                    chan.outputFilter.setCoeffs(newCoeffs);
+                    chan.lastDesignedFilterCutoffHz = targetCutoff;
+                }
+            }
 
             const float in = inputSamples[i];
             const float out = processBBDChannel(ch, in, clockFreq, clockSmoothCoeff, effectiveStages);

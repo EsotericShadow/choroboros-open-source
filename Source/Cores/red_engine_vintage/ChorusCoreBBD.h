@@ -36,6 +36,7 @@ public:
     
     float getGuardSamples() const override { return 1.0f; }
     float getMaxDelaySamples() const override;
+    float getOutputTrim() const override { return 1.0f; }
     
 private:
     static constexpr int BBD_STAGES_MAX = 2048; // Max stages (allocate buffer this size)
@@ -45,8 +46,8 @@ private:
         std::vector<float> stages; // BBD stage buffer
         int head = 0;
         double clockPhase = 0.0;
-        float heldPrev = 0.0f;  // Previous held output for time interpolation
-        float heldNext = 0.0f;  // Next held output for time interpolation
+        float heldOutput = 0.0f;  // Current sample-and-hold output value
+        float prevHeldOutput = 0.0f; // Previous held value for first-order hold interpolation
         float prevFilteredInput = 0.0f; // For input interpolation (Raffel)
 
         choroboros::BBDCascadeFilter inputFilter;
@@ -56,6 +57,7 @@ private:
         float smoothedClockFreq = 5000.0f;
         float smoothedFilterCutoffHz = 4000.0f;
         float lastDesignedFilterCutoffHz = -1.0f;
+        int filterUpdateCounter = 0;
     };
     
     std::vector<BBDChannel> channels;
@@ -65,8 +67,6 @@ private:
     // Process one channel's BBD
     float processBBDChannel(int channel, float input, float clockFreq, float clockSmoothCoeff,
                             int effectiveStages);
-
-    choroboros::BBD5thOrderButterworthCoeffs filterCoeffs;
 
     float lastDelaySmoothingMs = -1.0f;
 };

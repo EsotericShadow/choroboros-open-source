@@ -86,7 +86,7 @@ inline BBD5thOrderButterworthCoeffs designBBD5thOrderButterworth(float fcHz, flo
         coeffs.biquad1.b0 = 1.0f / K;
         coeffs.biquad1.b1 = 2.0f / K;
         coeffs.biquad1.b2 = 1.0f / K;
-        coeffs.biquad1.a1 = 2.0f * (cSq - (sigmaSq + omegaSq)) / K;
+        coeffs.biquad1.a1 = 2.0f * ((sigmaSq + omegaSq) - cSq) / K;
         coeffs.biquad1.a2 = (cSq - 2.0f * sigma * c + (sigmaSq + omegaSq)) / K;
     }
 
@@ -101,7 +101,7 @@ inline BBD5thOrderButterworthCoeffs designBBD5thOrderButterworth(float fcHz, flo
         coeffs.biquad2.b0 = 1.0f / K;
         coeffs.biquad2.b1 = 2.0f / K;
         coeffs.biquad2.b2 = 1.0f / K;
-        coeffs.biquad2.a1 = 2.0f * (cSq - (sigmaSq + omegaSq)) / K;
+        coeffs.biquad2.a1 = 2.0f * ((sigmaSq + omegaSq) - cSq) / K;
         coeffs.biquad2.a2 = (cSq - 2.0f * sigma * c + (sigmaSq + omegaSq)) / K;
     }
 
