@@ -175,8 +175,8 @@ void TopBarDrawer::paint (juce::Graphics& g)
     g.setGradientFill (grad);
     g.fillRoundedRectangle (visX, 0.0f, visW, totalH, radius);
 
-    // Accent border (same as combo box outline)
-    g.setColour (devpanel::hackerBorder().withAlpha (0.95f));
+    // Accent border — uses current engine accent, not hardcoded hacker green.
+    g.setColour (accentColour_.withAlpha (0.55f));
     g.drawRoundedRectangle (visX + 0.5f, 0.5f, visW - 1.0f, totalH - 1.0f,
                             radius, 1.05f);
 
@@ -201,7 +201,7 @@ void TopBarDrawer::paintTooltipArea (juce::Graphics& g, float visX, float visW)
     const float textW  = visW - static_cast<float> (padH_) * 2.0f - 4.0f;
 
     // Separator line between icons and tooltip
-    g.setColour (devpanel::hackerBorder().withAlpha (0.4f * alpha));
+    g.setColour (accentColour_.withAlpha (0.4f * alpha));
     g.drawHorizontalLine (juce::roundToInt (baseY), visX + 4.0f, visX + visW - 4.0f);
 
     // Title: engine accent colour, bold, vertically centred
