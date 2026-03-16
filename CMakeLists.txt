@@ -28,7 +28,7 @@ else()
 endif()
 
 juce_add_plugin(Choroboros
-    COMPANY_NAME "Kaizen Strategic AI"
+    COMPANY_NAME "Kaizen DSP"
     COMPANY_COPYRIGHT "Copyright (C) 2026 Kaizen Strategic AI Inc. All rights reserved."
     BUNDLE_ID "com.kaizenstrategicai.Choroboros"
     PLUGIN_MANUFACTURER_CODE ChBr
@@ -52,6 +52,8 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/FeedbackDialog.h
     Source/Plugin/AboutDialog.cpp
     Source/Plugin/AboutDialog.h
+    Source/Plugin/HelpDialog.cpp
+    Source/Plugin/HelpDialog.h
     Source/Plugin/SessionLog.cpp
     Source/Plugin/SessionLog.h
     Source/Plugin/CrashReporter.cpp

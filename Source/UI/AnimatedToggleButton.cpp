@@ -90,7 +90,11 @@ void AnimatedToggleButton::commitToggleState(bool newState, juce::NotificationTy
 
 void AnimatedToggleButton::mouseDown(const juce::MouseEvent& e)
 {
-    juce::Slider::mouseDown(e); // keep APVTS SliderAttachment gesture behavior
+    // Do NOT forward to Slider::mouseDown — it snaps value based on click Y
+    // position, which prevents single-click toggle from HQ→NQ when clicking
+    // near the top (Slider resolves to value 1.0 = no change, eating the event).
+    // APVTS sync happens through setValue() in commitToggleState().
+    juce::ignoreUnused(e);
     juce::Component::beginDragAutoRepeat(16);
     dragStartScreenY = e.getScreenPosition().y;
     dragAnchorScreenY = dragStartScreenY;
@@ -120,7 +124,7 @@ void AnimatedToggleButton::mouseUp(const juce::MouseEvent& e)
 
     pointerIsDown = false;
     dragToggled = false;
-    juce::Slider::mouseUp(e);
+    // Do NOT forward to Slider::mouseUp — see mouseDown comment.
 }
 
 void AnimatedToggleButton::mouseDoubleClick(const juce::MouseEvent& e)

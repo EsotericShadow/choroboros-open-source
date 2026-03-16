@@ -408,7 +408,7 @@ void PluginEditorSetup::setupSliders(ChoroborosPluginEditor& editor)
     editor.offsetSlider.setSmoothingTime(100.0f);
     editor.widthSlider.setUseExponential(true);
     editor.widthSlider.setSmoothingTime(100.0f);
-    editor.colorSlider.setSmoothingTime(25.0f);  // Snappier for linear slider - reduces lag/stuck feel
+    editor.colorSlider.setSmoothingTime(80.0f);  // Smooth but responsive for linear slider
     editor.mixSlider.setSmoothingTime(100.0f);
 
     applyLayout(editor, editor.layoutTuning);

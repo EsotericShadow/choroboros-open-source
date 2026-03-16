@@ -17,270 +17,233 @@
  */
 
 #include "AboutDialog.h"
+#include "PluginProcessor.h"
+#include "../UI/DevPanelSupport.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
 
-namespace
-{
-juce::Font makeRetroFont(float height, bool bold)
-{
-    juce::Font font { juce::FontOptions { height, bold ? juce::Font::bold : juce::Font::plain } };
-    if (BinaryData::Retroica_ttfSize > 0)
-    {
-        static juce::Typeface::Ptr retroTypeface = juce::Typeface::createSystemTypefaceFor(
-            BinaryData::Retroica_ttf,
-            static_cast<size_t>(BinaryData::Retroica_ttfSize));
-        if (retroTypeface != nullptr)
-            font = juce::Font { juce::FontOptions { retroTypeface }.withHeight(height) };
-    }
-    if (bold)
-        font.setBold(true);
-    return font;
-}
-} // namespace
-
 AboutDialog::AboutDialog()
 {
-    setSize(450, 550);
+    setSize(450, 520);
 
-    const auto accent = juce::Colour(0xff9dbd78);
-    const auto bodyText = juce::Colour(0xffe8ecf1);
-    const auto mutedText = juce::Colour(0xff9aa5b3);
-    
+    const auto accent = devpanel::hackerText();        // bright green
+    const auto body   = devpanel::hackerTextDim();     // softer green
+    const auto muted  = devpanel::hackerTextMuted();   // dim green
+
+    // --- Title ---
     titleLabel.setText("Choroboros", juce::dontSendNotification);
-    titleLabel.setFont(makeRetroFont(33.0f, true));
+    titleLabel.setFont(devpanel::makeTitleFont(28.0f, true));
     titleLabel.setJustificationType(juce::Justification::centred);
     titleLabel.setColour(juce::Label::textColourId, accent);
     addAndMakeVisible(titleLabel);
-    
+
+    // --- Version ---
 #ifdef CHOROBOROS_VERSION_STRING
-    versionLabel.setText(juce::String("Version ") + juce::String(CHOROBOROS_VERSION_STRING), juce::dontSendNotification);
+    versionLabel.setText(juce::String("v") + juce::String(CHOROBOROS_VERSION_STRING),
+                         juce::dontSendNotification);
 #else
-    versionLabel.setText("Version 2.04", juce::dontSendNotification);
+    versionLabel.setText("v2.04", juce::dontSendNotification);
 #endif
-    versionLabel.setFont(makeRetroFont(14.0f, false));
+    versionLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::description, false));
     versionLabel.setJustificationType(juce::Justification::centred);
-    versionLabel.setColour(juce::Label::textColourId, mutedText);
+    versionLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(versionLabel);
-    
-    descriptionLabel.setText("A chorus that eats its own tail\nFive colors, ten algorithms", juce::dontSendNotification);
-    descriptionLabel.setFont(makeRetroFont(14.0f, false));
+
+    // --- Tagline ---
+    descriptionLabel.setText("A chorus that eats its own tail\nFive colors \u2022 Ten algorithms",
+                             juce::dontSendNotification);
+    descriptionLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::description, false));
     descriptionLabel.setJustificationType(juce::Justification::centred);
-    descriptionLabel.setColour(juce::Label::textColourId, bodyText);
+    descriptionLabel.setColour(juce::Label::textColourId, body);
     addAndMakeVisible(descriptionLabel);
-    
-    companyLabel.setText("Kaizen Strategic AI Inc", juce::dontSendNotification);
-    companyLabel.setFont(makeRetroFont(16.0f, true));
+
+    // --- Company ---
+    companyLabel.setText("Kaizen DSP", juce::dontSendNotification);
+    companyLabel.setFont(devpanel::makeLabelFont(14.0f, true));
     companyLabel.setJustificationType(juce::Justification::centred);
-    companyLabel.setColour(juce::Label::textColourId, bodyText);
+    companyLabel.setColour(juce::Label::textColourId, body);
     addAndMakeVisible(companyLabel);
-    
-    dbaLabel.setText("DBA: Green DSP", juce::dontSendNotification);
-    dbaLabel.setFont(makeRetroFont(14.0f, false));
-    dbaLabel.setJustificationType(juce::Justification::centred);
-    dbaLabel.setColour(juce::Label::textColourId, bodyText);
-    addAndMakeVisible(dbaLabel);
-    
+
     locationLabel.setText("British Columbia, Canada", juce::dontSendNotification);
-    locationLabel.setFont(makeRetroFont(14.0f, false));
+    locationLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::label, false));
     locationLabel.setJustificationType(juce::Justification::centred);
-    locationLabel.setColour(juce::Label::textColourId, bodyText);
+    locationLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(locationLabel);
-    
-    copyrightLabel.setText("(C) 2026 Kaizen Strategic AI Inc", juce::dontSendNotification);
-    copyrightLabel.setFont(makeRetroFont(12.0f, false));
+
+    // --- Copyright ---
+    copyrightLabel.setText("\u00A9 2026 Kaizen Strategic AI Inc.", juce::dontSendNotification);
+    copyrightLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::labelSmall, false));
     copyrightLabel.setJustificationType(juce::Justification::centred);
-    copyrightLabel.setColour(juce::Label::textColourId, mutedText);
+    copyrightLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(copyrightLabel);
-    
-    contactLabel.setText("Info:", juce::dontSendNotification);
-    contactLabel.setFont(makeRetroFont(14.0f, false));
-    contactLabel.setJustificationType(juce::Justification::centred);
-    contactLabel.setColour(juce::Label::textColourId, bodyText);
-    addAndMakeVisible(contactLabel);
-    
+
+    // --- Contact link (replaces separate contactLabel + contactLink) ---
     contactLink.setButtonText("info@kaizenstrategic.ai");
     contactLink.setURL(juce::URL("mailto:info@kaizenstrategic.ai?subject=Choroboros%20Info"));
-    contactLink.setFont(makeRetroFont(14.0f, false), false);
-    contactLink.setColour(juce::HyperlinkButton::textColourId, accent.brighter(0.18f));
+    contactLink.setFont(devpanel::makeLabelFont(devpanel::Typography::label, false), false);
+    contactLink.setColour(juce::HyperlinkButton::textColourId, accent);
     addAndMakeVisible(contactLink);
-    
+
+    // --- Built with ---
     juceLabel.setText("Built with JUCE 8.0.12", juce::dontSendNotification);
-    juceLabel.setFont(makeRetroFont(11.0f, false));
+    juceLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::labelSmall, false));
     juceLabel.setJustificationType(juce::Justification::centred);
-    juceLabel.setColour(juce::Label::textColourId, mutedText);
+    juceLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(juceLabel);
-    
-    closeButton.setButtonText("Close");
-    closeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2a3138));
-    closeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff3a444d));
-    closeButton.setColour(juce::TextButton::textColourOffId, bodyText);
-    closeButton.setColour(juce::TextButton::textColourOnId, bodyText);
-    closeButton.onClick = [this] { closeDialog(); };
-    addAndMakeVisible(closeButton);
-    
+
+    // --- Buttons (DevPanel hacker style) ---
+    devpanel::styleHackerTextButton(licenseButton, true);
     licenseButton.setButtonText("View License");
-    licenseButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1f2f23));
-    licenseButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff2a4130));
-    licenseButton.setColour(juce::TextButton::textColourOffId, accent.brighter(0.18f));
-    licenseButton.setColour(juce::TextButton::textColourOnId, accent.brighter(0.18f));
     licenseButton.onClick = [this] { showLicense(); };
     addAndMakeVisible(licenseButton);
+
+    devpanel::styleHackerTextButton(closeButton, false);
+    closeButton.setButtonText("Close");
+    closeButton.onClick = [this] { closeDialog(); };
+    addAndMakeVisible(closeButton);
 }
 
 void AboutDialog::paint(juce::Graphics& g)
 {
-    const auto accent = juce::Colour(0xff9dbd78);
+    const auto accent = devpanel::hackerText();
     const auto bounds = getLocalBounds().toFloat();
 
-    g.fillAll(juce::Colour(0xff090b0d));
-    juce::ColourGradient bg(juce::Colour(0xff151a1f), 0.0f, 0.0f,
-                            juce::Colour(0xff11161b), 0.0f, bounds.getBottom(), false);
+    // HackerTheme background
+    g.fillAll(devpanel::hackerBg());
+    juce::ColourGradient bg(devpanel::hackerBgElevated(), 0.0f, 0.0f,
+                            devpanel::hackerBg(), 0.0f, bounds.getBottom(), false);
     g.setGradientFill(bg);
-    g.fillRoundedRectangle(bounds.reduced(8.0f), 10.0f);
+    g.fillRoundedRectangle(bounds.reduced(6.0f), 8.0f);
 
-    g.setColour(accent.withAlpha(0.78f));
-    g.drawRoundedRectangle(bounds.reduced(8.5f), 10.0f, 1.2f);
-    g.setColour(accent.withAlpha(0.18f));
-    g.drawRoundedRectangle(bounds.reduced(12.0f), 8.0f, 1.0f);
+    // Border — matches DevPanel section styling
+    g.setColour(devpanel::hackerBorder().withAlpha(0.7f));
+    g.drawRoundedRectangle(bounds.reduced(6.5f), 8.0f, 1.0f);
+
+    // Subtle inner glow
+    g.setColour(accent.withAlpha(0.06f));
+    g.drawRoundedRectangle(bounds.reduced(10.0f), 6.0f, 0.8f);
 }
 
 void AboutDialog::resized()
 {
-    auto area = getLocalBounds().reduced(30);
-    
-    titleLabel.setBounds(area.removeFromTop(50));
-    area.removeFromTop(10);
-    
-    versionLabel.setBounds(area.removeFromTop(25));
+    auto area = getLocalBounds().reduced(28);
+
+    titleLabel.setBounds(area.removeFromTop(42));
+    area.removeFromTop(4);
+    versionLabel.setBounds(area.removeFromTop(22));
+    area.removeFromTop(16);
+
+    descriptionLabel.setBounds(area.removeFromTop(44));
+    area.removeFromTop(24);
+
+    companyLabel.setBounds(area.removeFromTop(22));
+    area.removeFromTop(4);
+    locationLabel.setBounds(area.removeFromTop(20));
     area.removeFromTop(20);
-    
-    descriptionLabel.setBounds(area.removeFromTop(50));
-    area.removeFromTop(30);
-    
-    companyLabel.setBounds(area.removeFromTop(25));
-    area.removeFromTop(5);
-    
-    dbaLabel.setBounds(area.removeFromTop(25));
-    area.removeFromTop(5);
-    
-    locationLabel.setBounds(area.removeFromTop(25));
-    area.removeFromTop(30);
-    
-    copyrightLabel.setBounds(area.removeFromTop(20));
+
+    copyrightLabel.setBounds(area.removeFromTop(18));
+    area.removeFromTop(16);
+    contactLink.setBounds(area.removeFromTop(22));
     area.removeFromTop(20);
-    
-    contactLabel.setBounds(area.removeFromTop(20));
-    area.removeFromTop(5);
-    
-    contactLink.setBounds(area.removeFromTop(25));
-    area.removeFromTop(30);
-    
-    juceLabel.setBounds(area.removeFromTop(20));
-    area.removeFromTop(20);
-    
-    auto buttonArea = area.removeFromTop(35);
-    licenseButton.setBounds(buttonArea.removeFromLeft(120).reduced(5, 0));
-    buttonArea.removeFromLeft(10);
-    closeButton.setBounds(buttonArea.removeFromLeft(120).reduced(5, 0));
+
+    juceLabel.setBounds(area.removeFromTop(18));
+    area.removeFromTop(16);
+
+    // Centred button row
+    auto buttonArea = area.removeFromTop(30);
+    const int totalW = 250;
+    const int bx = (buttonArea.getWidth() - totalW) / 2;
+    licenseButton.setBounds(buttonArea.getX() + bx, buttonArea.getY(), 120, 28);
+    closeButton.setBounds(buttonArea.getX() + bx + 130, buttonArea.getY(), 120, 28);
 }
 
 void AboutDialog::closeDialog()
 {
-    if (auto* parent = getParentComponent())
+    if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
     {
-        parent->removeChildComponent(this);
+        dw->exitModalState(0);
+        dw->setVisible(false);
+        return;
     }
+
+    if (auto* parent = getParentComponent())
+        parent->removeChildComponent(this);
     delete this;
 }
 
 void AboutDialog::showLicense()
 {
-    // First, try to load EULA from BinaryData (bundled with plugin)
+    // Try to load EULA from BinaryData (bundled with plugin)
     const char* eulaData = BinaryData::EULA_md;
     int eulaSize = BinaryData::EULA_mdSize;
-    
+
     if (eulaData != nullptr && eulaSize > 0)
     {
-        // Save to temporary file and open it
         juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
         juce::File tempEula = tempDir.getChildFile("Choroboros_EULA.md");
-        
+
         if (tempEula.replaceWithData(eulaData, static_cast<size_t>(eulaSize)))
         {
-            tempEula.revealToUser();
             juce::URL("file://" + tempEula.getFullPathName()).launchInDefaultBrowser();
             return;
         }
     }
-    
-    // Fallback: Try to find EULA.md in file system
-    juce::File eulaFile;
+
+    // Fallback: Try to find EULA.md relative to executable
     auto appDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
-    
-    // Check if we're in a .app bundle (macOS)
+    juce::File eulaFile;
+
     if (appDir.getFileName() == "MacOS")
     {
-        // We're in Contents/MacOS, go up to Contents
         auto contentsDir = appDir.getParentDirectory();
-        auto resourcesDir = contentsDir.getChildFile("Resources");
-        eulaFile = resourcesDir.getChildFile("EULA.md");
-        
-        // If not in Resources, try Contents root
+        eulaFile = contentsDir.getChildFile("Resources").getChildFile("EULA.md");
         if (!eulaFile.existsAsFile())
-        {
             eulaFile = contentsDir.getChildFile("EULA.md");
-        }
     }
     else
     {
-        // Try current directory and parent directories
         eulaFile = appDir.getChildFile("EULA.md");
         if (!eulaFile.existsAsFile())
-        {
             eulaFile = appDir.getParentDirectory().getChildFile("EULA.md");
-        }
     }
-    
+
     if (eulaFile.existsAsFile())
     {
-        eulaFile.revealToUser();
         juce::URL("file://" + eulaFile.getFullPathName()).launchInDefaultBrowser();
     }
     else
     {
-        // Final fallback: Show a dialog with key license terms
         juce::AlertWindow::showMessageBoxAsync(
             juce::AlertWindow::InfoIcon,
             "End User License Agreement",
             "Choroboros End User License Agreement\n\n"
             "Copyright (C) 2026 Kaizen Strategic AI Inc.\n"
-            "DBA: Green DSP\n"
             "British Columbia, Canada\n\n"
-            "This software is licensed, not sold. By using this software, you agree to the terms of the End User License Agreement.\n\n"
+            "This software is licensed, not sold. By using this software, you agree "
+            "to the terms of the End User License Agreement.\n\n"
             "PROPRIETARY ALGORITHMS:\n"
-            "The Purple engine algorithms (Phase-Warped Chorus and Orbit Chorus) are proprietary intellectual property of Kaizen Strategic AI Inc. "
-            "These algorithms are protected by trade secret law and may not be reverse engineered, extracted, copied, or used without explicit written license.\n\n"
+            "The Purple engine algorithms (Phase-Warped Chorus and Orbit Chorus) are "
+            "proprietary intellectual property of Kaizen Strategic AI Inc. These "
+            "algorithms are protected by trade secret law and may not be reverse "
+            "engineered, extracted, copied, or used without explicit written license.\n\n"
             "THIRD-PARTY COMPONENTS:\n"
             "This software uses the JUCE framework, subject to its own license terms.\n\n"
             "For the complete EULA, please contact:\n"
-            "info@kaizenstrategic.ai\n\n"
-            "For questions about this license, please contact Kaizen Strategic AI Inc."
-        );
+            "info@kaizenstrategic.ai");
     }
 }
 
 void AboutDialog::show()
 {
     auto* dialog = new AboutDialog();
-    
+
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(dialog);
     options.dialogTitle = "About Choroboros";
-    options.dialogBackgroundColour = juce::Colour(0xff1a1a1a);
+    options.dialogBackgroundColour = devpanel::hackerBg();
     options.resizable = false;
     options.useNativeTitleBar = true;
-    
+
     auto* window = options.launchAsync();
     (void)window;
 }

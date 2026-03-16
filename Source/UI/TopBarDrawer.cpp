@@ -17,6 +17,8 @@
  */
 
 #include "TopBarDrawer.h"
+#include "../Plugin/PluginProcessor.h"
+#include "DevPanelSupport.h"
 #include <cmath>
 
 //==============================================================================
@@ -32,6 +34,14 @@ TopBarDrawer::TopBarDrawer()
     addChildComponent (aboutButton);
     addChildComponent (helpButton);
     addChildComponent (feedbackButton);
+
+    // Button info: title + description (replaces native tooltips)
+    buttonInfos_ = {{
+        { &devButton,      "Developer Panel",  "Diagnostics, parameter mapping, DSP internals" },
+        { &aboutButton,    "About",            "Version info, credits, license" },
+        { &helpButton,     "Help",             "Documentation & support" },
+        { &feedbackButton, "Feedback",         "Send feedback or report a bug" }
+    }};
 }
 
 //==============================================================================
@@ -43,18 +53,41 @@ void TopBarDrawer::setupIcons (const juce::Image& dev,
                                const juce::Image& help,
                                const juce::Image& feedback)
 {
-    auto setup = [] (juce::ImageButton& btn, const juce::Image& icon)
+    // Store the raw icon images so we can re-tint them later
+    iconDev_      = dev;
+    iconAbout_    = about;
+    iconHelp_     = help;
+    iconFeedback_ = feedback;
+
+    applyIconTint (accentColour_);
+}
+
+void TopBarDrawer::setAccentColour (juce::Colour newAccent)
+{
+    if (accentColour_ == newAccent)
+        return;
+
+    accentColour_ = newAccent;
+    applyIconTint (accentColour_);
+    repaint();
+}
+
+void TopBarDrawer::applyIconTint (juce::Colour accent)
+{
+    auto setup = [accent] (juce::ImageButton& btn, const juce::Image& icon)
     {
         btn.setImages (true, true, true,
-            icon, 0.55f, {},    // normal: subtle
-            icon, 1.0f,  {},    // hover: full
-            icon, 0.4f,  {});   // pressed: dim
+            icon, 0.55f, accent,   // normal: subtle tint
+            icon, 1.0f,  accent,   // hover: full tint
+            icon, 0.4f,  accent);  // pressed: dim tint
+
+        btn.setTooltip ({});
     };
 
-    setup (devButton,      dev);
-    setup (aboutButton,    about);
-    setup (helpButton,     help);
-    setup (feedbackButton, feedback);
+    setup (devButton,      iconDev_);
+    setup (aboutButton,    iconAbout_);
+    setup (helpButton,     iconHelp_);
+    setup (feedbackButton, iconFeedback_);
 }
 
 void TopBarDrawer::setupLayout (float uiScale)
@@ -81,6 +114,9 @@ void TopBarDrawer::setupLayout (float uiScale)
 
     drawerH_ = padV_ * 2 + btnSize_;
 
+    // Tooltip area: title row + description row + padding
+    tooltipH_ = s (32);
+
     // Final button positions (relative to component left edge)
     btnY_ = padV_;
     const int x0 = padH_ + arrowW_ + arrowGap_;
@@ -96,6 +132,11 @@ void TopBarDrawer::setupLayout (float uiScale)
     feedbackButton.setBounds (feedbackFinalX_, btnY_, btnSize_, btnSize_);
 }
 
+int TopBarDrawer::getTotalHeight() const
+{
+    return drawerH_ + juce::roundToInt (static_cast<float> (tooltipH_) * tooltipProgress_);
+}
+
 //==============================================================================
 // Painting
 //==============================================================================
@@ -106,13 +147,62 @@ void TopBarDrawer::paint (juce::Graphics& g)
     const float visW = static_cast<float> (collapsedW_)
                      + static_cast<float> (expandedW_ - collapsedW_) * progress;
     const float visX = static_cast<float> (getWidth()) - visW;
+    const float totalH = static_cast<float> (getTotalHeight());
+    constexpr float radius = 4.0f;
 
-    // Dark container background
-    g.setColour (juce::Colour (0x99000000));   // 60 % black
-    g.fillRoundedRectangle (visX, 0.0f, visW,
-                            static_cast<float> (getHeight()), 3.0f);
+    // Vertical gradient matching engine-selector combo box style
+    const auto bgTop = devpanel::hackerBgElevated().brighter (0.15f);
+    const auto bgBot = devpanel::hackerBg().darker (0.32f)
+                           .interpolatedWith (devpanel::hackerText(), 0.06f);
+
+    juce::ColourGradient grad (bgTop, visX, 0.0f, bgBot, visX, totalH, false);
+    g.setGradientFill (grad);
+    g.fillRoundedRectangle (visX, 0.0f, visW, totalH, radius);
+
+    // Accent border (same as combo box outline)
+    g.setColour (devpanel::hackerBorder().withAlpha (0.95f));
+    g.drawRoundedRectangle (visX + 0.5f, 0.5f, visW - 1.0f, totalH - 1.0f,
+                            radius, 1.05f);
+
+    // Subtle inner glow
+    g.setColour (accentColour_.withAlpha (0.04f));
+    g.drawRoundedRectangle (visX + 1.5f, 1.5f, visW - 3.0f, totalH - 3.0f,
+                            radius - 1.0f, 0.6f);
 
     paintArrow (g, visX);
+
+    // Draw tooltip text if expanded
+    if (tooltipProgress_ > 0.01f && hoveredIndex_ >= 0)
+        paintTooltipArea (g, visX, visW);
+}
+
+void TopBarDrawer::paintTooltipArea (juce::Graphics& g, float visX, float visW)
+{
+    const auto& info = buttonInfos_[static_cast<size_t> (hoveredIndex_)];
+    const float baseY  = static_cast<float> (drawerH_);
+    const float alpha  = tooltipProgress_;
+    const float textX  = visX + static_cast<float> (padH_) + 2.0f;
+    const float textW  = visW - static_cast<float> (padH_) * 2.0f - 4.0f;
+
+    // Separator line between icons and tooltip
+    g.setColour (devpanel::hackerBorder().withAlpha (0.4f * alpha));
+    g.drawHorizontalLine (juce::roundToInt (baseY), visX + 4.0f, visX + visW - 4.0f);
+
+    // Title: engine accent colour, bold
+    auto titleFont = devpanel::makeLabelFont (11.0f, true);
+    g.setFont (titleFont);
+    g.setColour (accentColour_.withAlpha (0.95f * alpha));
+    g.drawText (info.title,
+                juce::Rectangle<float> (textX, baseY + 3.0f, textW, 13.0f),
+                juce::Justification::centredLeft, true);
+
+    // Description: white, thin italic
+    auto descFont = devpanel::makeLabelFont (10.0f, false).italicised();
+    g.setFont (descFont);
+    g.setColour (juce::Colours::white.withAlpha (0.70f * alpha));
+    g.drawText (info.description,
+                juce::Rectangle<float> (textX, baseY + 16.0f, textW, 12.0f),
+                juce::Justification::centredLeft, true);
 }
 
 void TopBarDrawer::paintArrow (juce::Graphics& g, float containerLeft)
@@ -120,10 +210,10 @@ void TopBarDrawer::paintArrow (juce::Graphics& g, float containerLeft)
     const float cx = containerLeft
                    + static_cast<float> (padH_)
                    + static_cast<float> (arrowW_) * 0.5f;
-    const float cy = static_cast<float> (getHeight()) * 0.5f;
+    const float cy = static_cast<float> (drawerH_) * 0.5f;
     const float sz = static_cast<float> (arrowW_) * 0.28f;
 
-    // dir: –1 = left-pointing (collapsed), 0 = line, +1 = right-pointing
+    // dir: -1 = left-pointing (collapsed), 0 = line, +1 = right-pointing
     const float dir    = rawProgress_ * 2.0f - 1.0f;
     const float absDir = std::abs (dir);
 
@@ -131,7 +221,7 @@ void TopBarDrawer::paintArrow (juce::Graphics& g, float containerLeft)
 
     if (absDir < 0.12f)
     {
-        // Near midpoint — draw a horizontal line
+        // Near midpoint - draw a horizontal line
         path.startNewSubPath (cx - sz, cy);
         path.lineTo (cx + sz, cy);
     }
@@ -146,22 +236,25 @@ void TopBarDrawer::paintArrow (juce::Graphics& g, float containerLeft)
         path.lineTo (armX, cy + spread);
     }
 
-    g.setColour (juce::Colours::white.withAlpha (0.85f));
+    g.setColour (accentColour_.withAlpha (0.90f));
     g.strokePath (path,
         juce::PathStrokeType (1.5f, juce::PathStrokeType::curved));
 }
 
 //==============================================================================
-// Hit testing — only the visible region responds to clicks
+// Hit testing - only the visible region responds to clicks/hovers
 //==============================================================================
 
-bool TopBarDrawer::hitTest (int x, int /*y*/)
+bool TopBarDrawer::hitTest (int x, int y)
 {
     const float progress = slideProgress();
     const float visW = static_cast<float> (collapsedW_)
                      + static_cast<float> (expandedW_ - collapsedW_) * progress;
     const float visX = static_cast<float> (getWidth()) - visW;
-    return static_cast<float> (x) >= visX;
+    const float totalH = static_cast<float> (getTotalHeight());
+
+    return static_cast<float> (x) >= visX
+        && static_cast<float> (y) < totalH;
 }
 
 void TopBarDrawer::mouseDown (const juce::MouseEvent& e)
@@ -178,34 +271,137 @@ void TopBarDrawer::mouseDown (const juce::MouseEvent& e)
         toggleDrawer();
 }
 
+void TopBarDrawer::mouseMove (const juce::MouseEvent&)
+{
+    // Continuously check hover even when the timer is idle
+    if (expanded_)
+        checkButtonHover();
+}
+
+void TopBarDrawer::mouseEnter (const juce::MouseEvent&)
+{
+    // Re-entering the drawer — check hover immediately
+    if (expanded_)
+        checkButtonHover();
+}
+
+void TopBarDrawer::mouseExit (const juce::MouseEvent&)
+{
+    // Mouse left the entire drawer - collapse tooltip
+    if (hoveredIndex_ >= 0)
+    {
+        hoveredIndex_ = -1;
+        tooltipExpanding_ = false;
+
+        if (! isTimerRunning())
+            startTimerHz (kAnimFps);
+    }
+}
+
 //==============================================================================
 // Animation
 //==============================================================================
 
 void TopBarDrawer::timerCallback()
 {
-    const float step = 1.0f
-                     / (static_cast<float> (kAnimFps) * kAnimDurationSec);
+    bool needsRepaint = false;
 
-    if (expanding_)
-        rawProgress_ = juce::jmin (1.0f, rawProgress_ + step);
-    else
-        rawProgress_ = juce::jmax (0.0f, rawProgress_ - step);
-
-    updateButtonStates();
-    repaint();
-
-    const bool done = (expanding_  && rawProgress_ >= 1.0f)
-                   || (!expanding_ && rawProgress_ <= 0.0f);
-    if (done)
+    // --- Horizontal slide animation ---
     {
-        stopTimer();
-        if (! expanding_)
+        const float step = 1.0f
+                         / (static_cast<float> (kAnimFps) * kAnimDurationSec);
+
+        const float prev = rawProgress_;
+
+        if (expanding_)
+            rawProgress_ = juce::jmin (1.0f, rawProgress_ + step);
+        else
+            rawProgress_ = juce::jmax (0.0f, rawProgress_ - step);
+
+        if (rawProgress_ != prev)
+        {
+            needsRepaint = true;
+            updateButtonStates();
+        }
+
+        const bool slideDone = (expanding_  && rawProgress_ >= 1.0f)
+                            || (!expanding_ && rawProgress_ <= 0.0f);
+        if (slideDone && !expanding_)
             expanded_ = false;
 
-        // Re-run after stopTimer so isTimerRunning() is false and
-        // buttons become interactive (expand) or hidden (collapse).
-        updateButtonStates();
+        if (slideDone)
+            updateButtonStates();
+    }
+
+    // --- Vertical tooltip expansion animation ---
+    {
+        const float step = 1.0f
+                         / (static_cast<float> (kAnimFps) * kTooltipDurationSec);
+
+        const float prev = tooltipProgress_;
+
+        if (tooltipExpanding_)
+            tooltipProgress_ = juce::jmin (1.0f, tooltipProgress_ + step);
+        else
+            tooltipProgress_ = juce::jmax (0.0f, tooltipProgress_ - step);
+
+        if (tooltipProgress_ != prev)
+        {
+            needsRepaint = true;
+
+            // Resize this component to accommodate the tooltip area
+            const int newH = getTotalHeight();
+            if (getHeight() != newH)
+                setSize (getWidth(), newH);
+        }
+    }
+
+    if (needsRepaint)
+        repaint();
+
+    // Check if we should poll hover state (buttons don't propagate
+    // mouseEnter to parent, so we poll while the timer is running)
+    if (expanded_)
+        checkButtonHover();
+
+    // Stop timer when all animations are done
+    const bool slideDone   = (expanding_  && rawProgress_ >= 1.0f)
+                          || (!expanding_ && rawProgress_ <= 0.0f);
+    const bool tipDone     = (tooltipExpanding_  && tooltipProgress_ >= 1.0f)
+                          || (!tooltipExpanding_ && tooltipProgress_ <= 0.0f);
+
+    if (slideDone && tipDone)
+        stopTimer();
+}
+
+void TopBarDrawer::checkButtonHover()
+{
+    // Check which button (if any) the mouse is over
+    const auto mousePos = getMouseXYRelative();
+    int newHovered = -1;
+
+    if (expanded_ && ! isMouseButtonDown())
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            auto* btn = buttonInfos_[static_cast<size_t> (i)].button;
+            if (btn->isVisible() && btn->getBounds().contains (mousePos))
+            {
+                newHovered = i;
+                break;
+            }
+        }
+    }
+
+    if (newHovered != hoveredIndex_)
+    {
+        hoveredIndex_ = newHovered;
+        tooltipExpanding_ = (newHovered >= 0);
+
+        if (! isTimerRunning())
+            startTimerHz (kAnimFps);
+
+        repaint();
     }
 }
 
@@ -215,7 +411,7 @@ void TopBarDrawer::updateButtonStates()
 
     if (expanding_)
     {
-        // Bounce completes at 65 % — ends before the slide finishes
+        // Bounce completes at 65 % - ends before the slide finishes
         const float bounceT = juce::jmin (1.0f, rawProgress_ / 0.65f);
         offsetFrac = easeOutBack (bounceT);
 
@@ -232,13 +428,22 @@ void TopBarDrawer::updateButtonStates()
     const float maxSlide = static_cast<float> (expandedW_ - collapsedW_);
     const int   xOff     = juce::roundToInt (maxSlide * (1.0f - offsetFrac));
     const bool  show     = fade > 0.01f;
-    const bool  interact = expanded_ && ! isTimerRunning();
+    const bool  interact = expanded_ && ! (expanding_ ? isTimerRunning() && rawProgress_ < 1.0f : true);
+
+    // Scale icons from 25 % to 100 % of btnSize_ as the drawer opens
+    const float scale = 0.25f + 0.75f * fade;
+    const int   sz    = juce::roundToInt (static_cast<float> (btnSize_) * scale);
 
     auto place = [&] (juce::ImageButton& btn, int finalX)
     {
         btn.setVisible (show);
         btn.setAlpha (fade);
-        btn.setTopLeftPosition (finalX + xOff, btnY_);
+
+        // Centre the scaled button on its final midpoint
+        const int cx = finalX + xOff + btnSize_ / 2;
+        const int cy = btnY_ + btnSize_ / 2;
+        btn.setBounds (cx - sz / 2, cy - sz / 2, sz, sz);
+
         btn.setInterceptsMouseClicks (interact, false);
     };
 
@@ -253,6 +458,14 @@ void TopBarDrawer::toggleDrawer()
     // Supports mid-animation reversal
     expanding_ = ! expanding_;
     expanded_  = true;            // keep alive during collapse anim
+
+    // Collapse tooltip when closing the drawer
+    if (! expanding_)
+    {
+        hoveredIndex_ = -1;
+        tooltipExpanding_ = false;
+    }
+
     startTimerHz (kAnimFps);
 }
 

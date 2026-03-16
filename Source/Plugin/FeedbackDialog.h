@@ -50,13 +50,12 @@ private:
     juce::String crashReportText;
 
     juce::TextEditor feedbackText;
-    juce::TextButton sendButton;       // "Send to Developer" — mailto:
+    juce::TextButton sendButton;       // "Send to Developer" — opens default mail app
     juce::TextButton saveButton;       // "Save to File"
     juce::TextButton formButton;       // "Open Feedback Form"
     juce::TextButton cancelButton;
     juce::Label titleLabel;
     juce::Label infoLabel;
-    juce::HyperlinkButton betaSignUpLink;
 
     void initCommon();
     void sendToDeveloper();
@@ -64,7 +63,7 @@ private:
     void openFeedbackForm();
     void closeDialog();
 
-    /** Build the mailto: body from user text + session/crash data. */
+    /** Build the outgoing email body from user text + session/crash data. */
     juce::String buildEmailBody() const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FeedbackDialog)

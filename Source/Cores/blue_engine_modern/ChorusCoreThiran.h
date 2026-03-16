@@ -85,6 +85,12 @@ private:
         int interpCounter = 0;
         static constexpr int INTERP_LENGTH = 32;
 
+        // Gentle one-pole lowpass on output (~16 kHz) to attenuate content above
+        // the allpass's useful range. Unlike polynomial interpolators (Lagrange,
+        // Catmull-Rom) which naturally roll off above Nyquist, an allpass passes
+        // ALL frequencies at unity gain — this shelf provides the safety net.
+        float outputLpState = 0.0f;
+
         void resetState()
         {
             state.fill(0.0f);
@@ -96,6 +102,7 @@ private:
             smoothedDelay = 0.0f;
             delayInitialized = false;
             interpCounter = 0;
+            outputLpState = 0.0f;
         }
     };
 
@@ -116,4 +123,8 @@ private:
 
     juce::dsp::ProcessSpec spec {};
     int maxDelaySamples = 0;
+
+    // One-pole output lowpass coefficient: y[n] = (1-a)*x[n] + a*y[n-1]
+    // Computed once in prepare() from sample rate. Cutoff ~16 kHz.
+    float outputLpAlpha = 0.0f;
 };

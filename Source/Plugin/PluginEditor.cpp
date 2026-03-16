@@ -20,9 +20,11 @@
 #include "PluginEditor.h"
 #include "../Config/DefaultsPersistence.h"
 #include "../UI/LabelWithContainer.h"
+#include "../UI/DevPanelSupport.h"
 #include "BinaryData.h"
 #include "FeedbackDialog.h"
 #include "AboutDialog.h"
+#include "HelpDialog.h"
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/DevPanel.h"
 #include <array>
@@ -690,9 +692,13 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         topBarDrawer.setupIcons (devIcon, aboutIcon, helpIcon, feedbackIcon);
         topBarDrawer.setupLayout (kUiScale);
 
-        // Wire up button callbacks
-        topBarDrawer.devButton.setTooltip (
-            "Developer Panel \u2014 diagnostics, parameter mapping, DSP internals");
+        // Set initial drawer accent colour to match the current engine
+        if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+            topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (
+                juce::jlimit (0, 4, static_cast<int> (engineColorParam->load()))));
+
+        // Wire up button callbacks (tooltips are now handled by the drawer
+        // itself via hover-expansion, not native JUCE tooltips)
         topBarDrawer.devButton.onClick = [this]
         {
             ensureDevPanelWindowCreated (true);
@@ -702,15 +708,10 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
                 devWindow->toFront (true);
         };
 
-        topBarDrawer.aboutButton.setTooltip ("About Choroboros \u2014 version info, credits");
         topBarDrawer.aboutButton.onClick = [] { AboutDialog::show(); };
 
-        topBarDrawer.helpButton.setTooltip ("Documentation & support");
-        topBarDrawer.helpButton.onClick = [] {
-            juce::URL ("https://choroboros.kaizenstrategic.ai/docs").launchInDefaultBrowser();
-        };
+        topBarDrawer.helpButton.onClick = [] { HelpDialog::show(); };
 
-        topBarDrawer.feedbackButton.setTooltip ("Send feedback or report a bug");
         topBarDrawer.feedbackButton.onClick = [this] {
             if (audioProcessor.feedbackCollector)
                 FeedbackDialog::show (*audioProcessor.feedbackCollector);
@@ -722,7 +723,8 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         const int marginT = uiScaleInt (3);
         const int dw = topBarDrawer.getExpandedWidth();
         const int dh = topBarDrawer.getDrawerHeight();
-        topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh);
+        // Give enough vertical room for the hover tooltip expansion area
+        topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh + 40);
         addAndMakeVisible (topBarDrawer);
     }
     
@@ -820,6 +822,7 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
         customLookAndFeel.setColorTheme(colorIndex);
         loadBackgroundImage(colorIndex);
         updateValueLabelColors(colorIndex);
+        topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
         PluginEditorSetup::applyLayout(*this, layoutTuning);
         repaint();
     }
@@ -964,6 +967,7 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         customLookAndFeel.setColorTheme(colorIndex);
         loadBackgroundImage(colorIndex);
         updateValueLabelColors(colorIndex);
+        topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
         PluginEditorSetup::applyLayout(*this, layoutTuning);
         
         // Track engine switch for feedback

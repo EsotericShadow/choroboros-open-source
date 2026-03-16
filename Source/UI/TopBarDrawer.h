@@ -19,6 +19,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <array>
 
 //==============================================================================
 /**
@@ -30,12 +31,16 @@
     smooth slide, micro-bounce, and fade-in.  The chevron morphs through
     a horizontal line to a right-pointing arrow, which collapses the
     drawer on click.
+
+    Hovering a button expands the drawer downward to show the button's
+    title (green) and description (white italic) in two extra rows.
+    Leaving the drawer collapses the tooltip area back up.
 */
 class TopBarDrawer : public juce::Component,
                      private juce::Timer
 {
 public:
-    // Public so the editor can wire up onClick callbacks and tooltips
+    // Public so the editor can wire up onClick callbacks
     juce::ImageButton devButton      { "dev" };
     juce::ImageButton aboutButton    { "about" };
     juce::ImageButton helpButton     { "help" };
@@ -52,23 +57,51 @@ public:
     /** Compute all internal layout values from the global UI scale. */
     void setupLayout (float uiScale);
 
+    /** Update the accent colour used for icon tinting, arrow, and tooltip title.
+        Call this whenever the engine colour changes. */
+    void setAccentColour (juce::Colour newAccent);
+
     int  getExpandedWidth()  const { return expandedW_; }
     int  getDrawerHeight()   const { return drawerH_; }
     bool isDrawerExpanded()  const { return expanded_; }
+
+    /** Total height including any tooltip expansion. */
+    int  getTotalHeight()    const;
 
 private:
     //==========================================================================
     void paint (juce::Graphics& g) override;
     bool hitTest (int x, int y) override;
     void mouseDown (const juce::MouseEvent& e) override;
+    void mouseMove (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent& e) override;
+    void mouseExit (const juce::MouseEvent& e) override;
     void timerCallback() override;
 
     //==========================================================================
     void  toggleDrawer();
     void  updateButtonStates();
     void  paintArrow (juce::Graphics& g, float containerLeft);
+    void  paintTooltipArea (juce::Graphics& g, float visX, float visW);
     float slideProgress() const;
     static float easeOutBack (float t);
+
+    //==========================================================================
+    // Hover tooltip expansion
+    struct ButtonInfo
+    {
+        juce::ImageButton* button;
+        juce::String       title;
+        juce::String       description;
+    };
+
+    std::array<ButtonInfo, 4> buttonInfos_;
+    int    hoveredIndex_     = -1;     // which button is hovered (-1 = none)
+    float  tooltipProgress_  = 0.0f;  // 0 = collapsed, 1 = fully expanded
+    bool   tooltipExpanding_ = false;
+    int    tooltipH_         = 0;     // pixel height of the tooltip area
+
+    void checkButtonHover();
 
     //==========================================================================
     bool  expanded_   = false;
@@ -82,8 +115,15 @@ private:
     int helpFinalX_ = 0, feedbackFinalX_ = 0;
     int btnY_ = 0;
 
+    //==========================================================================
+    // Accent colour + stored icon images for re-tinting
+    juce::Colour accentColour_ { 0xff80ef80 };  // default: hacker green
+    juce::Image  iconDev_, iconAbout_, iconHelp_, iconFeedback_;
+    void applyIconTint (juce::Colour accent);
+
     static constexpr int   kAnimFps         = 60;
     static constexpr float kAnimDurationSec = 0.35f;
+    static constexpr float kTooltipDurationSec = 0.18f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TopBarDrawer)
 };

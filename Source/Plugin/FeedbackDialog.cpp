@@ -17,28 +17,11 @@
  */
 
 #include "FeedbackDialog.h"
+#include "PluginProcessor.h"
 #include "SessionLog.h"
+#include "../UI/DevPanelSupport.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
-
-namespace
-{
-juce::Font makeRetroFont (float height, bool bold)
-{
-    juce::Font font { juce::FontOptions { height, bold ? juce::Font::bold : juce::Font::plain } };
-    if (BinaryData::Retroica_ttfSize > 0)
-    {
-        static juce::Typeface::Ptr retroTypeface = juce::Typeface::createSystemTypefaceFor (
-            BinaryData::Retroica_ttf,
-            static_cast<size_t> (BinaryData::Retroica_ttfSize));
-        if (retroTypeface != nullptr)
-            font = juce::Font { juce::FontOptions { retroTypeface }.withHeight (height) };
-    }
-    if (bold)
-        font.setBold (true);
-    return font;
-}
-} // namespace
 
 //==============================================================================
 // Constructors
@@ -65,104 +48,75 @@ FeedbackDialog::FeedbackDialog (FeedbackCollector& collector,
 
 void FeedbackDialog::initCommon()
 {
-    setSize (520, 570);
+    setSize (520, 560);
 
-    const auto accent    = juce::Colour (0xff9dbd78);
-    const auto bodyText  = juce::Colour (0xffe8ecf1);
-    const auto mutedText = juce::Colour (0xffa0acba);
-    const auto warnText  = juce::Colour (0xffd4a043);
+    const auto accent = devpanel::hackerText();        // bright green
+    const auto body   = devpanel::hackerTextDim();     // softer green
+    const auto muted  = devpanel::hackerTextMuted();   // dim green
+    // Crash-mode uses amber from DevPanel's StagePalette-style warning
+    const auto warn   = juce::Colour (0xffd4a043);
 
-    // Title
+    // --- Title ---
     if (crashReportMode)
-        titleLabel.setText ("Choroboros - Crash Report", juce::dontSendNotification);
+        titleLabel.setText ("Choroboros \u2014 Crash Report", juce::dontSendNotification);
     else
-        titleLabel.setText ("Choroboros Beta - Feedback", juce::dontSendNotification);
+        titleLabel.setText ("Choroboros \u2014 Feedback", juce::dontSendNotification);
 
-    titleLabel.setFont (makeRetroFont (20.0f, true));
+    titleLabel.setFont (devpanel::makeTitleFont (devpanel::Typography::title, true));
     titleLabel.setJustificationType (juce::Justification::centred);
-    titleLabel.setColour (juce::Label::textColourId, crashReportMode ? warnText : accent);
+    titleLabel.setColour (juce::Label::textColourId, crashReportMode ? warn : accent);
     addAndMakeVisible (titleLabel);
 
-    // Info label
+    // --- Info label ---
     if (crashReportMode)
     {
         infoLabel.setText ("It looks like Choroboros didn't close properly last time.\n"
-                           "Help us fix this — send the crash log to the developer.\n"
+                           "Help us fix this \u2014 send the crash log to the developer.\n"
                            "Add any details about what you were doing when it happened.",
                            juce::dontSendNotification);
     }
     else
     {
-        infoLabel.setText ("Help us improve! Share bug reports, feature requests, or feedback.\n"
-                           "Click \"Send to Developer\" to email directly from the plugin.\n\n"
-                           "Not yet a beta tester? Sign up:",
+        infoLabel.setText ("Share bug reports, feature requests, or general feedback.\n"
+                           "Click \"Send to Developer\" to open your default mail app with the report prefilled.",
                            juce::dontSendNotification);
     }
-    infoLabel.setFont (makeRetroFont (14.0f, false));
+    infoLabel.setFont (devpanel::makeLabelFont (devpanel::Typography::description, false));
     infoLabel.setJustificationType (juce::Justification::centred);
-    infoLabel.setColour (juce::Label::textColourId, mutedText);
+    infoLabel.setColour (juce::Label::textColourId, muted);
     addAndMakeVisible (infoLabel);
 
-    // Feedback text editor
+    // --- Feedback text editor (hacker-styled) ---
     feedbackText.setMultiLine (true, true);
     feedbackText.setReturnKeyStartsNewLine (true);
-    feedbackText.setFont (makeRetroFont (14.0f, false));
-    feedbackText.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff11161b));
-    feedbackText.setColour (juce::TextEditor::textColourId, bodyText);
-    feedbackText.setColour (juce::TextEditor::outlineColourId, accent.withAlpha (0.65f));
-    feedbackText.setColour (juce::TextEditor::focusedOutlineColourId, accent);
-    feedbackText.setColour (juce::CaretComponent::caretColourId, accent.brighter (0.25f));
+    feedbackText.setFont (devpanel::makeLabelFont (devpanel::Typography::description, false));
+    devpanel::styleHackerEditor (feedbackText);
+    feedbackText.setColour (juce::CaretComponent::caretColourId, accent);
     addAndMakeVisible (feedbackText);
 
-    // Send to Developer button (primary action)
+    // --- Buttons (all hacker-styled) ---
+    devpanel::styleHackerTextButton (sendButton, true);   // primary
     sendButton.setButtonText ("Send to Developer");
-    sendButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff1f3f23));
-    sendButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff2a5130));
-    sendButton.setColour (juce::TextButton::textColourOffId, accent.brighter (0.25f));
-    sendButton.setColour (juce::TextButton::textColourOnId, accent.brighter (0.25f));
     sendButton.addListener (this);
     addAndMakeVisible (sendButton);
 
-    // Save to File button
+    devpanel::styleHackerTextButton (saveButton, false);
     saveButton.setButtonText ("Save to File");
-    saveButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff1f2f23));
-    saveButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff2a4130));
-    saveButton.setColour (juce::TextButton::textColourOffId, accent.brighter (0.18f));
-    saveButton.setColour (juce::TextButton::textColourOnId, accent.brighter (0.18f));
     saveButton.addListener (this);
     addAndMakeVisible (saveButton);
 
-    // Open Form button (hidden in crash mode — not useful there)
     if (! crashReportMode)
     {
-        formButton.setButtonText ("Open Form");
-        formButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff243138));
-        formButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff31424c));
-        formButton.setColour (juce::TextButton::textColourOffId, bodyText);
-        formButton.setColour (juce::TextButton::textColourOnId, bodyText);
+        devpanel::styleHackerTextButton (formButton, false);
+        formButton.setButtonText ("Feedback Form");
         formButton.addListener (this);
         addAndMakeVisible (formButton);
     }
 
-    // Cancel / Dismiss
+    devpanel::styleHackerTextButton (cancelButton, false);
     cancelButton.setButtonText (crashReportMode ? "Dismiss" : "Cancel");
-    cancelButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2a3138));
-    cancelButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff3a444d));
-    cancelButton.setColour (juce::TextButton::textColourOffId, bodyText);
-    cancelButton.setColour (juce::TextButton::textColourOnId, bodyText);
     cancelButton.addListener (this);
     addAndMakeVisible (cancelButton);
-
-    // Beta sign-up link (only in normal mode)
-    if (! crashReportMode)
-    {
-        betaSignUpLink.setButtonText ("Choroboros v2.04 Sign-up");
-        betaSignUpLink.setURL (juce::URL ("https://docs.google.com/forms/d/e/"
-                                           "1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform"));
-        betaSignUpLink.setFont (makeRetroFont (12.0f, false), false);
-        betaSignUpLink.setColour (juce::HyperlinkButton::textColourId, accent.brighter (0.18f));
-        addAndMakeVisible (betaSignUpLink);
-    }
 }
 
 //==============================================================================
@@ -172,58 +126,52 @@ void FeedbackDialog::initCommon()
 void FeedbackDialog::paint (juce::Graphics& g)
 {
     const auto accent = crashReportMode ? juce::Colour (0xffd4a043)
-                                        : juce::Colour (0xff9dbd78);
+                                        : devpanel::hackerText();
     const auto bounds = getLocalBounds().toFloat();
 
-    g.fillAll (juce::Colour (0xff090b0d));
-    juce::ColourGradient bg (juce::Colour (0xff151a1f), 0.0f, 0.0f,
-                             juce::Colour (0xff11161b), 0.0f, bounds.getBottom(), false);
+    // HackerTheme background
+    g.fillAll (devpanel::hackerBg());
+    juce::ColourGradient bg (devpanel::hackerBgElevated(), 0.0f, 0.0f,
+                             devpanel::hackerBg(), 0.0f, bounds.getBottom(), false);
     g.setGradientFill (bg);
-    g.fillRoundedRectangle (bounds.reduced (8.0f), 10.0f);
+    g.fillRoundedRectangle (bounds.reduced (6.0f), 8.0f);
 
-    g.setColour (accent.withAlpha (0.78f));
-    g.drawRoundedRectangle (bounds.reduced (8.5f), 10.0f, 1.2f);
-    g.setColour (accent.withAlpha (0.18f));
-    g.drawRoundedRectangle (bounds.reduced (12.0f), 8.0f, 1.0f);
+    // Border
+    g.setColour (devpanel::hackerBorder().withAlpha (0.7f));
+    g.drawRoundedRectangle (bounds.reduced (6.5f), 8.0f, 1.0f);
+
+    // Subtle inner glow
+    g.setColour (accent.withAlpha (0.06f));
+    g.drawRoundedRectangle (bounds.reduced (10.0f), 6.0f, 0.8f);
 }
 
 void FeedbackDialog::resized()
 {
     auto area = getLocalBounds().reduced (20);
 
-    titleLabel.setBounds (area.removeFromTop (30));
-    area.removeFromTop (10);
+    titleLabel.setBounds (area.removeFromTop (28));
+    area.removeFromTop (8);
 
-    infoLabel.setBounds (area.removeFromTop (70));
-    area.removeFromTop (5);
+    infoLabel.setBounds (area.removeFromTop (50));
+    area.removeFromTop (12);
 
-    if (! crashReportMode)
-    {
-        betaSignUpLink.setBounds (area.removeFromTop (22));
-        area.removeFromTop (10);
-    }
-    else
-    {
-        area.removeFromTop (10);
-    }
-
-    auto buttonArea = area.removeFromBottom (30);
+    auto buttonArea = area.removeFromBottom (28);
     area.removeFromBottom (10);
     feedbackText.setBounds (area);
 
-    // Button layout: [Send to Developer] [Save to File] [Open Form?] [Cancel/Dismiss]
-    sendButton.setBounds (buttonArea.removeFromLeft (145));
-    buttonArea.removeFromLeft (8);
-    saveButton.setBounds (buttonArea.removeFromLeft (100));
-    buttonArea.removeFromLeft (8);
+    // Button layout: [Send to Developer] [Save to File] [Feedback Form?] [Cancel/Dismiss]
+    sendButton.setBounds (buttonArea.removeFromLeft (140));
+    buttonArea.removeFromLeft (6);
+    saveButton.setBounds (buttonArea.removeFromLeft (95));
+    buttonArea.removeFromLeft (6);
 
     if (! crashReportMode)
     {
-        formButton.setBounds (buttonArea.removeFromLeft (90));
-        buttonArea.removeFromLeft (8);
+        formButton.setBounds (buttonArea.removeFromLeft (110));
+        buttonArea.removeFromLeft (6);
     }
 
-    cancelButton.setBounds (buttonArea.removeFromLeft (90));
+    cancelButton.setBounds (buttonArea.removeFromLeft (85));
 }
 
 //==============================================================================
@@ -240,8 +188,6 @@ void FeedbackDialog::buttonClicked (juce::Button* button)
         openFeedbackForm();
     else if (button == &cancelButton)
     {
-        // User chose to dismiss — clear the crash report so it doesn't
-        // nag on every launch, but they chose not to send it.
         if (crashReportMode)
             SessionLog::clearPendingCrashReport();
         closeDialog();
@@ -259,24 +205,20 @@ void FeedbackDialog::sendToDeveloper()
                        ? juce::String ("Choroboros Crash Report")
                        : juce::String ("Choroboros Feedback");
 
-    // Add version to subject
 #ifdef CHOROBOROS_VERSION_STRING
     subject << " - v" << juce::String (CHOROBOROS_VERSION_STRING);
 #else
     subject << " - v2.04-dev";
 #endif
 
-    // Build mailto: URL.  Body is URL-encoded by juce::URL.
     juce::String mailto = "mailto:info@kaizenstrategic.ai"
                           "?subject=" + juce::URL::addEscapeChars (subject, true)
                         + "&body="    + juce::URL::addEscapeChars (body, true);
 
     juce::URL (mailto).launchInDefaultBrowser();
 
-    // Also save a local copy
     feedbackCollector.saveFeedbackToFile (body);
 
-    // Clear crash report now that the user has acted on it
     if (crashReportMode)
         SessionLog::clearPendingCrashReport();
 
@@ -287,32 +229,23 @@ juce::String FeedbackDialog::buildEmailBody() const
 {
     juce::String body;
 
-    // User's typed message
     auto userText = feedbackText.getText().trim();
     if (userText.isNotEmpty())
-    {
         body << userText << "\n\n";
-    }
 
     body << "---\n";
 
-    // Crash report data (if applicable)
     if (crashReportMode && crashReportText.isNotEmpty())
     {
-        // Truncate crash report to keep mailto: URL reasonable
         auto truncated = crashReportText.substring (0, 1200);
         body << "CRASH LOG:\n" << truncated << "\n\n";
     }
 
-    // Usage summary (concise)
     body << feedbackCollector.getUsageSummary();
 
-    // Session log summary (if available via collector)
     auto sessionSummary = feedbackCollector.getSessionLogSummary();
     if (sessionSummary.isNotEmpty())
-    {
         body << "\nSESSION LOG (last events):\n" << sessionSummary << "\n";
-    }
 
     return body;
 }
@@ -326,7 +259,6 @@ void FeedbackDialog::saveFeedback()
             SessionLog::clearPendingCrashReport();
         closeDialog();
     }
-    // If save failed, dialog stays open
 }
 
 void FeedbackDialog::openFeedbackForm()
@@ -343,11 +275,9 @@ void FeedbackDialog::closeDialog()
     {
         dw->exitModalState (0);
         dw->setVisible (false);
-        // DialogWindow cleans up the content component
         return;
     }
 
-    // Fallback for non-DialogWindow parents
     if (auto* parent = getParentComponent())
         parent->removeChildComponent (this);
     delete this;
@@ -363,11 +293,11 @@ void FeedbackDialog::show (FeedbackCollector& collector)
 
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned (dialog);
-    options.content->setSize (520, 570);
-    options.dialogTitle          = "Feedback";
-    options.dialogBackgroundColour = juce::Colour (0xff2a2a2a);
-    options.resizable            = true;
-    options.useNativeTitleBar    = true;
+    options.content->setSize (520, 560);
+    options.dialogTitle            = "Feedback";
+    options.dialogBackgroundColour = devpanel::hackerBg();
+    options.resizable              = true;
+    options.useNativeTitleBar      = true;
 
     auto* window = options.launchAsync();
     if (window != nullptr)
@@ -381,11 +311,11 @@ void FeedbackDialog::showCrashReport (FeedbackCollector& collector,
 
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned (dialog);
-    options.content->setSize (520, 570);
-    options.dialogTitle          = "Crash Report";
-    options.dialogBackgroundColour = juce::Colour (0xff2a2a2a);
-    options.resizable            = true;
-    options.useNativeTitleBar    = true;
+    options.content->setSize (520, 560);
+    options.dialogTitle            = "Crash Report";
+    options.dialogBackgroundColour = devpanel::hackerBg();
+    options.resizable              = true;
+    options.useNativeTitleBar      = true;
 
     auto* window = options.launchAsync();
     if (window != nullptr)

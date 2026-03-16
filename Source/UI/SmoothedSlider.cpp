@@ -110,11 +110,24 @@ void SmoothedSlider::timerCallback()
     }
     else
     {
-        // Linear smoothing - advance by actual time delta for smoother motion
-        // At 120Hz, each frame is ~8.33ms, so we advance by 2 samples per frame
-        // This ensures smooth interpolation without jankiness
-        visualValueLinear.skip(2);
+        // Linear smoothing — advance one step per timer tick.
+        // At 120 Hz the timer fires every ~8 ms; reset() sets the ramp
+        // length in samples, so smoothingTimeMs * 0.001 * 120 gives the
+        // correct ramp duration.  skip(1) moves one step along that ramp.
+        visualValueLinear.skip(1);
         isSmoothing = visualValueLinear.isSmoothing();
+
+        // When SmoothedValue declares "done", snap to the exact target
+        // so the visual thumb never ends up a fraction of a pixel short.
+        if (! isSmoothing)
+        {
+            const float target = static_cast<float>(getValue());
+            if (std::abs(visualValueLinear.getCurrentValue() - target) > 1.0e-6f)
+            {
+                visualValueLinear.setCurrentAndTargetValue(target);
+                needsRepaint = true;
+            }
+        }
     }
 
     if (lastScrollTimeMs > 0 && (juce::Time::currentTimeMillis() - lastScrollTimeMs) > 50)

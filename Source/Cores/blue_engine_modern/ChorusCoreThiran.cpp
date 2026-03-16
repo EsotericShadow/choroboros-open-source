@@ -130,6 +130,16 @@ void ChorusCoreThiran::prepare(const juce::dsp::ProcessSpec& processSpec, Chorus
     delayBuffers.resize(static_cast<size_t>(spec.numChannels));
     writePositions.resize(static_cast<size_t>(spec.numChannels));
 
+    // Gentle one-pole lowpass on output to tame content the allpass passes
+    // at unity gain. Cutoff ~16 kHz gives ~6 dB/oct roll-off — comparable
+    // to the natural attenuation of a 3rd-order polynomial interpolator.
+    {
+        constexpr float outputLpCutoffHz = 16000.0f;
+        const float w = 2.0f * juce::MathConstants<float>::pi * outputLpCutoffHz
+                        / static_cast<float>(spec.sampleRate);
+        outputLpAlpha = std::exp(-w);  // y[n] = (1-a)*x[n] + a*y[n-1]
+    }
+
     for (size_t ch = 0; ch < delayBuffers.size(); ++ch)
     {
         delayBuffers[ch].assign(static_cast<size_t>(bufferSize), 0.0f);
@@ -248,7 +258,13 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
             const float delayedSample = buffer[static_cast<size_t>(readPos)];
 
             // Apply Thiran allpass for fractional delay
-            const float out = processAllpass(thiranCh, delayedSample);
+            const float allpassOut = processAllpass(thiranCh, delayedSample);
+
+            // Gentle one-pole lowpass (~16 kHz) — unlike polynomial interpolators
+            // that naturally attenuate above Nyquist, allpass passes everything.
+            const float out = (1.0f - outputLpAlpha) * allpassOut
+                            + outputLpAlpha * thiranCh.outputLpState;
+            thiranCh.outputLpState = out;
 
             writePos = (writePos + 1) & bufferMask;
             outputSamples[i] = out;

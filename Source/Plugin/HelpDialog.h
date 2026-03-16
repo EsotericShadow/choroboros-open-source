@@ -20,29 +20,32 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-class AboutDialog : public juce::Component
+class HelpDialog : public juce::Component
 {
 public:
-    AboutDialog();
-    ~AboutDialog() override = default;
-    
+    HelpDialog();
+    ~HelpDialog() override = default;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
-    
+
     static void show();
-    
+
 private:
     juce::Label titleLabel;
-    juce::Label versionLabel;
-    juce::Label descriptionLabel;
-    juce::Label companyLabel;
-    juce::Label locationLabel;
-    juce::Label copyrightLabel;
-    juce::Label juceLabel;
+    juce::Label introLabel;
+    juce::Label docsHeaderLabel;
+    juce::Label docsBodyLabel;
+    juce::Label supportHeaderLabel;
+    juce::Label supportBodyLabel;
+    juce::Label feedbackHintLabel;
+    juce::TextButton docsButton;
+    juce::TextButton supportButton;
     juce::TextButton closeButton;
-    juce::TextButton licenseButton;
-    juce::HyperlinkButton contactLink;
-    
+
+    void openDocs();
+    void emailSupport();
     void closeDialog();
-    void showLicense();
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HelpDialog)
 };
