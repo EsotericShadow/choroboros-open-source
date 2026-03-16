@@ -35,12 +35,20 @@ TopBarDrawer::TopBarDrawer()
     addChildComponent (helpButton);
     addChildComponent (feedbackButton);
 
+    // Listen for mouse events on child buttons so we can detect hover
+    // even when the mouse is over a button (JUCE routes events to the
+    // child, so the parent's mouseMove/mouseEnter never fire).
+    devButton.addMouseListener (this, false);
+    aboutButton.addMouseListener (this, false);
+    helpButton.addMouseListener (this, false);
+    feedbackButton.addMouseListener (this, false);
+
     // Button info: title + description (replaces native tooltips)
     buttonInfos_ = {{
-        { &devButton,      "Developer Panel",  "Diagnostics, parameter mapping, DSP internals" },
-        { &aboutButton,    "About",            "Version info, credits, license" },
-        { &helpButton,     "Help",             "Documentation & support" },
-        { &feedbackButton, "Feedback",         "Send feedback or report a bug" }
+        { &devButton,      "Developer Panel",  {} },
+        { &aboutButton,    "About",            {} },
+        { &helpButton,     "Help",             {} },
+        { &feedbackButton, "Report Bug",       {} }
     }};
 }
 
@@ -74,9 +82,12 @@ void TopBarDrawer::setAccentColour (juce::Colour newAccent)
 
 void TopBarDrawer::applyIconTint (juce::Colour accent)
 {
+    // false for first param = don't resize button to fit image.
+    // This prevents setImages from blowing up button bounds when
+    // the engine colour changes while the drawer is open.
     auto setup = [accent] (juce::ImageButton& btn, const juce::Image& icon)
     {
-        btn.setImages (true, true, true,
+        btn.setImages (false, true, true,
             icon, 0.55f, accent,   // normal: subtle tint
             icon, 1.0f,  accent,   // hover: full tint
             icon, 0.4f,  accent);  // pressed: dim tint
@@ -88,6 +99,11 @@ void TopBarDrawer::applyIconTint (juce::Colour accent)
     setup (aboutButton,    iconAbout_);
     setup (helpButton,     iconHelp_);
     setup (feedbackButton, iconFeedback_);
+
+    // Re-apply correct bounds (scaled size) in case the drawer is
+    // mid-animation or fully expanded when the colour changes.
+    if (btnSize_ > 0)
+        updateButtonStates();
 }
 
 void TopBarDrawer::setupLayout (float uiScale)
@@ -114,8 +130,8 @@ void TopBarDrawer::setupLayout (float uiScale)
 
     drawerH_ = padV_ * 2 + btnSize_;
 
-    // Tooltip area: title row + description row + padding
-    tooltipH_ = s (32);
+    // Tooltip area: title row only
+    tooltipH_ = s (18);
 
     // Final button positions (relative to component left edge)
     btnY_ = padV_;
@@ -188,20 +204,13 @@ void TopBarDrawer::paintTooltipArea (juce::Graphics& g, float visX, float visW)
     g.setColour (devpanel::hackerBorder().withAlpha (0.4f * alpha));
     g.drawHorizontalLine (juce::roundToInt (baseY), visX + 4.0f, visX + visW - 4.0f);
 
-    // Title: engine accent colour, bold
+    // Title: engine accent colour, bold, vertically centred
     auto titleFont = devpanel::makeLabelFont (11.0f, true);
     g.setFont (titleFont);
     g.setColour (accentColour_.withAlpha (0.95f * alpha));
     g.drawText (info.title,
-                juce::Rectangle<float> (textX, baseY + 3.0f, textW, 13.0f),
-                juce::Justification::centredLeft, true);
-
-    // Description: white, thin italic
-    auto descFont = devpanel::makeLabelFont (10.0f, false).italicised();
-    g.setFont (descFont);
-    g.setColour (juce::Colours::white.withAlpha (0.70f * alpha));
-    g.drawText (info.description,
-                juce::Rectangle<float> (textX, baseY + 16.0f, textW, 12.0f),
+                juce::Rectangle<float> (textX, baseY + 2.0f,
+                                        textW, static_cast<float> (tooltipH_) - 4.0f),
                 juce::Justification::centredLeft, true);
 }
 
@@ -285,9 +294,15 @@ void TopBarDrawer::mouseEnter (const juce::MouseEvent&)
         checkButtonHover();
 }
 
-void TopBarDrawer::mouseExit (const juce::MouseEvent&)
+void TopBarDrawer::mouseExit (const juce::MouseEvent& e)
 {
-    // Mouse left the entire drawer - collapse tooltip
+    // This fires both when the mouse leaves the drawer AND when it
+    // exits a child button (via addMouseListener).  Only collapse the
+    // tooltip if the mouse has genuinely left the entire drawer area.
+    const auto pos = e.getEventRelativeTo (this).position.toInt();
+    if (hitTest (pos.x, pos.y))
+        return;   // still inside the visible drawer region
+
     if (hoveredIndex_ >= 0)
     {
         hoveredIndex_ = -1;
