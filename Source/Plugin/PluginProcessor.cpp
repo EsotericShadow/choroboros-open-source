@@ -871,6 +871,10 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     feedbackCollector(std::make_unique<FeedbackCollector>()),
     sessionLog(std::make_unique<SessionLog>())
 {
+    // Create preset manager early — it only scans the user presets directory
+    // and doesn't call back into the processor during construction.
+    presetManager = std::make_unique<PresetManager> (*this);
+
     // Link session log to feedback collector for richer diagnostics
     feedbackCollector->setSessionLog(sessionLog.get());
 

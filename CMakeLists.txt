@@ -54,6 +54,10 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/AboutDialog.h
     Source/Plugin/HelpDialog.cpp
     Source/Plugin/HelpDialog.h
+    Source/Plugin/PresetManager.cpp
+    Source/Plugin/PresetManager.h
+    Source/UI/TopHeaderBar.cpp
+    Source/UI/TopHeaderBar.h
     Source/Plugin/SessionLog.cpp
     Source/Plugin/SessionLog.h
     Source/Plugin/CrashReporter.cpp
@@ -165,6 +169,8 @@ juce_add_binary_data(ChoroborosBinaryData
         Assets/gui_icons/dev.png
         Assets/gui_icons/help.png
         Assets/gui_icons/bug_feedback_button.png
+        Assets/gui_icons/kaizen_logo.png
+        Kaizen_logo.svg
         Assets/fonts/Technology.ttf
         Assets/fonts/Retroica.ttf
         Assets/fonts/labels/JetBrainsMonoNL-Thin.ttf

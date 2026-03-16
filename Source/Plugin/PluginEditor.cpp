@@ -613,6 +613,13 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     audioProcessor.logLoadTraceEvent("editor_layout_defaults_ms",
                                      juce::Time::getMillisecondCounterHiRes() - layoutDefaultsStartMs);
     
+    // Create branded top header bar with preset browser
+    if (audioProcessor.presetManager)
+    {
+        topHeaderBar_ = std::make_unique<TopHeaderBar> (*audioProcessor.presetManager, kUiScale);
+        addAndMakeVisible (*topHeaderBar_);
+    }
+
     const double themeSetupStartMs = juce::Time::getMillisecondCounterHiRes();
     setupEngineColorSelector();
     if (CustomLookAndFeel::isThemeAssetPackCached(initialEngineIndex))
@@ -694,8 +701,13 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
 
         // Set initial drawer accent colour to match the current engine
         if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+        {
             topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (
                 juce::jlimit (0, 4, static_cast<int> (engineColorParam->load()))));
+            if (topHeaderBar_)
+                topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (
+                    juce::jlimit (0, 4, static_cast<int> (engineColorParam->load()))));
+        }
 
         // Wire up button callbacks (tooltips are now handled by the drawer
         // itself via hover-expansion, not native JUCE tooltips)
@@ -717,12 +729,13 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
                 FeedbackDialog::show (*audioProcessor.feedbackCollector);
         };
 
-        // Position drawer (always at expanded-size bounds; it clips internally)
+        // Position drawer inside the header bar (right-aligned, vertically centred).
         const int windowW = uiScaleInt (700);
         const int marginR = uiScaleInt (4);
-        const int marginT = uiScaleInt (3);
         const int dw = topBarDrawer.getExpandedWidth();
         const int dh = topBarDrawer.getDrawerHeight();
+        const int barH = getHeaderBarHeight();
+        const int marginT = (barH - dh) / 2;   // vertically centred in header
         // Give enough vertical room for the hover tooltip expansion area
         topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh + 40);
         addAndMakeVisible (topBarDrawer);
@@ -731,8 +744,8 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Listen for engine color changes (preset load or manual) to update value label colors
     audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
     
-    // Set fixed size
-    setSize(uiScaleInt(700), uiScaleInt(363));
+    // Set fixed size (original content height + header bar)
+    setSize(uiScaleInt(700), uiScaleInt(363) + getHeaderBarHeight());
     applyLayout();
     setResizable(false, false);
 
@@ -823,6 +836,15 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
         loadBackgroundImage(colorIndex);
         updateValueLabelColors(colorIndex);
         topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+        if (topHeaderBar_)
+            topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+
+        // Engine colour changed — if this wasn't triggered by a preset load,
+        // invalidate the current preset so the dropdown shows the placeholder.
+        if (audioProcessor.presetManager
+            && ! audioProcessor.presetManager->isLoadInProgress())
+            audioProcessor.presetManager->invalidatePreset();
+
         PluginEditorSetup::applyLayout(*this, layoutTuning);
         repaint();
     }
@@ -859,15 +881,17 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
         scheduleDeferredDevPanelPrewarm();
     }
 
-    // Draw background
+    // Fill the whole window (including header area) with black
+    g.fillAll (juce::Colours::black);
+
+    // Draw background below the header bar
+    const int yOff = getHeaderBarHeight();
+    const int contentH = getHeight() - yOff;
+
     if (backgroundImage.isValid())
     {
-        g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), 0, 0,
+        g.drawImage(backgroundImage, 0, yOff, getWidth(), contentH, 0, 0,
                    backgroundImage.getWidth(), backgroundImage.getHeight());
-    }
-    else
-    {
-        g.fillAll(juce::Colours::black);
     }
 
     // Overlay lit panel with opacity synced to HQ switch animation (all themes)
@@ -877,7 +901,7 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
         if (litOpacity > 0.0f)
         {
             g.setOpacity(litOpacity);
-            g.drawImage(backgroundImageLit, 0, 0, getWidth(), getHeight(), 0, 0,
+            g.drawImage(backgroundImageLit, 0, yOff, getWidth(), contentH, 0, 0,
                         backgroundImageLit.getWidth(), backgroundImageLit.getHeight());
         }
     }
@@ -887,7 +911,9 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
 
 void ChoroborosPluginEditor::resized()
 {
-    // Fixed size, no resizing needed
+    // Position header bar across the full width at the very top
+    if (topHeaderBar_)
+        topHeaderBar_->setBounds (0, 0, getWidth(), topHeaderBar_->getBarHeight());
 }
 
 void ChoroborosPluginEditor::applyLayout()
@@ -927,24 +953,17 @@ void ChoroborosPluginEditor::refreshValueLabels()
 
 void ChoroborosPluginEditor::setupEngineColorSelector()
 {
-    addAndMakeVisible(engineColorBox);
-    
     engineColorBox.addItem("Green", 1);
     engineColorBox.addItem("Blue", 2);
     engineColorBox.addItem("Red", 3);
     engineColorBox.addItem("Purple", 4);
     engineColorBox.addItem("Black", 5);
     engineColorBox.setSelectedId(1);
-    
-    const int engineColorWidth = 80;
-    const int engineColorHeight = 14;
-    // Position at top left
-    engineColorBox.setBounds(uiScaleInt(20), uiScaleInt(5), uiScaleInt(engineColorWidth), uiScaleInt(engineColorHeight));
-    
-    // Remove background color - make it transparent
-    engineColorBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
-    engineColorBox.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
-    engineColorBox.setColour(juce::ComboBox::textColourId, juce::Colours::white);
+
+    // The header bar owns layout; pass the combo to it.
+    // Styling is handled by TopHeaderBar::setEngineSelector().
+    if (topHeaderBar_)
+        topHeaderBar_->setEngineSelector (&engineColorBox);
     
     engineColorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::ENGINE_COLOR_ID, engineColorBox);
@@ -968,6 +987,8 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         loadBackgroundImage(colorIndex);
         updateValueLabelColors(colorIndex);
         topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+        if (topHeaderBar_)
+            topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
         PluginEditorSetup::applyLayout(*this, layoutTuning);
         
         // Track engine switch for feedback

@@ -27,6 +27,7 @@
 #include "../UI/AnimatedToggleButton.h"
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/TopBarDrawer.h"
+#include "../UI/TopHeaderBar.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <future>
@@ -51,6 +52,7 @@ public:
     void refreshValueLabels();
     void resetLayoutToFactoryDefaults();
     float getUiScale() const { return kUiScale; }
+    int getHeaderBarHeight() const { return topHeaderBar_ ? topHeaderBar_->getBarHeight() : 0; }
     const LayoutTuning& getLayoutTuning() const { return layoutTuning; }
     LayoutTuning& getLayoutTuning() { return layoutTuning; }
     juce::Font makeValueLabelFont(float heightPx, bool bold = true) const;
@@ -97,6 +99,9 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> hqAttachment;
     LabelWithContainer hqLabel;
     
+    // Branded top header bar with logo + preset browser
+    std::unique_ptr<TopHeaderBar> topHeaderBar_;
+
     // Top-bar sliding icon-button drawer
     TopBarDrawer topBarDrawer;
     std::unique_ptr<juce::DocumentWindow> devWindow;

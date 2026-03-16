@@ -27,6 +27,7 @@
 #include "FeedbackCollector.h"
 #include "SessionLog.h"
 #include "CrashReporter.h"
+#include "PresetManager.h"
 
 //==============================================================================
 /**
@@ -211,6 +212,9 @@ public:
 
     // Session log (public for editor crash-report check)
     std::unique_ptr<SessionLog> sessionLog;
+
+    // Preset manager (public for editor header bar access)
+    std::unique_ptr<PresetManager> presetManager;
     
     // Parameter IDs (public for editor access)
     static constexpr const char* RATE_ID = "rate";

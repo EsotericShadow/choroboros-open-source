@@ -27,6 +27,7 @@ LayoutTuning PluginEditorSetup::makeDefaultLayout()
 void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const LayoutTuning& layout)
 {
     const auto s = [&editor](int value) { return juce::roundToInt(static_cast<float>(value) * editor.getUiScale()); };
+    const int yOff = editor.getHeaderBarHeight(); // offset all Y positions below the header bar
     int colorIndex = 0;
     if (auto* engineColorParam = editor.audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
         colorIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
@@ -114,10 +115,10 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
                                               layout.mixValueOffsetXPurple, layout.mixValueOffsetXBlack, layout.mixValueOffsetX));
     const auto makeColour = [](int argb) { return juce::Colour(static_cast<juce::uint32>(argb)); };
 
-    editor.rateSlider.setBounds(rateCenterX - (mainKnobSize / 2), knobTopY, mainKnobSize, mainKnobSize);
-    editor.depthSlider.setBounds(depthCenterX - (mainKnobSize / 2), knobTopY, mainKnobSize, mainKnobSize);
-    editor.offsetSlider.setBounds(offsetCenterX - (mainKnobSize / 2), knobTopY, mainKnobSize, mainKnobSize);
-    editor.widthSlider.setBounds(widthCenterX - (mainKnobSize / 2), knobTopY, mainKnobSize, mainKnobSize);
+    editor.rateSlider.setBounds(rateCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+    editor.depthSlider.setBounds(depthCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+    editor.offsetSlider.setBounds(offsetCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+    editor.widthSlider.setBounds(widthCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
 
     // Purple knob shadow extends below bounds; allow drawing overflow so it isn't clipped
     const bool allowKnobOverflow = (colorIndex == 3);
@@ -126,12 +127,12 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     editor.offsetSlider.setPaintingIsUnclipped(allowKnobOverflow);
     editor.widthSlider.setPaintingIsUnclipped(allowKnobOverflow);
 
-    editor.colorSlider.setBounds(sliderX, sliderY, sliderW, sliderH);
+    editor.colorSlider.setBounds(sliderX, sliderY + yOff, sliderW, sliderH);
 
     const int mixKnobX = mixCenterX - (mixKnobSize / 2);
     const int mixKnobY = s(pickByColor(layout.mixKnobYGreen, layout.mixKnobYBlue, layout.mixKnobYRed,
                                        layout.mixKnobYPurple, layout.mixKnobYBlack, layout.mixKnobY));
-    editor.mixSlider.setBounds(mixKnobX, mixKnobY, mixKnobSize, mixKnobSize);
+    editor.mixSlider.setBounds(mixKnobX, mixKnobY + yOff, mixKnobSize, mixKnobSize);
 
     const juce::Font labelFont = editor.makeUiTextFont(12.25f * editor.getUiScale(), true);
     int rateLabelWidth = editor.calculateLabelWidth("RATE", labelFont);
@@ -141,7 +142,7 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     int colorLabelWidth = editor.calculateLabelWidth("COLOR", labelFont);
     int mixLabelWidth = editor.calculateLabelWidth("MIX", labelFont);
 
-    const int knobLabelY = knobTopY - s(15);
+    const int knobLabelY = knobTopY - s(15) + yOff;
     const int labelHeight = s(20);
     editor.rateLabel.setBounds(rateCenterX - (rateLabelWidth / 2), knobLabelY, rateLabelWidth, labelHeight);
     editor.depthLabel.setBounds(depthCenterX - (depthLabelWidth / 2), knobLabelY, depthLabelWidth, labelHeight);
@@ -149,25 +150,25 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     editor.widthLabel.setBounds(widthCenterX - (widthLabelWidth / 2), knobLabelY, widthLabelWidth, labelHeight);
 
     editor.rateValueLabel.setBounds(rateCenterX - (valueLabelWidth / 2) + rateValueOffsetX,
-                                    valueLabelY + rateValueOffsetY, valueLabelWidth, valueLabelHeight);
+                                    valueLabelY + rateValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
     editor.depthValueLabel.setBounds(depthCenterX - (valueLabelWidth / 2) + depthValueOffsetX,
-                                     valueLabelY + depthValueOffsetY, valueLabelWidth, valueLabelHeight);
+                                     valueLabelY + depthValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
     editor.offsetValueLabel.setBounds(offsetCenterX - (valueLabelWidth / 2) + offsetValueOffsetX,
-                                      valueLabelY + offsetValueOffsetY, valueLabelWidth, valueLabelHeight);
+                                      valueLabelY + offsetValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
     editor.widthValueLabel.setBounds(widthCenterX - (valueLabelWidth / 2) + widthValueOffsetX,
-                                     valueLabelY + widthValueOffsetY, valueLabelWidth, valueLabelHeight);
+                                     valueLabelY + widthValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
 
     const int colorValueCenterX = s(layout.colorValueCenterX);
     const int colorValueX = colorValueCenterX - (colorValueWidth / 2) + colorValueXOffset;
-    editor.colorValueLabel.setBounds(colorValueX, colorValueY, colorValueWidth, colorValueHeight);
+    editor.colorValueLabel.setBounds(colorValueX, colorValueY + yOff, colorValueWidth, colorValueHeight);
     editor.colorLabel.setBounds(colorValueCenterX - (colorLabelWidth / 2),
-                                colorValueY + colorValueHeight + s(4),
+                                colorValueY + colorValueHeight + s(4) + yOff,
                                 colorLabelWidth, labelHeight);
 
     editor.mixValueLabel.setBounds(mixCenterX - (mixValueWidth / 2) + mixValueOffsetX,
-                                   mixValueY, mixValueWidth, mixValueHeight);
+                                   mixValueY + yOff, mixValueWidth, mixValueHeight);
     editor.mixLabel.setBounds(mixCenterX - (mixLabelWidth / 2),
-                              mixValueY + mixValueHeight + s(4),
+                              mixValueY + mixValueHeight + s(4) + yOff,
                               mixLabelWidth, labelHeight);
 
     const juce::Font mainValueFont = editor.makeValueLabelFont(static_cast<float>(layout.knobValueFontSize) * editor.getUiScale(), true);
@@ -294,39 +295,24 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     // grouped row.  The legacy topButtons* layout fields are retained in
     // LayoutTuning for serialisation compat but no longer drive placement.
 
-    // Force top-left position — ignore any stale Y from saved layouts
-    editor.engineColorBox.setBounds(s(layout.engineSelectorX), s(5), s(layout.engineSelectorW), s(layout.engineSelectorH));
-    const auto selectorText = makeColour(layout.engineSelectorTextColour);
-    const auto selectorBackground = makeColour(layout.engineSelectorBackgroundColour);
-    const auto selectorOutline = makeColour(layout.engineSelectorOutlineColour);
-    const auto selectorArrow = makeColour(layout.engineSelectorArrowColour);
-    const auto popupBackground = makeColour(layout.engineSelectorPopupBackgroundColour);
-    const auto popupText = makeColour(layout.engineSelectorPopupTextColour);
-    const auto popupHighlightedBackground = makeColour(layout.engineSelectorPopupHighlightedBackgroundColour);
-    const auto popupHighlightedText = makeColour(layout.engineSelectorPopupHighlightedTextColour);
+    // Engine selector is now positioned by TopHeaderBar — only apply global
+    // popup-menu / tooltip colours to the customLookAndFeel here.
+    {
+        const auto popupBackground = makeColour(layout.engineSelectorPopupBackgroundColour);
+        const auto popupText = makeColour(layout.engineSelectorPopupTextColour);
+        const auto popupHighlightedBackground = makeColour(layout.engineSelectorPopupHighlightedBackgroundColour);
+        const auto popupHighlightedText = makeColour(layout.engineSelectorPopupHighlightedTextColour);
 
-    editor.engineColorBox.setColour(juce::ComboBox::textColourId, selectorText);
-    editor.engineColorBox.setColour(juce::ComboBox::backgroundColourId, selectorBackground);
-    editor.engineColorBox.setColour(juce::ComboBox::outlineColourId, selectorOutline);
-    editor.engineColorBox.setColour(juce::ComboBox::buttonColourId, selectorBackground);
-    editor.engineColorBox.setColour(juce::ComboBox::arrowColourId, selectorArrow);
-    editor.engineColorBox.setColour(juce::PopupMenu::backgroundColourId, popupBackground);
-    editor.engineColorBox.setColour(juce::PopupMenu::textColourId, popupText);
-    editor.engineColorBox.setColour(juce::PopupMenu::highlightedBackgroundColourId, popupHighlightedBackground);
-    editor.engineColorBox.setColour(juce::PopupMenu::highlightedTextColourId, popupHighlightedText);
-    editor.engineColorBox.getProperties().set("customFontHeight", static_cast<float>(layout.engineSelectorFontSize) * editor.getUiScale());
-    editor.customLookAndFeel.setColour(juce::PopupMenu::backgroundColourId, popupBackground);
-    editor.customLookAndFeel.setColour(juce::PopupMenu::textColourId, popupText);
-    editor.customLookAndFeel.setColour(juce::PopupMenu::headerTextColourId, popupHighlightedText.interpolatedWith(popupText, 0.4f));
-    editor.customLookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, popupHighlightedBackground);
-    editor.customLookAndFeel.setColour(juce::PopupMenu::highlightedTextColourId, popupHighlightedText);
-    editor.customLookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, popupBackground.brighter(0.06f).withAlpha(0.97f));
-    editor.customLookAndFeel.setColour(juce::TooltipWindow::textColourId, popupText);
-    editor.customLookAndFeel.setColour(juce::TooltipWindow::outlineColourId, popupHighlightedBackground.brighter(0.25f));
-    editor.customLookAndFeel.setPopupMenuFontHeight(static_cast<float>(layout.engineSelectorFontSize) * editor.getUiScale());
-    editor.engineColorBox.setLookAndFeel(&editor.customLookAndFeel);
-    editor.engineColorBox.setJustificationType(juce::Justification::centred);
-    editor.engineColorBox.setTooltip("Engine Selection: Choose between five distinct chorus algorithms. Green=Classic, Blue=Modern, Red=Vintage, Purple=Experimental, Black=Linear.");
+        editor.customLookAndFeel.setColour(juce::PopupMenu::backgroundColourId, popupBackground);
+        editor.customLookAndFeel.setColour(juce::PopupMenu::textColourId, popupText);
+        editor.customLookAndFeel.setColour(juce::PopupMenu::headerTextColourId, popupHighlightedText.interpolatedWith(popupText, 0.4f));
+        editor.customLookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, popupHighlightedBackground);
+        editor.customLookAndFeel.setColour(juce::PopupMenu::highlightedTextColourId, popupHighlightedText);
+        editor.customLookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, popupBackground.brighter(0.06f).withAlpha(0.97f));
+        editor.customLookAndFeel.setColour(juce::TooltipWindow::textColourId, popupText);
+        editor.customLookAndFeel.setColour(juce::TooltipWindow::outlineColourId, popupHighlightedBackground.brighter(0.25f));
+        editor.customLookAndFeel.setPopupMenuFontHeight(static_cast<float>(layout.engineSelectorFontSize) * editor.getUiScale());
+    }
 
     const int hqSize = s(layout.hqSwitchSize);
     const int hqOffsetX = pickByColor(layout.hqSwitchOffsetXGreen, layout.hqSwitchOffsetXBlue, layout.hqSwitchOffsetXRed,
@@ -334,7 +320,7 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
     const int hqOffsetY = pickByColor(layout.hqSwitchOffsetYGreen, layout.hqSwitchOffsetYBlue, layout.hqSwitchOffsetYRed,
                                       layout.hqSwitchOffsetYPurple, layout.hqSwitchOffsetYBlack, layout.hqSwitchOffsetY);
     const int hqCenterX = s(350 + hqOffsetX);
-    const int hqCenterY = s(152 + hqOffsetY);
+    const int hqCenterY = s(152 + hqOffsetY) + yOff;
     editor.hqButton.setBounds(hqCenterX - (hqSize / 2), hqCenterY - (hqSize / 2), hqSize, hqSize);
 
     const juce::Font hqFont = editor.makeUiTextFont(12.25f * editor.getUiScale(), true);
