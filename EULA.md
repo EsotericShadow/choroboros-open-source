@@ -2,7 +2,7 @@
 
 ## Choroboros Audio Plugin
 
-**IMPORTANT - READ CAREFULLY:** This End User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity) and Kaizen Strategic AI Inc., doing business as Green DSP ("Licensor", "we", "us", or "our") for the Choroboros audio plugin software product, which includes computer software and may include associated media, printed materials, and "online" or electronic documentation ("Software Product").
+**IMPORTANT - READ CAREFULLY:** This End User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity) and Kaizen Strategic AI Inc., doing business as Kaizen DSP ("Licensor", "we", "us", or "our") for the Choroboros audio plugin software product, which includes computer software and may include associated media, printed materials, and "online" or electronic documentation ("Software Product").
 
 By installing, copying, or otherwise using the Software Product, you agree to be bound by the terms of this EULA. If you do not agree to the terms of this EULA, do not install or use the Software Product.
 
@@ -138,8 +138,8 @@ If any provision of this EULA is held to be unenforceable, such provision shall 
 
 For questions about this EULA or the Software Product, please contact:
 
-**Kaizen Strategic AI Inc.**  
-**DBA: Green DSP**  
+**Kaizen Strategic AI Inc.**
+**DBA: Kaizen DSP**  
 **British Columbia, Canada**  
 **Email: info@kaizenstrategic.ai**
 
@@ -155,7 +155,7 @@ BY INSTALLING OR USING THE SOFTWARE PRODUCT, YOU ACKNOWLEDGE THAT YOU HAVE READ 
 
 **Copyright © 2026 Kaizen Strategic AI Inc. All rights reserved.**
 
-**DBA: Green DSP**  
+**DBA: Kaizen DSP**
 **British Columbia, Canada**
 
 The Software Product, including all source code, algorithms, graphical user interface designs, visual assets, and sound design, was created and developed by Gabriel Lacroix Marko, founder of Kaizen Strategic AI Inc.

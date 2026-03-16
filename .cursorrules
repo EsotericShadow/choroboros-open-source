@@ -1,6 +1,6 @@
 # Choroboros — Cursor Rules for v2.04-dev
 # JUCE 8.0.12 audio plugin (VST3/AU/AAX/Standalone)
-# Copyright (C) 2026 Kaizen Strategic AI Inc. / Green DSP
+# Copyright (C) 2026 Kaizen Strategic AI Inc. (DBA: Kaizen DSP)
 
 You are working on Choroboros, a multi-engine chorus audio plugin. Five
 selectable "color" engines (Green, Blue, Red, Purple, Black) each with
@@ -207,7 +207,7 @@ if (isBulkChange) { ... return; }
 
 ## Code Style
 
-- Copyright header on every `.cpp` / `.h` (GPL-3.0+, Kaizen Strategic AI)
+- Copyright header on every `.cpp` / `.h` (GPL-3.0+, Kaizen Strategic AI Inc.)
 - JUCE style: spaces (no tabs), `juce::` prefix everywhere, no
   `using namespace juce`
 - Braces on same line for single-statement control flow

@@ -115,7 +115,7 @@ After installation, rescan plugins in your DAW.
 ## Technical Details
 
 - **Version:** 2.04
-- **Company:** Kaizen Strategic AI Inc. (DBA: Green DSP)
+- **Company:** Kaizen DSP
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
 - **Sample Rate:** Up to 192 kHz
@@ -161,8 +161,7 @@ For more information about JUCE licensing, visit: https://juce.com/legal/juce-8-
 
 For issues, questions, or licensing inquiries:
 - **Email:** Greenalderson@gmail.com
-- **Company:** Kaizen Strategic AI Inc.
-- **DBA:** Green DSP
+- **Company:** Kaizen DSP
 - **Location:** British Columbia, Canada
 
 ## Installation Troubleshooting
