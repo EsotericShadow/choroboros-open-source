@@ -47,6 +47,7 @@ public:
     juce::ImageButton feedbackButton { "feedback" };
 
     TopBarDrawer();
+    ~TopBarDrawer() override;
 
     /** Load icon images into the four buttons. */
     void setupIcons (const juce::Image& dev,

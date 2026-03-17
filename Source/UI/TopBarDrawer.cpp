@@ -52,6 +52,15 @@ TopBarDrawer::TopBarDrawer()
     }};
 }
 
+TopBarDrawer::~TopBarDrawer()
+{
+    stopTimer();
+    devButton.removeMouseListener (this);
+    aboutButton.removeMouseListener (this);
+    helpButton.removeMouseListener (this);
+    feedbackButton.removeMouseListener (this);
+}
+
 //==============================================================================
 // Setup
 //==============================================================================

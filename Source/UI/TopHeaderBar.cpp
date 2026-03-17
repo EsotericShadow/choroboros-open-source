@@ -388,12 +388,15 @@ TopHeaderBar::TopHeaderBar (PresetManager& presetManager, float uiScale)
 
 TopHeaderBar::~TopHeaderBar()
 {
-    presetManager_.removeListener (this);
+    // Clear LookAndFeel on all children FIRST — if removeListener triggers a
+    // callback that touches child components, they won't use a stale L&F.
     presetMenu_.setLookAndFeel (nullptr);
     if (engineSelector_ != nullptr)
         engineSelector_->setLookAndFeel (nullptr);
     for (auto* btn : { &prevButton_, &nextButton_, &saveButton_, &deleteButton_ })
         btn->setLookAndFeel (nullptr);
+
+    presetManager_.removeListener (this);
 }
 
 //==============================================================================
