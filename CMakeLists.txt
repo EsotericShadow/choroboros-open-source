@@ -105,6 +105,8 @@ target_sources(Choroboros PRIVATE
     Source/UI/LabelWithContainer.h
     Source/UI/SmoothedSlider.cpp
     Source/UI/SmoothedSlider.h
+    Source/UI/RateSyncOverlay.cpp
+    Source/UI/RateSyncOverlay.h
     Source/UI/AnimatedToggleButton.cpp
     Source/UI/AnimatedToggleButton.h
     Source/UI/DevPanel.cpp

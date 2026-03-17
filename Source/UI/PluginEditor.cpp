@@ -910,6 +910,8 @@ double ChoroborosPluginEditor::getHostBpm() const
 
 void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
 {
+    rateSyncOverlay_.reset();
+
     const double bpm = getHostBpm();
     if (bpm <= 0.0)
         return;
@@ -922,106 +924,44 @@ void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
     constexpr double maxQuantizedRateHz = 20.0;
     const double quantizedMappedMax = juce::jmin(mappedMax, maxQuantizedRateHz);
 
-    juce::PopupMenu menu;
-    menu.addSectionHeader("Rate Sync @ " + juce::String(bpm, 2) + " BPM");
-
-    int nextId = 1000;
-    std::vector<std::pair<int, double>> idToHz;
-
-    const auto addRateItem = [&](juce::PopupMenu& targetMenu, const juce::String& label, double beatsPerCycle)
-    {
-        if (beatsPerCycle <= 0.0)
-            return;
-        const double hz = bpm / (60.0 * beatsPerCycle);
-        const bool inRange = (hz >= mappedMin && hz <= quantizedMappedMax);
-        const bool isTicked = std::abs(hz - mappedCurrent) <= 0.01;
-        targetMenu.addItem(nextId, label + " (" + juce::String(hz, 2) + " Hz)", inRange, isTicked);
-        if (inRange)
-            idToHz.emplace_back(nextId, hz);
-        ++nextId;
-    };
-
-    using RateItem = std::pair<juce::String, double>;
-    const auto addSubdivisionMenu = [&](const juce::String& title, const std::vector<RateItem>& items)
-    {
-        juce::PopupMenu subMenu;
-        for (const auto& item : items)
-            addRateItem(subMenu, item.first, item.second);
-        menu.addSubMenu(title, subMenu);
-    };
-
-    addSubdivisionMenu("Straight",
-    {
-        { "4 Bars", 16.0 },
-        { "2 Bars", 8.0 },
-        { "1 Bar", 4.0 },
-        { "1/2", 2.0 },
-        { "1/4", 1.0 },
-        { "1/8", 0.5 },
-        { "1/16", 0.25 },
-        { "1/32", 0.125 },
-        { "1/64", 0.0625 }
-    });
-
-    addSubdivisionMenu("Triplet",
-    {
-        { "1/1T", (4.0 / 1.0) * (2.0 / 3.0) },
-        { "1/2T", (4.0 / 2.0) * (2.0 / 3.0) },
-        { "1/4T", (4.0 / 4.0) * (2.0 / 3.0) },
-        { "1/8T", (4.0 / 8.0) * (2.0 / 3.0) },
-        { "1/16T", (4.0 / 16.0) * (2.0 / 3.0) },
-        { "1/32T", (4.0 / 32.0) * (2.0 / 3.0) }
-    });
-
-    addSubdivisionMenu("Dotted",
-    {
-        { "1/1.", (4.0 / 1.0) * 1.5 },
-        { "1/2.", (4.0 / 2.0) * 1.5 },
-        { "1/4.", (4.0 / 4.0) * 1.5 },
-        { "1/8.", (4.0 / 8.0) * 1.5 },
-        { "1/16.", (4.0 / 16.0) * 1.5 },
-        { "1/32.", (4.0 / 32.0) * 1.5 }
-    });
+    rateSyncOverlay_ = std::make_unique<RateSyncOverlay>();
+    rateSyncOverlay_->configure(bpm, mappedCurrent, mappedMin, quantizedMappedMax);
+    rateSyncOverlay_->setAnchorPoint(rateControl.getBoundsInParent().getCentre());
 
     juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&rateControl),
-                       [safeThis, idToHz, mappedMin, quantizedMappedMax](int selectedId)
-                       {
-                           if (safeThis == nullptr || selectedId == 0)
-                               return;
 
-                           double targetHz = -1.0;
-                           for (const auto& entry : idToHz)
-                           {
-                               if (entry.first == selectedId)
-                               {
-                                   targetHz = entry.second;
-                                   break;
-                               }
-                           }
+    rateSyncOverlay_->onRateSelected = [safeThis, mappedMin, quantizedMappedMax](double targetHz)
+    {
+        if (safeThis == nullptr || targetHz <= 0.0)
+            return;
 
-                           if (targetHz <= 0.0)
-                               return;
+        const double clampedMapped = juce::jlimit(mappedMin, quantizedMappedMax, targetHz);
+        double lo = safeThis->rateSlider.getMinimum();
+        double hi = safeThis->rateSlider.getMaximum();
+        for (int i = 0; i < 30; ++i)
+        {
+            const double mid = 0.5 * (lo + hi);
+            const double mappedMid = static_cast<double>(safeThis->audioProcessor.mapParameterValue(
+                ChoroborosAudioProcessor::RATE_ID, static_cast<float>(mid)));
+            if (mappedMid < clampedMapped)
+                lo = mid;
+            else
+                hi = mid;
+        }
+        const double raw = juce::jlimit(safeThis->rateSlider.getMinimum(),
+                                        safeThis->rateSlider.getMaximum(), 0.5 * (lo + hi));
+        safeThis->rateSlider.setValue(raw, juce::sendNotificationSync);
+    };
 
-                           const auto toRawRate = [&](double desiredMappedHz) -> double
-                           {
-                               const double clampedMapped = juce::jlimit(mappedMin, quantizedMappedMax, desiredMappedHz);
-                               double lo = safeThis->rateSlider.getMinimum();
-                               double hi = safeThis->rateSlider.getMaximum();
-                               for (int i = 0; i < 30; ++i)
-                               {
-                                   const double mid = 0.5 * (lo + hi);
-                                   const double mappedMid = static_cast<double>(safeThis->audioProcessor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, static_cast<float>(mid)));
-                                   if (mappedMid < clampedMapped)
-                                       lo = mid;
-                                   else
-                                       hi = mid;
-                               }
-                               return juce::jlimit(safeThis->rateSlider.getMinimum(), safeThis->rateSlider.getMaximum(), 0.5 * (lo + hi));
-                           };
+    rateSyncOverlay_->onDismiss = [safeThis]()
+    {
+        if (safeThis != nullptr)
+            safeThis->rateSyncOverlay_.reset();
+    };
 
-                           safeThis->rateSlider.setValue(toRawRate(targetHz), juce::sendNotificationSync);
-                       });
+    addAndMakeVisible(*rateSyncOverlay_);
+    rateSyncOverlay_->setBounds(getLocalBounds());
+    rateSyncOverlay_->grabKeyboardFocus();
 }
 
 void ChoroborosPluginEditor::updateValueLabel(LabelWithContainer& label, float value, const juce::String& paramId)

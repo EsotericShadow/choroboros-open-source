@@ -28,6 +28,7 @@
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/TopBarDrawer.h"
 #include "../UI/TopHeaderBar.h"
+#include "../UI/RateSyncOverlay.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <future>
@@ -145,6 +146,7 @@ private:
     void ensureDevPanelWindowCreated(bool triggeredByUser);
     double getHostBpm() const;
     void showRateSyncMenu(juce::Slider& rateControl);
+    std::unique_ptr<RateSyncOverlay> rateSyncOverlay_;
     
     // parseValueFromText helper methods
     float parseRateValue(const juce::String& trimmed);

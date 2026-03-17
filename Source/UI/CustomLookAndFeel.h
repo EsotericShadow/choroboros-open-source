@@ -87,7 +87,11 @@ public:
     juce::Font getLabelFont(juce::Label&) override;
     void setUiTextTypeface(juce::Typeface::Ptr typeface);
     void setPopupMenuFontHeight(float height) { popupMenuFontHeight = height; }
-    
+
+    juce::Colour getThemeAccentColour() const;
+    juce::Colour getThemePanelColour() const;
+    juce::Colour getThemePanelOutlineColour() const;
+
 private:
     juce::Image knobBaseImage;
     juce::Image knobIndicatorImage;
@@ -109,9 +113,6 @@ private:
     
     void loadImages(int colorIndex);
     void applyThemeAssetPack(const ThemeAssetPack& pack);
-    juce::Colour getThemeAccentColour() const;
-    juce::Colour getThemePanelColour() const;
-    juce::Colour getThemePanelOutlineColour() const;
     
     // Helper methods for loadImages
     static void getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,
