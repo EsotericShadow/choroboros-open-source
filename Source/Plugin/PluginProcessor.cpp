@@ -1567,7 +1567,6 @@ void ChoroborosAudioProcessor::updateDSPParameters()
         restoreEngineInternalsToDsp(colorIndex, hqEnabled);
         activeInternalsEngine = colorIndex;
         activeInternalsHQ = hqEnabled;
-        startTimer(0);
     }
 
     chorusDSP->setEngineColor(colorIndex);
