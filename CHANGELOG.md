@@ -2,9 +2,13 @@
 
 All notable changes to Choroboros are documented here.
 
-## [2.04-dev] - 2026-03-15
+## [2.04-dev] - 2026-03-16
 
 ### Added
+- **PresetManager:** New preset management system wrapping factory programs and user presets (XML files on disk). Supports browsing, save, delete, and smart state invalidation — `currentIndex = -1` sentinel means "no preset active". `loadInProgress_` guard prevents re-entrant invalidation when a preset load changes parameter values as a side-effect.
+- **TopHeaderBar:** Branded header bar at top of plugin window. Contains Kaizen DSP SVG wordmark logo (brightness-to-alpha pixel conversion strips baked-in black background), preset browser (prev/next chevrons, combo dropdown, save/delete buttons), engine selector slot, and accent-colour-aware custom LookAndFeel with dark gradient background and thin accent separator line.
+- **Preset browser UI:** ComboBox dropdown with "Load a preset" placeholder text on init. Selecting a preset shows its name; switching engine colour invalidates the active preset and resets the dropdown to placeholder. Next/prev buttons wrap around; pressing next/prev from no-preset-active state starts from first/last preset respectively.
+- **Engine selector in header bar:** Engine colour ComboBox relocated from main content area into the header bar, laid out as part of the centred cluster: `|logo| space |‹|›|preset combo|+|−| gap |engine selector| space |drawer|`. Header bar accepts an externally-owned ComboBox via `setEngineSelector()` and handles styling and layout.
 - **Session event log:** Lightweight ring buffer (last 64 events) tracks engine switches, HQ toggles, preset loads, DSP anomalies (NaN/Inf/clipping), and host info. Flushed to disk every 30 s so it survives crashes.
 - **Crash reporter:** Platform-specific signal handlers (macOS: SIGSEGV/SIGABRT/SIGFPE/SIGBUS/SIGILL; Windows: SetUnhandledExceptionFilter). On next launch, if a clean-shutdown marker is missing, the user is prompted to send the crash report.
 - **Send to Developer (in-app):** Feedback dialog "Send to Developer" button opens the user's default mail client pre-filled with feedback text, usage summary, session log, and system info addressed to info@kaizenstrategic.ai.
@@ -19,6 +23,9 @@ All notable changes to Choroboros are documented here.
 - **Thiran output lowpass:** Gentle one-pole lowpass (~16 kHz, ~6 dB/oct) on Blue HQ allpass output to attenuate content the allpass passes at unity gain, matching the natural roll-off behaviour of polynomial interpolators (Lagrange, Catmull-Rom).
 
 ### Changed
+- **Window height:** Plugin window increased by header bar height (36 design-px scaled). All UI Y-coordinates in `PluginEditorSetup::applyLayout()` offset by `getHeaderBarHeight()`.
+- **Drawer repositioned into header bar:** TopBarDrawer moved from content area (below header) to inside the header bar, right-aligned and vertically centred.
+- **Engine selector styling:** Engine ComboBox now uses the header bar's `HeaderLookAndFeel` (transparent background, accent-coloured arrow, white text) instead of the content area's `customLookAndFeel`. Global popup-menu and tooltip colours still applied via `customLookAndFeel`.
 - **Signal chain:** Pre-emphasis moved inside processChorus (wet-path only). Legacy juce::dsp::Compressor replaced with transparent post-sum peak catcher (-2 dB / 2:1 / 4 dB knee / 1 ms attack / 100 ms release).
 - **Per-core output trim:** Added virtual getOutputTrim() to ChorusCore base class; applied during crossfade blending.
 - **Runtime tuning:** depthSmoothingMs 150→50, depthRateLimit 0.25→2.0, centreDelaySmoothingMs 150→60, tapeDelaySmoothingMs 180→90, tapeWetGain 1.15→1.05, greenBloomGain 0.10→0.05, blueFocusOutputGain 0.08→0.04.
@@ -44,6 +51,7 @@ All notable changes to Choroboros are documented here.
 - **Version string build fix:** `CHOROBOROS_VERSION_STRING` changed from a `CACHE STRING` to a normal `set()` variable so that stale `CMakeCache.txt` entries can never override the checked-in version.
 
 ### Fixed
+- **Drawer border colour stuck on green:** Drawer outer border and tooltip separator line used hardcoded `devpanel::hackerBorder()` (always hacker green) instead of `accentColour_`. Now both use the current engine accent colour so they match Blue/Red/Purple/Black engines.
 - **BBD (Red NQ) phaser sweep:** S&H clock images aliased into audio band. Added first-order hold interpolation (~40 dB alias rejection). Fixed a1 coefficient sign in 5th-order Butterworth cascade. Raised bbdClockMinHz 2000→6000, bbdFilterCutoffMinHz 1200→3000.
 - **Tape (Red HQ) rate knob:** Undamped phase integrator caused DC drift (~73 samples). Added damping (tapePhaseDamping 1.0→0.99999). Widened LFO smoothing bandwidth (fc 10→56 Hz) so high rates track properly.
 - **Thiran (Blue HQ) zippering/noise:** Per-sample 5th-order coefficient recomputation caused DFII-T state transients. Added 32-sample linear coefficient interpolation (~30 dB transient reduction). Delay smoothing 0.998→0.9985.
