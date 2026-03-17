@@ -75,6 +75,12 @@ public:
     /** Log an event from the audio thread (non-blocking, may drop). */
     void tryLog (EventType type, const juce::String& detail = {});
 
+    /** Call before destruction to perform final flush and marker write while
+        the message thread and file system are still fully available.
+        Prevents file I/O from running inside the destructor (which may
+        execute during DLL_PROCESS_DETACH on Windows, where I/O can hang). */
+    void prepareForShutdown();
+
     /** Flush the ring buffer to the "live" log file on disk. */
     void flushToDisk();
 

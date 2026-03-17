@@ -101,7 +101,7 @@ SessionLog::SessionLog()
     startTimer (30000);
 }
 
-SessionLog::~SessionLog()
+void SessionLog::prepareForShutdown()
 {
     stopTimer();
     log (EventType::SessionEnd, "Session ended");
@@ -110,15 +110,21 @@ SessionLog::~SessionLog()
 
     if (remaining <= 0)
     {
-        // Last instance in this process — final flush and clean marker.
         flushToDisk();
         markCleanShutdown();
     }
     else
     {
-        // Other instances still alive — just flush, don't mark clean.
         flushToDisk();
     }
+}
+
+SessionLog::~SessionLog()
+{
+    // All heavy work (flush + marker) should have been done in
+    // prepareForShutdown() while the message thread was still available.
+    // If the caller forgot, do a best-effort stop (no file I/O).
+    stopTimer();
 }
 
 //==============================================================================
