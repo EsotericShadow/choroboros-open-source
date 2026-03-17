@@ -31,7 +31,7 @@ juce_add_plugin(Choroboros
     COMPANY_NAME "Kaizen DSP"
     COMPANY_COPYRIGHT "Copyright (C) 2026 Kaizen Strategic AI Inc. All rights reserved."
     BUNDLE_ID "com.kaizenstrategicai.Choroboros"
-    PLUGIN_MANUFACTURER_CODE ChBr
+    PLUGIN_MANUFACTURER_CODE KzDp
     PLUGIN_CODE ChBr
     FORMATS AU VST3 AAX Standalone
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
