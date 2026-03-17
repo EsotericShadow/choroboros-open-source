@@ -1,7 +1,7 @@
 param(
     [ValidateSet("Release", "Debug")]
     [string]$Config = "Release",
-    [string]$VersionLabel = "v2.03-beta",
+    [string]$VersionLabel = "v2.04-beta",
     [string]$RepoRoot = "",
     [switch]$SkipX64,
     [switch]$SkipX86

@@ -67,7 +67,7 @@ powershell -ExecutionPolicy Bypass -File .\windows\trace_load_performance.ps1
 10. Build release ZIP packages (x64 primary + x86 compatibility):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\windows\package_windows_release.ps1 -Config Release -VersionLabel v2.03-beta
+powershell -ExecutionPolicy Bypass -File .\windows\package_windows_release.ps1 -Config Release -VersionLabel v2.04-beta
 ```
 
 ## Presets

@@ -1,6 +1,6 @@
 # Choroboros: The Official User Manual
 
-*Version: 2.03*
+*Version: 2.04*
 *Audience: Musicians, Mixing Engineers, and Sound Designers.*
 
 Welcome to the official manual for **Choroboros**. 

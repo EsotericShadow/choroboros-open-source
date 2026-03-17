@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="1.0.1"
+VERSION="2.04-beta"
 PLUGIN_NAME="Choroboros"
 DMG_NAME="${PLUGIN_NAME}-v${VERSION}-macOS"
 TEMP_DIR="dmg_temp"
@@ -72,7 +72,7 @@ Troubleshooting:
 - On macOS, you may need to allow the plugins in System Preferences > Security & Privacy
 - After installation, rescan plugins in your DAW's preferences
 
-Version: 1.0.1
+Version: 2.04-beta
 EOF
 
 # Copy README if it exists

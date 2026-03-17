@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="1.0.1"
+VERSION="2.04-beta"
 PLUGIN_NAME="Choroboros"
 RELEASE_DIR="Release/${PLUGIN_NAME}-v${VERSION}"
 

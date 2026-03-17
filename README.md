@@ -62,13 +62,13 @@ Intended for educators, sound designers, and power users who want to see under t
 
 ## Installation
 
-**Downloads (v2.03-beta):**
+**Downloads (v2.04-beta):**
 
 | Platform | File | Link |
 |----------|------|------|
-| macOS Universal | `Choroboros-v2.03-beta-macOS-Universal.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.03-beta/Choroboros-v2.03-beta-macOS-Universal.zip) |
-| Windows x64 | `Choroboros-v2.03-beta-Windows-x64.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.03-beta/Choroboros-v2.03-beta-Windows-x64.zip) |
-| Windows x86 | `Choroboros-v2.03-beta-Windows-x86-compat.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.03-beta/Choroboros-v2.03-beta-Windows-x86-compat.zip) |
+| macOS Universal | `Choroboros-v2.04-beta-macOS-Universal.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.04-beta/Choroboros-v2.04-beta-macOS-Universal.zip) |
+| Windows x64 | `Choroboros-v2.04-beta-Windows-x64.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.04-beta/Choroboros-v2.04-beta-Windows-x64.zip) |
+| Windows x86 | `Choroboros-v2.04-beta-Windows-x86-compat.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.04-beta/Choroboros-v2.04-beta-Windows-x86-compat.zip) |
 
 SHA256 checksums included for all builds. Or use `install.sh` from the distribution (macOS).
 
