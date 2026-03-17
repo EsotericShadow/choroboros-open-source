@@ -301,7 +301,7 @@ struct LayoutTuning
     int offsetKnobVisualResponseMs = 100;
     int widthKnobVisualResponseMs = 100;
     int mixKnobVisualResponseMs = 100;
-    int knobDragSensitivityPct = 100;
+    int knobDragSensitivityPct = 31;
     int knobRollOffSpeedPct = 100;
     int knobSweepStartDeg = 0;
     int knobSweepEndDeg = 360;

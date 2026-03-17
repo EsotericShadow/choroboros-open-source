@@ -1358,7 +1358,7 @@
       "offsetKnobVisualResponseMs": 150,
       "widthKnobVisualResponseMs": 150,
       "mixKnobVisualResponseMs": 150,
-      "knobDragSensitivityPct": 40,
+      "knobDragSensitivityPct": 31,
       "knobRollOffSpeedPct": 58,
       "knobSweepStartDeg": 14,
       "knobSweepEndDeg": 346,
