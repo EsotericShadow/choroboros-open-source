@@ -155,7 +155,7 @@ private:
     float parseMixValue(const juce::String& trimmed);
 
     std::thread themePrewarmThread;
-    std::atomic<bool> stopThemePrewarm { false };
+    std::shared_ptr<std::atomic<bool>> themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
     std::future<CustomLookAndFeel::ThemeAssetPack> activeThemeDecodeFuture;
     int activeThemeDecodeColorIndex = 0;
     bool activeThemeInstalled = false;

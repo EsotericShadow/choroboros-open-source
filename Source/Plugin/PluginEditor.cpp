@@ -768,15 +768,31 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     }
 }
 
+// Shared typeface caches — ref-counted via SharedResourcePointer so they are
+// destroyed when the last editor instance dies, not during DLL_PROCESS_DETACH.
+struct ValueLabelTypefaceCache
+{
+    juce::Typeface::Ptr typeface = (BinaryData::Technology_ttfSize > 0)
+        ? juce::Typeface::createSystemTypefaceFor(BinaryData::Technology_ttf,
+                                                   static_cast<size_t>(BinaryData::Technology_ttfSize))
+        : nullptr;
+};
+
+struct UiTextTypefaceCache
+{
+    juce::Typeface::Ptr typeface = (BinaryData::Retroica_ttfSize > 0)
+        ? juce::Typeface::createSystemTypefaceFor(BinaryData::Retroica_ttf,
+                                                   static_cast<size_t>(BinaryData::Retroica_ttfSize))
+        : nullptr;
+};
+
 void ChoroborosPluginEditor::loadValueLabelTypeface()
 {
     if (BinaryData::Technology_ttfSize <= 0)
         return;
 
-    static juce::Typeface::Ptr cachedValueLabelTypeface = juce::Typeface::createSystemTypefaceFor(
-        BinaryData::Technology_ttf,
-        static_cast<size_t>(BinaryData::Technology_ttfSize));
-    valueLabelTypeface = cachedValueLabelTypeface;
+    juce::SharedResourcePointer<ValueLabelTypefaceCache> cache;
+    valueLabelTypeface = cache->typeface;
 }
 
 void ChoroborosPluginEditor::loadUiTextTypeface()
@@ -784,10 +800,8 @@ void ChoroborosPluginEditor::loadUiTextTypeface()
     if (BinaryData::Retroica_ttfSize <= 0)
         return;
 
-    static juce::Typeface::Ptr cachedUiTypeface = juce::Typeface::createSystemTypefaceFor(
-        BinaryData::Retroica_ttf,
-        static_cast<size_t>(BinaryData::Retroica_ttfSize));
-    uiTextTypeface = cachedUiTypeface;
+    juce::SharedResourcePointer<UiTextTypefaceCache> cache;
+    uiTextTypeface = cache->typeface;
 }
 
 juce::Font ChoroborosPluginEditor::makeValueLabelFont(float heightPx, bool bold) const
@@ -1014,9 +1028,12 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
 {
     stopDeferredThemePrewarm();
 
-    stopThemePrewarm.store(false);
+    // Each thread invocation gets its own stop flag so that detaching the
+    // previous thread and resetting the flag doesn't create a race.
+    themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
+    auto stopFlag = themePrewarmStopFlag;  // shared_ptr copy — thread owns a ref
+
     juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-    std::atomic<bool>* stopFlag = &stopThemePrewarm;
 
     themePrewarmThread = std::thread([safeThis, stopFlag, activeColorIndex]()
     {
@@ -1065,9 +1082,20 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
 
 void ChoroborosPluginEditor::stopDeferredThemePrewarm()
 {
-    stopThemePrewarm.store(true);
+    // Signal the current thread invocation to stop.
+    themePrewarmStopFlag->store(true);
+
+    // IMPORTANT: Do NOT call themePrewarmThread.join() here.
+    // This function runs on the message thread (from the editor destructor).
+    // The worker thread calls MessageManager::callAsync(), which needs the
+    // message thread to process its callback.  Calling join() here would
+    // deadlock: message thread blocked in join(), worker blocked in callAsync().
+    //
+    // Instead we detach the thread and let it exit on its own — it checks
+    // its own stop flag every iteration, and all callAsync lambdas use a
+    // SafePointer that will be null once the editor is destroyed.
     if (themePrewarmThread.joinable())
-        themePrewarmThread.join();
+        themePrewarmThread.detach();
 }
 
 void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)
