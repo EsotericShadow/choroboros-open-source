@@ -59,6 +59,7 @@ private:
     int dragAnchorScreenY = 0;
     bool pointerIsDown = false;
     bool dragToggled = false;  // true if drag already changed state during this gesture
+    juce::Image spritesheetImage;  // loaded once in ctor, avoids static in DLL
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnimatedToggleButton)
 };

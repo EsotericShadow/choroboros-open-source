@@ -30,6 +30,8 @@ AnimatedToggleButton::AnimatedToggleButton()
     setMouseDragSensitivity(500);
     setScrollWheelEnabled(false);
     setWantsKeyboardFocus(false);
+    spritesheetImage = juce::ImageCache::getFromMemory(BinaryData::switch_a_spritesheet_png,
+                                                        BinaryData::switch_a_spritesheet_pngSize);
     onValueChange = [this]
     {
         const bool isOn = getValue() >= 0.5;
@@ -56,7 +58,7 @@ void AnimatedToggleButton::paint(juce::Graphics& g)
     if (!isTimerRunning() && std::abs(animatedFrame - targetFrame) > 0.01f)
         animatedFrame = targetFrame;
 
-    static const juce::Image sheet = juce::ImageCache::getFromMemory(BinaryData::switch_a_spritesheet_png, BinaryData::switch_a_spritesheet_pngSize);
+    const auto& sheet = spritesheetImage;
     if (!sheet.isValid())
         return;
 

@@ -60,10 +60,15 @@ std::uint64_t nextLoadTraceInstanceId()
     return getLoadTraceInstanceCounter().fetch_add(1, std::memory_order_relaxed);
 }
 
+// Intentional leak: the CriticalSection is heap-allocated and never freed.
+// A static CriticalSection would be destroyed during DLL_PROCESS_DETACH on
+// Windows while the loader lock is held — if any thread holds the CS at that
+// point, the destructor deadlocks.  Leaking a trivial amount of memory at
+// process exit is the standard workaround (Raymond Chen, "The Old New Thing").
 juce::CriticalSection& getLoadTraceFileLock()
 {
-    static juce::CriticalSection lock;
-    return lock;
+    static auto* lock = new juce::CriticalSection();
+    return *lock;
 }
 
 juce::String getSafeHostDescription()
@@ -937,7 +942,11 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     stopTimer();
 
     if (analyzerWorker != nullptr)
-        analyzerWorker->stopThread(1500);
+    {
+        analyzerWorker->signalThreadShouldExit();
+        analyzerWorker->notify();  // wake from wait() so it exits promptly
+        analyzerWorker->stopThread(500);
+    }
 
     parameters.removeParameterListener(ENGINE_COLOR_ID, this);
     parameters.removeParameterListener(RATE_ID, this);
@@ -948,9 +957,17 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     parameters.removeParameterListener(HQ_ID, this);
     parameters.removeParameterListener(MIX_ID, this);
 
-    // Uninstall crash handlers before the session log is destroyed.
-    // The sessionLog destructor writes a clean-shutdown marker.
+    // Flush the session log and write the clean-shutdown marker NOW, while
+    // the message thread and file system are still fully available.  The
+    // SessionLog destructor intentionally does NOT do file I/O to avoid
+    // blocking during DLL_PROCESS_DETACH on Windows.
+    if (sessionLog)
+        sessionLog->prepareForShutdown();
+
+    // Uninstall crash handlers after the session log is flushed (a crash
+    // between flush and here would still leave a valid log on disk).
     CrashReporter::uninstall();
+
     // feedbackCollector must be destroyed before sessionLog (it holds a raw pointer)
     feedbackCollector.reset();
     sessionLog.reset();
@@ -1258,7 +1275,11 @@ void ChoroborosAudioProcessor::releaseResources()
 {
     stopTimer();
     if (analyzerWorker != nullptr)
-        analyzerWorker->stopThread(1500);
+    {
+        analyzerWorker->signalThreadShouldExit();
+        analyzerWorker->notify();
+        analyzerWorker->stopThread(500);
+    }
     chorusDSP->reset();
 }
 
