@@ -1,0 +1,473 @@
+/*
+ * Choroboros - A chorus that eats its own tail
+ * Copyright (C) 2026 Kaizen Strategic AI Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include "PluginEditorSetup.h"
+#include "../Plugin/PluginEditor.h"
+
+LayoutTuning PluginEditorSetup::makeDefaultLayout()
+{
+    return LayoutTuning{};
+}
+
+void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const LayoutTuning& layout)
+{
+    const auto s = [&editor](int value) { return juce::roundToInt(static_cast<float>(value) * editor.getUiScale()); };
+    const int yOff = editor.getHeaderBarHeight(); // offset all Y positions below the header bar
+    int colorIndex = 0;
+    if (auto* engineColorParam = editor.audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+        colorIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
+
+    const auto pickByColor = [colorIndex](int green, int blue, int red, int purple, int black, int fallback)
+    {
+        if (colorIndex == 0) return green;
+        if (colorIndex == 1) return blue;
+        if (colorIndex == 2) return red;
+        if (colorIndex == 3) return purple;
+        if (colorIndex == 4) return black;
+        return fallback;
+    };
+
+    const int mainKnobSize = s(pickByColor(layout.mainKnobSizeGreen,
+                                           layout.mainKnobSizeBlue,
+                                           layout.mainKnobSizeRed,
+                                           layout.mainKnobSizePurple,
+                                           layout.mainKnobSizeBlack,
+                                           layout.mainKnobSize));
+    const int knobTopY = s(pickByColor(layout.knobTopYGreen, layout.knobTopYBlue, layout.knobTopYRed,
+                                       layout.knobTopYPurple, layout.knobTopYBlack, layout.knobTopY));
+    const int rateCenterX = s(pickByColor(layout.rateCenterXGreen, layout.rateCenterXBlue, layout.rateCenterXRed,
+                                          layout.rateCenterXPurple, layout.rateCenterXBlack, layout.rateCenterX));
+    const int depthCenterX = s(pickByColor(layout.depthCenterXGreen, layout.depthCenterXBlue, layout.depthCenterXRed,
+                                           layout.depthCenterXPurple, layout.depthCenterXBlack, layout.depthCenterX));
+    const int offsetCenterX = s(pickByColor(layout.offsetCenterXGreen, layout.offsetCenterXBlue, layout.offsetCenterXRed,
+                                            layout.offsetCenterXPurple, layout.offsetCenterXBlack, layout.offsetCenterX));
+    const int widthCenterX = s(pickByColor(layout.widthCenterXGreen, layout.widthCenterXBlue, layout.widthCenterXRed,
+                                           layout.widthCenterXPurple, layout.widthCenterXBlack, layout.widthCenterX));
+    const int trackStartX = s(pickByColor(layout.sliderTrackStartXGreen, layout.sliderTrackStartXBlue, layout.sliderTrackStartXRed,
+                                          layout.sliderTrackStartXPurple, layout.sliderTrackStartXBlack, layout.sliderTrackStartX));
+    const int trackStartY = s(pickByColor(layout.sliderTrackStartYGreen, layout.sliderTrackStartYBlue, layout.sliderTrackStartYRed,
+                                          layout.sliderTrackStartYPurple, layout.sliderTrackStartYBlack, layout.sliderTrackStartY));
+    const int trackEndX = s(pickByColor(layout.sliderTrackEndXGreen, layout.sliderTrackEndXBlue, layout.sliderTrackEndXRed,
+                                        layout.sliderTrackEndXPurple, layout.sliderTrackEndXBlack, layout.sliderTrackEndX));
+    const int trackEndY = s(pickByColor(layout.sliderTrackEndYGreen, layout.sliderTrackEndYBlue, layout.sliderTrackEndYRed,
+                                        layout.sliderTrackEndYPurple, layout.sliderTrackEndYBlack, layout.sliderTrackEndY));
+    const float sizeScale = pickByColor(layout.sliderSizeGreen, layout.sliderSizeBlue, layout.sliderSizeRed,
+                                        layout.sliderSizePurple, layout.sliderSizeBlack, layout.sliderSize) / 100.0f;
+    const int sliderH = juce::roundToInt(s(18) * sizeScale);
+    const int sliderX = juce::jmin(trackStartX, trackEndX);
+    const int sliderW = juce::jmax(1, std::abs(trackEndX - trackStartX));
+    const int trackCenterY = (trackStartY + trackEndY) / 2;
+    const int sliderY = trackCenterY - (sliderH / 2);
+    const int mixKnobSize = s(pickByColor(layout.mixKnobSizeGreen,
+                                          layout.mixKnobSizeBlue,
+                                          layout.mixKnobSizeRed,
+                                          layout.mixKnobSizePurple,
+                                          layout.mixKnobSizeBlack,
+                                          layout.mixKnobSize));
+    const int mixCenterX = s(pickByColor(layout.mixCenterXGreen, layout.mixCenterXBlue, layout.mixCenterXRed,
+                                         layout.mixCenterXPurple, layout.mixCenterXBlack, layout.mixCenterX));
+    const int valueLabelWidth = s(layout.valueLabelWidth);
+    const int valueLabelHeight = s(layout.valueLabelHeight);
+    const int valueLabelY = s(pickByColor(layout.valueLabelYGreen, layout.valueLabelYBlue, layout.valueLabelYRed,
+                                          layout.valueLabelYPurple, layout.valueLabelYBlack, layout.valueLabelY));
+    const int rateValueOffsetX = s(pickByColor(layout.rateValueOffsetXGreen, layout.rateValueOffsetXBlue, layout.rateValueOffsetXRed,
+                                               layout.rateValueOffsetXPurple, layout.rateValueOffsetXBlack, layout.rateValueOffsetX));
+    const int depthValueOffsetX = s(pickByColor(layout.depthValueOffsetXGreen, layout.depthValueOffsetXBlue, layout.depthValueOffsetXRed,
+                                                layout.depthValueOffsetXPurple, layout.depthValueOffsetXBlack, layout.depthValueOffsetX));
+    const int offsetValueOffsetX = s(pickByColor(layout.offsetValueOffsetXGreen, layout.offsetValueOffsetXBlue, layout.offsetValueOffsetXRed,
+                                                 layout.offsetValueOffsetXPurple, layout.offsetValueOffsetXBlack, layout.offsetValueOffsetX));
+    const int widthValueOffsetX = s(pickByColor(layout.widthValueOffsetXGreen, layout.widthValueOffsetXBlue, layout.widthValueOffsetXRed,
+                                                layout.widthValueOffsetXPurple, layout.widthValueOffsetXBlack, layout.widthValueOffsetX));
+    const int rateValueOffsetY = s(pickByColor(layout.rateValueOffsetYGreen, layout.rateValueOffsetYBlue, layout.rateValueOffsetYRed,
+                                               layout.rateValueOffsetYPurple, layout.rateValueOffsetYBlack, layout.rateValueOffsetY));
+    const int depthValueOffsetY = s(pickByColor(layout.depthValueOffsetYGreen, layout.depthValueOffsetYBlue, layout.depthValueOffsetYRed,
+                                                layout.depthValueOffsetYPurple, layout.depthValueOffsetYBlack, layout.depthValueOffsetY));
+    const int offsetValueOffsetY = s(pickByColor(layout.offsetValueOffsetYGreen, layout.offsetValueOffsetYBlue, layout.offsetValueOffsetYRed,
+                                                 layout.offsetValueOffsetYPurple, layout.offsetValueOffsetYBlack, layout.offsetValueOffsetY));
+    const int widthValueOffsetY = s(pickByColor(layout.widthValueOffsetYGreen, layout.widthValueOffsetYBlue, layout.widthValueOffsetYRed,
+                                                layout.widthValueOffsetYPurple, layout.widthValueOffsetYBlack, layout.widthValueOffsetY));
+    const int colorValueWidth = s(layout.colorValueWidth);
+    const int colorValueHeight = s(layout.colorValueHeight);
+    const int colorValueY = s(pickByColor(layout.colorValueYGreen, layout.colorValueYBlue, layout.colorValueYRed,
+                                          layout.colorValueYPurple, layout.colorValueYBlack, layout.colorValueY));
+    const int colorValueXOffset = s(pickByColor(layout.colorValueXOffsetGreen, layout.colorValueXOffsetBlue, layout.colorValueXOffsetRed,
+                                                layout.colorValueXOffsetPurple, layout.colorValueXOffsetBlack, layout.colorValueXOffset));
+    const int mixValueWidth = s(layout.mixValueWidth);
+    const int mixValueHeight = s(layout.mixValueHeight);
+    const int mixValueY = s(pickByColor(layout.mixValueYGreen, layout.mixValueYBlue, layout.mixValueYRed,
+                                        layout.mixValueYPurple, layout.mixValueYBlack, layout.mixValueY));
+    const int mixValueOffsetX = s(pickByColor(layout.mixValueOffsetXGreen, layout.mixValueOffsetXBlue, layout.mixValueOffsetXRed,
+                                              layout.mixValueOffsetXPurple, layout.mixValueOffsetXBlack, layout.mixValueOffsetX));
+    const auto makeColour = [](int argb) { return juce::Colour(static_cast<juce::uint32>(argb)); };
+
+    editor.rateSlider.setBounds(rateCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+    editor.depthSlider.setBounds(depthCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+    editor.offsetSlider.setBounds(offsetCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+    editor.widthSlider.setBounds(widthCenterX - (mainKnobSize / 2), knobTopY + yOff, mainKnobSize, mainKnobSize);
+
+    // Purple knob shadow extends below bounds; allow drawing overflow so it isn't clipped
+    const bool allowKnobOverflow = (colorIndex == 3);
+    editor.rateSlider.setPaintingIsUnclipped(allowKnobOverflow);
+    editor.depthSlider.setPaintingIsUnclipped(allowKnobOverflow);
+    editor.offsetSlider.setPaintingIsUnclipped(allowKnobOverflow);
+    editor.widthSlider.setPaintingIsUnclipped(allowKnobOverflow);
+
+    editor.colorSlider.setBounds(sliderX, sliderY + yOff, sliderW, sliderH);
+
+    const int mixKnobX = mixCenterX - (mixKnobSize / 2);
+    const int mixKnobY = s(pickByColor(layout.mixKnobYGreen, layout.mixKnobYBlue, layout.mixKnobYRed,
+                                       layout.mixKnobYPurple, layout.mixKnobYBlack, layout.mixKnobY));
+    editor.mixSlider.setBounds(mixKnobX, mixKnobY + yOff, mixKnobSize, mixKnobSize);
+
+    const juce::Font labelFont = editor.makeUiTextFont(12.25f * editor.getUiScale(), true);
+    int rateLabelWidth = editor.calculateLabelWidth("RATE", labelFont);
+    int depthLabelWidth = editor.calculateLabelWidth("DEPTH", labelFont);
+    int offsetLabelWidth = editor.calculateLabelWidth("OFFSET", labelFont);
+    int widthLabelWidth = editor.calculateLabelWidth("WIDTH", labelFont);
+    int colorLabelWidth = editor.calculateLabelWidth("COLOR", labelFont);
+    int mixLabelWidth = editor.calculateLabelWidth("MIX", labelFont);
+
+    const int knobLabelY = knobTopY - s(15) + yOff;
+    const int labelHeight = s(20);
+    editor.rateLabel.setBounds(rateCenterX - (rateLabelWidth / 2), knobLabelY, rateLabelWidth, labelHeight);
+    editor.depthLabel.setBounds(depthCenterX - (depthLabelWidth / 2), knobLabelY, depthLabelWidth, labelHeight);
+    editor.offsetLabel.setBounds(offsetCenterX - (offsetLabelWidth / 2), knobLabelY, offsetLabelWidth, labelHeight);
+    editor.widthLabel.setBounds(widthCenterX - (widthLabelWidth / 2), knobLabelY, widthLabelWidth, labelHeight);
+
+    editor.rateValueLabel.setBounds(rateCenterX - (valueLabelWidth / 2) + rateValueOffsetX,
+                                    valueLabelY + rateValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
+    editor.depthValueLabel.setBounds(depthCenterX - (valueLabelWidth / 2) + depthValueOffsetX,
+                                     valueLabelY + depthValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
+    editor.offsetValueLabel.setBounds(offsetCenterX - (valueLabelWidth / 2) + offsetValueOffsetX,
+                                      valueLabelY + offsetValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
+    editor.widthValueLabel.setBounds(widthCenterX - (valueLabelWidth / 2) + widthValueOffsetX,
+                                     valueLabelY + widthValueOffsetY + yOff, valueLabelWidth, valueLabelHeight);
+
+    const int colorValueCenterX = s(layout.colorValueCenterX);
+    const int colorValueX = colorValueCenterX - (colorValueWidth / 2) + colorValueXOffset;
+    editor.colorValueLabel.setBounds(colorValueX, colorValueY + yOff, colorValueWidth, colorValueHeight);
+    editor.colorLabel.setBounds(colorValueCenterX - (colorLabelWidth / 2),
+                                colorValueY + colorValueHeight + s(4) + yOff,
+                                colorLabelWidth, labelHeight);
+
+    editor.mixValueLabel.setBounds(mixCenterX - (mixValueWidth / 2) + mixValueOffsetX,
+                                   mixValueY + yOff, mixValueWidth, mixValueHeight);
+    editor.mixLabel.setBounds(mixCenterX - (mixLabelWidth / 2),
+                              mixValueY + mixValueHeight + s(4) + yOff,
+                              mixLabelWidth, labelHeight);
+
+    const juce::Font mainValueFont = editor.makeValueLabelFont(static_cast<float>(layout.knobValueFontSize) * editor.getUiScale(), true);
+    editor.rateValueLabel.setFont(mainValueFont);
+    editor.depthValueLabel.setFont(mainValueFont);
+    editor.offsetValueLabel.setFont(mainValueFont);
+    editor.widthValueLabel.setFont(mainValueFont);
+
+    const juce::Font colorValueFont = editor.makeValueLabelFont(static_cast<float>(layout.colorValueFontSize) * editor.getUiScale(), true);
+    editor.colorValueLabel.setFont(colorValueFont);
+    const juce::Font mixValueFont = editor.makeValueLabelFont(static_cast<float>(layout.mixValueFontSize) * editor.getUiScale(), true);
+    editor.mixValueLabel.setFont(mixValueFont);
+    editor.updateValueLabelColors(colorIndex);
+
+    auto applyMainValueAnimation = [&](LabelWithContainer& label, int fieldIndex)
+    {
+        const auto& anim = layout.mainValueAnimationsByEngine[static_cast<std::size_t>(colorIndex)][static_cast<std::size_t>(fieldIndex)];
+
+        const bool flipEnabled = anim.flip.enabled != 0;
+        const int flipDurationMs = anim.flip.durationMs;
+        const float flipTravelUpPx = static_cast<float>(anim.flip.travelUpPxTimes100) * 0.01f;
+        const float flipTravelDownPx = static_cast<float>(anim.flip.travelDownPxTimes100) * 0.01f;
+        const float flipTravelOutScale = static_cast<float>(anim.flip.travelOutPct) * 0.01f;
+        const float flipTravelInScale = static_cast<float>(anim.flip.travelInPct) * 0.01f;
+        const float flipShearAmount = static_cast<float>(anim.flip.shearPct) * 0.01f;
+        const float flipScaleAmount = static_cast<float>(anim.flip.minScalePct) * 0.01f;
+        const float flipMinScale = 1.0f - juce::jlimit(0.0f, 1.0f, flipScaleAmount);
+        label.setFlipAnimationParams(flipEnabled, flipDurationMs, flipTravelUpPx, flipTravelDownPx, flipTravelOutScale, flipTravelInScale, flipShearAmount, flipMinScale);
+
+        const bool fxEnabled = anim.fx.enabled != 0;
+        const float glowAlpha = static_cast<float>(anim.fx.glowAlphaPct) * 0.01f;
+        const float glowSpreadPx = static_cast<float>(anim.fx.glowSpreadPxTimes100) * 0.01f;
+        const float perCharOffsetX = static_cast<float>(anim.fx.perCharOffsetXPxTimes100) * 0.01f;
+        const float perCharOffsetY = static_cast<float>(anim.fx.perCharOffsetYPxTimes100) * 0.01f;
+        const float topAlpha = static_cast<float>(anim.fx.topReflectAlphaPct) * 0.01f;
+        const float topOffsetX = static_cast<float>(anim.fx.topReflectOffsetXPxTimes100) * 0.01f;
+        const float topOffsetY = static_cast<float>(anim.fx.topReflectOffsetYPxTimes100) * 0.01f;
+        const float topShear = static_cast<float>(anim.fx.topReflectShearPct) * 0.01f;
+        const float topRotateDeg = static_cast<float>(anim.fx.topReflectRotateDeg);
+        const float bottomAlpha = static_cast<float>(anim.fx.bottomReflectAlphaPct) * 0.01f;
+        const float bottomOffsetX = static_cast<float>(anim.fx.bottomReflectOffsetXPxTimes100) * 0.01f;
+        const float bottomOffsetY = static_cast<float>(anim.fx.bottomReflectOffsetYPxTimes100) * 0.01f;
+        const float bottomShear = static_cast<float>(anim.fx.bottomReflectShearPct) * 0.01f;
+        const float bottomRotateDeg = static_cast<float>(anim.fx.bottomReflectRotateDeg);
+        const float reflectBlurPx = static_cast<float>(anim.fx.reflectBlurPxTimes100) * 0.01f;
+        const float reflectSquash = static_cast<float>(anim.fx.reflectSquashPct) * 0.01f;
+        const float reflectMotion = static_cast<float>(anim.fx.reflectMotionPct) * 0.01f;
+        label.setValueFxParams(fxEnabled, glowAlpha, glowSpreadPx, perCharOffsetX, perCharOffsetY,
+                               topAlpha, topOffsetX, topOffsetY, topShear, topRotateDeg,
+                               bottomAlpha, bottomOffsetX, bottomOffsetY, bottomShear, bottomRotateDeg,
+                               reflectBlurPx, reflectSquash, reflectMotion);
+    };
+
+    applyMainValueAnimation(editor.rateValueLabel, 0);
+    applyMainValueAnimation(editor.depthValueLabel, 1);
+    applyMainValueAnimation(editor.offsetValueLabel, 2);
+    applyMainValueAnimation(editor.widthValueLabel, 3);
+
+    const bool colorFlipEnabled = layout.colorValueFlipEnabled != 0;
+    const int colorFlipDurationMs = layout.colorValueFlipDurationMs;
+    const float colorFlipTravelUpPx = static_cast<float>(layout.colorValueFlipTravelUpPxTimes100) * 0.01f;
+    const float colorFlipTravelDownPx = static_cast<float>(layout.colorValueFlipTravelDownPxTimes100) * 0.01f;
+    const float colorFlipTravelOutScale = static_cast<float>(layout.colorValueFlipTravelOutPct) * 0.01f;
+    const float colorFlipTravelInScale = static_cast<float>(layout.colorValueFlipTravelInPct) * 0.01f;
+    const float colorFlipShearAmount = static_cast<float>(layout.colorValueFlipShearPct) * 0.01f;
+    const float colorFlipScaleAmount = static_cast<float>(layout.colorValueFlipMinScalePct) * 0.01f;
+    const float colorFlipMinScale = 1.0f - juce::jlimit(0.0f, 1.0f, colorFlipScaleAmount);
+    editor.colorValueLabel.setFlipAnimationParams(colorFlipEnabled, colorFlipDurationMs, colorFlipTravelUpPx, colorFlipTravelDownPx, colorFlipTravelOutScale, colorFlipTravelInScale, colorFlipShearAmount, colorFlipMinScale);
+
+    const bool mixFlipEnabled = layout.mixValueFlipEnabled != 0;
+    const int mixFlipDurationMs = layout.mixValueFlipDurationMs;
+    const float mixFlipTravelUpPx = static_cast<float>(layout.mixValueFlipTravelUpPxTimes100) * 0.01f;
+    const float mixFlipTravelDownPx = static_cast<float>(layout.mixValueFlipTravelDownPxTimes100) * 0.01f;
+    const float mixFlipTravelOutScale = static_cast<float>(layout.mixValueFlipTravelOutPct) * 0.01f;
+    const float mixFlipTravelInScale = static_cast<float>(layout.mixValueFlipTravelInPct) * 0.01f;
+    const float mixFlipShearAmount = static_cast<float>(layout.mixValueFlipShearPct) * 0.01f;
+    const float mixFlipScaleAmount = static_cast<float>(layout.mixValueFlipMinScalePct) * 0.01f;
+    const float mixFlipMinScale = 1.0f - juce::jlimit(0.0f, 1.0f, mixFlipScaleAmount);
+    editor.mixValueLabel.setFlipAnimationParams(mixFlipEnabled, mixFlipDurationMs, mixFlipTravelUpPx, mixFlipTravelDownPx, mixFlipTravelOutScale, mixFlipTravelInScale, mixFlipShearAmount, mixFlipMinScale);
+
+    const bool colorFxEnabled = layout.colorValueFxEnabled != 0;
+    const float colorGlowAlpha = static_cast<float>(layout.colorValueGlowAlphaPct) * 0.01f;
+    const float colorGlowSpreadPx = static_cast<float>(layout.colorValueGlowSpreadPxTimes100) * 0.01f;
+    const float colorPerCharOffsetX = static_cast<float>(layout.colorValueFxPerCharOffsetXPxTimes100) * 0.01f;
+    const float colorPerCharOffsetY = static_cast<float>(layout.colorValueFxPerCharOffsetYPxTimes100) * 0.01f;
+    const float colorTopAlpha = static_cast<float>(layout.colorValueTopReflectAlphaPct) * 0.01f;
+    const float colorTopOffsetX = static_cast<float>(layout.colorValueTopReflectOffsetXPxTimes100) * 0.01f;
+    const float colorTopOffsetY = static_cast<float>(layout.colorValueTopReflectOffsetYPxTimes100) * 0.01f;
+    const float colorTopShear = static_cast<float>(layout.colorValueTopReflectShearPct) * 0.01f;
+    const float colorTopRotateDeg = static_cast<float>(layout.colorValueTopReflectRotateDeg);
+    const float colorBottomAlpha = static_cast<float>(layout.colorValueBottomReflectAlphaPct) * 0.01f;
+    const float colorBottomOffsetX = static_cast<float>(layout.colorValueBottomReflectOffsetXPxTimes100) * 0.01f;
+    const float colorBottomOffsetY = static_cast<float>(layout.colorValueBottomReflectOffsetYPxTimes100) * 0.01f;
+    const float colorBottomShear = static_cast<float>(layout.colorValueBottomReflectShearPct) * 0.01f;
+    const float colorBottomRotateDeg = static_cast<float>(layout.colorValueBottomReflectRotateDeg);
+    const float colorReflectBlurPx = static_cast<float>(layout.colorValueReflectBlurPxTimes100) * 0.01f;
+    const float colorReflectSquash = static_cast<float>(layout.colorValueReflectSquashPct) * 0.01f;
+    const float colorReflectMotion = static_cast<float>(layout.colorValueReflectMotionPct) * 0.01f;
+
+    const bool mixFxEnabled = layout.mixValueFxEnabled != 0;
+    const float mixGlowAlpha = static_cast<float>(layout.mixValueGlowAlphaPct) * 0.01f;
+    const float mixGlowSpreadPx = static_cast<float>(layout.mixValueGlowSpreadPxTimes100) * 0.01f;
+    const float mixPerCharOffsetX = static_cast<float>(layout.mixValueFxPerCharOffsetXPxTimes100) * 0.01f;
+    const float mixPerCharOffsetY = static_cast<float>(layout.mixValueFxPerCharOffsetYPxTimes100) * 0.01f;
+    const float mixTopAlpha = static_cast<float>(layout.mixValueTopReflectAlphaPct) * 0.01f;
+    const float mixTopOffsetX = static_cast<float>(layout.mixValueTopReflectOffsetXPxTimes100) * 0.01f;
+    const float mixTopOffsetY = static_cast<float>(layout.mixValueTopReflectOffsetYPxTimes100) * 0.01f;
+    const float mixTopShear = static_cast<float>(layout.mixValueTopReflectShearPct) * 0.01f;
+    const float mixTopRotateDeg = static_cast<float>(layout.mixValueTopReflectRotateDeg);
+    const float mixBottomAlpha = static_cast<float>(layout.mixValueBottomReflectAlphaPct) * 0.01f;
+    const float mixBottomOffsetX = static_cast<float>(layout.mixValueBottomReflectOffsetXPxTimes100) * 0.01f;
+    const float mixBottomOffsetY = static_cast<float>(layout.mixValueBottomReflectOffsetYPxTimes100) * 0.01f;
+    const float mixBottomShear = static_cast<float>(layout.mixValueBottomReflectShearPct) * 0.01f;
+    const float mixBottomRotateDeg = static_cast<float>(layout.mixValueBottomReflectRotateDeg);
+    const float mixReflectBlurPx = static_cast<float>(layout.mixValueReflectBlurPxTimes100) * 0.01f;
+    const float mixReflectSquash = static_cast<float>(layout.mixValueReflectSquashPct) * 0.01f;
+    const float mixReflectMotion = static_cast<float>(layout.mixValueReflectMotionPct) * 0.01f;
+
+    editor.colorValueLabel.setValueFxParams(colorFxEnabled, colorGlowAlpha, colorGlowSpreadPx, colorPerCharOffsetX, colorPerCharOffsetY, colorTopAlpha, colorTopOffsetX, colorTopOffsetY, colorTopShear, colorTopRotateDeg, colorBottomAlpha, colorBottomOffsetX, colorBottomOffsetY, colorBottomShear, colorBottomRotateDeg, colorReflectBlurPx, colorReflectSquash, colorReflectMotion);
+    editor.mixValueLabel.setValueFxParams(mixFxEnabled, mixGlowAlpha, mixGlowSpreadPx, mixPerCharOffsetX, mixPerCharOffsetY, mixTopAlpha, mixTopOffsetX, mixTopOffsetY, mixTopShear, mixTopRotateDeg, mixBottomAlpha, mixBottomOffsetX, mixBottomOffsetY, mixBottomShear, mixBottomRotateDeg, mixReflectBlurPx, mixReflectSquash, mixReflectMotion);
+
+    // NOTE: Top-bar icon buttons (dev, about, help, feedback) are now
+    // positioned exclusively in the PluginEditor constructor as a single
+    // grouped row.  The legacy topButtons* layout fields are retained in
+    // LayoutTuning for serialisation compat but no longer drive placement.
+
+    // Engine selector is now positioned by TopHeaderBar — only apply global
+    // popup-menu / tooltip colours to the customLookAndFeel here.
+    {
+        const auto popupBackground = makeColour(layout.engineSelectorPopupBackgroundColour);
+        const auto popupText = makeColour(layout.engineSelectorPopupTextColour);
+        const auto popupHighlightedBackground = makeColour(layout.engineSelectorPopupHighlightedBackgroundColour);
+        const auto popupHighlightedText = makeColour(layout.engineSelectorPopupHighlightedTextColour);
+
+        editor.customLookAndFeel.setColour(juce::PopupMenu::backgroundColourId, popupBackground);
+        editor.customLookAndFeel.setColour(juce::PopupMenu::textColourId, popupText);
+        editor.customLookAndFeel.setColour(juce::PopupMenu::headerTextColourId, popupHighlightedText.interpolatedWith(popupText, 0.4f));
+        editor.customLookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, popupHighlightedBackground);
+        editor.customLookAndFeel.setColour(juce::PopupMenu::highlightedTextColourId, popupHighlightedText);
+        editor.customLookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, popupBackground.brighter(0.06f).withAlpha(0.97f));
+        editor.customLookAndFeel.setColour(juce::TooltipWindow::textColourId, popupText);
+        editor.customLookAndFeel.setColour(juce::TooltipWindow::outlineColourId, popupHighlightedBackground.brighter(0.25f));
+        editor.customLookAndFeel.setPopupMenuFontHeight(static_cast<float>(layout.engineSelectorFontSize) * editor.getUiScale());
+    }
+
+    const int hqSize = s(layout.hqSwitchSize);
+    const int hqOffsetX = pickByColor(layout.hqSwitchOffsetXGreen, layout.hqSwitchOffsetXBlue, layout.hqSwitchOffsetXRed,
+                                      layout.hqSwitchOffsetXPurple, layout.hqSwitchOffsetXBlack, layout.hqSwitchOffsetX);
+    const int hqOffsetY = pickByColor(layout.hqSwitchOffsetYGreen, layout.hqSwitchOffsetYBlue, layout.hqSwitchOffsetYRed,
+                                      layout.hqSwitchOffsetYPurple, layout.hqSwitchOffsetYBlack, layout.hqSwitchOffsetY);
+    const int hqCenterX = s(350 + hqOffsetX);
+    const int hqCenterY = s(152 + hqOffsetY) + yOff;
+    editor.hqButton.setBounds(hqCenterX - (hqSize / 2), hqCenterY - (hqSize / 2), hqSize, hqSize);
+
+    const juce::Font hqFont = editor.makeUiTextFont(12.25f * editor.getUiScale(), true);
+    editor.hqLabel.setFont(hqFont);
+    const int hqLabelWidth = editor.calculateLabelWidth("HQ", hqFont);
+    editor.hqLabel.setBounds(hqCenterX - (hqLabelWidth / 2), hqCenterY + (hqSize / 2) + s(1), hqLabelWidth, s(18));
+
+    const float knobDragSensitivityScale = static_cast<float>(juce::jlimit(10, 400, layout.knobDragSensitivityPct)) * 0.01f;
+    const float scrollWheelScale = static_cast<float>(juce::jlimit(5, 200, layout.scrollWheelSensitivityPct)) * 0.01f;
+    const float knobRollOffSpeedScale = static_cast<float>(juce::jlimit(10, 400, layout.knobRollOffSpeedPct)) * 0.01f;
+    const auto applyKnobResponse = [knobDragSensitivityScale, scrollWheelScale, knobRollOffSpeedScale](SmoothedSlider& knob, int baseResponseMs)
+    {
+        const float effectiveResponseMs = juce::jmax(1.0f, static_cast<float>(baseResponseMs) / knobRollOffSpeedScale);
+        knob.setSmoothingTime(effectiveResponseMs);
+        knob.setDragSensitivity(knobDragSensitivityScale);
+        knob.setScrollWheelSensitivity(scrollWheelScale);
+    };
+
+    applyKnobResponse(editor.rateSlider, layout.rateKnobVisualResponseMs);
+    applyKnobResponse(editor.depthSlider, layout.depthKnobVisualResponseMs);
+    applyKnobResponse(editor.offsetSlider, layout.offsetKnobVisualResponseMs);
+    applyKnobResponse(editor.widthSlider, layout.widthKnobVisualResponseMs);
+    applyKnobResponse(editor.mixSlider, layout.mixKnobVisualResponseMs);
+    editor.colorSlider.setScrollWheelSensitivity(scrollWheelScale);
+
+    const auto setKnobSweepProps = [&layout](juce::Slider& knob)
+    {
+        knob.getProperties().set("knobSweepStartDeg", layout.knobSweepStartDeg);
+        knob.getProperties().set("knobSweepEndDeg", layout.knobSweepEndDeg);
+        knob.getProperties().set("knobFrameCount", layout.knobFrameCount);
+    };
+
+    setKnobSweepProps(editor.rateSlider);
+    setKnobSweepProps(editor.depthSlider);
+    setKnobSweepProps(editor.offsetSlider);
+    setKnobSweepProps(editor.widthSlider);
+    setKnobSweepProps(editor.mixSlider);
+}
+
+void PluginEditorSetup::setupSliders(ChoroborosPluginEditor& editor)
+{
+    // Component IDs for sprite sheet selection
+    editor.rateSlider.setComponentID("Rate");
+    editor.depthSlider.setComponentID("Depth");
+    editor.offsetSlider.setComponentID("Offset");
+    editor.widthSlider.setComponentID("Width");
+    editor.mixSlider.setComponentID("Mix");
+    
+    // Configure slider styles
+    editor.rateSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    editor.depthSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    editor.offsetSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    editor.widthSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    editor.colorSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    editor.colorSlider.setVelocityBasedMode(false);  // Position-based drag, not velocity - reduces jank
+    editor.mixSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    
+    editor.rateSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    editor.depthSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    editor.offsetSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    editor.widthSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    editor.colorSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    editor.mixSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    
+    // Set mix slider name so CustomLookAndFeel can identify it
+    editor.mixSlider.setName("Mix");
+    
+    // Set visual smoothing times
+    editor.rateSlider.setUseExponential(true);
+    editor.rateSlider.setSmoothingTime(100.0f);
+    editor.depthSlider.setUseExponential(true);
+    editor.depthSlider.setSmoothingTime(150.0f);
+    editor.offsetSlider.setUseExponential(true);
+    editor.offsetSlider.setSmoothingTime(100.0f);
+    editor.widthSlider.setUseExponential(true);
+    editor.widthSlider.setSmoothingTime(100.0f);
+    editor.colorSlider.setSmoothingTime(80.0f);  // Smooth but responsive for linear slider
+    editor.mixSlider.setSmoothingTime(100.0f);
+
+    applyLayout(editor, editor.layoutTuning);
+}
+
+void PluginEditorSetup::setupValueLabels(ChoroborosPluginEditor& editor)
+{
+    const juce::Font valueFont = editor.makeValueLabelFont(15.3f * editor.getUiScale(), true);
+
+    editor.rateValueLabel.setJustificationType(juce::Justification::centredRight);
+    editor.depthValueLabel.setJustificationType(juce::Justification::centredRight);
+    editor.offsetValueLabel.setJustificationType(juce::Justification::centredRight);
+    editor.widthValueLabel.setJustificationType(juce::Justification::centredRight);
+    editor.colorValueLabel.setJustificationType(juce::Justification::centredRight);
+    editor.mixValueLabel.setJustificationType(juce::Justification::centredRight);
+    
+    editor.rateValueLabel.setValueLabelStyle(true);
+    editor.depthValueLabel.setValueLabelStyle(true);
+    editor.offsetValueLabel.setValueLabelStyle(true);
+    editor.widthValueLabel.setValueLabelStyle(true);
+    editor.colorValueLabel.setValueLabelStyle(true);
+    editor.mixValueLabel.setValueLabelStyle(true);
+
+    editor.rateValueLabel.setFont(valueFont);
+    editor.depthValueLabel.setFont(valueFont);
+    editor.offsetValueLabel.setFont(valueFont);
+    editor.widthValueLabel.setFont(valueFont);
+    editor.colorValueLabel.setFont(valueFont);
+    editor.mixValueLabel.setFont(valueFont);
+    
+    juce::Colour valueTextColor(0xff9dbd78);
+    editor.rateValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    editor.depthValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    editor.offsetValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    editor.widthValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    editor.colorValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    editor.mixValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+}
+
+void PluginEditorSetup::setupLabels(ChoroborosPluginEditor& editor)
+{
+    editor.rateLabel.setVisible(false);
+    editor.depthLabel.setVisible(false);
+    editor.offsetLabel.setVisible(false);
+    editor.widthLabel.setVisible(false);
+    editor.colorLabel.setVisible(false);
+
+    // Mix value label uses 25% smaller font (14.0f * 0.75 = 10.5f)
+    const juce::Font mixValueFont = editor.makeValueLabelFont(11.5f * editor.getUiScale(), true);
+    editor.mixValueLabel.setFont(mixValueFont);
+    editor.mixLabel.setVisible(false);
+
+    applyLayout(editor, editor.layoutTuning);
+}
+
+void PluginEditorSetup::setupHQButton(ChoroborosPluginEditor& editor)
+{
+    editor.addAndMakeVisible(editor.hqButton);
+    editor.addAndMakeVisible(editor.hqLabel);
+    
+    editor.hqLabel.setText("HQ", juce::dontSendNotification);
+    editor.hqLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    editor.hqLabel.setJustificationType(juce::Justification::centred);
+
+    // Set HQ button tooltip
+    editor.hqButton.setTooltip("High Quality Mode: Enables higher-quality algorithm variant for the selected engine. Increases CPU usage but improves audio fidelity.");
+    editor.hqLabel.setVisible(false);
+
+    // Repaint editor when HQ switch animates so lit backpanel overlay stays synced (all themes)
+    editor.hqButton.onAnimationTick = [&editor] { editor.repaint(); };
+
+    applyLayout(editor, editor.layoutTuning);
+}

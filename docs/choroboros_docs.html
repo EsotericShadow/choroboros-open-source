@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaizen DSP Documentation</title>
+    <style>
+        @font-face {
+            font-family: "JetBrainsMonoUI";
+            src: url("/fonts/JetBrainsMonoNL-ExtraLight.ttf") format("truetype");
+            font-weight: 300;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "JetBrainsMonoUI";
+            src: url("/fonts/JetBrainsMonoNL-ExtraLightItalic.ttf") format("truetype");
+            font-weight: 300;
+            font-style: italic;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "JetBrainsMonoUI";
+            src: url("/fonts/JetBrainsMono-ExtraBold.ttf") format("truetype");
+            font-weight: 800;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "ChoroborosBrand";
+            src: url("/fonts/choroboros.ttf") format("truetype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        :root {
+            --bg-color: #070b09;
+            --bg-grad: radial-gradient(1200px 900px at 80% -200px, rgba(122, 255, 156, 0.12), transparent 70%),
+                       radial-gradient(900px 700px at -120px 60%, rgba(127, 217, 255, 0.08), transparent 65%);
+            --fg-color: #d7f1df;
+            --muted-fg: #9cbfac;
+            --sidebar-bg: #0c1410;
+            --border-color: #264735;
+            --accent: #7aff9c;
+            --accent-2: #7fd9ff;
+            --heading-1: #b7ffca;
+            --heading-2: #8ef7b0;
+            --heading-3: #b9f9ff;
+            --code-bg: #0f1b15;
+            --tip-bg: #10261c;
+            --warn-bg: #2a1a11;
+            --note-bg: #111f18;
+            --surface-1: #0f1914;
+            --surface-2: #12221a;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            background: var(--bg-color);
+            background-image: var(--bg-grad);
+            color: var(--fg-color);
+            font-family: "JetBrainsMonoUI", "JetBrains Mono", Menlo, Consolas, monospace;
+            line-height: 1.65;
+            letter-spacing: 0.01em;
+            min-width: 1040px;
+        }
+        #sidebar {
+            width: 340px;
+            min-width: 340px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            box-sizing: border-box;
+            overflow-y: auto;
+            background: linear-gradient(180deg, #101a15 0%, var(--sidebar-bg) 100%);
+            border-right: 1px solid var(--border-color);
+            padding: 18px;
+        }
+        #sidebar h2 {
+            margin: 0 0 14px;
+            font-size: 1.12rem;
+            color: var(--heading-1);
+            font-weight: 800;
+            border: 0;
+            padding: 0;
+        }
+        #sidebar ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        #sidebar li a {
+            display: block;
+            text-decoration: none;
+            color: var(--fg-color);
+            font-size: 0.9rem;
+            padding: 7px 10px;
+            border-radius: 6px;
+            transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
+        #sidebar li a:hover {
+            background: linear-gradient(90deg, rgba(122, 255, 156, 0.2), rgba(127, 217, 255, 0.1));
+            color: #dfffea;
+            box-shadow: inset 0 0 0 1px rgba(122, 255, 156, 0.28);
+        }
+        #sidebar .l1 > a {
+            font-weight: 700;
+            color: var(--heading-2);
+        }
+        #sidebar .l2 {
+            margin: 3px 0 8px 12px;
+            border-left: 1px solid var(--border-color);
+            padding-left: 10px;
+        }
+        #sidebar .l2 a {
+            font-size: 0.84rem;
+            color: #b7d9c5;
+        }
+        #content {
+            margin-left: 340px;
+            width: calc(100% - 340px);
+            box-sizing: border-box;
+            padding: 24px 42px;
+        }
+        h1, h2, h3, h4 {
+            scroll-margin-top: 18px;
+            margin-top: 2.0em;
+            margin-bottom: 0.65em;
+            line-height: 1.25;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 2.2rem;
+            color: var(--heading-1);
+            font-weight: 800;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+        h2 {
+            font-size: 1.65rem;
+            color: var(--heading-2);
+            font-weight: 800;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+        h3 {
+            font-size: 1.3rem;
+            color: var(--heading-3);
+            font-weight: 800;
+        }
+        h4 {
+            font-size: 1.04rem;
+            color: #c7f3d2;
+            font-weight: 800;
+        }
+        p { margin: 0 0 1em; }
+        ul, ol { margin: 0 0 1em; padding-left: 1.35em; }
+        li { margin-bottom: 0.3em; }
+        code {
+            font-family: "JetBrainsMonoUI", "JetBrains Mono", Menlo, Consolas, monospace;
+            font-size: 0.9em;
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent-2);
+            box-shadow: inset 0 0 0 1px rgba(127, 217, 255, 0.2);
+        }
+        pre {
+            margin: 0 0 1em;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 18px;
+            font-size: 0.95rem;
+        }
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 9px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            color: var(--heading-1);
+            font-weight: 700;
+            background: linear-gradient(180deg, #14251b 0%, #112018 100%);
+        }
+        .meta {
+            color: var(--muted-fg);
+            font-size: 0.95rem;
+            margin-top: -4px;
+        }
+        .tip, .warn, .note {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 12px 0 14px;
+            backdrop-filter: blur(1.5px);
+        }
+        .tip {
+            background: var(--tip-bg);
+            border-color: #2f6a4c;
+        }
+        .warn {
+            background: var(--warn-bg);
+            border-color: #7f5235;
+        }
+        .note {
+            background: var(--note-bg);
+            border-color: #2b5740;
+        }
+        .tip strong, .warn strong, .note strong {
+            color: #eafff1;
+        }
+        a {
+            color: var(--accent-2);
+            text-decoration-color: rgba(127, 217, 255, 0.5);
+        }
+        a:hover { color: #a6e6ff; }
+        .brand-choroboros {
+            font-family: "ChoroborosBrand", "JetBrainsMonoUI", "JetBrains Mono", Menlo, Consolas, monospace;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+        }
+        .brand-panel {
+            border: 1px solid var(--border-color);
+            background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin: 10px 0 16px;
+        }
+        .brand-panel strong {
+            color: var(--heading-1);
+        }
+        .brand-links {
+            margin: 8px 0 0;
+            padding-left: 1.2em;
+        }
+        .brand-footer {
+            margin-top: 2.5em;
+            padding-top: 0.8em;
+            border-top: 1px solid var(--border-color);
+            color: var(--muted-fg);
+            font-size: 0.92rem;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid var(--border-color);
+            margin: 2.2em 0;
+        }
+    </style>
+</head>
+<body>
+    <aside id="sidebar">
+        <h2><span class="brand-choroboros">Choroboros</span> Docs</h2>
+        <ul>
+            <li class="l1"><a href="#intro">1. Overview</a></li>
+            <li class="l1"><a href="#quick-start">2. Quick Start</a></li>
+            <li class="l1"><a href="#front-panel">3. Main Plugin Controls</a></li>
+            <li class="l1"><a href="#dev-panel">4. Dev Panel Manual</a>
+                <ul class="l2">
+                    <li><a href="#dev-open">4.1 Open and Window Behavior</a></li>
+                    <li><a href="#dev-mental">4.2 Mental Model</a></li>
+                    <li><a href="#dev-topbar">4.3 Top Target Controls</a></li>
+                    <li><a href="#dev-tab-overview">4.4 Overview Tab</a></li>
+                    <li><a href="#dev-tab-modulation">4.5 Modulation Tab</a></li>
+                    <li><a href="#dev-tab-tone">4.6 Tone Tab</a></li>
+                    <li><a href="#dev-tab-engine">4.7 Engine Tab</a></li>
+                    <li><a href="#dev-tab-look">4.8 Look and Feel Tab</a></li>
+                    <li><a href="#dev-tab-validation">4.9 Validation Tab</a></li>
+                    <li><a href="#dev-tab-settings">4.10 Settings Tab</a></li>
+                </ul>
+            </li>
+            <li class="l1"><a href="#tutorials">5. Interactive Tutorials</a></li>
+            <li class="l1"><a href="#console">6. Interactive Console Manual</a>
+                <ul class="l2">
+                    <li><a href="#console-syntax">6.1 Syntax and Input Rules</a></li>
+                    <li><a href="#console-state">6.2 Engine and State Commands</a></li>
+                    <li><a href="#console-tuning">6.3 Parameter Tuning Commands</a></li>
+                    <li><a href="#console-history">6.4 History and Undo</a></li>
+                    <li><a href="#console-introspection">6.5 Introspection and Utilities</a></li>
+                    <li><a href="#console-core-slot">6.6 Core and Slot Commands</a></li>
+                    <li><a href="#console-io">6.7 Import Export and Defaults</a></li>
+                    <li><a href="#console-examples">6.8 Practical Command Examples</a></li>
+                </ul>
+            </li>
+            <li class="l1"><a href="#files">7. File Locations and Persistence</a></li>
+            <li class="l1"><a href="#performance">8. Performance and Troubleshooting</a></li>
+            <li class="l1"><a href="#glossary">9. Glossary</a></li>
+            <li class="l1"><a href="#references">10. Licenses and Attribution</a></li>
+        </ul>
+    </aside>
+
+    <main id="content">
+        <h1 id="intro"><span class="brand-choroboros">Choroboros</span> Documentation</h1>
+        <p class="meta">Version target: 2.03</p>
+        <div class="brand-panel">
+            <strong>Kaizen DSP 2026</strong><br>
+            Official links:
+            <ul class="brand-links">
+                <li><a href="https://www.kaizenstrategic.ai/" target="_blank" rel="noopener noreferrer">kaizenstrategic.ai</a></li>
+                <li><a href="https://choro-beta-site.vercel.app/" target="_blank" rel="noopener noreferrer">choro-beta-site.vercel.app</a></li>
+            </ul>
+        </div>
+        <p>This document explains how <span class="brand-choroboros">Choroboros</span> is organized today: the front panel workflow, the Dev Panel architecture, the modular core assignment system, the tutorial flow, and the full interactive console command surface.</p>
+        <p>It is written as one continuous learning path so you can read top-to-bottom without jumping around.</p>
+
+        <h2 id="quick-start">2. Quick Start</h2>
+        <ol>
+            <li>Load <span class="brand-choroboros">Choroboros</span> on a track in your DAW.</li>
+            <li>Choose an engine color and HQ mode.</li>
+            <li>Set <code>rate</code>, <code>depth</code>, <code>offset</code>, <code>width</code>, <code>color</code>, <code>mix</code>.</li>
+            <li>Open Dev Panel for deep tuning and diagnostics.</li>
+            <li>In Dev Panel, use this loop:
+                <ol>
+                    <li>Set target: Profile + Core + HQ.</li>
+                    <li>Shape movement in Modulation.</li>
+                    <li>Shape frequency and response in Tone.</li>
+                    <li>Validate telemetry and trace matrix.</li>
+                    <li>Persist with JSON/script/defaults only after validation.</li>
+                </ol>
+            </li>
+        </ol>
+
+        <div class="tip"><strong>Tip:</strong> If you are debugging or building a repeatable sound, use the Validation Console early. It is faster and easier to audit than manual mouse edits.</div>
+
+        <h2 id="front-panel">3. Main Plugin Controls</h2>
+        <p>The front panel is the fast performance surface: six macro controls, engine and quality selectors, and utility actions. It is intentionally compact so host automation stays stable while deeper DSP tuning lives in Dev Panel.</p>
+        <h3>3.1 Primary Automation Surface</h3>
+        <p>These are the host-visible control IDs exposed by the processor:</p>
+        <table>
+            <thead>
+                <tr><th>Control</th><th>Parameter ID</th><th>What It Does</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Rate</td><td><code>rate</code></td><td>Modulation speed (0.01 Hz to 10.0 Hz).</td></tr>
+                <tr><td>Depth</td><td><code>depth</code></td><td>Modulation amount (0% to 100%).</td></tr>
+                <tr><td>Offset</td><td><code>offset</code></td><td>L/R phase relationship (0 deg to 180 deg).</td></tr>
+                <tr><td>Width</td><td><code>width</code></td><td>Stereo spread (0% to 200%).</td></tr>
+                <tr><td>Color</td><td><code>color</code></td><td>Engine-dependent character macro.</td></tr>
+                <tr><td>Mix</td><td><code>mix</code></td><td>Dry/wet blend (0% dry to 100% wet).</td></tr>
+                <tr><td>Engine Color</td><td><code>engineColor</code></td><td>Select Green, Blue, Red, Purple, Black engine slot.</td></tr>
+                <tr><td>HQ</td><td><code>hq</code></td><td>Toggle Normal Quality (NQ) / High Quality (HQ).</td></tr>
+            </tbody>
+        </table>
+
+        <div class="note"><strong>Note:</strong> These IDs are the stable automation contract. Dev Panel core assignment and internals are additive and do not replace this surface.</div>
+
+        <h3>3.2 What the Color Macro Means Per Engine</h3>
+        <table>
+            <thead>
+                <tr><th>Engine</th><th>Color Macro Intent</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Green</td><td>Bloom body and softness response.</td></tr>
+                <tr><td>Blue</td><td>Focus and presence response.</td></tr>
+                <tr><td>Red NQ</td><td>BBD/post-chorus drive behavior.</td></tr>
+                <tr><td>Red HQ</td><td>Tape tone and drive balance.</td></tr>
+                <tr><td>Purple</td><td>Warp/orbit style motion character.</td></tr>
+                <tr><td>Black</td><td>Modulation intensity and ensemble spread.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>3.3 Direct Value Editing and Units</h3>
+        <p>Each value readout under a control is editable. Double-click a value text field, type a value, and commit.</p>
+        <ul>
+            <li><strong>Rate</strong>: accepts <code>Hz</code> values (example: <code>0.35</code>, <code>2.5 Hz</code>).</li>
+            <li><strong>Depth/Width/Color/Mix</strong>: accepts either normalized values (<code>0.0..1.0</code> or <code>0.0..2.0</code> for Width) or percentages (example: <code>65%</code>).</li>
+            <li><strong>Offset</strong>: accepts degrees (example: <code>120</code>, <code>120 deg</code>, <code>120°</code>).</li>
+            <li>Invalid input is rejected and the previous value is restored.</li>
+        </ul>
+
+        <h3>3.4 Fast Gestures and Defaults</h3>
+        <ul>
+            <li><strong>Double-click any slider</strong> to return it to that parameter's default value.</li>
+            <li><strong>Right-click the Rate slider</strong> to open the host-BPM sync menu with straight, triplet, and dotted subdivisions.</li>
+            <li>Rate sync menu only enables entries inside valid mapped range and writes back to the real underlying raw parameter.</li>
+        </ul>
+
+        <h3>3.5 Engine and HQ Visual Behavior</h3>
+        <ul>
+            <li>Changing Engine updates the front-panel theme colors, background art set, and value text accent color.</li>
+            <li>HQ switch animates and also drives the lit overlay layer on the panel background.</li>
+            <li>Value text color follows engine accent unless a custom override mode is enabled in layout tuning.</li>
+        </ul>
+
+        <h3>3.6 Utility Buttons (Top Bar)</h3>
+        <table>
+            <thead>
+                <tr><th>Button</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>DEV</td><td>Toggle Dev Panel window (always-on-top, min 1028 x 525).</td></tr>
+                <tr><td>About</td><td>Open version/company dialog.</td></tr>
+                <tr><td>Help</td><td>Launch help contact link.</td></tr>
+                <tr><td>Feedback</td><td>Open feedback form dialog with collected usage context.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>3.7 Front Panel Workflow (Practical)</h3>
+        <ol>
+            <li>Choose Engine + HQ first, because Color meaning depends on target engine/mode.</li>
+            <li>Set <code>mix</code> to 40% to 60% as a starting point.</li>
+            <li>Use Rate/Depth to set movement amount and speed.</li>
+            <li>Set Offset/Width for stereo behavior.</li>
+            <li>Use Color last for engine character shaping.</li>
+            <li>If needed, open Dev Panel and continue with engine internals and validation.</li>
+        </ol>
+
+        <div class="tip"><strong>Tip:</strong> If you are aligning chorus rate to tempo, use the Rate right-click sync menu first, then fine-trim by ear.</div>
+
+        <h3>3.8 Tooltips and Discoverability</h3>
+        <p>The front panel ships with contextual hover help for all major controls:</p>
+        <ul>
+            <li>Each macro control has a behavior-focused tooltip.</li>
+            <li>Engine selector and HQ toggle explain quality/algorithm intent and trade-offs.</li>
+            <li>Top utility buttons (DEV/About/Help/Feedback) describe what opens and why to use it.</li>
+        </ul>
+
+        <h3>3.9 Main Window Behavior</h3>
+        <ul>
+            <li>Main plugin editor is fixed-size by design to preserve visual alignment.</li>
+            <li>Default editor size is 700 x 363 (then UI scale is applied).</li>
+            <li>The Dev Panel window is where deep, resizable editing and diagnostics happen.</li>
+        </ul>
+
+        <hr>
+
+        <h1 id="dev-panel">4. Dev Panel Manual</h1>
+
+        <h2 id="dev-open">4.1 Open and Window Behavior</h2>
+        <ul>
+            <li>Open the panel from the plugin editor <code>DEV</code> entry.</li>
+            <li>Panel is resizable and always-on-top.</li>
+            <li>Minimum size is <strong>1028 x 525</strong>.</li>
+        </ul>
+
+        <h2 id="dev-mental">4.2 Mental Model</h2>
+        <p>The Dev Panel is split into two columns:</p>
+        <ul>
+            <li><strong>Left Inspector</strong>: readouts and controls for the currently selected tab/subtab.</li>
+            <li><strong>Right Visual Deck</strong>: cards, visualizers, workbenches, and action rows.</li>
+        </ul>
+        <p>The top row of controls defines the active editing target, then each tab changes what you can inspect and edit for that target.</p>
+
+        <h2 id="dev-topbar">4.3 Top Target Controls</h2>
+        <p>At the top of the right column, these controls are always visible:</p>
+        <table>
+            <thead>
+                <tr><th>Control</th><th>Purpose</th><th>Example</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Profile</td>
+                    <td>Select which engine color slot you are editing.</td>
+                    <td>Set to <code>Red</code> to tune red slot values.</td>
+                </tr>
+                <tr>
+                    <td>Core</td>
+                    <td>Select the algorithm package for the active slot/mode.</td>
+                    <td>Set to <code>tape</code> for Red HQ tape behavior.</td>
+                </tr>
+                <tr>
+                    <td>HQ</td>
+                    <td>Choose NQ or HQ side for that slot.</td>
+                    <td>HQ off + Red usually maps to BBD in legacy map.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warn"><strong>Important:</strong> Profile, Core, and HQ are context selectors. If you change them, you are editing a different state target even if the visible tab stays the same.</div>
+
+        <h2 id="dev-tab-overview">4.4 Overview Tab</h2>
+        <h3>Subtabs</h3>
+        <ul>
+            <li><strong>Signal Flow</strong></li>
+            <li><strong>Delay Visual</strong></li>
+        </ul>
+        <h3>What you see</h3>
+        <ul>
+            <li>Left inspector sections: <code>Active Parameters (start here)</code>, <code>Derived State</code>.</li>
+            <li>Right cards: signal chain view and delay trajectory view.</li>
+        </ul>
+        <h3>How to use it</h3>
+        <ol>
+            <li>Confirm target (Profile/Core/HQ).</li>
+            <li>Read raw to mapped values in inspector.</li>
+            <li>Use Delay Visual to confirm smooth movement before deep tuning.</li>
+        </ol>
+
+        <h2 id="dev-tab-modulation">4.5 Modulation Tab</h2>
+        <p>Modulation is unified (no second row subtabs).</p>
+        <h3>What you see</h3>
+        <ul>
+            <li>Left inspector: <code>LFO Readouts (passive monitor)</code>.</li>
+            <li>Right cards in one stack:
+                <ul>
+                    <li>LFO Left</li>
+                    <li>LFO Right</li>
+                    <li>Delay Trajectory</li>
+                    <li>LFO Control Workbench</li>
+                </ul>
+            </li>
+        </ul>
+        <h3>LFO Control Workbench controls</h3>
+        <ul>
+            <li><code>LFO Rate (Hz)</code></li>
+            <li><code>LFO Depth (%)</code></li>
+            <li><code>Stereo Offset (deg)</code></li>
+            <li><code>Stereo Width (x)</code></li>
+        </ul>
+        <div class="tip"><strong>Tip:</strong> Keep one eye on LFO cards and one eye on trajectory while adjusting offset and width. It is the fastest way to avoid unstable stereo movement.</div>
+
+        <h2 id="dev-tab-tone">4.6 Tone Tab</h2>
+        <h3>Subtabs</h3>
+        <ul>
+            <li><strong>Spectrum</strong></li>
+            <li><strong>Engine Response</strong></li>
+        </ul>
+
+        <h3>Spectrum subtab</h3>
+        <ul>
+            <li>Left inspector sections: <code>Analyzer Controls (for cards above)</code>, <code>Tone Readouts (passive monitor)</code>.</li>
+            <li>Right card: spectrum and HP/LP overlay.</li>
+        </ul>
+
+        <h3>Engine Response subtab</h3>
+        <p>Cards are engine and HQ specific. The panel chooses cards based on active Profile and HQ mode.</p>
+        <table>
+            <thead>
+                <tr><th>Profile/Mode</th><th>Curve Card</th><th>Controls Card</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Green (NQ/HQ)</td><td>Green Bloom Response Curve</td><td>Green Bloom Tone Controls</td></tr>
+                <tr><td>Blue (NQ/HQ)</td><td>Blue Focus Response Curve</td><td>Blue Focus Tone Controls</td></tr>
+                <tr><td>Red NQ</td><td>Red NQ Saturation Transfer Curve</td><td>Red NQ Saturation Controls</td></tr>
+                <tr><td>Red HQ</td><td>Red HQ Tape Transfer Curve</td><td>Red HQ Tape Controls</td></tr>
+                <tr><td>Purple NQ</td><td>Purple NQ Warp Response Curve</td><td>Purple Warp Tone Controls</td></tr>
+                <tr><td>Purple HQ</td><td>Purple HQ Orbit Response Curve</td><td>Purple Orbit Tone Controls</td></tr>
+                <tr><td>Black NQ</td><td>Black NQ Intensity Response Curve</td><td>Black Intensity Tone Controls</td></tr>
+                <tr><td>Black HQ</td><td>Black HQ Ensemble Response Curve</td><td>Black Ensemble Tone Controls</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="dev-tab-engine">4.7 Engine Tab</h2>
+        <h3>Subtabs</h3>
+        <ul>
+            <li><strong>Signal Flow</strong></li>
+            <li><strong>Engine Identity</strong></li>
+            <li><strong>Dynamic macro label from selected core</strong> (for example Bloom Macros, Tape Macros, Orbit Macros, Ensemble Macros)</li>
+        </ul>
+
+        <h3>Signal Flow subtab</h3>
+        <ul>
+            <li>Shows engine signal flow card.</li>
+            <li>Core row uses active core descriptor label (not fixed per color anymore in modular mode).</li>
+        </ul>
+
+        <h3>Engine Identity subtab</h3>
+        <ul>
+            <li>Engine Identity Guide card.</li>
+            <li>Core Assignment card:
+                <ul>
+                    <li><code>Enable Modular Cores (DevPanel)</code></li>
+                    <li><code>NQ Core</code> chooser</li>
+                    <li><code>HQ Core</code> chooser</li>
+                </ul>
+            </li>
+            <li>Core Assignment Warnings card (duplicates are allowed, but listed).</li>
+            <li>Engine Macro Workbench for main macros (Rate/Depth/Offset/Width/Color/Mix).</li>
+        </ul>
+
+        <h3>Third Engine subtab (dynamic label)</h3>
+        <ul>
+            <li>Contains engine-specific macro controls tied to active core package.</li>
+            <li>Cards are filtered by engine and HQ mode where needed (for example BBD only for Red NQ, Tape only for Red HQ).</li>
+        </ul>
+
+        <h3>Internals panels below Engine visual deck</h3>
+        <p>In Engine tab, active internals panels are laid out below the deck on the right side. These include the active per-engine internals panel and conditional Red BBD/Tape sections when visible.</p>
+
+        <h3>Core tokens</h3>
+        <p><code>lagrange3</code>, <code>lagrange5</code>, <code>cubic</code>, <code>thiran</code>, <code>bbd</code>, <code>tape</code>, <code>phase_warp</code>, <code>orbit</code>, <code>linear</code>, <code>ensemble</code>.</p>
+
+        <h3>Legacy assignment map (when modular cores disabled)</h3>
+        <table>
+            <thead>
+                <tr><th>Slot</th><th>NQ</th><th>HQ</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Green</td><td><code>lagrange3</code></td><td><code>lagrange5</code></td></tr>
+                <tr><td>Blue</td><td><code>cubic</code></td><td><code>thiran</code></td></tr>
+                <tr><td>Red</td><td><code>bbd</code></td><td><code>tape</code></td></tr>
+                <tr><td>Purple</td><td><code>phase_warp</code></td><td><code>orbit</code></td></tr>
+                <tr><td>Black</td><td><code>linear</code></td><td><code>ensemble</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="warn"><strong>Duplicate policy:</strong> assigning the same core to multiple slots/modes is allowed. The UI and console warn, but do not block.</div>
+
+        <h2 id="dev-tab-look">4.8 Look and Feel Tab</h2>
+        <h3>Subtabs</h3>
+        <ul>
+            <li>Mapping</li>
+            <li>UI Feel</li>
+            <li>Engine Layout</li>
+            <li>Global Layout</li>
+            <li>Text Animations</li>
+        </ul>
+
+        <h3>Engine Layout propagation menu</h3>
+        <p>Many Engine Layout numeric controls support right-click propagation with two actions:</p>
+        <ul>
+            <li><code>Apply to all engine colours</code></li>
+            <li><code>Apply to all HQ profiles</code> or <code>Apply to all NQ profiles</code> (label adapts to current HQ state)</li>
+        </ul>
+
+        <h2 id="dev-tab-validation">4.9 Validation Tab</h2>
+        <h3>Subtabs</h3>
+        <ul>
+            <li>Telemetry</li>
+            <li>Trace Matrix</li>
+            <li>Console</li>
+        </ul>
+
+        <h3>Telemetry</h3>
+        <p>Telemetry readouts include:</p>
+        <ul>
+            <li>Audio thread process time (last and peak)</li>
+            <li>Input and output peak hold</li>
+            <li>Callbacks and parameter write counters</li>
+            <li>Engine/HQ switch counters</li>
+            <li>Host sample rate and block size</li>
+            <li>Analyzer frame and delay probe data</li>
+        </ul>
+
+        <h3>Trace Matrix</h3>
+        <p>Shows control flow from UI to runtime using rows like Rate/Depth/Offset/Width/Color/Mix with columns for <code>raw</code>, <code>mapped</code>, <code>snapshot</code>, and <code>effective</code>.</p>
+
+        <h3>Console</h3>
+        <p>Interactive command console with watch HUD, history, and direct state editing. Full command guide is in section 6 below.</p>
+
+        <h2 id="dev-tab-settings">4.10 Settings Tab</h2>
+        <h3>Top action rows (right side)</h3>
+        <ul>
+            <li>FX presets: <code>FX Off</code>, <code>FX Subtle</code>, <code>FX Medium</code></li>
+            <li>Actions: <code>Lock Controls</code>, <code>Reset to Factory</code>, <code>Set Current as Defaults</code>, <code>Copy JSON</code></li>
+        </ul>
+
+        <h3>Inspector sections in Settings tab</h3>
+        <table>
+            <thead>
+                <tr><th>Section</th><th>What It Controls</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Tutorial</td><td>Topic picker, run/skip controls, focus-hint preference.</td></tr>
+                <tr><td>UI Text</td><td>Text size and text color mode.</td></tr>
+                <tr><td>Theme</td><td>Theme preset, accent source, manual accent color.</td></tr>
+                <tr><td>Core Routing</td><td>Enable modular cores and restore legacy map action.</td></tr>
+                <tr><td>Accessibility</td><td>Color vision assist, reduced motion, large hit targets, strong focus ring, scope hint visibility.</td></tr>
+                <tr><td>Performance</td><td><code>Lazy UI Refresh</code> toggle.</td></tr>
+                <tr><td>Validation Console</td><td>Auto-scroll, timestamps, wrap, max lines (300/600/1000/2000).</td></tr>
+                <tr><td>Safety</td><td>Confirm reset and confirm defaults actions.</td></tr>
+                <tr><td>Help and Feedback</td><td>Open console help, website, feedback form, support email.</td></tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h1 id="tutorials">5. Interactive Tutorials</h1>
+        <p>Tutorials are available from Settings and from console commands.</p>
+
+        <h2>How to launch</h2>
+        <ul>
+            <li>Settings -> Tutorial -> choose topic -> <code>Run</code></li>
+            <li>Console command: <code>tutorial</code> or <code>tutorial &lt;topic&gt;</code></li>
+        </ul>
+
+        <h2>Available topics</h2>
+        <pre>core, overview, modulation, tone, engine, validation, bbd, tape, phase, bimodulation, saturation, envelope</pre>
+
+        <h2>Controls while tutorial is active</h2>
+        <ul>
+            <li>Overlay buttons: <code>Next</code>, <code>Next Section</code>, <code>Skip Tutorial</code></li>
+            <li>Console: <code>tutorial next</code>, <code>tutorial next section</code>, <code>tutorial skip</code>, <code>tutorial exit</code></li>
+        </ul>
+
+        <div class="tip"><strong>Tip:</strong> Use <code>tutorial next section</code> when you already know basics and only need tab-by-tab orientation.</div>
+
+        <hr>
+
+        <h1 id="console">6. Interactive Console Manual</h1>
+
+        <h2 id="console-syntax">6.1 Syntax and Input Rules</h2>
+        <ul>
+            <li>Commands are space-separated tokens.</li>
+            <li>Use <code>help</code> any time for in-console command list.</li>
+            <li>Many commands return <code>ERROR:</code> messages when usage is wrong.</li>
+            <li>Alias support exists via <code>alias &lt;name&gt; &lt;command&gt;</code>.</li>
+        </ul>
+
+        <h2 id="console-state">6.2 Engine and State Commands</h2>
+        <pre>engine &lt;green|blue|red|purple|black&gt;
+hq &lt;on|off&gt;
+view &lt;overview|modulation|tone|engine|layout|validation|settings&gt;
+bypass &lt;on|off&gt;
+solo &lt;node&gt;
+unsolo</pre>
+
+        <h3>Notes</h3>
+        <ul>
+            <li><code>view</code> accepts aliases: <code>internals</code>, <code>bbd</code>, <code>tape</code>, <code>look</code>, <code>lookfeel</code>.</li>
+            <li><code>bypass on</code> forces wet mix to 0 and remembers previous mix for restore on <code>bypass off</code>.</li>
+        </ul>
+
+        <h2 id="console-tuning">6.3 Parameter Tuning Commands</h2>
+        <pre>set &lt;target&gt; &lt;value&gt;
+add &lt;target&gt; &lt;delta&gt;
+sub &lt;target&gt; &lt;delta&gt;
+get &lt;target&gt;
+reset &lt;target&gt;
+reset all
+lock &lt;target&gt;
+unlock &lt;target&gt;
+toggle &lt;target&gt;
+macro &lt;rate|depth|offset|width|color|mix&gt; &lt;0..100&gt;
+sweep &lt;target&gt; &lt;start&gt; &lt;end&gt; &lt;time_ms&gt;</pre>
+
+        <h3>Usage tips</h3>
+        <ul>
+            <li><code>get</code> prints current value and previous value when available.</li>
+            <li><code>sweep</code> creates a timed parameter ramp.</li>
+            <li><code>lock</code> and <code>unlock</code> affect panel interaction lock state for target controls.</li>
+        </ul>
+
+        <h2 id="console-history">6.4 History and Undo</h2>
+        <pre>undo [n]
+redo [n]
+history</pre>
+        <p>Use these while listening to quickly A/B sequences of changes.</p>
+
+        <h2 id="console-introspection">6.5 Introspection and Utilities</h2>
+        <pre>watch &lt;target&gt;
+unwatch &lt;target&gt;
+dump &lt;color&gt;
+diff factory
+search &lt;term&gt;
+stats
+list &lt;color&gt; [all] [full]
+list globals [full]
+fx &lt;0|1|2&gt;
+clear</pre>
+
+        <h3>How <code>list</code> works</h3>
+        <ul>
+            <li>Default output is deduped and capped for speed/readability.</li>
+            <li><code>full</code> shows all variant slugs.</li>
+            <li><code>all</code> (with color) includes globals plus engine-scoped entries.</li>
+        </ul>
+
+        <h2 id="console-core-slot">6.6 Core and Slot Commands</h2>
+        <pre>core list
+core show &lt;id&gt;
+slot show
+slot set &lt;green|blue|red|purple|black&gt; &lt;nq|hq&gt; &lt;core_id&gt;</pre>
+
+        <h3>Behavior details</h3>
+        <ul>
+            <li><code>core list</code>: prints all core IDs with token and display name.</li>
+            <li><code>core show</code>: accepts token or numeric index.</li>
+            <li><code>slot show</code>: prints slot assignment table and duplicate warning count.</li>
+            <li><code>slot set</code>: applies assignment immediately; duplicates return warning but still apply.</li>
+        </ul>
+
+        <h2 id="console-io">6.7 Import Export and Defaults</h2>
+        <pre>export script
+import script [file_path]
+cp json
+save defaults
+alias &lt;name&gt; &lt;command&gt;
+help</pre>
+
+        <h3>I/O behavior</h3>
+        <ul>
+            <li><code>export script</code>: copies generated <code>set ...</code> command list to clipboard.</li>
+            <li><code>import script</code>: reads clipboard by default; if file path provided, reads that file.</li>
+            <li><code>cp json</code>: copies full state JSON to clipboard.</li>
+            <li><code>save defaults</code>: writes current state to user defaults file.</li>
+        </ul>
+
+        <h2 id="console-examples">6.8 Practical Command Examples</h2>
+        <h3>Example A: Switch profile and tweak movement</h3>
+        <pre>engine purple
+hq off
+set rate 0.75
+set depth 0.42
+set width 1.40
+stats</pre>
+
+        <h3>Example B: Core routing test</h3>
+        <pre>slot show
+slot set red nq bbd
+slot set red hq tape
+slot show</pre>
+
+        <h3>Example C: Safe tune workflow with rollback</h3>
+        <pre>search bloom
+watch green_bloom_gain
+set green_bloom_gain 0.42
+diff factory
+undo
+redo
+export script</pre>
+
+        <hr>
+
+        <h1 id="files">7. File Locations and Persistence</h1>
+        <p>State and recovery files are stored in the user application data directory under <code><span class="brand-choroboros">Choroboros</span>/</code>.</p>
+        <ul>
+            <li><code>defaults_user.json</code></li>
+            <li><code>defaults_factory.json</code></li>
+            <li><code>defaults_user_recovery_last_attempt.json</code></li>
+            <li><code>defaults_user_recovery_failed_&lt;timestamp&gt;.json</code></li>
+            <li><code>defaults_save_failures.log</code></li>
+            <li><code>devpanel_recent_touches.log</code></li>
+        </ul>
+
+        <div class="note"><strong>Note:</strong> Legacy <code>defaults.json</code> is handled by migration logic when present.</div>
+
+        <h1 id="performance">8. Performance and Troubleshooting</h1>
+
+        <h2>Performance checklist</h2>
+        <ol>
+            <li>Enable <code>Lazy UI Refresh</code> in Settings -> Performance for lower UI overhead.</li>
+            <li>Use Validation -> Telemetry to watch process time and write activity.</li>
+            <li>Keep Console output line cap reasonable (300 or 600) during long sessions.</li>
+            <li>Use <code>list ...</code> in deduped mode unless you specifically need <code>full</code>.</li>
+        </ol>
+
+        <h2>Common issues and fixes</h2>
+        <table>
+            <thead>
+                <tr><th>Issue</th><th>What to check</th><th>Fix</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>A control seems to edit the wrong sound</td>
+                    <td>Profile/Core/HQ context</td>
+                    <td>Re-check top row context, then retry edit.</td>
+                </tr>
+                <tr>
+                    <td>Console list output feels too long</td>
+                    <td>Command options</td>
+                    <td>Use deduped list first, then <code>full</code> only when needed.</td>
+                </tr>
+                <tr>
+                    <td>Unexpected startup state</td>
+                    <td>User defaults and save action history</td>
+                    <td>Use Reset to Factory, then re-apply desired state and save defaults again.</td>
+                </tr>
+                <tr>
+                    <td>Duplicate core assignments warning</td>
+                    <td>Slot table</td>
+                    <td>Run <code>slot show</code>, then reassign conflicting slots if unwanted.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h1 id="glossary">9. Glossary</h1>
+        <ul>
+            <li><strong>LFO</strong>: Low Frequency Oscillator used to modulate delay motion.</li>
+            <li><strong>Trajectory</strong>: time path of moving delay target values.</li>
+            <li><strong>Zipper noise</strong>: audible stepping from abrupt parameter jumps.</li>
+            <li><strong>HPF / LPF</strong>: high-pass filter / low-pass filter.</li>
+            <li><strong>Raw</strong>: normalized control value from host/UI layer.</li>
+            <li><strong>Mapped</strong>: engineering-unit value after mapping/scaling.</li>
+            <li><strong>Snapshot</strong>: stored profile value in state.</li>
+            <li><strong>Effective</strong>: live runtime value currently used by DSP.</li>
+            <li><strong>NQ / HQ</strong>: Normal Quality / High Quality mode per slot.</li>
+            <li><strong>Core package</strong>: selected algorithm identity token for a slot/mode.</li>
+            <li><strong>Macro</strong>: high-level control that steers multiple lower-level behaviors.</li>
+        </ul>
+
+        <h1 id="references">10. Licenses and Attribution</h1>
+        <p>This section documents what third-party frameworks and SDKs are used, where their licenses live in this repository, and what should ship with binaries for transparency.</p>
+
+        <h2>10.1 Project Ownership and Primary License Files</h2>
+        <table>
+            <thead>
+                <tr><th>Item</th><th>Path</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Project copyright notice</td><td><code>CMakeLists.txt</code></td><td>Build metadata identifies Kaizen Strategic AI Inc. and 2026 copyright string.</td></tr>
+                <tr><td>GPL text bundle</td><td><code>LICENSE</code>, <code>COPYING</code></td><td>Repository currently contains GPLv3 license text files.</td></tr>
+                <tr><td>EULA text</td><td><code>EULA.md</code></td><td>End-user agreement file is also present and embedded in plugin binary data.</td></tr>
+            </tbody>
+        </table>
+        <div class="warn"><strong>Transparency note:</strong> This repository currently contains both GPL and EULA artifacts. For releases, ship one clear licensing model and matching notices so users are not given conflicting terms.</div>
+
+        <h2>10.2 Frameworks and SDKs Used in Build</h2>
+        <table>
+            <thead>
+                <tr><th>Framework / SDK</th><th>Used For</th><th>License / Notice Location</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>JUCE Framework</td><td>Plugin runtime, UI, DSP plumbing, format clients</td><td><code>JUCE/LICENSE.md</code> (dual-license model described there)</td></tr>
+                <tr><td>Steinberg VST3 SDK (via JUCE)</td><td>VST3 format support</td><td><code>JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK/LICENSE.txt</code> (MIT)</td></tr>
+                <tr><td>Avid AAX SDK (via JUCE)</td><td>AAX format support</td><td><code>JUCE/modules/juce_audio_plugin_client/AAX/SDK/LICENSE.txt</code> (Avid license terms / GPL option as stated by SDK)</td></tr>
+                <tr><td>Apple AudioUnit SDK (via JUCE)</td><td>AU format support</td><td><code>JUCE/modules/juce_audio_plugin_client/AU/AudioUnitSDK/LICENSE.txt</code> (Apache 2.0)</td></tr>
+            </tbody>
+        </table>
+        <div class="note"><strong>Scope note:</strong> JUCE contains many optional third-party dependencies. Only a subset is exercised by this plugin's enabled modules and target formats.</div>
+
+        <h2>10.3 Fonts, Branding, and UI Assets</h2>
+        <table>
+            <thead>
+                <tr><th>Asset</th><th>Path</th><th>Attribution Status</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><span class="brand-choroboros">Choroboros</span> brand font</td><td><code>Assets/fonts/choroboros.ttf</code></td><td>Project-specific branding font.</td></tr>
+                <tr><td>JetBrains Mono variants</td><td><code>Assets/fonts/labels/</code>, <code>Assets/fonts/titles/</code>, <code>Assets/fonts/tooltips/</code></td><td>Font files are present; ensure upstream license text is included in distribution packages.</td></tr>
+                <tr><td>Plugin art and icons</td><td><code>Assets/</code>, <code>Assets/gui_icons/</code></td><td>Owned project art unless separately licensed.</td></tr>
+            </tbody>
+        </table>
+
+        <h2>10.4 Third-Party Notice Bundles in Repository</h2>
+        <p>Additional vendor notices are archived under <code>Licenses/</code>, including:</p>
+        <ul>
+            <li><code>Licenses/Avid/</code></li>
+            <li><code>Licenses/Third Party/</code></li>
+        </ul>
+        <p>These folders contain notices from SDK/toolchain bundles and historical packaging work. Not every file in those folders is necessarily linked into the current shipping binary.</p>
+
+        <h2>10.5 Public Project Links</h2>
+        <ul>
+            <li><a href="https://www.kaizenstrategic.ai/" target="_blank" rel="noopener noreferrer">Kaizen DSP</a></li>
+            <li><a href="https://choro-beta-site.vercel.app/" target="_blank" rel="noopener noreferrer"><span class="brand-choroboros">Choroboros</span> Beta Site</a></li>
+        </ul>
+
+        <p><em>End of manual.</em></p>
+        <div class="brand-footer">
+            <strong>Kaizen DSP 2026</strong> · <span class="brand-choroboros">Choroboros</span> User Manual
+        </div>
+    </main>
+</body>
+</html>

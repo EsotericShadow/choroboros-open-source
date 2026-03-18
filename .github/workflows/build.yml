@@ -1,0 +1,248 @@
+name: Build
+
+on:
+  push:
+    branches: [v2.04-dev]
+  pull_request:
+    branches: [v2.04-dev]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Linux x64 — VST3 + Standalone
+  # ---------------------------------------------------------------------------
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install JUCE system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            libasound2-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libgl1-mesa-dev \
+            xvfb \
+            ninja-build \
+            pkg-config
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/linux-x64-release
+          key: linux-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            linux-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/linux-x64-release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/linux-x64-release \
+            --target Choroboros_VST3 Choroboros_Standalone \
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/linux-x64-release \
+            --target ChoroborosRegressionTests \
+            --parallel
+
+      - name: Run DSP regression tests
+        run: |
+          xvfb-run --auto-servernum \
+            ./build/linux-x64-release/ChoroborosRegressionTests --dsp-only
+
+      - name: Package and checksum
+        run: |
+          mkdir -p dist
+          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros.vst3" dist/
+          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros" dist/
+          cd dist
+          zip -r Choroboros-linux-x64.zip Choroboros.vst3 Choroboros
+          sha256sum Choroboros-linux-x64.zip > Choroboros-linux-x64.zip.sha256
+          cat Choroboros-linux-x64.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-linux-x64
+          path: |
+            dist/Choroboros-linux-x64.zip
+            dist/Choroboros-linux-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows x64 — VST3 + Standalone
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-x64-release
+          key: windows-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-x64-release `
+            -G "Visual Studio 17 2022" -A x64
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-x64-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/windows-x64-release `
+            --config Release `
+            --target ChoroborosRegressionTests `
+            --parallel
+
+      - name: Run DSP regression tests
+        shell: cmd
+        run: |
+          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --dsp-only
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-windows-x64.zip
+          $hash = (Get-FileHash dist\Choroboros-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-windows-x64.zip" | Out-File -FilePath dist\Choroboros-windows-x64.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-windows-x64.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-windows-x64
+          path: |
+            dist/Choroboros-windows-x64.zip
+            dist/Choroboros-windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows x86 — VST3 + Standalone (legacy 32-bit host support)
+  # ---------------------------------------------------------------------------
+  windows-x86:
+    name: Windows x86
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-x86-release
+          key: windows-x86-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-x86-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-x86-release `
+            -G "Visual Studio 17 2022" -A Win32
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-x86-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/windows-x86-release `
+            --config Release `
+            --target ChoroborosRegressionTests `
+            --parallel
+
+      - name: Run DSP regression tests
+        shell: cmd
+        run: |
+          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --dsp-only
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-windows-x86.zip
+          $hash = (Get-FileHash dist\Choroboros-windows-x86.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-windows-x86.zip" | Out-File -FilePath dist\Choroboros-windows-x86.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-windows-x86.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-windows-x86
+          path: |
+            dist/Choroboros-windows-x86.zip
+            dist/Choroboros-windows-x86.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,1515 @@
+/*
+ * Choroboros - A chorus that eats its own tail
+ * Copyright (C) 2026 Kaizen Strategic AI Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+#include "../Config/DefaultsPersistence.h"
+#include "../UI/LabelWithContainer.h"
+#include "../UI/DevPanelSupport.h"
+#include "BinaryData.h"
+#include "FeedbackDialog.h"
+#include "AboutDialog.h"
+#include "HelpDialog.h"
+#include "../UI/PluginEditorSetup.h"
+#include "../UI/DevPanel.h"
+#include <array>
+#include <cmath>
+#include <future>
+#include <vector>
+
+namespace
+{
+struct BackgroundAssetPack
+{
+    juce::Image off;
+    juce::Image lit;
+};
+
+struct SharedBackgroundCache
+{
+    juce::CriticalSection lock;
+    std::array<BackgroundAssetPack, 5> packs {};
+    std::array<bool, 5> valid { false, false, false, false, false };
+};
+
+SharedBackgroundCache& getSharedBackgroundCache()
+{
+    static SharedBackgroundCache cache;
+    return cache;
+}
+
+int uiScaleInt(int value)
+{
+    return juce::roundToInt(static_cast<float>(value) * ChoroborosPluginEditor::kUiScale);
+}
+
+int getIntOrDefault(const juce::var& objectVar, const juce::Identifier& key, int fallback)
+{
+    if (const auto* object = objectVar.getDynamicObject())
+    {
+        const auto value = object->getProperty(key);
+        if (value.isInt() || value.isInt64())
+            return static_cast<int>(value);
+        if (value.isDouble())
+            return static_cast<int>(std::lround(static_cast<double>(value)));
+    }
+    return fallback;
+}
+
+void loadPersistedLayoutDefaults(LayoutTuning& layout)
+{
+    const auto json = DefaultsPersistence::load();
+    if (json.isEmpty())
+        return;
+
+    const auto parsed = juce::JSON::parse(json);
+    if (parsed.isVoid())
+        return;
+
+    const auto* root = parsed.getDynamicObject();
+    if (root == nullptr || !root->hasProperty("layout"))
+        return;
+
+    const juce::var layoutVar = root->getProperty("layout");
+    layout.mainKnobSize = getIntOrDefault(layoutVar, "mainKnobSize", layout.mainKnobSize);
+    layout.mainKnobSizeGreen = getIntOrDefault(layoutVar, "mainKnobSizeGreen", layout.mainKnobSize);
+    layout.mainKnobSizeBlue = getIntOrDefault(layoutVar, "mainKnobSizeBlue", layout.mainKnobSize);
+    layout.mainKnobSizeRed = getIntOrDefault(layoutVar, "mainKnobSizeRed", layout.mainKnobSize);
+    layout.mainKnobSizePurple = getIntOrDefault(layoutVar, "mainKnobSizePurple", layout.mainKnobSize);
+    layout.mainKnobSizeBlack = getIntOrDefault(layoutVar, "mainKnobSizeBlack", layout.mainKnobSize);
+    layout.knobTopY = getIntOrDefault(layoutVar, "knobTopY", layout.knobTopY);
+    layout.knobTopYGreen = getIntOrDefault(layoutVar, "knobTopYGreen", layout.knobTopY);
+    layout.knobTopYBlue = getIntOrDefault(layoutVar, "knobTopYBlue", layout.knobTopY);
+    layout.knobTopYRed = getIntOrDefault(layoutVar, "knobTopYRed", layout.knobTopY);
+    layout.knobTopYPurple = getIntOrDefault(layoutVar, "knobTopYPurple", layout.knobTopY);
+    layout.knobTopYBlack = getIntOrDefault(layoutVar, "knobTopYBlack", layout.knobTopY);
+    layout.rateCenterX = getIntOrDefault(layoutVar, "rateCenterX", layout.rateCenterX);
+    layout.rateCenterXGreen = getIntOrDefault(layoutVar, "rateCenterXGreen", layout.rateCenterX);
+    layout.rateCenterXBlue = getIntOrDefault(layoutVar, "rateCenterXBlue", layout.rateCenterX);
+    layout.rateCenterXRed = getIntOrDefault(layoutVar, "rateCenterXRed", layout.rateCenterX);
+    layout.rateCenterXPurple = getIntOrDefault(layoutVar, "rateCenterXPurple", layout.rateCenterX);
+    layout.rateCenterXBlack = getIntOrDefault(layoutVar, "rateCenterXBlack", layout.rateCenterX);
+    layout.depthCenterX = getIntOrDefault(layoutVar, "depthCenterX", layout.depthCenterX);
+    layout.depthCenterXGreen = getIntOrDefault(layoutVar, "depthCenterXGreen", layout.depthCenterX);
+    layout.depthCenterXBlue = getIntOrDefault(layoutVar, "depthCenterXBlue", layout.depthCenterX);
+    layout.depthCenterXRed = getIntOrDefault(layoutVar, "depthCenterXRed", layout.depthCenterX);
+    layout.depthCenterXPurple = getIntOrDefault(layoutVar, "depthCenterXPurple", layout.depthCenterX);
+    layout.depthCenterXBlack = getIntOrDefault(layoutVar, "depthCenterXBlack", layout.depthCenterX);
+    layout.offsetCenterX = getIntOrDefault(layoutVar, "offsetCenterX", layout.offsetCenterX);
+    layout.offsetCenterXGreen = getIntOrDefault(layoutVar, "offsetCenterXGreen", layout.offsetCenterX);
+    layout.offsetCenterXBlue = getIntOrDefault(layoutVar, "offsetCenterXBlue", layout.offsetCenterX);
+    layout.offsetCenterXRed = getIntOrDefault(layoutVar, "offsetCenterXRed", layout.offsetCenterX);
+    layout.offsetCenterXPurple = getIntOrDefault(layoutVar, "offsetCenterXPurple", layout.offsetCenterX);
+    layout.offsetCenterXBlack = getIntOrDefault(layoutVar, "offsetCenterXBlack", layout.offsetCenterX);
+    layout.widthCenterX = getIntOrDefault(layoutVar, "widthCenterX", layout.widthCenterX);
+    layout.widthCenterXGreen = getIntOrDefault(layoutVar, "widthCenterXGreen", layout.widthCenterX);
+    layout.widthCenterXBlue = getIntOrDefault(layoutVar, "widthCenterXBlue", layout.widthCenterX);
+    layout.widthCenterXRed = getIntOrDefault(layoutVar, "widthCenterXRed", layout.widthCenterX);
+    layout.widthCenterXPurple = getIntOrDefault(layoutVar, "widthCenterXPurple", layout.widthCenterX);
+    layout.widthCenterXBlack = getIntOrDefault(layoutVar, "widthCenterXBlack", layout.widthCenterX);
+    layout.sliderTrackStartX = getIntOrDefault(layoutVar, "sliderTrackStartX", layout.sliderTrackStartX);
+    layout.sliderTrackStartY = getIntOrDefault(layoutVar, "sliderTrackStartY", layout.sliderTrackStartY);
+    layout.sliderTrackEndX = getIntOrDefault(layoutVar, "sliderTrackEndX", layout.sliderTrackEndX);
+    layout.sliderTrackEndY = getIntOrDefault(layoutVar, "sliderTrackEndY", layout.sliderTrackEndY);
+    layout.sliderSize = getIntOrDefault(layoutVar, "sliderSize", layout.sliderSize);
+    layout.sliderTrackStartXGreen = getIntOrDefault(layoutVar, "sliderTrackStartXGreen", layout.sliderTrackStartX);
+    layout.sliderTrackStartYGreen = getIntOrDefault(layoutVar, "sliderTrackStartYGreen", layout.sliderTrackStartY);
+    layout.sliderTrackEndXGreen = getIntOrDefault(layoutVar, "sliderTrackEndXGreen", layout.sliderTrackEndX);
+    layout.sliderTrackEndYGreen = getIntOrDefault(layoutVar, "sliderTrackEndYGreen", layout.sliderTrackEndY);
+    layout.sliderSizeGreen = getIntOrDefault(layoutVar, "sliderSizeGreen", layout.sliderSize);
+    layout.sliderTrackStartXBlue = getIntOrDefault(layoutVar, "sliderTrackStartXBlue", layout.sliderTrackStartX);
+    layout.sliderTrackStartYBlue = getIntOrDefault(layoutVar, "sliderTrackStartYBlue", layout.sliderTrackStartY);
+    layout.sliderTrackEndXBlue = getIntOrDefault(layoutVar, "sliderTrackEndXBlue", layout.sliderTrackEndX);
+    layout.sliderTrackEndYBlue = getIntOrDefault(layoutVar, "sliderTrackEndYBlue", layout.sliderTrackEndY);
+    layout.sliderSizeBlue = getIntOrDefault(layoutVar, "sliderSizeBlue", layout.sliderSize);
+    layout.sliderTrackStartXRed = getIntOrDefault(layoutVar, "sliderTrackStartXRed", layout.sliderTrackStartX);
+    layout.sliderTrackStartYRed = getIntOrDefault(layoutVar, "sliderTrackStartYRed", layout.sliderTrackStartY);
+    layout.sliderTrackEndXRed = getIntOrDefault(layoutVar, "sliderTrackEndXRed", layout.sliderTrackEndX);
+    layout.sliderTrackEndYRed = getIntOrDefault(layoutVar, "sliderTrackEndYRed", layout.sliderTrackEndY);
+    layout.sliderSizeRed = getIntOrDefault(layoutVar, "sliderSizeRed", layout.sliderSize);
+    layout.sliderTrackStartXPurple = getIntOrDefault(layoutVar, "sliderTrackStartXPurple", layout.sliderTrackStartX);
+    layout.sliderTrackStartYPurple = getIntOrDefault(layoutVar, "sliderTrackStartYPurple", layout.sliderTrackStartY);
+    layout.sliderTrackEndXPurple = getIntOrDefault(layoutVar, "sliderTrackEndXPurple", layout.sliderTrackEndX);
+    layout.sliderTrackEndYPurple = getIntOrDefault(layoutVar, "sliderTrackEndYPurple", layout.sliderTrackEndY);
+    layout.sliderSizePurple = getIntOrDefault(layoutVar, "sliderSizePurple", layout.sliderSize);
+    layout.sliderTrackStartXBlack = getIntOrDefault(layoutVar, "sliderTrackStartXBlack", layout.sliderTrackStartX);
+    layout.sliderTrackStartYBlack = getIntOrDefault(layoutVar, "sliderTrackStartYBlack", layout.sliderTrackStartY);
+    layout.sliderTrackEndXBlack = getIntOrDefault(layoutVar, "sliderTrackEndXBlack", layout.sliderTrackEndX);
+    layout.sliderTrackEndYBlack = getIntOrDefault(layoutVar, "sliderTrackEndYBlack", layout.sliderTrackEndY);
+    layout.sliderSizeBlack = getIntOrDefault(layoutVar, "sliderSizeBlack", layout.sliderSize);
+    // Backwards compat: migrate old sliderX/sliderY/sliderCenterX/sliderCenterY/sliderW/sliderH
+    if (const auto* obj = layoutVar.getDynamicObject())
+    {
+        if (obj->hasProperty("sliderTrackStartX") == false)
+        {
+            if (obj->hasProperty("sliderCenterX"))
+            {
+                const int centerX = getIntOrDefault(layoutVar, "sliderCenterX", 360);
+                const int centerY = getIntOrDefault(layoutVar, "sliderCenterY", 268);
+                const int oldW = getIntOrDefault(layoutVar, "sliderW", 250);
+                layout.sliderTrackStartX = centerX - (oldW / 2);
+                layout.sliderTrackStartY = centerY;
+                layout.sliderTrackEndX = centerX + (oldW / 2);
+                layout.sliderTrackEndY = centerY;
+            }
+            else if (obj->hasProperty("sliderX"))
+            {
+                const int oldX = getIntOrDefault(layoutVar, "sliderX", 235);
+                const int oldY = getIntOrDefault(layoutVar, "sliderY", 259);
+                const int oldW = getIntOrDefault(layoutVar, "sliderW", 250);
+                layout.sliderTrackStartX = oldX;
+                layout.sliderTrackStartY = oldY + 9;  // track Y = center of old bounds
+                layout.sliderTrackEndX = oldX + oldW;
+                layout.sliderTrackEndY = oldY + 9;
+            }
+        }
+        if (obj->hasProperty("sliderW") || obj->hasProperty("sliderH"))
+        {
+            const int oldW = getIntOrDefault(layoutVar, "sliderW", 250);
+            const int oldH = getIntOrDefault(layoutVar, "sliderH", 18);
+            layout.sliderSize = juce::jlimit(10, 500, juce::jmax(
+                juce::roundToInt(100.0f * oldW / 250.0f),
+                juce::roundToInt(100.0f * oldH / 18.0f)));
+        }
+    }
+    layout.mixKnobSize = getIntOrDefault(layoutVar, "mixKnobSize", layout.mixKnobSize);
+    layout.mixKnobSizeGreen = getIntOrDefault(layoutVar, "mixKnobSizeGreen", layout.mixKnobSize);
+    layout.mixKnobSizeBlue = getIntOrDefault(layoutVar, "mixKnobSizeBlue", layout.mixKnobSize);
+    layout.mixKnobSizeRed = getIntOrDefault(layoutVar, "mixKnobSizeRed", layout.mixKnobSize);
+    layout.mixKnobSizePurple = getIntOrDefault(layoutVar, "mixKnobSizePurple", layout.mixKnobSize);
+    layout.mixKnobSizeBlack = getIntOrDefault(layoutVar, "mixKnobSizeBlack", layout.mixKnobSize);
+    layout.mixCenterX = getIntOrDefault(layoutVar, "mixCenterX", layout.mixCenterX);
+    layout.mixCenterXGreen = getIntOrDefault(layoutVar, "mixCenterXGreen", layout.mixCenterX);
+    layout.mixCenterXBlue = getIntOrDefault(layoutVar, "mixCenterXBlue", layout.mixCenterX);
+    layout.mixCenterXRed = getIntOrDefault(layoutVar, "mixCenterXRed", layout.mixCenterX);
+    layout.mixCenterXPurple = getIntOrDefault(layoutVar, "mixCenterXPurple", layout.mixCenterX);
+    layout.mixCenterXBlack = getIntOrDefault(layoutVar, "mixCenterXBlack", layout.mixCenterX);
+    layout.mixKnobY = getIntOrDefault(layoutVar, "mixKnobY", layout.mixKnobY);
+    layout.mixKnobYGreen = getIntOrDefault(layoutVar, "mixKnobYGreen", layout.mixKnobY);
+    layout.mixKnobYBlue = getIntOrDefault(layoutVar, "mixKnobYBlue", layout.mixKnobY);
+    layout.mixKnobYRed = getIntOrDefault(layoutVar, "mixKnobYRed", layout.mixKnobY);
+    layout.mixKnobYPurple = getIntOrDefault(layoutVar, "mixKnobYPurple", layout.mixKnobY);
+    layout.mixKnobYBlack = getIntOrDefault(layoutVar, "mixKnobYBlack", layout.mixKnobY);
+    layout.mixKnobYOffset = getIntOrDefault(layoutVar, "mixKnobYOffset", layout.mixKnobYOffset);
+    layout.mixKnobYOffsetGreen = getIntOrDefault(layoutVar, "mixKnobYOffsetGreen", layout.mixKnobYOffset);
+    layout.mixKnobYOffsetBlue = getIntOrDefault(layoutVar, "mixKnobYOffsetBlue", layout.mixKnobYOffset);
+    layout.mixKnobYOffsetRed = getIntOrDefault(layoutVar, "mixKnobYOffsetRed", layout.mixKnobYOffset);
+    layout.mixKnobYOffsetPurple = getIntOrDefault(layoutVar, "mixKnobYOffsetPurple", layout.mixKnobYOffset);
+    layout.mixKnobYOffsetBlack = getIntOrDefault(layoutVar, "mixKnobYOffsetBlack", layout.mixKnobYOffset);
+    layout.valueLabelWidth = getIntOrDefault(layoutVar, "valueLabelWidth", layout.valueLabelWidth);
+    layout.valueLabelHeight = getIntOrDefault(layoutVar, "valueLabelHeight", layout.valueLabelHeight);
+    layout.valueLabelY = getIntOrDefault(layoutVar, "valueLabelY", layout.valueLabelY);
+    layout.valueLabelYGreen = getIntOrDefault(layoutVar, "valueLabelYGreen", layout.valueLabelY);
+    layout.valueLabelYBlue = getIntOrDefault(layoutVar, "valueLabelYBlue", layout.valueLabelY);
+    layout.valueLabelYRed = getIntOrDefault(layoutVar, "valueLabelYRed", layout.valueLabelY);
+    layout.valueLabelYPurple = getIntOrDefault(layoutVar, "valueLabelYPurple", layout.valueLabelY);
+    layout.valueLabelYBlack = getIntOrDefault(layoutVar, "valueLabelYBlack", layout.valueLabelY);
+    layout.rateValueOffsetX = getIntOrDefault(layoutVar, "rateValueOffsetX", layout.rateValueOffsetX);
+    layout.rateValueOffsetXGreen = getIntOrDefault(layoutVar, "rateValueOffsetXGreen", layout.rateValueOffsetX);
+    layout.rateValueOffsetXBlue = getIntOrDefault(layoutVar, "rateValueOffsetXBlue", layout.rateValueOffsetX);
+    layout.rateValueOffsetXRed = getIntOrDefault(layoutVar, "rateValueOffsetXRed", layout.rateValueOffsetX);
+    layout.rateValueOffsetXPurple = getIntOrDefault(layoutVar, "rateValueOffsetXPurple", layout.rateValueOffsetX);
+    layout.rateValueOffsetXBlack = getIntOrDefault(layoutVar, "rateValueOffsetXBlack", layout.rateValueOffsetX);
+    layout.depthValueOffsetX = getIntOrDefault(layoutVar, "depthValueOffsetX", layout.depthValueOffsetX);
+    layout.depthValueOffsetXGreen = getIntOrDefault(layoutVar, "depthValueOffsetXGreen", layout.depthValueOffsetX);
+    layout.depthValueOffsetXBlue = getIntOrDefault(layoutVar, "depthValueOffsetXBlue", layout.depthValueOffsetX);
+    layout.depthValueOffsetXRed = getIntOrDefault(layoutVar, "depthValueOffsetXRed", layout.depthValueOffsetX);
+    layout.depthValueOffsetXPurple = getIntOrDefault(layoutVar, "depthValueOffsetXPurple", layout.depthValueOffsetX);
+    layout.depthValueOffsetXBlack = getIntOrDefault(layoutVar, "depthValueOffsetXBlack", layout.depthValueOffsetX);
+    layout.offsetValueOffsetX = getIntOrDefault(layoutVar, "offsetValueOffsetX", layout.offsetValueOffsetX);
+    layout.offsetValueOffsetXGreen = getIntOrDefault(layoutVar, "offsetValueOffsetXGreen", layout.offsetValueOffsetX);
+    layout.offsetValueOffsetXBlue = getIntOrDefault(layoutVar, "offsetValueOffsetXBlue", layout.offsetValueOffsetX);
+    layout.offsetValueOffsetXRed = getIntOrDefault(layoutVar, "offsetValueOffsetXRed", layout.offsetValueOffsetX);
+    layout.offsetValueOffsetXPurple = getIntOrDefault(layoutVar, "offsetValueOffsetXPurple", layout.offsetValueOffsetX);
+    layout.offsetValueOffsetXBlack = getIntOrDefault(layoutVar, "offsetValueOffsetXBlack", layout.offsetValueOffsetX);
+    layout.widthValueOffsetX = getIntOrDefault(layoutVar, "widthValueOffsetX", layout.widthValueOffsetX);
+    layout.widthValueOffsetXGreen = getIntOrDefault(layoutVar, "widthValueOffsetXGreen", layout.widthValueOffsetX);
+    layout.widthValueOffsetXBlue = getIntOrDefault(layoutVar, "widthValueOffsetXBlue", layout.widthValueOffsetX);
+    layout.widthValueOffsetXRed = getIntOrDefault(layoutVar, "widthValueOffsetXRed", layout.widthValueOffsetX);
+    layout.widthValueOffsetXPurple = getIntOrDefault(layoutVar, "widthValueOffsetXPurple", layout.widthValueOffsetX);
+    layout.widthValueOffsetXBlack = getIntOrDefault(layoutVar, "widthValueOffsetXBlack", layout.widthValueOffsetX);
+    layout.colorValueY = getIntOrDefault(layoutVar, "colorValueY", layout.colorValueY);
+    layout.colorValueYGreen = getIntOrDefault(layoutVar, "colorValueYGreen", layout.colorValueY);
+    layout.colorValueYBlue = getIntOrDefault(layoutVar, "colorValueYBlue", layout.colorValueY);
+    layout.colorValueYRed = getIntOrDefault(layoutVar, "colorValueYRed", layout.colorValueY);
+    layout.colorValueYPurple = getIntOrDefault(layoutVar, "colorValueYPurple", layout.colorValueY);
+    layout.colorValueYBlack = getIntOrDefault(layoutVar, "colorValueYBlack", layout.colorValueY);
+    layout.colorValueCenterX = getIntOrDefault(layoutVar, "colorValueCenterX", layout.colorValueCenterX);
+    layout.colorValueWidth = getIntOrDefault(layoutVar, "colorValueWidth", layout.colorValueWidth);
+    layout.colorValueHeight = getIntOrDefault(layoutVar, "colorValueHeight", layout.colorValueHeight);
+    layout.colorValueXOffset = getIntOrDefault(layoutVar, "colorValueXOffset", layout.colorValueXOffset);
+    layout.colorValueXOffsetGreen = getIntOrDefault(layoutVar, "colorValueXOffsetGreen", layout.colorValueXOffset);
+    layout.colorValueXOffsetBlue = getIntOrDefault(layoutVar, "colorValueXOffsetBlue", layout.colorValueXOffset);
+    layout.colorValueXOffsetRed = getIntOrDefault(layoutVar, "colorValueXOffsetRed", layout.colorValueXOffset);
+    layout.colorValueXOffsetPurple = getIntOrDefault(layoutVar, "colorValueXOffsetPurple", layout.colorValueXOffset);
+    layout.colorValueXOffsetBlack = getIntOrDefault(layoutVar, "colorValueXOffsetBlack", layout.colorValueXOffset);
+    layout.mixValueY = getIntOrDefault(layoutVar, "mixValueY", layout.mixValueY);
+    layout.mixValueYGreen = getIntOrDefault(layoutVar, "mixValueYGreen", layout.mixValueY);
+    layout.mixValueYBlue = getIntOrDefault(layoutVar, "mixValueYBlue", layout.mixValueY);
+    layout.mixValueYRed = getIntOrDefault(layoutVar, "mixValueYRed", layout.mixValueY);
+    layout.mixValueYPurple = getIntOrDefault(layoutVar, "mixValueYPurple", layout.mixValueY);
+    layout.mixValueYBlack = getIntOrDefault(layoutVar, "mixValueYBlack", layout.mixValueY);
+    layout.mixValueWidth = getIntOrDefault(layoutVar, "mixValueWidth", layout.mixValueWidth);
+    layout.mixValueHeight = getIntOrDefault(layoutVar, "mixValueHeight", layout.mixValueHeight);
+    layout.mixValueOffsetX = getIntOrDefault(layoutVar, "mixValueOffsetX", layout.mixValueOffsetX);
+    layout.mixValueOffsetXGreen = getIntOrDefault(layoutVar, "mixValueOffsetXGreen", layout.mixValueOffsetX);
+    layout.mixValueOffsetXBlue = getIntOrDefault(layoutVar, "mixValueOffsetXBlue", layout.mixValueOffsetX);
+    layout.mixValueOffsetXRed = getIntOrDefault(layoutVar, "mixValueOffsetXRed", layout.mixValueOffsetX);
+    layout.mixValueOffsetXPurple = getIntOrDefault(layoutVar, "mixValueOffsetXPurple", layout.mixValueOffsetX);
+    layout.mixValueOffsetXBlack = getIntOrDefault(layoutVar, "mixValueOffsetXBlack", layout.mixValueOffsetX);
+    layout.rateValueOffsetY = getIntOrDefault(layoutVar, "rateValueOffsetY", layout.rateValueOffsetY);
+    layout.rateValueOffsetYGreen = getIntOrDefault(layoutVar, "rateValueOffsetYGreen", layout.rateValueOffsetY);
+    layout.rateValueOffsetYBlue = getIntOrDefault(layoutVar, "rateValueOffsetYBlue", layout.rateValueOffsetY);
+    layout.rateValueOffsetYRed = getIntOrDefault(layoutVar, "rateValueOffsetYRed", layout.rateValueOffsetY);
+    layout.rateValueOffsetYPurple = getIntOrDefault(layoutVar, "rateValueOffsetYPurple", layout.rateValueOffsetY);
+    layout.rateValueOffsetYBlack = getIntOrDefault(layoutVar, "rateValueOffsetYBlack", layout.rateValueOffsetY);
+    layout.depthValueOffsetY = getIntOrDefault(layoutVar, "depthValueOffsetY", layout.depthValueOffsetY);
+    layout.depthValueOffsetYGreen = getIntOrDefault(layoutVar, "depthValueOffsetYGreen", layout.depthValueOffsetY);
+    layout.depthValueOffsetYBlue = getIntOrDefault(layoutVar, "depthValueOffsetYBlue", layout.depthValueOffsetY);
+    layout.depthValueOffsetYRed = getIntOrDefault(layoutVar, "depthValueOffsetYRed", layout.depthValueOffsetY);
+    layout.depthValueOffsetYPurple = getIntOrDefault(layoutVar, "depthValueOffsetYPurple", layout.depthValueOffsetY);
+    layout.depthValueOffsetYBlack = getIntOrDefault(layoutVar, "depthValueOffsetYBlack", layout.depthValueOffsetY);
+    layout.offsetValueOffsetY = getIntOrDefault(layoutVar, "offsetValueOffsetY", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYGreen = getIntOrDefault(layoutVar, "offsetValueOffsetYGreen", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYBlue = getIntOrDefault(layoutVar, "offsetValueOffsetYBlue", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYRed = getIntOrDefault(layoutVar, "offsetValueOffsetYRed", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYPurple = getIntOrDefault(layoutVar, "offsetValueOffsetYPurple", layout.offsetValueOffsetY);
+    layout.offsetValueOffsetYBlack = getIntOrDefault(layoutVar, "offsetValueOffsetYBlack", layout.offsetValueOffsetY);
+    layout.widthValueOffsetY = getIntOrDefault(layoutVar, "widthValueOffsetY", layout.widthValueOffsetY);
+    layout.widthValueOffsetYGreen = getIntOrDefault(layoutVar, "widthValueOffsetYGreen", layout.widthValueOffsetY);
+    layout.widthValueOffsetYBlue = getIntOrDefault(layoutVar, "widthValueOffsetYBlue", layout.widthValueOffsetY);
+    layout.widthValueOffsetYRed = getIntOrDefault(layoutVar, "widthValueOffsetYRed", layout.widthValueOffsetY);
+    layout.widthValueOffsetYPurple = getIntOrDefault(layoutVar, "widthValueOffsetYPurple", layout.widthValueOffsetY);
+    layout.widthValueOffsetYBlack = getIntOrDefault(layoutVar, "widthValueOffsetYBlack", layout.widthValueOffsetY);
+    layout.knobValueFontSize = getIntOrDefault(layoutVar, "knobValueFontSize", layout.knobValueFontSize);
+    layout.colorValueFontSize = getIntOrDefault(layoutVar, "colorValueFontSize", layout.colorValueFontSize);
+    layout.mixValueFontSize = getIntOrDefault(layoutVar, "mixValueFontSize", layout.mixValueFontSize);
+    layout.valueTextAlphaPct = getIntOrDefault(layoutVar, "valueTextAlphaPct", layout.valueTextAlphaPct);
+    layout.valueTextColourMode = getIntOrDefault(layoutVar, "valueTextColourMode", layout.valueTextColourMode);
+    layout.valueTextColour = getIntOrDefault(layoutVar, "valueTextColour", layout.valueTextColour);
+    layout.topButtonsWidth = getIntOrDefault(layoutVar, "topButtonsWidth", layout.topButtonsWidth);
+    layout.topButtonsHeight = getIntOrDefault(layoutVar, "topButtonsHeight", layout.topButtonsHeight);
+    layout.topButtonsGap = getIntOrDefault(layoutVar, "topButtonsGap", layout.topButtonsGap);
+    layout.topButtonsRightMargin = getIntOrDefault(layoutVar, "topButtonsRightMargin", layout.topButtonsRightMargin);
+    layout.topButtonsTopY = getIntOrDefault(layoutVar, "topButtonsTopY", layout.topButtonsTopY);
+    layout.topButtonsFontSize = getIntOrDefault(layoutVar, "topButtonsFontSize", layout.topButtonsFontSize);
+    layout.topButtonsTextColour = getIntOrDefault(layoutVar, "topButtonsTextColour", layout.topButtonsTextColour);
+    layout.topButtonsBackgroundColour = getIntOrDefault(layoutVar, "topButtonsBackgroundColour", layout.topButtonsBackgroundColour);
+    layout.topButtonsOnBackgroundColour = getIntOrDefault(layoutVar, "topButtonsOnBackgroundColour", layout.topButtonsOnBackgroundColour);
+    layout.engineSelectorX = getIntOrDefault(layoutVar, "engineSelectorX", layout.engineSelectorX);
+    layout.engineSelectorY = getIntOrDefault(layoutVar, "engineSelectorY", layout.engineSelectorY);
+    layout.engineSelectorW = getIntOrDefault(layoutVar, "engineSelectorW", layout.engineSelectorW);
+    layout.engineSelectorH = getIntOrDefault(layoutVar, "engineSelectorH", layout.engineSelectorH);
+    layout.engineSelectorFontSize = getIntOrDefault(layoutVar, "engineSelectorFontSize", layout.engineSelectorFontSize);
+    layout.engineSelectorTextColour = getIntOrDefault(layoutVar, "engineSelectorTextColour", layout.engineSelectorTextColour);
+    layout.engineSelectorBackgroundColour = getIntOrDefault(layoutVar, "engineSelectorBackgroundColour", layout.engineSelectorBackgroundColour);
+    layout.engineSelectorOutlineColour = getIntOrDefault(layoutVar, "engineSelectorOutlineColour", layout.engineSelectorOutlineColour);
+    layout.engineSelectorArrowColour = getIntOrDefault(layoutVar, "engineSelectorArrowColour", layout.engineSelectorArrowColour);
+    layout.engineSelectorPopupBackgroundColour = getIntOrDefault(layoutVar, "engineSelectorPopupBackgroundColour", layout.engineSelectorPopupBackgroundColour);
+    layout.engineSelectorPopupTextColour = getIntOrDefault(layoutVar, "engineSelectorPopupTextColour", layout.engineSelectorPopupTextColour);
+    layout.engineSelectorPopupHighlightedBackgroundColour = getIntOrDefault(layoutVar, "engineSelectorPopupHighlightedBackgroundColour", layout.engineSelectorPopupHighlightedBackgroundColour);
+    layout.engineSelectorPopupHighlightedTextColour = getIntOrDefault(layoutVar, "engineSelectorPopupHighlightedTextColour", layout.engineSelectorPopupHighlightedTextColour);
+    layout.hqSwitchSize = getIntOrDefault(layoutVar, "hqSwitchSize", layout.hqSwitchSize);
+    layout.hqSwitchOffsetX = getIntOrDefault(layoutVar, "hqSwitchOffsetX", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetY = getIntOrDefault(layoutVar, "hqSwitchOffsetY", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetXGreen = getIntOrDefault(layoutVar, "hqSwitchOffsetXGreen", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXBlue = getIntOrDefault(layoutVar, "hqSwitchOffsetXBlue", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXRed = getIntOrDefault(layoutVar, "hqSwitchOffsetXRed", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXPurple = getIntOrDefault(layoutVar, "hqSwitchOffsetXPurple", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetXBlack = getIntOrDefault(layoutVar, "hqSwitchOffsetXBlack", layout.hqSwitchOffsetX);
+    layout.hqSwitchOffsetYGreen = getIntOrDefault(layoutVar, "hqSwitchOffsetYGreen", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYBlue = getIntOrDefault(layoutVar, "hqSwitchOffsetYBlue", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYRed = getIntOrDefault(layoutVar, "hqSwitchOffsetYRed", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYPurple = getIntOrDefault(layoutVar, "hqSwitchOffsetYPurple", layout.hqSwitchOffsetY);
+    layout.hqSwitchOffsetYBlack = getIntOrDefault(layoutVar, "hqSwitchOffsetYBlack", layout.hqSwitchOffsetY);
+    layout.rateKnobVisualResponseMs = getIntOrDefault(layoutVar, "rateKnobVisualResponseMs", layout.rateKnobVisualResponseMs);
+    layout.depthKnobVisualResponseMs = getIntOrDefault(layoutVar, "depthKnobVisualResponseMs", layout.depthKnobVisualResponseMs);
+    layout.offsetKnobVisualResponseMs = getIntOrDefault(layoutVar, "offsetKnobVisualResponseMs", layout.offsetKnobVisualResponseMs);
+    layout.widthKnobVisualResponseMs = getIntOrDefault(layoutVar, "widthKnobVisualResponseMs", layout.widthKnobVisualResponseMs);
+    layout.mixKnobVisualResponseMs = getIntOrDefault(layoutVar, "mixKnobVisualResponseMs", layout.mixKnobVisualResponseMs);
+    layout.knobDragSensitivityPct = getIntOrDefault(layoutVar, "knobDragSensitivityPct", layout.knobDragSensitivityPct);
+    layout.scrollWheelSensitivityPct = getIntOrDefault(layoutVar, "scrollWheelSensitivityPct", layout.scrollWheelSensitivityPct);
+    layout.knobRollOffSpeedPct = getIntOrDefault(layoutVar, "knobRollOffSpeedPct", layout.knobRollOffSpeedPct);
+    layout.knobSweepStartDeg = getIntOrDefault(layoutVar, "knobSweepStartDeg", layout.knobSweepStartDeg);
+    layout.knobSweepEndDeg = getIntOrDefault(layoutVar, "knobSweepEndDeg", layout.knobSweepEndDeg);
+    layout.knobFrameCount = getIntOrDefault(layoutVar, "knobFrameCount", layout.knobFrameCount);
+    const int legacyFlipEnabled = getIntOrDefault(layoutVar, "valueFlipEnabled", layout.mainValueFlipEnabled);
+    const int legacyFlipDurationMs = getIntOrDefault(layoutVar, "valueFlipDurationMs", layout.mainValueFlipDurationMs);
+    const int legacyFlipTravelPxTimes10 = getIntOrDefault(layoutVar, "valueFlipTravelPxTimes10", layout.mainValueFlipTravelUpPxTimes100 / 10);
+    const int legacyFlipShearPct = getIntOrDefault(layoutVar, "valueFlipShearPct", layout.mainValueFlipShearPct);
+    const int legacyFlipMinScalePct = getIntOrDefault(layoutVar, "valueFlipMinScalePct", layout.mainValueFlipMinScalePct);
+
+    layout.mainValueFlipEnabled = getIntOrDefault(layoutVar, "mainValueFlipEnabled", legacyFlipEnabled);
+    layout.mainValueFlipDurationMs = getIntOrDefault(layoutVar, "mainValueFlipDurationMs", legacyFlipDurationMs);
+    const int legacyMainTravelUpTimes100 = getIntOrDefault(layoutVar, "mainValueFlipTravelUpPxTimes10", legacyFlipTravelPxTimes10) * 10;
+    const int legacyMainTravelDownTimes100 = getIntOrDefault(layoutVar, "mainValueFlipTravelDownPxTimes10", legacyFlipTravelPxTimes10) * 10;
+    layout.mainValueFlipTravelUpPxTimes100 = getIntOrDefault(layoutVar, "mainValueFlipTravelUpPxTimes100", legacyMainTravelUpTimes100);
+    layout.mainValueFlipTravelDownPxTimes100 = getIntOrDefault(layoutVar, "mainValueFlipTravelDownPxTimes100", legacyMainTravelDownTimes100);
+    layout.mainValueFlipTravelOutPct = getIntOrDefault(layoutVar, "mainValueFlipTravelOutPct", layout.mainValueFlipTravelOutPct);
+    layout.mainValueFlipTravelInPct = getIntOrDefault(layoutVar, "mainValueFlipTravelInPct", layout.mainValueFlipTravelInPct);
+    layout.mainValueFlipShearPct = getIntOrDefault(layoutVar, "mainValueFlipShearPct", legacyFlipShearPct);
+    layout.mainValueFlipMinScalePct = getIntOrDefault(layoutVar, "mainValueFlipMinScalePct", legacyFlipMinScalePct);
+
+    layout.colorValueFlipEnabled = getIntOrDefault(layoutVar, "colorValueFlipEnabled", legacyFlipEnabled);
+    layout.colorValueFlipDurationMs = getIntOrDefault(layoutVar, "colorValueFlipDurationMs", legacyFlipDurationMs);
+    const int legacyColorTravelUpTimes100 = getIntOrDefault(layoutVar, "colorValueFlipTravelUpPxTimes10", legacyFlipTravelPxTimes10) * 10;
+    const int legacyColorTravelDownTimes100 = getIntOrDefault(layoutVar, "colorValueFlipTravelDownPxTimes10", legacyFlipTravelPxTimes10) * 10;
+    layout.colorValueFlipTravelUpPxTimes100 = getIntOrDefault(layoutVar, "colorValueFlipTravelUpPxTimes100", legacyColorTravelUpTimes100);
+    layout.colorValueFlipTravelDownPxTimes100 = getIntOrDefault(layoutVar, "colorValueFlipTravelDownPxTimes100", legacyColorTravelDownTimes100);
+    layout.colorValueFlipTravelOutPct = getIntOrDefault(layoutVar, "colorValueFlipTravelOutPct", layout.colorValueFlipTravelOutPct);
+    layout.colorValueFlipTravelInPct = getIntOrDefault(layoutVar, "colorValueFlipTravelInPct", layout.colorValueFlipTravelInPct);
+    layout.colorValueFlipShearPct = getIntOrDefault(layoutVar, "colorValueFlipShearPct", legacyFlipShearPct);
+    layout.colorValueFlipMinScalePct = getIntOrDefault(layoutVar, "colorValueFlipMinScalePct", legacyFlipMinScalePct);
+
+    layout.mixValueFlipEnabled = getIntOrDefault(layoutVar, "mixValueFlipEnabled", legacyFlipEnabled);
+    layout.mixValueFlipDurationMs = getIntOrDefault(layoutVar, "mixValueFlipDurationMs", legacyFlipDurationMs);
+    const int legacyMixTravelUpTimes100 = getIntOrDefault(layoutVar, "mixValueFlipTravelUpPxTimes10", legacyFlipTravelPxTimes10) * 10;
+    const int legacyMixTravelDownTimes100 = getIntOrDefault(layoutVar, "mixValueFlipTravelDownPxTimes10", legacyFlipTravelPxTimes10) * 10;
+    layout.mixValueFlipTravelUpPxTimes100 = getIntOrDefault(layoutVar, "mixValueFlipTravelUpPxTimes100", legacyMixTravelUpTimes100);
+    layout.mixValueFlipTravelDownPxTimes100 = getIntOrDefault(layoutVar, "mixValueFlipTravelDownPxTimes100", legacyMixTravelDownTimes100);
+    layout.mixValueFlipTravelOutPct = getIntOrDefault(layoutVar, "mixValueFlipTravelOutPct", layout.mixValueFlipTravelOutPct);
+    layout.mixValueFlipTravelInPct = getIntOrDefault(layoutVar, "mixValueFlipTravelInPct", layout.mixValueFlipTravelInPct);
+    layout.mixValueFlipShearPct = getIntOrDefault(layoutVar, "mixValueFlipShearPct", legacyFlipShearPct);
+    layout.mixValueFlipMinScalePct = getIntOrDefault(layoutVar, "mixValueFlipMinScalePct", legacyFlipMinScalePct);
+    layout.valueFxEnabled = getIntOrDefault(layoutVar, "valueFxEnabled", layout.valueFxEnabled);
+    layout.valueGlowAlphaPct = getIntOrDefault(layoutVar, "valueGlowAlphaPct", layout.valueGlowAlphaPct);
+    layout.valueGlowSpreadPxTimes100 = getIntOrDefault(layoutVar, "valueGlowSpreadPxTimes100", layout.valueGlowSpreadPxTimes100);
+    layout.valueFxPerCharOffsetXPxTimes100 = getIntOrDefault(layoutVar, "valueFxPerCharOffsetXPxTimes100", layout.valueFxPerCharOffsetXPxTimes100);
+    layout.valueFxPerCharOffsetYPxTimes100 = getIntOrDefault(layoutVar, "valueFxPerCharOffsetYPxTimes100", layout.valueFxPerCharOffsetYPxTimes100);
+    layout.valueTopReflectAlphaPct = getIntOrDefault(layoutVar, "valueTopReflectAlphaPct", layout.valueTopReflectAlphaPct);
+    layout.valueTopReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, "valueTopReflectOffsetXPxTimes100", layout.valueTopReflectOffsetXPxTimes100);
+    layout.valueTopReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, "valueTopReflectOffsetYPxTimes100", layout.valueTopReflectOffsetYPxTimes100);
+    layout.valueTopReflectShearPct = getIntOrDefault(layoutVar, "valueTopReflectShearPct", layout.valueTopReflectShearPct);
+    layout.valueTopReflectRotateDeg = getIntOrDefault(layoutVar, "valueTopReflectRotateDeg", layout.valueTopReflectRotateDeg);
+    layout.valueBottomReflectAlphaPct = getIntOrDefault(layoutVar, "valueBottomReflectAlphaPct", layout.valueBottomReflectAlphaPct);
+    layout.valueBottomReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, "valueBottomReflectOffsetXPxTimes100", layout.valueBottomReflectOffsetXPxTimes100);
+    layout.valueBottomReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, "valueBottomReflectOffsetYPxTimes100", layout.valueBottomReflectOffsetYPxTimes100);
+    layout.valueBottomReflectShearPct = getIntOrDefault(layoutVar, "valueBottomReflectShearPct", layout.valueBottomReflectShearPct);
+    layout.valueBottomReflectRotateDeg = getIntOrDefault(layoutVar, "valueBottomReflectRotateDeg", layout.valueBottomReflectRotateDeg);
+    layout.valueReflectBlurPxTimes100 = getIntOrDefault(layoutVar, "valueReflectBlurPxTimes100", layout.valueReflectBlurPxTimes100);
+    layout.valueReflectSquashPct = getIntOrDefault(layoutVar, "valueReflectSquashPct", layout.valueReflectSquashPct);
+    layout.valueReflectMotionPct = getIntOrDefault(layoutVar, "valueReflectMotionPct", layout.valueReflectMotionPct);
+    layout.colorValueFxEnabled = getIntOrDefault(layoutVar, "colorValueFxEnabled", layout.valueFxEnabled);
+    layout.colorValueGlowAlphaPct = getIntOrDefault(layoutVar, "colorValueGlowAlphaPct", layout.valueGlowAlphaPct);
+    layout.colorValueGlowSpreadPxTimes100 = getIntOrDefault(layoutVar, "colorValueGlowSpreadPxTimes100", layout.valueGlowSpreadPxTimes100);
+    layout.colorValueFxPerCharOffsetXPxTimes100 = getIntOrDefault(layoutVar, "colorValueFxPerCharOffsetXPxTimes100", layout.valueFxPerCharOffsetXPxTimes100);
+    layout.colorValueFxPerCharOffsetYPxTimes100 = getIntOrDefault(layoutVar, "colorValueFxPerCharOffsetYPxTimes100", layout.valueFxPerCharOffsetYPxTimes100);
+    layout.colorValueTopReflectAlphaPct = getIntOrDefault(layoutVar, "colorValueTopReflectAlphaPct", layout.valueTopReflectAlphaPct);
+    layout.colorValueTopReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, "colorValueTopReflectOffsetXPxTimes100", layout.valueTopReflectOffsetXPxTimes100);
+    layout.colorValueTopReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, "colorValueTopReflectOffsetYPxTimes100", layout.valueTopReflectOffsetYPxTimes100);
+    layout.colorValueTopReflectShearPct = getIntOrDefault(layoutVar, "colorValueTopReflectShearPct", layout.valueTopReflectShearPct);
+    layout.colorValueTopReflectRotateDeg = getIntOrDefault(layoutVar, "colorValueTopReflectRotateDeg", layout.valueTopReflectRotateDeg);
+    layout.colorValueBottomReflectAlphaPct = getIntOrDefault(layoutVar, "colorValueBottomReflectAlphaPct", layout.valueBottomReflectAlphaPct);
+    layout.colorValueBottomReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, "colorValueBottomReflectOffsetXPxTimes100", layout.valueBottomReflectOffsetXPxTimes100);
+    layout.colorValueBottomReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, "colorValueBottomReflectOffsetYPxTimes100", layout.valueBottomReflectOffsetYPxTimes100);
+    layout.colorValueBottomReflectShearPct = getIntOrDefault(layoutVar, "colorValueBottomReflectShearPct", layout.valueBottomReflectShearPct);
+    layout.colorValueBottomReflectRotateDeg = getIntOrDefault(layoutVar, "colorValueBottomReflectRotateDeg", layout.valueBottomReflectRotateDeg);
+    layout.colorValueReflectBlurPxTimes100 = getIntOrDefault(layoutVar, "colorValueReflectBlurPxTimes100", layout.valueReflectBlurPxTimes100);
+    layout.colorValueReflectSquashPct = getIntOrDefault(layoutVar, "colorValueReflectSquashPct", layout.valueReflectSquashPct);
+    layout.colorValueReflectMotionPct = getIntOrDefault(layoutVar, "colorValueReflectMotionPct", layout.valueReflectMotionPct);
+    layout.mixValueFxEnabled = getIntOrDefault(layoutVar, "mixValueFxEnabled", layout.valueFxEnabled);
+    layout.mixValueGlowAlphaPct = getIntOrDefault(layoutVar, "mixValueGlowAlphaPct", layout.valueGlowAlphaPct);
+    layout.mixValueGlowSpreadPxTimes100 = getIntOrDefault(layoutVar, "mixValueGlowSpreadPxTimes100", layout.valueGlowSpreadPxTimes100);
+    layout.mixValueFxPerCharOffsetXPxTimes100 = getIntOrDefault(layoutVar, "mixValueFxPerCharOffsetXPxTimes100", layout.valueFxPerCharOffsetXPxTimes100);
+    layout.mixValueFxPerCharOffsetYPxTimes100 = getIntOrDefault(layoutVar, "mixValueFxPerCharOffsetYPxTimes100", layout.valueFxPerCharOffsetYPxTimes100);
+    layout.mixValueTopReflectAlphaPct = getIntOrDefault(layoutVar, "mixValueTopReflectAlphaPct", layout.valueTopReflectAlphaPct);
+    layout.mixValueTopReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, "mixValueTopReflectOffsetXPxTimes100", layout.valueTopReflectOffsetXPxTimes100);
+    layout.mixValueTopReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, "mixValueTopReflectOffsetYPxTimes100", layout.valueTopReflectOffsetYPxTimes100);
+    layout.mixValueTopReflectShearPct = getIntOrDefault(layoutVar, "mixValueTopReflectShearPct", layout.valueTopReflectShearPct);
+    layout.mixValueTopReflectRotateDeg = getIntOrDefault(layoutVar, "mixValueTopReflectRotateDeg", layout.valueTopReflectRotateDeg);
+    layout.mixValueBottomReflectAlphaPct = getIntOrDefault(layoutVar, "mixValueBottomReflectAlphaPct", layout.valueBottomReflectAlphaPct);
+    layout.mixValueBottomReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, "mixValueBottomReflectOffsetXPxTimes100", layout.valueBottomReflectOffsetXPxTimes100);
+    layout.mixValueBottomReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, "mixValueBottomReflectOffsetYPxTimes100", layout.valueBottomReflectOffsetYPxTimes100);
+    layout.mixValueBottomReflectShearPct = getIntOrDefault(layoutVar, "mixValueBottomReflectShearPct", layout.valueBottomReflectShearPct);
+    layout.mixValueBottomReflectRotateDeg = getIntOrDefault(layoutVar, "mixValueBottomReflectRotateDeg", layout.valueBottomReflectRotateDeg);
+    layout.mixValueReflectBlurPxTimes100 = getIntOrDefault(layoutVar, "mixValueReflectBlurPxTimes100", layout.valueReflectBlurPxTimes100);
+    layout.mixValueReflectSquashPct = getIntOrDefault(layoutVar, "mixValueReflectSquashPct", layout.valueReflectSquashPct);
+    layout.mixValueReflectMotionPct = getIntOrDefault(layoutVar, "mixValueReflectMotionPct", layout.valueReflectMotionPct);
+
+    const std::array<juce::String, LayoutTuning::engineCount> engineSuffixes { { "Green", "Blue", "Red", "Purple", "Black" } };
+    const std::array<juce::String, LayoutTuning::mainValueFieldCount> fieldPrefixes { { "Rate", "Depth", "Offset", "Width" } };
+    for (int engineIndex = 0; engineIndex < LayoutTuning::engineCount; ++engineIndex)
+    {
+        for (int fieldIndex = 0; fieldIndex < LayoutTuning::mainValueFieldCount; ++fieldIndex)
+        {
+            auto& anim = layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)];
+            const auto key = [&fieldPrefixes, &engineSuffixes, fieldIndex, engineIndex](const juce::String& suffix)
+            {
+                return juce::Identifier("mainValue" + fieldPrefixes[static_cast<std::size_t>(fieldIndex)] + suffix
+                                        + engineSuffixes[static_cast<std::size_t>(engineIndex)]);
+            };
+
+            anim.fx.enabled = getIntOrDefault(layoutVar, key("FxEnabled"), layout.valueFxEnabled);
+            anim.fx.glowAlphaPct = getIntOrDefault(layoutVar, key("GlowAlphaPct"), layout.valueGlowAlphaPct);
+            anim.fx.glowSpreadPxTimes100 = getIntOrDefault(layoutVar, key("GlowSpreadPxTimes100"), layout.valueGlowSpreadPxTimes100);
+            anim.fx.perCharOffsetXPxTimes100 = getIntOrDefault(layoutVar, key("PerCharOffsetXPxTimes100"), layout.valueFxPerCharOffsetXPxTimes100);
+            anim.fx.perCharOffsetYPxTimes100 = getIntOrDefault(layoutVar, key("PerCharOffsetYPxTimes100"), layout.valueFxPerCharOffsetYPxTimes100);
+            anim.fx.topReflectAlphaPct = getIntOrDefault(layoutVar, key("TopReflectAlphaPct"), layout.valueTopReflectAlphaPct);
+            anim.fx.topReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, key("TopReflectOffsetXPxTimes100"), layout.valueTopReflectOffsetXPxTimes100);
+            anim.fx.topReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, key("TopReflectOffsetYPxTimes100"), layout.valueTopReflectOffsetYPxTimes100);
+            anim.fx.topReflectShearPct = getIntOrDefault(layoutVar, key("TopReflectShearPct"), layout.valueTopReflectShearPct);
+            anim.fx.topReflectRotateDeg = getIntOrDefault(layoutVar, key("TopReflectRotateDeg"), layout.valueTopReflectRotateDeg);
+            anim.fx.bottomReflectAlphaPct = getIntOrDefault(layoutVar, key("BottomReflectAlphaPct"), layout.valueBottomReflectAlphaPct);
+            anim.fx.bottomReflectOffsetXPxTimes100 = getIntOrDefault(layoutVar, key("BottomReflectOffsetXPxTimes100"), layout.valueBottomReflectOffsetXPxTimes100);
+            anim.fx.bottomReflectOffsetYPxTimes100 = getIntOrDefault(layoutVar, key("BottomReflectOffsetYPxTimes100"), layout.valueBottomReflectOffsetYPxTimes100);
+            anim.fx.bottomReflectShearPct = getIntOrDefault(layoutVar, key("BottomReflectShearPct"), layout.valueBottomReflectShearPct);
+            anim.fx.bottomReflectRotateDeg = getIntOrDefault(layoutVar, key("BottomReflectRotateDeg"), layout.valueBottomReflectRotateDeg);
+            anim.fx.reflectBlurPxTimes100 = getIntOrDefault(layoutVar, key("ReflectBlurPxTimes100"), layout.valueReflectBlurPxTimes100);
+            anim.fx.reflectSquashPct = getIntOrDefault(layoutVar, key("ReflectSquashPct"), layout.valueReflectSquashPct);
+            anim.fx.reflectMotionPct = getIntOrDefault(layoutVar, key("ReflectMotionPct"), layout.valueReflectMotionPct);
+
+            anim.flip.enabled = getIntOrDefault(layoutVar, key("FlipEnabled"), layout.mainValueFlipEnabled);
+            anim.flip.durationMs = getIntOrDefault(layoutVar, key("FlipDurationMs"), layout.mainValueFlipDurationMs);
+            anim.flip.travelUpPxTimes100 = getIntOrDefault(layoutVar, key("FlipTravelUpPxTimes100"), layout.mainValueFlipTravelUpPxTimes100);
+            anim.flip.travelDownPxTimes100 = getIntOrDefault(layoutVar, key("FlipTravelDownPxTimes100"), layout.mainValueFlipTravelDownPxTimes100);
+            anim.flip.travelOutPct = getIntOrDefault(layoutVar, key("FlipTravelOutPct"), layout.mainValueFlipTravelOutPct);
+            anim.flip.travelInPct = getIntOrDefault(layoutVar, key("FlipTravelInPct"), layout.mainValueFlipTravelInPct);
+            anim.flip.shearPct = getIntOrDefault(layoutVar, key("FlipShearPct"), layout.mainValueFlipShearPct);
+            anim.flip.minScalePct = getIntOrDefault(layoutVar, key("FlipMinScalePct"), layout.mainValueFlipMinScalePct);
+        }
+    }
+}
+
+BackgroundAssetPack decodeBackgroundAssetPack(int colorIndex)
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    const char* offName = nullptr;
+    int offSize = 0;
+    const char* onName = nullptr;
+    int onSize = 0;
+
+    if (colorIndex == 0) // Green
+    {
+        offName = BinaryData::green_light_off_backpanel_png;
+        offSize = BinaryData::green_light_off_backpanel_pngSize;
+        onName = BinaryData::green_light_on_backpanel_png;
+        onSize = BinaryData::green_light_on_backpanel_pngSize;
+    }
+    else if (colorIndex == 1) // Blue
+    {
+        offName = BinaryData::blue_light_off_backpanel_png;
+        offSize = BinaryData::blue_light_off_backpanel_pngSize;
+        onName = BinaryData::blue_light_on_backpanel_png;
+        onSize = BinaryData::blue_light_on_backpanel_pngSize;
+    }
+    else if (colorIndex == 2) // Red
+    {
+        offName = BinaryData::red_light_off_backpanel_png;
+        offSize = BinaryData::red_light_off_backpanel_pngSize;
+        onName = BinaryData::red_light_on_backpanel_png;
+        onSize = BinaryData::red_light_on_backpanel_pngSize;
+    }
+    else if (colorIndex == 3) // Purple
+    {
+        offName = BinaryData::purple_light_off_backpanel_png;
+        offSize = BinaryData::purple_light_off_backpanel_pngSize;
+        onName = BinaryData::purple_light_on_backpanel_png;
+        onSize = BinaryData::purple_light_on_backpanel_pngSize;
+    }
+    else // Black (colorIndex == 4)
+    {
+        offName = BinaryData::black_light_off_backpanel_png;
+        offSize = BinaryData::black_light_off_backpanel_pngSize;
+        onName = BinaryData::black_light_on_backpanel_png;
+        onSize = BinaryData::black_light_on_backpanel_pngSize;
+    }
+
+    BackgroundAssetPack pack;
+    if (offName && offSize > 0)
+        pack.off = juce::ImageCache::getFromMemory(offName, offSize);
+    if (onName && onSize > 0)
+        pack.lit = juce::ImageCache::getFromMemory(onName, onSize);
+    return pack;
+}
+
+BackgroundAssetPack getOrDecodeBackgroundAssetPack(int colorIndex)
+{
+    colorIndex = juce::jlimit(0, 4, colorIndex);
+    const auto index = static_cast<size_t>(colorIndex);
+    auto& cache = getSharedBackgroundCache();
+
+    {
+        const juce::ScopedLock lock(cache.lock);
+        if (cache.valid[index])
+            return cache.packs[index];
+    }
+
+    auto decoded = decodeBackgroundAssetPack(colorIndex);
+    {
+        const juce::ScopedLock lock(cache.lock);
+        if (!cache.valid[index])
+        {
+            cache.packs[index] = decoded;
+            cache.valid[index] = true;
+        }
+        return cache.packs[index];
+    }
+}
+
+class DevPanelWindow : public juce::DocumentWindow
+{
+public:
+    DevPanelWindow(ChoroborosPluginEditor& editor, ChoroborosAudioProcessor& processor)
+        : juce::DocumentWindow("Choroboros Dev Panel",
+                               juce::Colour(0xff202020),
+                               juce::DocumentWindow::closeButton)
+    {
+        setUsingNativeTitleBar(true);
+        setResizable(true, true);
+        setResizeLimits(1028, 525, 8192, 8192);
+        setAlwaysOnTop(true);
+        setContentOwned(new DevPanel(editor, processor), true);
+        centreAroundComponent(&editor, 900, 700);
+    }
+
+    void closeButtonPressed() override
+    {
+        setVisible(false);
+    }
+};
+} // namespace
+
+//==============================================================================
+ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
+    : AudioProcessorEditor (&p), audioProcessor (p)
+{
+    editorCtorStartMs = juce::Time::getMillisecondCounterHiRes();
+    setLookAndFeel(&customLookAndFeel);
+
+    int initialEngineIndex = 0;
+    if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+        initialEngineIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
+
+    activeThemeDecodeColorIndex = initialEngineIndex;
+    activeThemeDecodeFuture = std::async(std::launch::async, [initialEngineIndex]()
+    {
+        return CustomLookAndFeel::getOrDecodeThemeAssetPack(initialEngineIndex);
+    });
+
+    const double fontSetupStartMs = juce::Time::getMillisecondCounterHiRes();
+    loadValueLabelTypeface();
+    loadUiTextTypeface();
+    customLookAndFeel.setUiTextTypeface(uiTextTypeface);
+    audioProcessor.logLoadTraceEvent("editor_font_setup_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - fontSetupStartMs);
+
+    const double layoutDefaultsStartMs = juce::Time::getMillisecondCounterHiRes();
+    layoutTuning = PluginEditorSetup::makeDefaultLayout();
+    loadPersistedLayoutDefaults(layoutTuning);
+    audioProcessor.logLoadTraceEvent("editor_layout_defaults_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - layoutDefaultsStartMs);
+    
+    // Create branded top header bar with preset browser
+    if (audioProcessor.presetManager)
+    {
+        topHeaderBar_ = std::make_unique<TopHeaderBar> (*audioProcessor.presetManager, kUiScale);
+        addAndMakeVisible (*topHeaderBar_);
+    }
+
+    const double themeSetupStartMs = juce::Time::getMillisecondCounterHiRes();
+    setupEngineColorSelector();
+    if (CustomLookAndFeel::isThemeAssetPackCached(initialEngineIndex))
+    {
+        customLookAndFeel.setColorTheme(initialEngineIndex);
+        activeThemeInstalled = true;
+    }
+    // Note: setupEngineColorSelector now reads the saved parameter value and updates UI
+    audioProcessor.logLoadTraceEvent("editor_theme_setup_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - themeSetupStartMs);
+    
+    const double controlsSetupStartMs = juce::Time::getMillisecondCounterHiRes();
+    // Setup sliders with exact bounds
+    setupSlider(rateSlider, rateLabel, rateValueLabel, "RATE", ChoroborosAudioProcessor::RATE_ID);
+    setupSlider(depthSlider, depthLabel, depthValueLabel, "DEPTH", ChoroborosAudioProcessor::DEPTH_ID);
+    setupSlider(offsetSlider, offsetLabel, offsetValueLabel, "OFFSET", ChoroborosAudioProcessor::OFFSET_ID);
+    setupSlider(widthSlider, widthLabel, widthValueLabel, "WIDTH", ChoroborosAudioProcessor::WIDTH_ID);
+    setupSlider(colorSlider, colorLabel, colorValueLabel, "COLOR", ChoroborosAudioProcessor::COLOR_ID);
+    setupSlider(mixSlider, mixLabel, mixValueLabel, "MIX", ChoroborosAudioProcessor::MIX_ID);
+    
+    PluginEditorSetup::setupSliders(*this);
+    applyTuningToUI();
+    setupSliderAttachments();
+    audioProcessor.logLoadTraceEvent("editor_controls_setup_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - controlsSetupStartMs);
+    
+    PluginEditorSetup::setupHQButton(*this);
+    hqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::HQ_ID, hqButton);
+    
+    PluginEditorSetup::setupValueLabels(*this);
+    PluginEditorSetup::setupLabels(*this);
+    setupSliderValueChangeListeners();
+    
+    // Update value label colors based on saved engine color (after all labels are set up)
+    auto engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID);
+    if (engineColorParam)
+    {
+        const int savedColorIndex = static_cast<int>(engineColorParam->load());
+        updateValueLabelColors(savedColorIndex);
+    }
+    else
+    {
+        updateValueLabelColors(0);  // Default to Green if no parameter
+    }
+    
+    // Set up double-click editing for value labels
+    setupValueLabelEditing(rateValueLabel, rateSlider, ChoroborosAudioProcessor::RATE_ID);
+    setupValueLabelEditing(depthValueLabel, depthSlider, ChoroborosAudioProcessor::DEPTH_ID);
+    setupValueLabelEditing(offsetValueLabel, offsetSlider, ChoroborosAudioProcessor::OFFSET_ID);
+    setupValueLabelEditing(widthValueLabel, widthSlider, ChoroborosAudioProcessor::WIDTH_ID);
+    setupValueLabelEditing(colorValueLabel, colorSlider, ChoroborosAudioProcessor::COLOR_ID);
+    setupValueLabelEditing(mixValueLabel, mixSlider, ChoroborosAudioProcessor::MIX_ID);
+    
+    // Initial value updates
+    updateValueLabel(rateValueLabel, rateSlider.getValue(), ChoroborosAudioProcessor::RATE_ID);
+    updateValueLabel(depthValueLabel, depthSlider.getValue(), ChoroborosAudioProcessor::DEPTH_ID);
+    updateValueLabel(offsetValueLabel, offsetSlider.getValue(), ChoroborosAudioProcessor::OFFSET_ID);
+    updateValueLabel(widthValueLabel, widthSlider.getValue(), ChoroborosAudioProcessor::WIDTH_ID);
+    updateValueLabel(colorValueLabel, colorSlider.getValue(), ChoroborosAudioProcessor::COLOR_ID);
+    updateValueLabel(mixValueLabel, mixSlider.getValue(), ChoroborosAudioProcessor::MIX_ID);
+    
+    // Setup tooltip window
+    tooltipWindow = std::make_unique<juce::TooltipWindow>(this, 700);
+    
+    // ---- Top-bar sliding icon-button drawer -----------------------------------
+    {
+        auto devIcon = juce::ImageCache::getFromMemory (
+            BinaryData::dev_png, BinaryData::dev_pngSize);
+        auto aboutIcon = juce::ImageCache::getFromMemory (
+            BinaryData::about_png, BinaryData::about_pngSize);
+        auto helpIcon = juce::ImageCache::getFromMemory (
+            BinaryData::help_png, BinaryData::help_pngSize);
+        auto feedbackIcon = juce::ImageCache::getFromMemory (
+            BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
+
+        topBarDrawer.setupIcons (devIcon, aboutIcon, helpIcon, feedbackIcon);
+        topBarDrawer.setupLayout (kUiScale);
+
+        // Set initial drawer accent colour to match the current engine
+        if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+        {
+            topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (
+                juce::jlimit (0, 4, static_cast<int> (engineColorParam->load()))));
+            if (topHeaderBar_)
+                topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (
+                    juce::jlimit (0, 4, static_cast<int> (engineColorParam->load()))));
+        }
+
+        // Wire up button callbacks (tooltips are now handled by the drawer
+        // itself via hover-expansion, not native JUCE tooltips)
+        topBarDrawer.devButton.onClick = [this]
+        {
+            ensureDevPanelWindowCreated (true);
+            const bool shouldShow = !devWindow->isVisible();
+            devWindow->setVisible (shouldShow);
+            if (shouldShow)
+                devWindow->toFront (true);
+        };
+
+        topBarDrawer.aboutButton.onClick = [] { AboutDialog::show(); };
+
+        topBarDrawer.helpButton.onClick = [] { HelpDialog::show(); };
+
+        topBarDrawer.feedbackButton.onClick = [this] {
+            if (audioProcessor.feedbackCollector)
+                FeedbackDialog::show (*audioProcessor.feedbackCollector);
+        };
+
+        // Position drawer inside the header bar (right-aligned, vertically centred).
+        const int windowW = uiScaleInt (700);
+        const int marginR = uiScaleInt (4);
+        const int dw = topBarDrawer.getExpandedWidth();
+        const int dh = topBarDrawer.getDrawerHeight();
+        const int barH = getHeaderBarHeight();
+        const int marginT = (barH - dh) / 2;   // vertically centred in header
+        // Give enough vertical room for the hover tooltip expansion area
+        topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh + 40);
+        addAndMakeVisible (topBarDrawer);
+    }
+    
+    // Listen for engine color changes (preset load or manual) to update value label colors
+    audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
+    
+    // Set fixed size (original content height + header bar)
+    setSize(uiScaleInt(700), uiScaleInt(363) + getHeaderBarHeight());
+    applyLayout();
+    setResizable(false, false);
+
+    audioProcessor.logLoadTraceEvent("editor_ctor_total_ms",
+                                     juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
+
+    // Check for pending crash report from a previous unclean shutdown.
+    // Deferred so the editor is fully visible before the dialog appears.
+    if (SessionLog::hasPendingCrashReport())
+    {
+        juce::Timer::callAfterDelay(1500, [safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]
+        {
+            if (safeThis == nullptr) return;
+            auto crashReport = SessionLog::readPendingCrashReport();
+            if (crashReport.isNotEmpty() && safeThis->audioProcessor.feedbackCollector)
+                FeedbackDialog::showCrashReport(*safeThis->audioProcessor.feedbackCollector, crashReport);
+            // Crash report file is NOT deleted here — FeedbackDialog clears
+            // it after the user sends, saves, or dismisses.
+        });
+    }
+}
+
+// Shared typeface caches — ref-counted via SharedResourcePointer so they are
+// destroyed when the last editor instance dies, not during DLL_PROCESS_DETACH.
+struct ValueLabelTypefaceCache
+{
+    juce::Typeface::Ptr typeface = (BinaryData::Technology_ttfSize > 0)
+        ? juce::Typeface::createSystemTypefaceFor(BinaryData::Technology_ttf,
+                                                   static_cast<size_t>(BinaryData::Technology_ttfSize))
+        : nullptr;
+};
+
+struct UiTextTypefaceCache
+{
+    juce::Typeface::Ptr typeface = (BinaryData::Retroica_ttfSize > 0)
+        ? juce::Typeface::createSystemTypefaceFor(BinaryData::Retroica_ttf,
+                                                   static_cast<size_t>(BinaryData::Retroica_ttfSize))
+        : nullptr;
+};
+
+void ChoroborosPluginEditor::loadValueLabelTypeface()
+{
+    if (BinaryData::Technology_ttfSize <= 0)
+        return;
+
+    juce::SharedResourcePointer<ValueLabelTypefaceCache> cache;
+    valueLabelTypeface = cache->typeface;
+}
+
+void ChoroborosPluginEditor::loadUiTextTypeface()
+{
+    if (BinaryData::Retroica_ttfSize <= 0)
+        return;
+
+    juce::SharedResourcePointer<UiTextTypefaceCache> cache;
+    uiTextTypeface = cache->typeface;
+}
+
+juce::Font ChoroborosPluginEditor::makeValueLabelFont(float heightPx, bool bold) const
+{
+    juce::FontOptions options { heightPx };
+    if (bold)
+        options = juce::FontOptions { heightPx, juce::Font::bold };
+
+    juce::Font font { options };
+    if (valueLabelTypeface != nullptr)
+        return juce::Font { juce::FontOptions { valueLabelTypeface }.withHeight(heightPx) };
+
+    if (bold)
+        font.setBold(true);
+    return font;
+}
+
+juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) const
+{
+    juce::FontOptions options { heightPx };
+    if (bold)
+        options = juce::FontOptions { heightPx, juce::Font::bold };
+
+    juce::Font font { options };
+    if (uiTextTypeface != nullptr)
+        return juce::Font { juce::FontOptions { uiTextTypeface }.withHeight(heightPx) };
+
+    if (bold)
+        font.setBold(true);
+    return font;
+}
+
+ChoroborosPluginEditor::~ChoroborosPluginEditor()
+{
+    stopDeferredThemePrewarm();
+    audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
+    setLookAndFeel(nullptr);
+}
+
+void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == ChoroborosAudioProcessor::ENGINE_COLOR_ID)
+    {
+        const int colorIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
+        customLookAndFeel.setColorTheme(colorIndex);
+        loadBackgroundImage(colorIndex);
+        updateValueLabelColors(colorIndex);
+        topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+        if (topHeaderBar_)
+            topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+
+        // Engine colour changed — if this wasn't triggered by a preset load,
+        // invalidate the current preset so the dropdown shows the placeholder.
+        if (audioProcessor.presetManager
+            && ! audioProcessor.presetManager->isLoadInProgress())
+            audioProcessor.presetManager->invalidatePreset();
+
+        PluginEditorSetup::applyLayout(*this, layoutTuning);
+        repaint();
+    }
+}
+
+//==============================================================================
+void ChoroborosPluginEditor::paint (juce::Graphics& g)
+{
+    if (!activeThemeInstalled && activeThemeDecodeFuture.valid())
+    {
+        const double waitStartMs = juce::Time::getMillisecondCounterHiRes();
+        auto themePack = activeThemeDecodeFuture.get();
+        customLookAndFeel.installThemeAssetPack(activeThemeDecodeColorIndex, std::move(themePack));
+        activeThemeInstalled = true;
+
+        audioProcessor.logLoadTraceEvent("editor_theme_wait_before_first_paint_ms",
+                                         juce::Time::getMillisecondCounterHiRes() - waitStartMs,
+                                         "engine=" + juce::String(activeThemeDecodeColorIndex));
+    }
+
+    if (!firstPaintTimingLogged)
+    {
+        firstPaintTimingLogged = true;
+        audioProcessor.logLoadTraceEvent("editor_first_paint_ms",
+                                         juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
+
+        if (!themePrewarmStarted)
+        {
+            themePrewarmStarted = true;
+            const int activeEngineIndex = juce::jlimit(0, 4, engineColorBox.getSelectedId() - 1);
+            startDeferredThemePrewarm(activeEngineIndex);
+        }
+
+        scheduleDeferredDevPanelPrewarm();
+    }
+
+    // Fill the whole window (including header area) with black
+    g.fillAll (juce::Colours::black);
+
+    // Draw background below the header bar
+    const int yOff = getHeaderBarHeight();
+    const int contentH = getHeight() - yOff;
+
+    if (backgroundImage.isValid())
+    {
+        g.drawImage(backgroundImage, 0, yOff, getWidth(), contentH, 0, 0,
+                   backgroundImage.getWidth(), backgroundImage.getHeight());
+    }
+
+    // Overlay lit panel with opacity synced to HQ switch animation (all themes)
+    if (backgroundImageLit.isValid())
+    {
+        const float litOpacity = hqButton.getAnimationProgress();
+        if (litOpacity > 0.0f)
+        {
+            g.setOpacity(litOpacity);
+            g.drawImage(backgroundImageLit, 0, yOff, getWidth(), contentH, 0, 0,
+                        backgroundImageLit.getWidth(), backgroundImageLit.getHeight());
+        }
+    }
+
+    // (Top-bar container is now painted by the TopBarDrawer component)
+}
+
+void ChoroborosPluginEditor::resized()
+{
+    // Position header bar across the full width at the very top
+    if (topHeaderBar_)
+        topHeaderBar_->setBounds (0, 0, getWidth(), topHeaderBar_->getBarHeight());
+}
+
+void ChoroborosPluginEditor::applyLayout()
+{
+    PluginEditorSetup::applyLayout(*this, layoutTuning);
+    repaint();
+}
+
+void ChoroborosPluginEditor::resetLayoutToFactoryDefaults()
+{
+    layoutTuning = PluginEditorSetup::makeDefaultLayout();
+    applyLayout();
+    refreshValueLabels();
+}
+
+void ChoroborosPluginEditor::applyTuningToUI()
+{
+    const auto& tuning = audioProcessor.getTuningState();
+    rateSlider.setSkewFactor(tuning.rate.uiSkew.load());
+    depthSlider.setSkewFactor(tuning.depth.uiSkew.load());
+    offsetSlider.setSkewFactor(tuning.offset.uiSkew.load());
+    widthSlider.setSkewFactor(tuning.width.uiSkew.load());
+    colorSlider.setSkewFactor(tuning.color.uiSkew.load());
+    mixSlider.setSkewFactor(tuning.mix.uiSkew.load());
+}
+
+void ChoroborosPluginEditor::refreshValueLabels()
+{
+    updateValueLabel(rateValueLabel, rateSlider.getValue(), ChoroborosAudioProcessor::RATE_ID);
+    updateValueLabel(depthValueLabel, depthSlider.getValue(), ChoroborosAudioProcessor::DEPTH_ID);
+    updateValueLabel(offsetValueLabel, offsetSlider.getValue(), ChoroborosAudioProcessor::OFFSET_ID);
+    updateValueLabel(widthValueLabel, widthSlider.getValue(), ChoroborosAudioProcessor::WIDTH_ID);
+    updateValueLabel(colorValueLabel, colorSlider.getValue(), ChoroborosAudioProcessor::COLOR_ID);
+    updateValueLabel(mixValueLabel, mixSlider.getValue(), ChoroborosAudioProcessor::MIX_ID);
+    repaint();
+}
+
+void ChoroborosPluginEditor::setupEngineColorSelector()
+{
+    engineColorBox.addItem("Green", 1);
+    engineColorBox.addItem("Blue", 2);
+    engineColorBox.addItem("Red", 3);
+    engineColorBox.addItem("Purple", 4);
+    engineColorBox.addItem("Black", 5);
+    engineColorBox.setSelectedId(1);
+
+    // The header bar owns layout; pass the combo to it.
+    // Styling is handled by TopHeaderBar::setEngineSelector().
+    if (topHeaderBar_)
+        topHeaderBar_->setEngineSelector (&engineColorBox);
+    
+    engineColorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::ENGINE_COLOR_ID, engineColorBox);
+    
+    // Read the current parameter value and update UI to match (for persistence)
+    // Do this AFTER attachment is created so ComboBox has the correct value
+    auto engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID);
+    if (engineColorParam)
+    {
+        // Use the ComboBox's selected ID to ensure consistency
+        const int actualColorIndex = engineColorBox.getSelectedId() - 1;
+        customLookAndFeel.setThemeColorIndexOnly(actualColorIndex);
+        // Value labels will be updated after they're set up in constructor
+    }
+    
+    engineColorBox.setTooltip("Engine Selection: Choose between five distinct chorus algorithms. Green=Classic, Blue=Modern, Red=Vintage, Purple=Experimental, Black=Linear.");
+    
+    engineColorBox.onChange = [this] {
+        const int colorIndex = engineColorBox.getSelectedId() - 1;
+        customLookAndFeel.setColorTheme(colorIndex);
+        loadBackgroundImage(colorIndex);
+        updateValueLabelColors(colorIndex);
+        topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+        if (topHeaderBar_)
+            topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+        PluginEditorSetup::applyLayout(*this, layoutTuning);
+        
+        // Track engine switch for feedback
+        if (audioProcessor.feedbackCollector)
+        {
+            auto hqParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::HQ_ID);
+            bool hq = hqParam ? (hqParam->load() > 0.5f) : false;
+            audioProcessor.feedbackCollector->trackEngineSwitch(colorIndex, hq);
+        }
+        
+        // Force sliders to repaint with new thumb image
+        rateSlider.repaint();
+        depthSlider.repaint();
+        offsetSlider.repaint();
+        widthSlider.repaint();
+        colorSlider.repaint();
+        mixSlider.repaint();
+        repaint();
+    };
+}
+
+void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
+{
+    stopDeferredThemePrewarm();
+
+    // Each thread invocation gets its own stop flag so that detaching the
+    // previous thread and resetting the flag doesn't create a race.
+    themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
+    auto stopFlag = themePrewarmStopFlag;  // shared_ptr copy — thread owns a ref
+
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+
+    themePrewarmThread = std::thread([safeThis, stopFlag, activeColorIndex]()
+    {
+        std::array<int, 5> prewarmOrder { activeColorIndex, 0, 1, 2, 3 };
+        int orderCursor = 1;
+        for (int i = 0; i < 5 && orderCursor < 5; ++i)
+        {
+            const int candidate = i;
+            if (candidate == activeColorIndex)
+                continue;
+            prewarmOrder[static_cast<size_t>(orderCursor++)] = candidate;
+        }
+
+        for (int i = 0; i < orderCursor; ++i)
+        {
+            if (stopFlag->load())
+                return;
+
+            const int colorIndex = prewarmOrder[static_cast<size_t>(i)];
+            auto backgroundPack = getOrDecodeBackgroundAssetPack(colorIndex);
+            auto pack = CustomLookAndFeel::getOrDecodeThemeAssetPack(colorIndex);
+
+            if (stopFlag->load())
+                return;
+
+            juce::MessageManager::callAsync(
+                [safeThis, colorIndex, activeColorIndex, pack = std::move(pack), backgroundPack = std::move(backgroundPack)]() mutable
+                {
+                    if (safeThis == nullptr)
+                        return;
+                    safeThis->customLookAndFeel.installThemeAssetPack(colorIndex, std::move(pack));
+                    if (colorIndex == activeColorIndex)
+                    {
+                        safeThis->backgroundImage = backgroundPack.off;
+                        safeThis->backgroundImageLit = backgroundPack.lit;
+                        safeThis->audioProcessor.logLoadTraceEvent(
+                            "editor_active_theme_ready_ms",
+                            juce::Time::getMillisecondCounterHiRes() - safeThis->editorCtorStartMs,
+                            "engine=" + juce::String(activeColorIndex));
+                        safeThis->repaint();
+                    }
+                });
+        }
+    });
+}
+
+void ChoroborosPluginEditor::stopDeferredThemePrewarm()
+{
+    // Signal the current thread invocation to stop.
+    themePrewarmStopFlag->store(true);
+
+    // IMPORTANT: Do NOT call themePrewarmThread.join() here.
+    // This function runs on the message thread (from the editor destructor).
+    // The worker thread calls MessageManager::callAsync(), which needs the
+    // message thread to process its callback.  Calling join() here would
+    // deadlock: message thread blocked in join(), worker blocked in callAsync().
+    //
+    // Instead we detach the thread and let it exit on its own — it checks
+    // its own stop flag every iteration, and all callAsync lambdas use a
+    // SafePointer that will be null once the editor is destroyed.
+    if (themePrewarmThread.joinable())
+        themePrewarmThread.detach();
+}
+
+void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)
+{
+    if (devWindow != nullptr)
+        return;
+
+    const double startMs = juce::Time::getMillisecondCounterHiRes();
+    devWindow = std::make_unique<DevPanelWindow>(*this, audioProcessor);
+
+    const juce::String eventName = triggeredByUser
+        ? "editor_devpanel_create_on_demand_ms"
+        : "editor_devpanel_prewarm_ms";
+    audioProcessor.logLoadTraceEvent(eventName,
+                                     juce::Time::getMillisecondCounterHiRes() - startMs);
+
+    devPanelPrewarmComplete = true;
+}
+
+void ChoroborosPluginEditor::scheduleDeferredDevPanelPrewarm()
+{
+    if (devPanelPrewarmScheduled || devPanelPrewarmComplete)
+        return;
+
+    devPanelPrewarmScheduled = true;
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    juce::Timer::callAfterDelay(1500, [safeThis]()
+    {
+        if (safeThis == nullptr)
+            return;
+        safeThis->ensureDevPanelWindowCreated(false);
+    });
+}
+
+void ChoroborosPluginEditor::setupSliderAttachments()
+{
+    rateAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::RATE_ID, rateSlider);
+    depthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::DEPTH_ID, depthSlider);
+    offsetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::OFFSET_ID, offsetSlider);
+    widthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::WIDTH_ID, widthSlider);
+    colorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::COLOR_ID, colorSlider);
+    mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::MIX_ID, mixSlider);
+}
+
+void ChoroborosPluginEditor::setupSliderValueChangeListeners()
+{
+    rateSlider.onValueChange = [this] { updateValueLabel(rateValueLabel, rateSlider.getValue(), ChoroborosAudioProcessor::RATE_ID); };
+    depthSlider.onValueChange = [this] { updateValueLabel(depthValueLabel, depthSlider.getValue(), ChoroborosAudioProcessor::DEPTH_ID); };
+    offsetSlider.onValueChange = [this] { updateValueLabel(offsetValueLabel, offsetSlider.getValue(), ChoroborosAudioProcessor::OFFSET_ID); };
+    widthSlider.onValueChange = [this] { updateValueLabel(widthValueLabel, widthSlider.getValue(), ChoroborosAudioProcessor::WIDTH_ID); };
+    colorSlider.onValueChange = [this] { updateValueLabel(colorValueLabel, colorSlider.getValue(), ChoroborosAudioProcessor::COLOR_ID); };
+    mixSlider.onValueChange = [this] { updateValueLabel(mixValueLabel, mixSlider.getValue(), ChoroborosAudioProcessor::MIX_ID); };
+}
+
+void ChoroborosPluginEditor::updateValueLabelColors(int colorIndex)
+{
+    juce::Colour valueTextColor;
+    if (layoutTuning.valueTextColourMode != 0)
+    {
+        valueTextColor = juce::Colour(static_cast<juce::uint32>(layoutTuning.valueTextColour));
+    }
+    else
+    {
+        // Color values for each engine:
+        // Green (0): #9dbd78
+        // Blue (1): #7fb8ff
+        // Red (2): #ff8d8b
+        // Purple (3): #b88dd8
+        // Black (4): #d4d4d4
+        if (colorIndex == 0) // Green
+            valueTextColor = juce::Colour(0xff9dbd78);
+        else if (colorIndex == 1) // Blue
+            valueTextColor = juce::Colour(0xff7fb8ff);
+        else if (colorIndex == 2) // Red
+            valueTextColor = juce::Colour(0xffff8d8b);
+        else if (colorIndex == 3) // Purple
+            valueTextColor = juce::Colour(0xffb88dd8);
+        else // Black (colorIndex == 4)
+            valueTextColor = juce::Colour(0xffd4d4d4);
+    }
+
+    const float alphaScale = static_cast<float>(juce::jlimit(0, 100, layoutTuning.valueTextAlphaPct)) * 0.01f;
+    valueTextColor = valueTextColor.withMultipliedAlpha(alphaScale);
+    
+    // Update all value label text colors
+    rateValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    depthValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    offsetValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    widthValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    colorValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    mixValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    
+    // Also update editor text colors (for when editing)
+    rateValueLabel.setEditorTextColor(valueTextColor);
+    depthValueLabel.setEditorTextColor(valueTextColor);
+    offsetValueLabel.setEditorTextColor(valueTextColor);
+    widthValueLabel.setEditorTextColor(valueTextColor);
+    colorValueLabel.setEditorTextColor(valueTextColor);
+    mixValueLabel.setEditorTextColor(valueTextColor);
+    
+    // Repaint all value labels to show new color
+    rateValueLabel.repaint();
+    depthValueLabel.repaint();
+    offsetValueLabel.repaint();
+    widthValueLabel.repaint();
+    colorValueLabel.repaint();
+    mixValueLabel.repaint();
+}
+
+void ChoroborosPluginEditor::loadBackgroundImage(int colorIndex)
+{
+    const auto pack = getOrDecodeBackgroundAssetPack(colorIndex);
+    backgroundImage = pack.off;
+    backgroundImageLit = pack.lit;
+}
+
+int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const
+{
+    // Calculate text width and add 16px total (8px padding on each side)
+    // Use GlyphArrangement for accurate text width (recommended approach)
+    float textWidth = juce::GlyphArrangement::getStringWidth(font, text);
+    return static_cast<int>(std::ceil(textWidth)) + 16;
+}
+
+void ChoroborosPluginEditor::setupSlider(juce::Slider& slider, LabelWithContainer& label, LabelWithContainer& valueLabel,
+                                         const juce::String& name, const juce::String& paramId)
+{
+    addAndMakeVisible(slider);
+    addAndMakeVisible(label);
+    addAndMakeVisible(valueLabel);
+    
+    label.setText(name, juce::dontSendNotification);
+    label.setJustificationType(juce::Justification::centred);
+    label.setColour(juce::Label::textColourId, juce::Colours::white);
+    const juce::Font font = makeUiTextFont(14.0f * getUiScale(), true);
+    label.setFont(font);
+    
+    // Set tooltips based on parameter
+    if (paramId == ChoroborosAudioProcessor::RATE_ID)
+        slider.setTooltip("LFO Speed: Controls the modulation rate from 0.01 Hz (slow, lush) to 20 Hz (fast, vibrato). Lower values create classic chorus, higher values add movement.");
+    else if (paramId == ChoroborosAudioProcessor::DEPTH_ID)
+        slider.setTooltip("Modulation Depth: Controls how much the delay time is modulated. 0% = no effect, 100% = maximum modulation. Engine-specific scaling applied.");
+    else if (paramId == ChoroborosAudioProcessor::OFFSET_ID)
+        slider.setTooltip("LFO Phase Offset: Shifts the modulation phase from 0° to 180°. Useful for stereo width and avoiding phase cancellation.");
+    else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
+        slider.setTooltip("Stereo Width: Controls the stereo spread from 0% (mono) to 200% (wide). Adjusts the phase relationship between left and right channels.");
+    else if (paramId == ChoroborosAudioProcessor::COLOR_ID)
+        slider.setTooltip("Tone/Character: Engine-specific parameter. Green=bloom (wet body/softness), Blue=focus (wet clarity/presence), Red NQ=post-chorus drive, Red HQ=tape tone+drive, Purple=warp/orbit shape, Black=modulation intensity/ensemble spread.");
+    else if (paramId == ChoroborosAudioProcessor::MIX_ID)
+        slider.setTooltip("Dry/Wet Mix: Blends the original signal (0%) with the processed signal (100%). 50% = equal blend.");
+
+    if (auto* parameter = audioProcessor.getValueTreeState().getParameter(paramId))
+    {
+        if (auto* rangedParameter = dynamic_cast<juce::RangedAudioParameter*>(parameter))
+        {
+            const double defaultValue = static_cast<double>(rangedParameter->convertFrom0to1(rangedParameter->getDefaultValue()));
+            slider.setDoubleClickReturnValue(true, defaultValue);
+        }
+    }
+
+    if (paramId == ChoroborosAudioProcessor::RATE_ID)
+    {
+        if (auto* smoothedSlider = dynamic_cast<SmoothedSlider*>(&slider))
+        {
+            smoothedSlider->onMouseUpCallback = [this, &slider](const juce::MouseEvent& e)
+            {
+                if (e.mods.isPopupMenu())
+                    showRateSyncMenu(slider);
+            };
+        }
+    }
+    
+    // Position labels above knobs/sliders (will be set per control in constructor)
+}
+
+double ChoroborosPluginEditor::getHostBpm() const
+{
+    if (auto* playHead = audioProcessor.getPlayHead())
+    {
+        if (auto position = playHead->getPosition())
+        {
+            if (auto bpm = position->getBpm())
+                return *bpm;
+        }
+    }
+    return 120.0;
+}
+
+void ChoroborosPluginEditor::showRateSyncMenu(juce::Slider& rateControl)
+{
+    rateSyncOverlay_.reset();
+
+    const double bpm = getHostBpm();
+    if (bpm <= 0.0)
+        return;
+
+    const double mappedCurrent = static_cast<double>(audioProcessor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, static_cast<float>(rateControl.getValue())));
+    const double mappedFromMin = static_cast<double>(audioProcessor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, static_cast<float>(rateControl.getMinimum())));
+    const double mappedFromMax = static_cast<double>(audioProcessor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID, static_cast<float>(rateControl.getMaximum())));
+    const double mappedMin = juce::jmin(mappedFromMin, mappedFromMax);
+    const double mappedMax = juce::jmax(mappedFromMin, mappedFromMax);
+    constexpr double maxQuantizedRateHz = 20.0;
+    const double quantizedMappedMax = juce::jmin(mappedMax, maxQuantizedRateHz);
+
+    rateSyncOverlay_ = std::make_unique<RateSyncOverlay>();
+    rateSyncOverlay_->configure(bpm, mappedCurrent, mappedMin, quantizedMappedMax);
+    rateSyncOverlay_->setAnchorPoint(rateControl.getBoundsInParent().getCentre());
+
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+
+    rateSyncOverlay_->onRateSelected = [safeThis, mappedMin, quantizedMappedMax](double targetHz)
+    {
+        if (safeThis == nullptr || targetHz <= 0.0)
+            return;
+
+        const double clampedMapped = juce::jlimit(mappedMin, quantizedMappedMax, targetHz);
+        double lo = safeThis->rateSlider.getMinimum();
+        double hi = safeThis->rateSlider.getMaximum();
+        for (int i = 0; i < 30; ++i)
+        {
+            const double mid = 0.5 * (lo + hi);
+            const double mappedMid = static_cast<double>(safeThis->audioProcessor.mapParameterValue(
+                ChoroborosAudioProcessor::RATE_ID, static_cast<float>(mid)));
+            if (mappedMid < clampedMapped)
+                lo = mid;
+            else
+                hi = mid;
+        }
+        const double raw = juce::jlimit(safeThis->rateSlider.getMinimum(),
+                                        safeThis->rateSlider.getMaximum(), 0.5 * (lo + hi));
+        safeThis->rateSlider.setValue(raw, juce::sendNotificationSync);
+    };
+
+    rateSyncOverlay_->onDismiss = [safeThis]()
+    {
+        if (safeThis != nullptr)
+            safeThis->rateSyncOverlay_.reset();
+    };
+
+    addAndMakeVisible(*rateSyncOverlay_);
+    rateSyncOverlay_->setBounds(getLocalBounds());
+    rateSyncOverlay_->grabKeyboardFocus();
+}
+
+void ChoroborosPluginEditor::updateValueLabel(LabelWithContainer& label, float value, const juce::String& paramId)
+{
+    const float mappedValue = audioProcessor.mapParameterValue(paramId, value);
+    juce::String text;
+    
+    if (paramId == ChoroborosAudioProcessor::RATE_ID)
+    {
+        // Rate: < 1.0 Hz: 2 decimals, >= 1.0 Hz: 1 decimal
+        if (mappedValue < 1.0f)
+            text = juce::String(mappedValue, 2) + " Hz";
+        else
+            text = juce::String(mappedValue, 1) + " Hz";
+    }
+    else if (paramId == ChoroborosAudioProcessor::DEPTH_ID)
+    {
+        text = juce::String(static_cast<int>(mappedValue * 100.0f)) + "%";
+    }
+    else if (paramId == ChoroborosAudioProcessor::OFFSET_ID)
+    {
+        text = juce::String(static_cast<int>(mappedValue)) + "°";
+    }
+    else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
+    {
+        text = juce::String(static_cast<int>(mappedValue * 100.0f)) + "%";
+    }
+    else if (paramId == ChoroborosAudioProcessor::COLOR_ID)
+    {
+        text = juce::String(static_cast<int>(mappedValue * 100.0f)) + "%";
+    }
+    else if (paramId == ChoroborosAudioProcessor::MIX_ID)
+    {
+        text = juce::String(static_cast<int>(mappedValue * 100.0f)) + "%";
+    }
+    
+    label.setAnimatedValueText(text);
+}
+
+void ChoroborosPluginEditor::setupValueLabelEditing(LabelWithContainer& label, juce::Slider& slider, const juce::String& paramId)
+{
+    label.onValueEdited = [this, &slider, &label, paramId](const juce::String& newText) -> bool
+    {
+        const float parsedMappedValue = parseValueFromText(newText, paramId);
+        if (parsedMappedValue >= 0.0f)  // Valid value
+        {
+            // Parse/edit values are in mapped display space; clamp in mapped space first.
+            const float mappedFromMin = audioProcessor.mapParameterValue(paramId, static_cast<float>(slider.getMinimum()));
+            const float mappedFromMax = audioProcessor.mapParameterValue(paramId, static_cast<float>(slider.getMaximum()));
+            const float mappedMin = juce::jmin(mappedFromMin, mappedFromMax);
+            const float mappedMax = juce::jmax(mappedFromMin, mappedFromMax);
+            const float clampedMappedValue = juce::jlimit(mappedMin, mappedMax, parsedMappedValue);
+
+            // Convert mapped display value back to raw parameter value.
+            const float rawValue = audioProcessor.unmapParameterValue(paramId, clampedMappedValue);
+            const float clampedRawValue = static_cast<float>(juce::jlimit(slider.getMinimum(), slider.getMaximum(),
+                                                                           static_cast<double>(rawValue)));
+
+            auto* param = audioProcessor.getValueTreeState().getParameter(paramId);
+            if (param != nullptr)
+            {
+                // Convert to normalized 0-1 range
+                float normalizedValue = param->convertTo0to1(clampedRawValue);
+                // Clamp normalized value to valid range
+                normalizedValue = juce::jlimit(0.0f, 1.0f, normalizedValue);
+                param->setValueNotifyingHost(normalizedValue);
+            }
+            else
+            {
+                // Parameter not found - fallback to slider update
+                slider.setValue(clampedRawValue, juce::sendNotificationSync);
+            }
+            
+            // Also set slider value to update visual position
+            slider.setValue(clampedRawValue, juce::dontSendNotification);
+            
+            // Format and set the label text - this will be picked up by editorAboutToBeHidden
+            updateValueLabel(label, clampedRawValue, paramId);
+            label.repaint();
+            repaint();
+            return true;  // Value was applied successfully
+        }
+        else
+        {
+            // Invalid value - restore previous value
+            updateValueLabel(label, slider.getValue(), paramId);
+            label.repaint();
+            repaint();
+            return false;  // Value was not applied
+        }
+    };
+}
+
+float ChoroborosPluginEditor::parseValueFromText(const juce::String& text, const juce::String& paramId)
+{
+    const juce::String trimmed = text.trim();
+    
+    if (paramId == ChoroborosAudioProcessor::RATE_ID)
+        return parseRateValue(trimmed);
+    if (paramId == ChoroborosAudioProcessor::DEPTH_ID)
+        return parseDepthValue(trimmed);
+    if (paramId == ChoroborosAudioProcessor::OFFSET_ID)
+        return parseOffsetValue(trimmed);
+    if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
+        return parseWidthValue(trimmed);
+    if (paramId == ChoroborosAudioProcessor::COLOR_ID)
+        return parseColorValue(trimmed);
+    if (paramId == ChoroborosAudioProcessor::MIX_ID)
+        return parseMixValue(trimmed);
+    
+    return -1.0f; // Invalid
+}
+
+float ChoroborosPluginEditor::parseRateValue(const juce::String& trimmed)
+{
+    juce::String clean = trimmed.removeCharacters("Hz").trim();
+    const float value = clean.getFloatValue();
+    if (value > 0.0f && std::isfinite(value))
+        return value;
+    return -1.0f;
+}
+
+float ChoroborosPluginEditor::parseDepthValue(const juce::String& trimmed)
+{
+    juce::String clean = trimmed.removeCharacters("%").trim();
+    const float value = clean.getFloatValue();
+    if (value >= 0.0f && std::isfinite(value))
+        return (value > 1.0f) ? (value / 100.0f) : value;
+    return -1.0f;
+}
+
+float ChoroborosPluginEditor::parseOffsetValue(const juce::String& trimmed)
+{
+    juce::String clean = trimmed.removeCharacters("°").trim();
+    if (clean.endsWithIgnoreCase("deg"))
+        clean = clean.substring(0, clean.length() - 3).trim();
+    const float value = clean.getFloatValue();
+    if (std::isfinite(value))
+        return value;
+    return -1.0f;
+}
+
+float ChoroborosPluginEditor::parseWidthValue(const juce::String& trimmed)
+{
+    juce::String clean = trimmed.removeCharacters("%").trim();
+    const float value = clean.getFloatValue();
+    if (value >= 0.0f && std::isfinite(value))
+        return (value > 2.0f) ? (value / 100.0f) : value;
+    return -1.0f;
+}
+
+float ChoroborosPluginEditor::parseColorValue(const juce::String& trimmed)
+{
+    juce::String clean = trimmed.removeCharacters("%").trim();
+    const float value = clean.getFloatValue();
+    if (value >= 0.0f && std::isfinite(value))
+        return (value > 1.0f) ? (value / 100.0f) : value;
+    return -1.0f;
+}
+
+float ChoroborosPluginEditor::parseMixValue(const juce::String& trimmed)
+{
+    juce::String clean = trimmed.removeCharacters("%").trim();
+    const float value = clean.getFloatValue();
+    if (value >= 0.0f && std::isfinite(value))
+        return (value > 1.0f) ? (value / 100.0f) : value;
+    return -1.0f;
+}

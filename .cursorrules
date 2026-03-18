@@ -1,0 +1,263 @@
+# Choroboros — Cursor Rules for v2.04-dev
+# JUCE 8.0.12 audio plugin (VST3/AU/AAX/Standalone)
+# Copyright (C) 2026 Kaizen Strategic AI Inc. (DBA: Kaizen DSP)
+
+You are working on Choroboros, a multi-engine chorus audio plugin. Five
+selectable "color" engines (Green, Blue, Red, Purple, Black) each with
+distinct DSP interpolation cores. Built on JUCE 8.0.12. Targets macOS
+(AU/VST3/Standalone), Windows (VST3/Standalone), and AAX.
+
+Active branch: `v2.04-dev`
+
+---
+
+## Repository Layout
+
+```
+Source/
+  Plugin/           PluginProcessor, PluginEditor, parameter wiring,
+                    SessionLog, CrashReporter, FeedbackDialog/Collector
+  DSP/              ChorusDSP engine, processBlock, prepare, signal chain
+  Cores/
+    green_engine_classic/       Lagrange 3rd & 5th interpolation
+    blue_engine_modern/         Cubic & Thiran allpass interpolation
+    red_engine_vintage/         BBD cascade & Tape delay
+    purple_engine_experimental/ Orbit & PhaseWarped
+    black_engine_linear/        Linear & Ensemble
+  UI/               CustomLookAndFeel, DevPanel, SmoothedSlider,
+                    AnimatedToggleButton, PluginEditorSetup
+  Config/           DefaultsPersistence (factory defaults)
+  Presets/          Preset management
+
+Tests/              ChoroborosRegressionTests (single harness, DSP + GUI)
+Assets/             GUI images, icons (BinaryData resources)
+Installers/         Platform packaging (pkgbuild, Inno Setup)
+```
+
+---
+
+## MANDATORY: Verify-Then-Commit Protocol
+
+NEVER commit without completing ALL of these steps IN ORDER.
+If you are asked to commit, review, or "get clean", follow this exact sequence.
+
+### Step 1 — Read the actual code you claim to have fixed
+
+Before writing ANY commit message, open every file you modified and verify
+the implementation matches what you plan to say in the commit. Read the
+functions, trace the control flow, check edge cases. Do NOT trust your
+memory of what you wrote — verify against the source.
+
+Specific things to check:
+- Did the early-return guards skip code you thought would execute?
+- Are there race conditions between multiple plugin instances or processes?
+- Is signal-handler code truly async-signal-safe? (no mutex, no heap, no juce::String)
+- Do PID-keyed files handle PID reuse correctly?
+- Does process-liveness checking actually happen before promoting orphan logs?
+
+### Step 2 — Build
+
+```bash
+cmake --build build-release --target ChoroborosRegressionTests -j4
+```
+
+Fix all errors. Do not proceed until the build is clean.
+
+### Step 3 — Run DSP-only tests
+
+```bash
+./build-release/ChoroborosRegressionTests --dsp-only
+```
+
+ALL tests must pass. Zero tolerance. If DSP tests fail, the code is wrong.
+
+### Step 4 — Run full regression harness
+
+```bash
+./build-release/ChoroborosRegressionTests
+```
+
+Known acceptable failure (ONE only):
+`ChoroborosRegressionTests.cpp ~line 364 — "DevPanel console component not found"`
+
+Any OTHER new failure blocks the commit. Fix it first.
+
+### Step 5 — Review the diff line by line
+
+```bash
+git status --short
+git diff --stat
+git diff          # read every line
+```
+
+Check for:
+- Accidental `DBG()`, `std::cout`, `printf` left in
+- Hardcoded paths, credentials, email addresses that shouldn't be there
+- Whitespace-only changes (revert them)
+- Build artifacts, .DS_Store, or other junk staged
+- Logic that contradicts the intended fix (the most dangerous kind of bug)
+
+### Step 6 — Write an honest commit message
+
+Format: `type(scope): concise description` (subject < 72 chars)
+
+Types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
+Scopes: `dsp`, `ui`, `plugin`, `feedback`, `preset`, `installer`, `build`
+
+Body rules:
+- Describe WHAT the code actually does, not what you intended it to do
+- If something is partially fixed or has a known limitation, say so
+- If addressing review findings, reference them: "P1 — ...", "P2 — ..."
+- Use `WIP:` prefix if any known issue remains. Do NOT claim "all fixed"
+  unless every finding is verified in the live source
+
+### Step 7 — Verify clean state
+
+```bash
+git status
+git log --oneline -5
+```
+
+---
+
+## HARD RULES — VIOLATIONS BREAK THE PLUGIN
+
+### 1. Red engine defaults are sacred
+Never touch user-facing macros that set Red engine defaults (mix/color).
+These values are intentionally tuned. If you think they're wrong, ask first.
+
+### 2. Crash handler = async-signal-safe ONLY
+`CrashReporter.cpp` signal/exception handlers may ONLY call:
+- POSIX: `unlink()`, `_exit()`, `raise()` — nothing else
+- Windows: `DeleteFileA()` — nothing else
+
+Absolutely forbidden inside handlers: `juce::String`, `std::mutex`,
+`std::string`, `new`/`delete`, `malloc`/`free`, file open/write/read,
+`juce::File`, `DBG()`, any JUCE method, any STL container operation.
+
+The crash handler's ONLY job is deleting the clean-shutdown marker file.
+The 30-second timer flush ensures the log is already on disk.
+
+### 3. Multi-instance safety (PID-keyed files)
+- Live log:       `session_log_{pid}.json`
+- Shutdown marker: `.clean_shutdown_{pid}`
+- Multiple plugin instances in the SAME DAW share one PID (correct)
+- Different DAWs get different PIDs (correct)
+- `CrashReporter` refcount: install handlers on first instance (0→1),
+  uninstall on last destroy (→0). Never uninstall while instances remain.
+
+### 4. Orphan-log scanner: check process liveness
+Before promoting `session_log_{pid}.json` as a crash report:
+1. Skip if PID matches our own process
+2. Check if PID is alive: `kill(pid, 0)` on POSIX, `OpenProcess` on Windows
+3. If alive → skip (it's another DAW still running)
+4. If dead + no clean marker → genuine crash, promote to `crash_report_pending.txt`
+
+NEVER assume "no clean marker = crashed". REAPER could still be running.
+
+### 5. Session-log events fire unconditionally
+In `PluginProcessor::parameterChanged()`, engine-switch and HQ-toggle
+`sessionLog->log()` calls MUST execute BEFORE the `isBulkChange` early
+return. Otherwise preset loads, state restores, and engine-profile
+applies silently skip logging.
+
+Pattern:
+```cpp
+// Log unconditionally
+if (parameterID == ENGINE_COLOR_ID && sessionLog != nullptr)
+    sessionLog->log(EventType::EngineSwitch, ...);
+else if (parameterID == HQ_ID && sessionLog != nullptr)
+    sessionLog->log(EventType::HqToggle, ...);
+
+// THEN check bulk-change guard
+if (isBulkChange) { ... return; }
+
+// Normal handling below
+```
+
+### 6. Crash reports preserved until user acts
+- `readPendingCrashReport()` — read-only, never deletes
+- `clearPendingCrashReport()` — only called AFTER user sends, saves, or dismisses
+- If mail launch fails or user closes dialog, the report file survives
+
+### 7. UI scale factor
+`kUiScale = 0.91f`. All pixel values in PluginEditor go through
+`uiScaleInt()`. Never hardcode raw pixel numbers.
+
+### 8. Git discipline
+- No force-push to `v2.04-dev`
+- New commits only — never amend shared history
+- No `--no-verify` to skip hooks
+
+---
+
+## DSP Rules
+
+- Every DSP change requires `--dsp-only` test pass before commit
+- Audio-thread code: ZERO allocations, ZERO locks. Use `tryLog()` for
+  session events (try_lock, drop on contention — never block audio)
+- `processBlock` anomaly detection (NaN/Inf/hard-clip >2.0) is throttled
+  to 1 event per 2 seconds via `lastAnomalyLogTimeMs` atomic. Do not
+  remove the throttle — it prevents log spam at audio rate
+- Oversampling changes: verify latency compensation end-to-end
+- Filter coefficients: test stability at 22050 Hz and 192000 Hz
+- Interpolation cores: check for denormals, zipper noise on param changes
+
+---
+
+## Code Style
+
+- Copyright header on every `.cpp` / `.h` (GPL-3.0+, Kaizen Strategic AI Inc.)
+- JUCE style: spaces (no tabs), `juce::` prefix everywhere, no
+  `using namespace juce`
+- Braces on same line for single-statement control flow
+- BinaryData identifiers: JUCE converts filenames by replacing
+  non-alphanumeric chars with `_`
+  (`bug_feedback_button.png` → `BinaryData::bug_feedback_button_png`)
+- Assets declared in `CMakeLists.txt` under `juce_add_binary_data`
+- ImageButton opacity convention: 0.7f normal, 1.0f hover, 0.5f pressed
+
+---
+
+## Key Architecture Decisions
+
+### Feedback & Crash System
+- `SessionLog` — ring buffer (64 events), periodic 30s flush to disk
+- `CrashReporter` — static install/uninstall, refcounted, signal-safe
+- `FeedbackDialog` — normal mode + crash-report mode (amber UI),
+  `mailto:info@kaizenstrategic.ai` with URL-encoded body
+- `FeedbackCollector` — usage stats, host info, non-owning SessionLog ptr
+
+### Parameter Change Flow
+`parameterChanged()` is the single truth for all parameter sources:
+manual UI, automation, preset load, state restore, engine profile apply.
+Guard flags (`presetLoadInProgress`, `stateLoadInProgress`,
+`engineProfileApplyInProgress`) prevent recursive profile saves but
+must NOT block session logging.
+
+### Engine Profile System
+Each color engine stores its own parameter profile. Switching engines:
+1. Save current params to outgoing engine profile
+2. Apply incoming engine profile
+3. `engineProfileApplyInProgress` flag prevents recursive `parameterChanged`
+   calls from re-saving during the apply
+
+---
+
+## Known Issues (do not "fix" without discussion)
+
+- DevPanel console component not found in regression test (GUI test)
+- Knob sensitivity / SmoothedSlider 1px drift (partially addressed)
+- Code signing blocked on DUNS number (C4)
+- Alt+click 1px drift, color slider glitch, dev button misalignment,
+  pyramid centering — logged but low priority
+- Resizable GUI — high priority, not yet implemented
+
+---
+
+## When in Doubt
+
+If your commit message needs a `WIP:` prefix, that's honest. Ship it.
+If you're unsure whether a finding is actually fixed, re-read the code
+one more time. The most dangerous commits are the ones where the message
+says "fixed" but the code says otherwise.

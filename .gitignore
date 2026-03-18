@@ -1,0 +1,68 @@
+# macOS
+.DS_Store
+
+# Build and cache
+Build/
+build/
+build-*/
+Release/
+Universal-Build/
+AU/
+VST3/
+.cache/
+.codacy/
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.vst3
+*.component
+*.app
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+.juce/
+dmg_temp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+
+# Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+
+# Large third-party docs (Pro Tools, Avid, etc.)
+Documentation/*.pdf
+Documentation/*.url
+
+# Beta tester feedback (names, emails, verbatim responses)
+feedback/
+
+# Local workspace noise (duplicate root-level source copies)
+/AnimatedToggleButton.cpp
+/AnimatedToggleButton.h
+/CustomLookAndFeel.cpp
+/DevPanel.cpp
+/PluginEditor.cpp
+/PluginEditor.h
+/PluginEditorSetup.cpp
+/PluginEditorSetup.h
+
+# Local comparison scratch scripts
+/compare_internals.py
+/compare_internals_param.py
+
+# Local artifacts / external bundles
+/aax-validator-dsh-2024-6-0-138bab0d-mac-arm64/
+/build-verify/
+/Pro_Tools_3PDev_2025_12_0_Mac_arm/
+
+# Removed Bloat
+/local_archive/
+/JUCE/
