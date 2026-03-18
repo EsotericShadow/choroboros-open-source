@@ -176,3 +176,76 @@ jobs:
           path: dist/windows-x64/
           if-no-files-found: error
           retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows x86 — VST3 + Standalone
+  # 32-bit build for legacy DAW hosts that require 32-bit plugins.
+  # Note: most modern DAWs are 64-bit only. This job exists for beta testers
+  # who specifically need x86 compatibility.
+  # ---------------------------------------------------------------------------
+  windows-x86:
+    name: Windows x86
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-x86-release
+          key: windows-x86-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-x86-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-x86-release `
+            -G "Visual Studio 17 2022" -A Win32
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-x86-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/windows-x86-release `
+            --config Release `
+            --target ChoroborosRegressionTests `
+            --parallel
+
+      - name: Run DSP regression tests
+        shell: cmd
+        run: |
+          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --dsp-only
+
+      - name: Collect artifacts
+        shell: cmd
+        run: |
+          mkdir dist\windows-x86
+          xcopy /E /I /Q ^
+            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" ^
+            "dist\windows-x86\Choroboros.vst3"
+          copy ^
+            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" ^
+            "dist\windows-x86\Choroboros.exe"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-windows-x86
+          path: dist/windows-x86/
+          if-no-files-found: error
+          retention-days: 30
