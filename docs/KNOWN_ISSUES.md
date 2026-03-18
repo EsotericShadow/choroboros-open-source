@@ -4,7 +4,7 @@ Issues known for Choroboros v2.04-dev. Please report additional issues via the F
 
 ## Current Test Scope
 
-- **Platform:** macOS (VST3, AU, AAX, Standalone) and Windows (VST3, Standalone — x64 primary, x86-compat). Linux not yet available.
+- **Platform:** macOS (VST3, AU, Standalone) and Windows (VST3, Standalone — x64 primary, x86-compat). Linux not yet available.
 - **Dev Panel:** Built-in diagnostic and tuning suite. Click the drawer tab (top-right) to expand the icon bar, then click the **DEV** icon to open. Intended for power users; some controls may be experimental.
 
 ## System Requirements

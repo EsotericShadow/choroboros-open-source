@@ -30,7 +30,7 @@ Choroboros is a multi-engine chorus plugin with five distinct engines, each offe
 
 ### Parameters
 
-- **Rate:** LFO speed (0.01–10 Hz); right-click for musical quantize (Straight/Triplet/Dotted, cap 20 Hz)
+- **Rate:** LFO speed (0.01–20 Hz); right-click for musical quantize (Straight/Triplet/Dotted, cap 20 Hz)
 - **Depth:** Modulation depth (0–100%, engine-specific scaling)
 - **Offset:** LFO phase offset (0–180°)
 - **Width:** Stereo width (0–200%)
@@ -82,11 +82,6 @@ Copy `Choroboros.component` to:
 - `/Library/Audio/Plug-Ins/Components/` (system-wide)
 - `~/Library/Audio/Plug-Ins/Components/` (user-specific)
 
-### macOS — AAX (Pro Tools)
-Copy `Choroboros.aaxplugin` to:
-- `~/Library/Application Support/Avid/Audio/Plug-Ins/` (user)
-- `/Library/Application Support/Avid/Audio/Plug-Ins/` (system)
-
 ### macOS — Standalone
 Copy `Choroboros.app` to `/Applications/` or any location you prefer.
 
@@ -108,7 +103,7 @@ After installation, rescan plugins in your DAW.
 
 - **macOS:** 10.13 High Sierra or later (Intel or Apple Silicon)
 - **Windows:** Windows 10 or later (x64 or x86)
-- **DAW:** Any DAW that supports VST3, AU, or AAX plugins
+- **DAW:** Any DAW that supports VST3 or AU plugins
 
 > **Note:** Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are not supported. The JUCE 8 framework requires 10.13 as a minimum deployment target. AU validation will fail on unsupported systems.
 
@@ -119,7 +114,7 @@ After installation, rescan plugins in your DAW.
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
 - **Sample Rate:** Up to 192 kHz
-- **Formats:** VST3, AU, AAX, Standalone (macOS); VST3, Standalone (Windows)
+- **Formats:** VST3, AU, Standalone (macOS); VST3, Standalone (Windows)
 - **macOS:** Universal binary (arm64 + x86_64)
 - **Windows:** x64 primary, x86-compat
 

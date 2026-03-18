@@ -39,7 +39,7 @@ This manual explains exactly what those six knobs do, what those five colors rep
 
 ## 1. Installation & First Launch
 
-Choroboros comes compiled as an AU, VST3, AAX, and Standalone application for macOS and Windows. 
+Choroboros comes compiled as VST3, AU, and Standalone for macOS, and VST3 and Standalone for Windows.
 
 1.  Place the provided plugins in your operating system's default plugin directories (e.g., `/Library/Audio/Plug-Ins/VST3` on Mac, or `C:\Program Files\Common Files\VST3` on Windows).
 2.  Launch your DAW (Ableton Live, Logic Pro, FL Studio, REAPER, etc.) and perform a plugin scan.

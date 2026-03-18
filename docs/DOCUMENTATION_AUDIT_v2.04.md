@@ -6,11 +6,11 @@ Audited against source code on 2026-03-17. Each finding is cross-referenced with
 
 ## HIGH SEVERITY — Will mislead users
 
-### 1. README.md — Rate range is wrong
+### ~~1. README.md — Rate range~~ RETRACTED
 
-**Docs say:** `Rate: LFO speed (0.01–20 Hz)`
-**Code says:** Parameter range is **0.01–10.0 Hz** (`PluginProcessor.h:230`, `RATE_MAX = 10.0f`). The 20 Hz figure is the cap for the rate *sync* quantizer only (`PluginEditor.cpp:1307`, `maxQuantizedRateHz = 20.0`), not the slider range.
-**Fix:** Change to `Rate: LFO speed (0.01–10 Hz); right-click for musical quantize (Straight/Triplet/Dotted, cap 20 Hz)`
+**Original claim:** Rate range was wrong (docs say 0.01–20 Hz, raw APVTS max is 10.0 Hz).
+**Correction:** The raw APVTS range (`RATE_MAX = 10.0f`) is NOT the user-facing range. There is a `mapTunedValue` tuning layer that remaps the raw range to the display range. The UI tooltip confirms "0.01 Hz to 20 Hz." The README was correct; the audit was wrong. **No change needed.**
+**Lesson:** Always trace through the full parameter mapping chain — don't stop at `createParameterLayout()`.
 
 ---
 
