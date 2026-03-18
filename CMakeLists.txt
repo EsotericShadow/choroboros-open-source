@@ -207,6 +207,13 @@ target_link_libraries(ChoroborosRegressionTests PRIVATE
     ChoroborosBinaryData
 )
 
+# JUCE's initialization chain (audio plugin client + AAX) exceeds Windows'
+# default 1 MB stack. Raise to 8 MB to prevent STATUS_STACK_OVERFLOW (0xC00000FD)
+# on Windows runners and machines.
+if(MSVC)
+    target_link_options(ChoroborosRegressionTests PRIVATE "/STACK:8388608")
+endif()
+
 # Build gate: regression harness
 # Run directly: ./build/ChoroborosRegressionTests
 # Or: cmake --build build --target ChoroborosRegressionTests && ./build/ChoroborosRegressionTests
