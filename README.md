@@ -30,7 +30,7 @@ Choroboros is a multi-engine chorus plugin with five distinct engines, each offe
 
 ### Parameters
 
-- **Rate:** LFO speed (0.01–20 Hz); right-click for musical quantize (Straight/Triplet/Dotted, cap 20 Hz)
+- **Rate:** LFO speed (0.01–10 Hz); right-click for musical quantize (Straight/Triplet/Dotted, cap 20 Hz)
 - **Depth:** Modulation depth (0–100%, engine-specific scaling)
 - **Offset:** LFO phase offset (0–180°)
 - **Width:** Stereo width (0–200%)
@@ -40,19 +40,19 @@ Choroboros is a multi-engine chorus plugin with five distinct engines, each offe
 
 ### Presets
 
-1. **Classic (Green)** — R=0.65 Hz, D=21%, O=33°, W=150%, M=50%, C=16%
-2. **Modern (Blue)** — R=0.26 Hz, D=53%, O=59°, W=100%, M=50%, C=41%
-3. **Vintage (Red)** — R=0.62 Hz, D=21%, O=56°, W=150%, M=50%, C=50%
-4. **Psychedelic (Purple)** — R=0.12 Hz, D=52%, O=52°, W=200%, M=69%, C=13%
-5. **Core (Black)** — R=0.8 Hz, D=35%, O=41°, W=159%, M=50%, C=28%
-6. **Duck** — Purple HQ, fast modulation
-7. **Ouroboros** — Blue HQ, medium modulation
+1. **Classic (Green NQ)** — R=0.65 Hz, D=21%, O=33°, W=150%, M=50%, C=16%
+2. **Vintage (Red HQ)** — R=0.62 Hz, D=21%, O=56°, W=150%, M=50%, C=50%
+3. **Modern (Blue HQ)** — R=0.26 Hz, D=53%, O=59°, W=100%, M=50%, C=41%
+4. **Psychedelic (Purple NQ)** — R=0.12 Hz, D=52%, O=52°, W=200%, M=69%, C=13%
+5. **Core (Black HQ)** — R=0.8 Hz, D=35%, O=41°, W=159%, M=50%, C=28%
+6. **Duck (Purple HQ)** — R=10 Hz, D=14%, O=50°, W=50%, M=100%, C=10%
+7. **Ouroboros (Blue HQ)** — R=2.0 Hz, D=11%, O=33°, W=33%, M=100%, C=65%
 
 Per-engine parameter memory: switching engines via dropdown restores your last values for that engine.
 
 ### Dev Panel (Power Users)
 
-Built-in diagnostic and tuning suite. Click the **DEV** button (top-left) to open. Features include:
+Built-in diagnostic and tuning suite. Click the **DEV** icon in the top-right drawer to open. Features include:
 - **Interactive Console & Tutorials:** Type `help` to see 30+ power commands or `tutorial` for interactive, guided DSP walkthroughs.
 - **Deep Introspection:** Exposes parameter mapping, DSP internals per engine, and live readout telemetry.
 - **UI Customization:** A dedicated Settings panel allows for granular control over typography, themes, and accessibility options (color-vision assistance, reduced motion, hit targets).
@@ -108,7 +108,7 @@ After installation, rescan plugins in your DAW.
 
 - **macOS:** 10.13 High Sierra or later (Intel or Apple Silicon)
 - **Windows:** Windows 10 or later (x64 or x86)
-- **DAW:** Any DAW that supports VST3 or AU plugins
+- **DAW:** Any DAW that supports VST3, AU, or AAX plugins
 
 > **Note:** Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are not supported. The JUCE 8 framework requires 10.13 as a minimum deployment target. AU validation will fail on unsupported systems.
 
@@ -160,7 +160,7 @@ For more information about JUCE licensing, visit: https://juce.com/legal/juce-8-
 ## Support & Contact
 
 For issues, questions, or licensing inquiries:
-- **Email:** Greenalderson@gmail.com
+- **Email:** info@kaizenstrategic.ai
 - **Company:** Kaizen DSP
 - **Location:** British Columbia, Canada
 

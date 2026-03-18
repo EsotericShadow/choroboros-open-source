@@ -20,12 +20,12 @@ This manual explains exactly what those six knobs do, what those five colors rep
 3.  **The Six Master Knobs**
     *   3.1 Rate (LFO Speed)
     *   3.2 Depth (Pitch & Delay Throw)
-    *   3.3 Offset (Center Delay Target)
+    *   3.3 Offset (LFO Phase Offset)
     *   3.4 Width (Stereo Phase & Correlation)
-    *   3.5 Color (Spectral Filtering)
+    *   3.5 Color (Engine-Specific Character)
     *   3.6 Mix (Parallel Integration)
 4.  **The Engine Core Selector (The Five Colors)**
-    *   4.1 The Green Engine: Classic & Envelopes
+    *   4.1 The Green Engine: Classic Bloom
     *   4.2 The Blue Engine: Modern & Focused
     *   4.3 The Red Engine: Vintage Analog & Tape
     *   4.4 The Purple Engine: Experimental & Asynchronous
@@ -45,7 +45,7 @@ Choroboros comes compiled as an AU, VST3, AAX, and Standalone application for ma
 2.  Launch your DAW (Ableton Live, Logic Pro, FL Studio, REAPER, etc.) and perform a plugin scan.
 3.  Load Choroboros onto an audio track or software synthesizer.
 
-Upon first launch, you will see a sleek, dark interface with six primary controls and a bright colored orb in the top center. This orb dictates the "Engine Color." By default, it glows Green.
+Upon first launch, you will see a sleek, dark interface with six primary controls. The engine selector is in the top-left header area, and a small animated drawer in the top-right gives access to the Dev Panel, About, Help, and Feedback icons. By default, the engine is set to Green.
 
 ---
 
@@ -79,21 +79,29 @@ The **Depth** knob controls the *amplitude* of the LFO. It determines exactly ho
 *   *Interaction Note:* Depth and Rate are inextricably linked. A fast Rate with a high Depth will cause extreme, seasick pitch modulation. If you push the Rate high, usually you must pull the Depth low to maintain musicality.
 
 ### 3.3 Offset
-The **Offset** knob is arguably the most important structural control in Choroboros. It dictates the base "Center Delay" time of the wet signal before the Depth modulation even begins.
-*   **Low Settings (0 - 5 ms):** Flanger territory. The wet signal is so close to the dry signal that deep phase cancellation occurs. Pushing the Rate and Depth up here will sound metallic, jet-engine-like, and physically close to the ear.
-*   **Mid Settings (10 - 25 ms):** True Chorus territory. The classic 1980s Roland Dimension or Juno style thickening. The audio sounds doubled, rich, and wide.
-*   **High Settings (30 - 60 ms):** Slapback territory. The delay is so long that your brain perceives it as a distinct, rhythmic echo rather than a thickened phase. Excellent for rhythmic guitar parts or bouncy synth arpeggios.
+The **Offset** knob controls the LFO phase offset between the left and right stereo channels (0–180°). It determines how "out of step" the left and right modulation sweeps are.
+*   **0° (Full Left):** Both channels sweep in perfect unison. The modulation is identical in left and right, producing a narrower, more centered chorus effect.
+*   **90° (Default, Straight Up):** The left and right LFOs are offset by a quarter cycle. This is the sweet spot for natural-sounding stereo chorus — enough separation to feel wide without sounding disconnected.
+*   **180° (Full Right):** The channels sweep in complete opposition. When the left pitch rises, the right pitch falls. This produces the widest possible stereo image from the LFO offset alone.
+*   *Interaction Note:* Offset and Width both affect stereo spread but in different ways. Offset shifts the LFO *phase relationship* between channels; Width scales the overall stereo *amplitude*. Use them together for maximum spatial control.
 
 ### 3.4 Width
-The **Width** knob controls the stereo spread and LFO phase correlation between your left and right speakers.
-*   **0% (Mono):** The Left and Right LFOs are perfectly locked in phase. They sweep up and down at the exact same millisecond. The chorus sits dead center in the stereo field.
-*   **100% (Anti-Phase):** The Left and Right LFOs are pulled exactly 180-degrees apart. When the left speaker is pitching upwards, the right speaker is pitching downwards. This creates a colossal, hyper-wide stereo image that sounds like it is wrapping completely around the listener's head.
+The **Width** knob controls the stereo spread of the chorus effect (0–200%).
+*   **0% (Mono):** The Left and Right channels output identical chorus signals. The effect sits dead center in the stereo field.
+*   **100% (Default):** Standard stereo width. The left and right channels have natural separation — wide enough to feel spacious without being exaggerated.
+*   **200% (Maximum):** Extreme stereo spread. The channels are pushed as far apart as possible, creating a hyper-wide stereo image that wraps around the listener. Great for ambient pads and special effects, but use with caution on lead instruments — it can thin the center image.
 
 ### 3.5 Color
-The **Color** knob consolidates an entire rack of EQs, Pre-Emphasis filters, and transient shapers into one slider.
-*   **0% (Dark):** Heavy low-pass filtering. High frequencies are destroyed before entering the chorus array, and high frequencies are crushed again when exiting. The resulting chorus is warm, muffled, and sits far back in the mix. Crucial for bass guitars to prevent high-end phase smearing.
-*   **50% (Neutral):** Flat frequency response. What goes in is precisely what comes out.
-*   **100% (Bright):** Extreme high-pass filtering and high-shelf EQ boosting. The low end is removed entirely to prevent muddy low-frequency phasing. The high frequencies are heavily amplified, creating a crystalline, airy, and shimmering top-end. Excellent for airy vocals or hi-hats.
+The **Color** knob is an engine-specific character control (0–100%). Unlike the other knobs, Color does something fundamentally different depending on which engine is active:
+
+*   **Green — Bloom:** Adds thickness and gentle vintage softening to the wet signal. No saturation. Low values stay clean and airy; high values add density and damping.
+*   **Blue — Focus:** Adds clarity and presence. No saturation. Low values are softer and wider; high values are tighter, brighter, and more articulate.
+*   **Red NQ — Saturation:** Controls the drive amount on the wet path. Adds analog-style harmonic distortion to the BBD chorus output.
+*   **Red HQ — Tape Tone:** Controls the tape character — tone and drive. Higher values push more tape-style coloring.
+*   **Purple — Warp:** Controls how much the phase or orbit modulation shape is applied. Subtly reshapes the modulation character.
+*   **Black — Mod Intensity:** Controls the modulation intensity and ensemble spread.
+
+Because Color is adaptive, turning it up on Green produces a warm, thick bloom, while turning it up on Red pushes saturation. Think of it as the engine's own personality dial.
 
 ### 3.6 Mix
 The **Mix** knob dictates the parallel blend of the unprocessed (Dry) signal against the chorused (Wet) signal.
@@ -105,19 +113,19 @@ The **Mix** knob dictates the parallel blend of the unprocessed (Dry) signal aga
 
 ## 4. The Engine Core Selector (The Five Colors)
 
-Clicking the glowing colored orb at the top center of the UI drops down the **Engine Core Selector**. This is the heart of Choroboros.
+The **Engine Core Selector** is the dropdown in the top-left header area. This is the heart of Choroboros.
 
 Changing the Engine doesn't just change parameters; it completely unloads the current C++ algorithm from memory and hot-swaps in a totally different mathematical topology. Choroboros is effectively five plugins in one.
 
 ### 4.1 The Green Engine (Classic Bloom)
-*   **Vibe:** Natural, dynamic, acoustic.
-*   **Implementation:** The Green engine is built on pristine 3rd-order Lagrange interpolation for smooth, artifact-free sweeping. 
-*   **Secret Weapon (Envelope Follower):** Green is the only engine with an internal dynamic envelope follower. It listens to how loud you play. If you strum a guitar aggressively, the chorus Depth automatically scales up. If you play softly, it flattens out. It makes the chorus feel "alive" and reactive to human performance.
+*   **Vibe:** Natural, warm, musical.
+*   **Implementation:** The Green engine is built on pristine 3rd-order Lagrange interpolation for smooth, artifact-free sweeping.
+*   **Secret Weapon (Bloom):** Green's Color knob applies a bloom effect — thickness and gentle vintage softening on the wet signal. It gives the chorus a lush, padded quality without adding any saturation or distortion. Perfect for acoustic instruments, pads, and vocals where you want warmth without grit.
 
 ### 4.2 The Blue Engine (Modern Focus)
-*   **Vibe:** Surgical, EDM, crystalline, aggressive.
-*   **Implementation:** Blue uses insanely high-fidelity 5th-order Lagrange math combined with steep 8-pole IIR (Infinite Impulse Response) tracking filters.
-*   **Secret Weapon (Presence EQ):** Blue is designed to cut through dense electronic mixes. Its "Color" knob manipulates an aggressive parametric bell-curve EQ that spikes presence frequencies, ensuring the chorus sits surgically on top of synth leads.
+*   **Vibe:** Surgical, EDM, crystalline, precise.
+*   **Implementation:** Blue NQ uses cubic interpolation for clean, transparent chorus. Blue HQ uses 5th-order Thiran allpass interpolation for phase-accurate stereo imaging.
+*   **Secret Weapon (Focus EQ):** Blue is designed to cut through dense electronic mixes. Its "Color" knob applies focus filters and a presence peak to the wet signal, adding clarity and articulation. Higher values make the chorus sit surgically on top of synth leads and electronic textures.
 
 ### 4.3 The Red Engine (Vintage Analog)
 *   **Vibe:** Lo-Fi, noisy, warm, degraded hardware.
@@ -134,7 +142,7 @@ Changing the Engine doesn't just change parameters; it completely unloads the cu
 ### 4.5 The Black Engine (Hard Linear)
 *   **Vibe:** 1990s Nu-Metal, harsh digital, comb-filtered.
 *   **Implementation:** Black runs low-fidelity, basic Linear interpolation math. Rather than trying to be smooth, it leans into harsh digital aliasing and edge-artifacts.
-*   **Secret Weapon (Multi-Tap Ensemble):** Black doesn't just use one delay line; it uses multiple play-heads tapped off the same buffer (an Ensemble). This results in incredibly dense, metallic phase cancellation. It is designed specifically to make heavy distortion guitars sound impossibly massive.
+*   **Secret Weapon (Dual-Tap Ensemble):** In HQ mode, Black uses two independent delay lines (a dual-tap ensemble) with separate stereo decorrelation. This creates dense, metallic phase cancellation. It is designed specifically to make heavy distortion guitars sound impossibly massive.
 
 ---
 
@@ -153,7 +161,7 @@ In standard plugins, an "HQ" or "Oversampling" button just doubles the internal 
 *   **Purple Normal:** Phase-Warp polynomial math.
 *   **Purple HQ:** Orbital X/Y polar coordinate trigonometric math.
 *   **Black Normal:** Single dense Linear comb-filter.
-*   **Black HQ:** 3-Voice Tap Ensemble array.
+*   **Black HQ:** Dual-Tap Linear Ensemble (independent stereo decorrelation).
 
 Whenever you want a different flavor of an existing color, try flipping the HQ switch. It will feel like an entirely new pedal.
 
@@ -161,7 +169,7 @@ Whenever you want a different flavor of an existing color, try flipping the HQ s
 
 ## 6. Presets & Initialization
 
-Choroboros ships with a default factory state. This state is mathematically proven to be a musically "safe" starting point (Moderate Rate, Offset at 15ms, Green Engine).
+Choroboros ships with a default factory state. This state is a musically "safe" starting point (Rate at 0.5 Hz, Offset at 90°, Green Engine).
 
 *   **DAW State Saving:** Whenever you save your project in Ableton, Logic, or Pro Tools, Choroboros silently serializes every knob position and Engine state into the DAW session file. When you re-open the project months later, Choroboros will sound exactly how you left it.
 *   **Customization:** If you absolutely hate the Green engine and wish Choroboros always booted up on the Blue Engine with a heavy Rate, you can do this from the Dev Panel (see section 7).
@@ -172,9 +180,9 @@ Choroboros ships with a default factory state. This state is mathematically prov
 
 If you are an advanced user—a sound designer, a C++ DSP student, or someone obsessed with telemetry data—you can open the hood.
 
-Look at the very top left corner of the plugin. Hover your mouse over the tiny text reading `DEV`. Click it.
+Look at the top-right corner of the plugin. You'll see a small tab with a chevron arrow — this is the **TopBarDrawer**. Click it to expand the drawer, revealing icon buttons for DEV, About, Help, and Feedback. Click the **DEV** icon.
 
-The entire UI will slide right, revealing an immense secondary dashboard known as the **Dev Panel**. This exposes all 119 internal float parameters, allowing you to reprogram the LFO phase integrators, tweak the BBD clock frequencies, stare at real-time Fast Fourier Transform spectral overlays, and write scripts via an interactive C++ console.
+The entire UI will expand, revealing an immense secondary dashboard known as the **Dev Panel**. This exposes internal parameters and diagnostics, allowing you to reprogram the LFO phase integrators, tweak the BBD clock frequencies, stare at real-time Fast Fourier Transform spectral overlays, and write commands via an interactive console.
 
 *(Warning: To learn how to operate the Dev Panel, please read `DEV_PANEL_MANUAL.md` and `DEV_PANEL_CONSOLE_MANUAL.md` located in the `/docs` installation directory).*
 
