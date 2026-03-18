@@ -204,6 +204,6 @@ echo "    → Requires macOS 10.13+. Older Macs (Pre-2012) may not be supported.
 echo "    → Try: killall -9 AudioComponentRegistrar"
 echo "    → Then rescan in Logic"
 echo ""
-echo "  Need help? Greenalderson@gmail.com"
+echo "  Need help? info@kaizenstrategic.ai"
 echo ""
 read -p "Press Enter to exit..."

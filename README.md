@@ -64,34 +64,54 @@ Intended for educators, sound designers, and power users who want to see under t
 
 **Downloads (v2.04-beta):**
 
-| Platform | File | Link |
-|----------|------|------|
-| macOS Universal | `Choroboros-v2.04-beta-macOS-Universal.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.04-beta/Choroboros-v2.04-beta-macOS-Universal.zip) |
-| Windows x64 | `Choroboros-v2.04-beta-Windows-x64.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.04-beta/Choroboros-v2.04-beta-Windows-x64.zip) |
-| Windows x86 | `Choroboros-v2.04-beta-Windows-x86-compat.zip` | [Download](https://github.com/EsotericShadow/choroboros-open-source/releases/download/v2.04-beta/Choroboros-v2.04-beta-Windows-x86-compat.zip) |
+Beta builds are distributed via GitHub Actions artifacts. Go to the [Actions tab](https://github.com/EsotericShadow/choroboros-open-source/actions), open the latest passing Build run, and download the artifact for your platform. Each artifact contains a `.zip` and a `.zip.sha256` checksum file.
 
-SHA256 checksums included for all builds. Or use `install.sh` from the distribution (macOS).
+| Platform | Artifact name |
+|----------|--------------|
+| macOS Universal (Intel + Apple Silicon) | `Choroboros-macos-universal` |
+| Linux x64 | `Choroboros-linux-x64` |
+| Windows x64 | `Choroboros-windows-x64` |
+| Windows x86 (legacy) | `Choroboros-windows-x86` |
 
-### macOS — VST3
+### macOS — install script (recommended)
+The macOS zip includes `install.sh` which handles copying and Gatekeeper quarantine removal automatically:
+```bash
+cd ~/Downloads/Choroboros-macOS-Universal
+bash install.sh
+```
+
+### macOS — manual VST3
 Copy `Choroboros.vst3` to:
+- `~/Library/Audio/Plug-Ins/VST3/` (user-specific, recommended)
 - `/Library/Audio/Plug-Ins/VST3/` (system-wide)
-- `~/Library/Audio/Plug-Ins/VST3/` (user-specific)
 
-### macOS — AU
+### macOS — manual AU
 Copy `Choroboros.component` to:
+- `~/Library/Audio/Plug-Ins/Components/` (user-specific, recommended)
 - `/Library/Audio/Plug-Ins/Components/` (system-wide)
-- `~/Library/Audio/Plug-Ins/Components/` (user-specific)
 
 ### macOS — Standalone
-Copy `Choroboros.app` to `/Applications/` or any location you prefer.
+Copy `Choroboros.app` to `/Applications/` or anywhere you prefer.
 
 ### Windows — VST3
-Extract the zip and copy `VST3/Choroboros.vst3` to:
+Extract the zip. Copy `Choroboros.vst3` to:
 - `C:\Program Files\Common Files\VST3\` (system-wide)
 - `%LOCALAPPDATA%\Programs\Common\VST3\` (user-specific)
 
 ### Windows — Standalone
-Extract the zip and run `Standalone/Choroboros.exe` or place it in your preferred location.
+Extract the zip. Run `Choroboros.exe` directly or place it anywhere you prefer.
+
+### Linux — VST3
+Extract the zip. Copy `Choroboros.vst3` to:
+- `~/.vst3/` (user-specific, recommended)
+- `/usr/lib/vst3/` (system-wide, requires sudo)
+
+### Linux — Standalone
+Extract the zip. Make `Choroboros` executable and run it:
+```bash
+chmod +x Choroboros
+./Choroboros
+```
 
 After installation, rescan plugins in your DAW.
 
