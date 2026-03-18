@@ -61,11 +61,8 @@ for dir in "${ABLETON_CACHE_DIRS[@]}"; do
 done
 
 # GarageBand cache
-# GarageBand is sandboxed — the AU cache that actually matters lives inside
-# the sandbox container, NOT in ~/Library/Caches. Clearing only the non-sandbox
-# path causes GarageBand to keep loading the old binary from its isolated cache.
 GARAGEBAND_CACHE="$HOME/Library/Caches/com.apple.garageband10"
-GARAGEBAND_SANDBOX_AU="$HOME/Library/Containers/com.apple.garageband10/Data/Library/Caches/AudioUnitCache"
+GARAGEBAND_PREFS="$HOME/Library/Preferences/com.apple.garageband10.plist"
 
 echo ""
 echo "📦 GarageBand:"
@@ -75,21 +72,6 @@ if [ -d "$GARAGEBAND_CACHE" ]; then
 else
     echo "  ℹ️  GarageBand cache not found"
 fi
-
-if [ -d "$GARAGEBAND_SANDBOX_AU" ]; then
-    rm -rf "$GARAGEBAND_SANDBOX_AU"
-    echo "  ✅ Cleared GarageBand sandboxed AU cache (this is the one that matters)"
-else
-    echo "  ℹ️  GarageBand sandboxed AU cache not found"
-fi
-
-# AUHostingService caches in /var/folders — also sandboxed per-app
-for dir in /var/folders/*/*/C/AUHostingService/com.apple.garageband10 2>/dev/null; do
-    if [ -d "$dir" ]; then
-        rm -rf "$dir"
-        echo "  ✅ Cleared AUHostingService GarageBand cache"
-    fi
-done
 
 # macOS Audio Unit cache (affects all DAWs)
 AUDIO_UNIT_CACHE="$HOME/Library/Caches/AudioUnitCache"
