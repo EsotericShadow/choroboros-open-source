@@ -7,6 +7,9 @@ on:
     branches: [v2.04-dev]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
 
   # ---------------------------------------------------------------------------
@@ -23,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # JUCE 8 on Linux requires these system libraries at build time.
       # JUCE_WEB_BROWSER=0 and JUCE_USE_CURL=0 (already in CMakeLists.txt)
@@ -53,7 +58,8 @@ jobs:
         with:
           path: build/linux-x64-release
           key: linux-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
-          restore-keys: linux-cmake-
+          restore-keys: |
+            linux-cmake-
 
       - name: Configure
         run: |
@@ -117,13 +123,16 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Cache build directory
         uses: actions/cache@v4
         with:
           path: build/windows-x64-release
           key: windows-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
-          restore-keys: windows-cmake-
+          restore-keys: |
+            windows-cmake-
 
       - name: Configure
         run: |
