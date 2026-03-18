@@ -212,6 +212,7 @@ target_link_libraries(ChoroborosRegressionTests PRIVATE
 # After each VST3 build, install to user Plug-Ins so Reaper loads the latest build
 if(APPLE)
     add_custom_command(TARGET Choroboros_VST3 POST_BUILD
+        COMMAND /usr/bin/codesign --force --sign - --deep "$<TARGET_BUNDLE_DIR:Choroboros_VST3>"
         COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
         COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.vst3 to user VST3 folder..."
         COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
