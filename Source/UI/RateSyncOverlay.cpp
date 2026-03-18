@@ -164,7 +164,7 @@ void RateSyncOverlay::paint(juce::Graphics& g)
     const auto accent = claf ? claf->getThemeAccentColour() : juce::Colour(0xff7fb8ff);
     const auto panelColour = claf ? claf->getThemePanelColour() : juce::Colour(0xff121417);
     const auto outlineColour = claf ? claf->getThemePanelOutlineColour() : accent.withAlpha(0.82f);
-    const auto font = claf ? claf->getPopupMenuFont() : juce::Font(14.0f);
+    const auto font = claf ? claf->getPopupMenuFont() : juce::Font(juce::FontOptions(14.0f));
 
     // Scrim
     g.setColour(juce::Colours::black.withAlpha(0.35f));
