@@ -171,24 +171,20 @@ namespace
 {
 juce::String getEmbeddedFactoryDefaults()
 {
-#if JUCE_MAC
-    const char* resourceName = "json_defaults_dump_json";
-#elif JUCE_WINDOWS
+    // Windows ships its own factory defaults JSON; all other platforms
+    // (macOS, Linux) use the same file — contents are platform-agnostic.
+#if JUCE_WINDOWS
     const char* resourceName = "windows_factory_defaults_json";
 #else
-    return {};
+    const char* resourceName = "json_defaults_dump_json";
 #endif
 
-#if JUCE_MAC || JUCE_WINDOWS
     int dataSize = 0;
     const char* data = BinaryData::getNamedResource(resourceName, dataSize);
     if (data == nullptr || dataSize <= 0)
         return {};
     const juce::String json = juce::String::fromUTF8(data, dataSize);
     return isValidJsonDocument(json) ? json : juce::String{};
-#else
-    return {};
-#endif
 }
 } // namespace
 
