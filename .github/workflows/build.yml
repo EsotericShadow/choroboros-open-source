@@ -1,0 +1,169 @@
+name: Build
+
+on:
+  push:
+    branches: [v2.04-dev]
+  pull_request:
+    branches: [v2.04-dev]
+  workflow_dispatch:
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Linux x64 — VST3 + Standalone
+  # Runs on a free ubuntu-22.04 x86_64 runner.
+  # NOTE: Linux factory defaults are not yet embedded (DefaultsPersistence.cpp
+  # returns {} on JUCE_LINUX). DSP regression tests still pass; plugin boots
+  # without factory defaults until that code path is filled in.
+  # ---------------------------------------------------------------------------
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # JUCE 8 on Linux requires these system libraries at build time.
+      # JUCE_WEB_BROWSER=0 and JUCE_USE_CURL=0 (already in CMakeLists.txt)
+      # means we skip WebKit and libcurl — the two heaviest deps.
+      - name: Install JUCE system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            libasound2-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libgl1-mesa-dev \
+            xvfb \
+            ninja-build \
+            pkg-config
+
+      # Cache the CMake build directory. Key on CMakeLists.txt + JUCE version.
+      # First run ~15 min; cached runs ~3 min.
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/linux-x64-release
+          key: linux-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: linux-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/linux-x64-release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/linux-x64-release \
+            --target Choroboros_VST3 Choroboros_Standalone \
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/linux-x64-release \
+            --target ChoroborosRegressionTests \
+            --parallel
+
+      # xvfb-run provides a virtual display. JUCE may probe for one even in
+      # DSP-only mode. The one known-acceptable failure (DevPanel console) is
+      # excluded by --dsp-only; any other failure blocks the build.
+      - name: Run DSP regression tests
+        run: |
+          xvfb-run --auto-servernum \
+            ./build/linux-x64-release/ChoroborosRegressionTests --dsp-only
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist/linux-x64
+          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros.vst3" \
+            dist/linux-x64/
+          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros" \
+            dist/linux-x64/
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-linux-x64
+          path: dist/linux-x64/
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows x64 — VST3 + Standalone
+  # Runs on a free windows-latest runner (Visual Studio 2022 pre-installed).
+  # Windows runners count as 2× the minute rate vs Linux on private repos.
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      # Long paths must be enabled before checkout — JUCE module paths inside
+      # the repo can exceed the 260-char Windows default.
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-x64-release
+          key: windows-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: windows-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-x64-release `
+            -G "Visual Studio 17 2022" -A x64
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-x64-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/windows-x64-release `
+            --config Release `
+            --target ChoroborosRegressionTests `
+            --parallel
+
+      - name: Run DSP regression tests
+        shell: cmd
+        run: |
+          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --dsp-only
+
+      - name: Collect artifacts
+        shell: cmd
+        run: |
+          mkdir dist\windows-x64
+          xcopy /E /I /Q ^
+            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" ^
+            "dist\windows-x64\Choroboros.vst3"
+          copy ^
+            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" ^
+            "dist\windows-x64\Choroboros.exe"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-windows-x64
+          path: dist/windows-x64/
+          if-no-files-found: error
+          retention-days: 30
