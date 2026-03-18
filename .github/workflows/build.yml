@@ -14,10 +14,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Linux x64 — VST3 + Standalone
-  # Runs on a free ubuntu-22.04 x86_64 runner.
-  # NOTE: Linux factory defaults are not yet embedded (DefaultsPersistence.cpp
-  # returns {} on JUCE_LINUX). DSP regression tests still pass; plugin boots
-  # without factory defaults until that code path is filled in.
   # ---------------------------------------------------------------------------
   linux:
     name: Linux x64
@@ -29,9 +25,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # JUCE 8 on Linux requires these system libraries at build time.
-      # JUCE_WEB_BROWSER=0 and JUCE_USE_CURL=0 (already in CMakeLists.txt)
-      # means we skip WebKit and libcurl — the two heaviest deps.
       - name: Install JUCE system dependencies
         run: |
           sudo apt-get update -qq
@@ -51,8 +44,6 @@ jobs:
             ninja-build \
             pkg-config
 
-      # Cache the CMake build directory. Key on CMakeLists.txt + JUCE version.
-      # First run ~15 min; cached runs ~3 min.
       - name: Cache build directory
         uses: actions/cache@v4
         with:
@@ -79,42 +70,39 @@ jobs:
             --target ChoroborosRegressionTests \
             --parallel
 
-      # xvfb-run provides a virtual display. JUCE may probe for one even in
-      # DSP-only mode. The one known-acceptable failure (DevPanel console) is
-      # excluded by --dsp-only; any other failure blocks the build.
       - name: Run DSP regression tests
         run: |
           xvfb-run --auto-servernum \
             ./build/linux-x64-release/ChoroborosRegressionTests --dsp-only
 
-      - name: Collect artifacts
+      - name: Package and checksum
         run: |
-          mkdir -p dist/linux-x64
-          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros.vst3" \
-            dist/linux-x64/
-          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros" \
-            dist/linux-x64/
+          mkdir -p dist
+          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros.vst3" dist/
+          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros" dist/
+          cd dist
+          zip -r Choroboros-linux-x64.zip Choroboros.vst3 Choroboros
+          sha256sum Choroboros-linux-x64.zip > Choroboros-linux-x64.zip.sha256
+          cat Choroboros-linux-x64.zip.sha256
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Choroboros-linux-x64
-          path: dist/linux-x64/
+          path: |
+            dist/Choroboros-linux-x64.zip
+            dist/Choroboros-linux-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
   # ---------------------------------------------------------------------------
   # Windows x64 — VST3 + Standalone
-  # Runs on a free windows-latest runner (Visual Studio 2022 pre-installed).
-  # Windows runners count as 2× the minute rate vs Linux on private repos.
   # ---------------------------------------------------------------------------
   windows:
     name: Windows x64
     runs-on: windows-latest
 
     steps:
-      # Long paths must be enabled before checkout — JUCE module paths inside
-      # the repo can exceed the 260-char Windows default.
       - name: Enable long paths
         shell: cmd
         run: |
@@ -158,30 +146,33 @@ jobs:
         run: |
           build\windows-x64-release\Release\ChoroborosRegressionTests.exe --dsp-only
 
-      - name: Collect artifacts
-        shell: cmd
+      - name: Package and checksum
+        shell: pwsh
         run: |
-          mkdir dist\windows-x64
-          xcopy /E /I /Q ^
-            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" ^
-            "dist\windows-x64\Choroboros.vst3"
-          copy ^
-            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" ^
-            "dist\windows-x64\Choroboros.exe"
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-windows-x64.zip
+          $hash = (Get-FileHash dist\Choroboros-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-windows-x64.zip" | Out-File -FilePath dist\Choroboros-windows-x64.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-windows-x64.zip.sha256
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Choroboros-windows-x64
-          path: dist/windows-x64/
+          path: |
+            dist/Choroboros-windows-x64.zip
+            dist/Choroboros-windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
   # ---------------------------------------------------------------------------
-  # Windows x86 — VST3 + Standalone
-  # 32-bit build for legacy DAW hosts that require 32-bit plugins.
-  # Note: most modern DAWs are 64-bit only. This job exists for beta testers
-  # who specifically need x86 compatibility.
+  # Windows x86 — VST3 + Standalone (legacy 32-bit host support)
   # ---------------------------------------------------------------------------
   windows-x86:
     name: Windows x86
@@ -231,21 +222,27 @@ jobs:
         run: |
           build\windows-x86-release\Release\ChoroborosRegressionTests.exe --dsp-only
 
-      - name: Collect artifacts
-        shell: cmd
+      - name: Package and checksum
+        shell: pwsh
         run: |
-          mkdir dist\windows-x86
-          xcopy /E /I /Q ^
-            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" ^
-            "dist\windows-x86\Choroboros.vst3"
-          copy ^
-            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" ^
-            "dist\windows-x86\Choroboros.exe"
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-windows-x86.zip
+          $hash = (Get-FileHash dist\Choroboros-windows-x86.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-windows-x86.zip" | Out-File -FilePath dist\Choroboros-windows-x86.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-windows-x86.zip.sha256
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Choroboros-windows-x86
-          path: dist/windows-x86/
+          path: |
+            dist/Choroboros-windows-x86.zip
+            dist/Choroboros-windows-x86.zip.sha256
           if-no-files-found: error
           retention-days: 30
