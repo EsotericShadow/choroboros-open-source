@@ -343,6 +343,7 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
     layout.widthKnobVisualResponseMs = getIntOrDefault(layoutVar, "widthKnobVisualResponseMs", layout.widthKnobVisualResponseMs);
     layout.mixKnobVisualResponseMs = getIntOrDefault(layoutVar, "mixKnobVisualResponseMs", layout.mixKnobVisualResponseMs);
     layout.knobDragSensitivityPct = getIntOrDefault(layoutVar, "knobDragSensitivityPct", layout.knobDragSensitivityPct);
+    layout.scrollWheelSensitivityPct = getIntOrDefault(layoutVar, "scrollWheelSensitivityPct", layout.scrollWheelSensitivityPct);
     layout.knobRollOffSpeedPct = getIntOrDefault(layoutVar, "knobRollOffSpeedPct", layout.knobRollOffSpeedPct);
     layout.knobSweepStartDeg = getIntOrDefault(layoutVar, "knobSweepStartDeg", layout.knobSweepStartDeg);
     layout.knobSweepEndDeg = getIntOrDefault(layoutVar, "knobSweepEndDeg", layout.knobSweepEndDeg);

@@ -2442,6 +2442,7 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
                             layout.hqSwitchOffsetYGreen, layout.hqSwitchOffsetYBlue, layout.hqSwitchOffsetYRed, layout.hqSwitchOffsetYPurple, layout.hqSwitchOffsetYBlack,
                             -300, 300);
     addLayout(layoutGlobalKnobResponseProps, "Knob Drag Sensitivity (%)", layout.knobDragSensitivityPct, 10, 400);
+    addLayout(layoutGlobalKnobResponseProps, "Scroll Wheel Sensitivity (%)", layout.scrollWheelSensitivityPct, 5, 200);
     addLayout(layoutGlobalKnobResponseProps, "Knob Roll-Off Speed (%)", layout.knobRollOffSpeedPct, 10, 400);
     addLayout(layoutGlobalKnobResponseProps, "Rate Visual Response (ms)", layout.rateKnobVisualResponseMs, 1, 1000);
     addLayout(layoutGlobalKnobResponseProps, "Depth Visual Response (ms)", layout.depthKnobVisualResponseMs, 1, 1000);

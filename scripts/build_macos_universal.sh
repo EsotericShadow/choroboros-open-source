@@ -49,18 +49,18 @@ echo "📦 Packaging universal build..."
 mkdir -p Release
 
 cd Universal-Build/Choroboros_artefacts/Release
-zip -r ../../../Release/Choroboros-v2.04-beta-macOS-Universal.zip \
+zip -r -o ../../../Release/Choroboros-v2.04-beta-macOS-Universal.zip \
     VST3 AU Standalone
 
 cd ../../..
 
 # Add documentation and installer scripts
 cd Release
-unzip -q Choroboros-v2.04-beta-macOS-Universal.zip || true
+unzip -q -o Choroboros-v2.04-beta-macOS-Universal.zip || true
 cp ../README.md ../DISTRIBUTION.md ../INSTALL.txt ../LICENSE ../COPYING ../SOURCE_LINK.txt . 2>/dev/null || true
 cp ../install.sh ../"Install Choroboros.command" . 2>/dev/null || true
 chmod +x install.sh "Install Choroboros.command" 2>/dev/null || true
-zip -r Choroboros-v2.04-beta-macOS-Universal.zip \
+zip -r -o Choroboros-v2.04-beta-macOS-Universal.zip \
     README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt \
     install.sh "Install Choroboros.command" 2>/dev/null || true
 rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt install.sh "Install Choroboros.command"

@@ -19,6 +19,7 @@
 #include "SmoothedSlider.h"
 #include <cmath>
 
+
 SmoothedSlider::SmoothedSlider(float smoothingTimeMs_, bool useExponential_)
     : smoothingTimeMs(smoothingTimeMs_), useExponential(useExponential_)
 {
@@ -32,7 +33,7 @@ SmoothedSlider::SmoothedSlider(float smoothingTimeMs_, bool useExponential_)
         visualValueLinear.reset(getSampleRate(), smoothingTimeMs * 0.001);
         visualValueLinear.setCurrentAndTargetValue(getValue());
     }
-    startTimerHz(120); // 120 FPS for smoother animation (reduced jankiness)
+    startTimerHz(120);
 }
 
 SmoothedSlider::~SmoothedSlider()
@@ -43,10 +44,9 @@ SmoothedSlider::~SmoothedSlider()
 void SmoothedSlider::mouseDown(const juce::MouseEvent& e)
 {
     if (getSliderStyle() == juce::Slider::RotaryVerticalDrag)
-    {
-        verticalDragStartY = e.position.y;
-        valueAtVerticalDragStart = getValue();
-    }
+        resetDragAnchor(e);
+
+    resetWheelAnchor();
     juce::Slider::mouseDown(e);
 }
 
@@ -54,14 +54,28 @@ void SmoothedSlider::mouseDrag(const juce::MouseEvent& e)
 {
     if (getSliderStyle() == juce::Slider::RotaryVerticalDrag)
     {
-        const double sensitivity = juce::jmax(1.0, static_cast<double>(getHeight()) / static_cast<double>(dragSensitivityScale));
-        // Upward drag should increase value, downward drag should decrease value.
-        const double proportionDelta = (verticalDragStartY - e.position.y) / sensitivity;
+        const bool fineAdjustActive = isFineWheelAdjustActive(e);
+        if (fineAdjustActive != dragFineAdjustActive)
+            resetDragAnchor(e);
+
+        const double sensitivity = getDragSensitivity(e);
+        const double pixelDelta = verticalDragStartY - e.position.y;
+
+        if (std::abs(pixelDelta) < 0.5)
+            return;
+
+        const double proportionDelta = pixelDelta / sensitivity;
         double newProportion = valueToProportionOfLength(valueAtVerticalDragStart) + proportionDelta;
         newProportion = juce::jlimit(0.0, 1.0, newProportion);
-        setValue(proportionOfLengthToValue(newProportion), juce::sendNotificationSync);
-        valueAtVerticalDragStart = getValue();
-        verticalDragStartY = e.position.y;
+        const double newValue = proportionOfLengthToValue(newProportion);
+
+        const double oldValue = getValue();
+        setValue(newValue, juce::sendNotificationSync);
+        if (getValue() != oldValue)
+        {
+            valueAtVerticalDragStart = getValue();
+            verticalDragStartY = e.position.y;
+        }
         return;
     }
     juce::Slider::mouseDrag(e);
@@ -69,7 +83,11 @@ void SmoothedSlider::mouseDrag(const juce::MouseEvent& e)
 
 void SmoothedSlider::mouseUp(const juce::MouseEvent& e)
 {
+    if (getSliderStyle() == juce::Slider::RotaryVerticalDrag)
+        setValue(getVisualValue(), juce::sendNotificationSync);
+
     snapVisualToValue();
+    dragFineAdjustActive = false;
     juce::Slider::mouseUp(e);
     if (onMouseUpCallback)
         onMouseUpCallback(e);
@@ -77,18 +95,35 @@ void SmoothedSlider::mouseUp(const juce::MouseEvent& e)
 
 void SmoothedSlider::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
-    juce::Slider::mouseWheelMove(e, wheel);
-    lastScrollTimeMs = juce::Time::currentTimeMillis();
+    if (shouldIgnoreWheelEvent(e, wheel))
+        return;
+
+    const float wheelAmount = getWheelAmount(wheel);
+    if (std::abs(wheelAmount) < 1.0e-6f)
+        return;
+
+    const auto now = juce::Time::currentTimeMillis();
+    prepareWheelAnchor(wheelAmount, now);
+
+    // Apply delta directly — no accumulation queue.
+    // Snap the visual immediately too: scroll wheel events arrive at OS cadence
+    // which already creates natural motion. Adding SmoothedValue lag on top
+    // causes the visual to lunge to the final position when the gesture ends.
+    const double delta = computeDirectWheelDelta(e, wheel);
+    wheelAnchorProportion = clampWheelAnchorProportion(wheelAnchorProportion + delta);
+    setValue(proportionOfLengthToValue(wheelAnchorProportion), juce::sendNotificationSync);
+    snapVisualToValue();
+
+    wheelFineAdjustActive = isFineWheelAdjustActive(e);
+    lastWheelDirection = wheelAmount;
+    lastScrollTimeMs = now;
+    needsRepaint = true;
 }
 
 void SmoothedSlider::valueChanged()
 {
-    // When the actual value changes, update the target for visual smoothing
     if (useExponential)
-    {
-        // Exponential smoothing target is set in timerCallback
         needsRepaint = true;
-    }
     else
     {
         visualValueLinear.setTargetValue(getValue());
@@ -99,26 +134,18 @@ void SmoothedSlider::valueChanged()
 void SmoothedSlider::timerCallback()
 {
     bool isSmoothing = false;
-    
+
     if (useExponential)
     {
-        // Exponential smoothing (one-pole filter) - matches audio smoothing
-        float target = getValue();
+        const float target = getValue();
         visualValueExp = visualValueExp * smoothingCoeff + target * (1.0f - smoothingCoeff);
-        // Check if still smoothing (within 0.1% of target)
         isSmoothing = std::abs(visualValueExp - target) > 0.001f;
     }
     else
     {
-        // Linear smoothing — advance one step per timer tick.
-        // At 120 Hz the timer fires every ~8 ms; reset() sets the ramp
-        // length in samples, so smoothingTimeMs * 0.001 * 120 gives the
-        // correct ramp duration.  skip(1) moves one step along that ramp.
         visualValueLinear.skip(1);
         isSmoothing = visualValueLinear.isSmoothing();
 
-        // When SmoothedValue declares "done", snap to the exact target
-        // so the visual thumb never ends up a fraction of a pixel short.
         if (! isSmoothing)
         {
             const float target = static_cast<float>(getValue());
@@ -130,16 +157,14 @@ void SmoothedSlider::timerCallback()
         }
     }
 
-    if (lastScrollTimeMs > 0 && (juce::Time::currentTimeMillis() - lastScrollTimeMs) > 50)
+    if (lastScrollTimeMs > 0 && (juce::Time::currentTimeMillis() - lastScrollTimeMs) > 150)
     {
-        snapVisualToValue();
+        resetWheelAnchor();
         lastScrollTimeMs = 0;
-        isSmoothing = false;
     }
-    
+
     if (needsRepaint || isSmoothing)
     {
-        // Force repaint to show smoothed visual position
         repaint();
         needsRepaint = false;
     }
@@ -148,11 +173,9 @@ void SmoothedSlider::timerCallback()
 void SmoothedSlider::setSmoothingTime(float timeMs)
 {
     smoothingTimeMs = timeMs;
-    
+
     if (useExponential)
-    {
         updateSmoothingCoeff();
-    }
     else
     {
         visualValueLinear.reset(getSampleRate(), smoothingTimeMs * 0.001);
@@ -162,20 +185,20 @@ void SmoothedSlider::setSmoothingTime(float timeMs)
 
 void SmoothedSlider::setUseExponential(bool useExp)
 {
-    if (useExponential != useExp)
+    if (useExponential == useExp)
+        return;
+
+    useExponential = useExp;
+
+    if (useExponential)
     {
-        useExponential = useExp;
-        
-        if (useExponential)
-        {
-            updateSmoothingCoeff();
-            visualValueExp = getValue();
-        }
-        else
-        {
-            visualValueLinear.reset(getSampleRate(), smoothingTimeMs * 0.001);
-            visualValueLinear.setCurrentAndTargetValue(getValue());
-        }
+        updateSmoothingCoeff();
+        visualValueExp = getValue();
+    }
+    else
+    {
+        visualValueLinear.reset(getSampleRate(), smoothingTimeMs * 0.001);
+        visualValueLinear.setCurrentAndTargetValue(getValue());
     }
 }
 
@@ -184,18 +207,110 @@ void SmoothedSlider::setDragSensitivity(float sensitivityScale)
     dragSensitivityScale = juce::jmax(0.01f, sensitivityScale);
 }
 
+void SmoothedSlider::setScrollWheelSensitivity(float sensitivityScale)
+{
+    scrollWheelScale = juce::jmax(0.01f, sensitivityScale);
+}
+
 float SmoothedSlider::getVisualValue() const
 {
     if (useExponential)
         return visualValueExp;
-    else
-        return visualValueLinear.getCurrentValue();
+    return visualValueLinear.getCurrentValue();
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+double SmoothedSlider::clampWheelAnchorProportion(double proportion) const
+{
+    if (getSliderStyle() == juce::Slider::RotaryVerticalDrag && ! getRotaryParameters().stopAtEnd)
+        return proportion - std::floor(proportion);
+
+    return juce::jlimit(0.0, 1.0, proportion);
+}
+
+double SmoothedSlider::getDragSensitivity(const juce::MouseEvent& e) const
+{
+    const double base = juce::jmax(1.0, static_cast<double>(getHeight())
+                                            / static_cast<double>(dragSensitivityScale));
+    return isFineWheelAdjustActive(e) ? base * 3.0 : base;
+}
+
+float SmoothedSlider::getWheelAmount(const juce::MouseWheelDetails& wheel) const
+{
+    const float dominant = std::abs(wheel.deltaX) > std::abs(wheel.deltaY)
+                               ? -wheel.deltaX
+                               : wheel.deltaY;
+    return dominant * (wheel.isReversed ? -1.0f : 1.0f);
+}
+
+bool SmoothedSlider::isFineWheelAdjustActive(const juce::MouseEvent& e) const
+{
+    const auto live = juce::ModifierKeys::getCurrentModifiersRealtime();
+    return e.mods.isCommandDown() || live.isCommandDown()
+        || e.mods.isCtrlDown()   || live.isCtrlDown();
+}
+
+bool SmoothedSlider::shouldIgnoreWheelEvent(const juce::MouseEvent& e,
+                                            const juce::MouseWheelDetails& wheel) const
+{
+    return ! isScrollWheelEnabled() || e.mods.isAnyMouseButtonDown() || wheel.isInertial;
+}
+
+double SmoothedSlider::computeDirectWheelDelta(const juce::MouseEvent& e,
+                                               const juce::MouseWheelDetails& wheel) const
+{
+    // Wheel sensitivity design (at factory default scrollWheelSensitivityPct = 25,
+    // i.e. scrollWheelScale = 0.25):
+    //
+    //   kBaseScale     — linear multiplier applied before the cap.
+    //   kNormalMaxStep — per-event cap for normal mode  → effective ~0.012/event
+    //   kFineMaxStep   — per-event cap for Cmd+scroll  → effective ~0.003/event
+    //
+    // Fast flicks: many events arrive rapidly, each capped, so total movement is
+    // proportional to gesture length — no runaway accumulation.
+    // Inertial (momentum) events are already rejected in shouldIgnoreWheelEvent.
+    static constexpr double kBaseScale     = 1.60;
+    static constexpr double kNormalMaxStep = 0.048;
+    static constexpr double kFineMaxStep   = 0.012;
+
+    const bool isFine = isFineWheelAdjustActive(e);
+    const double maxStep = isFine ? kFineMaxStep : kNormalMaxStep;
+    const double scaled  = static_cast<double>(getWheelAmount(wheel)) * kBaseScale;
+    const double capped  = std::copysign(std::min(std::abs(scaled), maxStep), scaled);
+    return capped * static_cast<double>(scrollWheelScale);
+}
+
+void SmoothedSlider::prepareWheelAnchor(float wheelAmount, int64_t now)
+{
+    const bool directionChanged = (lastWheelDirection > 0.0f && wheelAmount < 0.0f)
+                               || (lastWheelDirection < 0.0f && wheelAmount > 0.0f);
+
+    if (! hasWheelAnchor || directionChanged || (now - lastScrollTimeMs) > 150)
+    {
+        wheelAnchorProportion = valueToProportionOfLength(getValue());
+        hasWheelAnchor = true;
+    }
+}
+
+void SmoothedSlider::resetDragAnchor(const juce::MouseEvent& e)
+{
+    verticalDragStartY = e.position.y;
+    valueAtVerticalDragStart = getValue();
+    dragFineAdjustActive = isFineWheelAdjustActive(e);
+}
+
+void SmoothedSlider::resetWheelAnchor()
+{
+    hasWheelAnchor = false;
+    lastWheelDirection = 0.0f;
+    wheelFineAdjustActive = false;
 }
 
 void SmoothedSlider::updateSmoothingCoeff()
 {
-    // Calculate one-pole filter coefficient for exponential smoothing
-    // Time constant = smoothingTimeMs
     smoothingCoeff = std::exp(-1.0f / (smoothingTimeMs * 0.001f * getSampleRate()));
 }
 

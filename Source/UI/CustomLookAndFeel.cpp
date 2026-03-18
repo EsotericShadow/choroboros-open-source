@@ -754,25 +754,29 @@ void CustomLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wi
     {
         // Track is built into the back panel; only draw the thumb.
         
-        // Calculate visual slider position (with smoothing if applicable)
-        // JUCE passes sliderPos as normalized 0..1 for LinearHorizontal
+        // Calculate visual slider position (with smoothing if applicable).
+        // Map normalized 0..1 directly into the constrained thumb range so
+        // the thumb reaches both ends of the visible track.
+        const float constraintOffset = static_cast<float>(width) * 0.115f;
+        const float thumbMinPos = static_cast<float>(x) + constraintOffset;
+        const float thumbMaxPos = static_cast<float>(x + width) - constraintOffset;
+
         float visualSliderPos;
         if (auto* smoothedSlider = dynamic_cast<SmoothedSlider*>(&slider))
         {
             const double minValue = slider.getMinimum();
             const double maxValue = slider.getMaximum();
             const double visualValue = smoothedSlider->getVisualValue();
-            const float normalized = static_cast<float>((visualValue - minValue) / (maxValue - minValue));
-            const float clampedNormalized = juce::jlimit(0.0f, 1.0f, normalized);
-            visualSliderPos = x + clampedNormalized * static_cast<float>(width);
+            const float normalized = juce::jlimit(0.0f, 1.0f,
+                static_cast<float>((visualValue - minValue) / (maxValue - minValue)));
+            visualSliderPos = thumbMinPos + normalized * (thumbMaxPos - thumbMinPos);
         }
         else
         {
-            // sliderPos is 0..1 normalized
             const float clamped = juce::jlimit(0.0f, 1.0f, sliderPos);
-            visualSliderPos = x + clamped * static_cast<float>(width);
+            visualSliderPos = thumbMinPos + clamped * (thumbMaxPos - thumbMinPos);
         }
-        
+
         drawSliderThumb(g, x, y, width, height, visualSliderPos);
     }
     else
@@ -799,24 +803,10 @@ void CustomLookAndFeel::drawSliderTrack(juce::Graphics& g, int x, int y, int wid
 void CustomLookAndFeel::drawSliderThumb(juce::Graphics& g, int x, int y, int width, int height,
                                        float visualSliderPos)
 {
-    const float constraintOffset = width * 0.115f;
-    
-    const float juceMinPos = x;
-    const float juceMaxPos = x + width;
-    const float actualMinPos = x + constraintOffset;
-    const float actualMaxPos = x + width - constraintOffset;
-    
-    float constrainedSliderPos;
-    if (juceMaxPos > juceMinPos)
-    {
-        const float normalized = (visualSliderPos - juceMinPos) / (juceMaxPos - juceMinPos);
-        constrainedSliderPos = actualMinPos + normalized * (actualMaxPos - actualMinPos);
-    }
-    else
-    {
-        constrainedSliderPos = actualMinPos;
-    }
-    
+    // visualSliderPos is already mapped into the constrained thumb range
+    // by drawLinearSlider, so use it directly.
+    const float constrainedSliderPos = visualSliderPos;
+
     // Calculate thumb size maintaining original aspect ratio (40x80 = 1:2)
     float thumbWidth, thumbHeight;
     if (sliderThumbImage.isValid())

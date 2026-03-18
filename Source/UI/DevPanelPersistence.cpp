@@ -392,6 +392,7 @@ juce::String DevPanel::buildJson() const
     json << "    \"widthKnobVisualResponseMs\": " << layout.widthKnobVisualResponseMs << ",\n";
     json << "    \"mixKnobVisualResponseMs\": " << layout.mixKnobVisualResponseMs << ",\n";
     json << "    \"knobDragSensitivityPct\": " << layout.knobDragSensitivityPct << ",\n";
+    json << "    \"scrollWheelSensitivityPct\": " << layout.scrollWheelSensitivityPct << ",\n";
     json << "    \"knobRollOffSpeedPct\": " << layout.knobRollOffSpeedPct << ",\n";
     json << "    \"knobSweepStartDeg\": " << layout.knobSweepStartDeg << ",\n";
     json << "    \"knobSweepEndDeg\": " << layout.knobSweepEndDeg << ",\n";
