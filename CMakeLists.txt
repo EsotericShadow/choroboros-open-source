@@ -34,6 +34,8 @@ juce_add_plugin(Choroboros
     PLUGIN_MANUFACTURER_CODE KzDp
     PLUGIN_CODE ChBr
     FORMATS AU VST3 AAX Standalone
+    VST3_CATEGORIES "Fx|Modulation"
+    AU_MAIN_TYPE kAudioUnitType_Effect
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
     PRODUCT_NAME "Choroboros"
     DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms"
