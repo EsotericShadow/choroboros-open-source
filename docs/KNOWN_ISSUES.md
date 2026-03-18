@@ -49,6 +49,7 @@ HQ toggle now switches in ~43 ms (18 ms warmup + 25 ms crossfade) and supports s
 ## Compatibility
 
 - **DAWs tested:** Reaper (macOS + Windows), Logic Pro (macOS), Ableton Live (Windows), FL Studio (Windows), Samplitude (Windows). Additional DAW reports welcome.
+- **Studio One / Fender Studio Pro:** Bugs reported in these hosts but not yet investigated — access to these environments is required before issues can be addressed. Fix ETA unknown. If you're running either host, in-plugin feedback or email is especially valuable.
 - **Ardour 8.10 (Windows):** One report of VST3 crash on load. Appears to be an Ardour VST3 hosting issue — other plugins also crash for this user.
 - **Sample rates:** Supports up to 192 kHz. Report any issues at extreme sample rates.
 
