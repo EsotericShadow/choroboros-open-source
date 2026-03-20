@@ -949,10 +949,8 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
       #endif
         fprintf(stderr, "%s\n", msg.toRawUTF8());
         fflush(stderr);
-        static const juce::File logFile(
-            juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
-                .getChildFile("choroboros_dtor_log.txt"));
-        logFile.appendText(msg + "\n");
+        FILE* f = fopen("C:\\choroboros_log.txt", "a");
+        if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
     };
 
     procLog("PROC DTOR START");

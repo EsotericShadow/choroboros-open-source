@@ -40,15 +40,27 @@ namespace
 void choroLog(const char* step)
 {
     juce::String msg = juce::String("[CHORO] ") + step;
+
   #if JUCE_WINDOWS
+    // Force a console window open so we can see output in real-time.
+    // Only allocates once — subsequent calls are no-ops.
+    static bool consoleAllocated = [] {
+        AllocConsole();
+        freopen("CONOUT$", "w", stderr);
+        freopen("CONOUT$", "w", stdout);
+        return true;
+    }();
+    (void)consoleAllocated;
+
     OutputDebugStringA((msg + "\n").toRawUTF8());
   #endif
+
     fprintf(stderr, "%s\n", msg.toRawUTF8());
     fflush(stderr);
-    static const juce::File logFile(
-        juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
-            .getChildFile("choroboros_dtor_log.txt"));
-    logFile.appendText(msg + "\n");
+
+    // Write to a hardcoded path (JUCE desktop path may resolve wrong in VST3)
+    FILE* f = fopen("C:\\choroboros_log.txt", "a");
+    if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
 }
 
 struct BackgroundAssetPack
