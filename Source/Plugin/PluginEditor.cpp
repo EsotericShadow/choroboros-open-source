@@ -39,27 +39,15 @@ namespace
 {
 void choroLog(const char* step)
 {
-    juce::String msg = juce::String("[CHORO] ") + step;
-
-  #if JUCE_WINDOWS
-    // Show a popup ONCE to prove the code runs, then just log to file
-    static bool firstCall = true;
-    if (firstCall)
+    // Hardcoded path — C:\Users\Public is writable by all users, no
+    // path expansion, no API calls, no short-name issues.
+    FILE* f = fopen("C:\\Users\\Public\\choroboros_log.txt", "a");
+    if (f)
     {
-        firstCall = false;
-        MessageBoxA(nullptr, "Choroboros debug logging active!\nCheck %%TEMP%%\\choroboros_log.txt",
-                     "Choroboros Debug", MB_OK | MB_SYSTEMMODAL);
+        fprintf(f, "[CHORO] %s\n", step);
+        fflush(f);
+        fclose(f);
     }
-
-    // Write to user's temp folder (always writable, unlike C:\)
-    char tempPath[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tempPath))
-    {
-        juce::String filePath = juce::String(tempPath) + "choroboros_log.txt";
-        FILE* f = fopen(filePath.toRawUTF8(), "a");
-        if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
-    }
-  #endif
 }
 
 struct BackgroundAssetPack
