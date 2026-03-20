@@ -2,13 +2,14 @@ name: Build
 
 on:
   push:
-    branches: [v2.04-dev]
+    branches: [main]
   pull_request:
-    branches: [v2.04-dev]
+    branches: [main]
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PRODUCT: "Choroboros Beta"
 
 jobs:
 
@@ -78,20 +79,20 @@ jobs:
       - name: Package and checksum
         run: |
           mkdir -p dist
-          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros.vst3" dist/
-          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros" dist/
+          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
+          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta" dist/
           cd dist
-          zip -r Choroboros-linux-x64.zip Choroboros.vst3 Choroboros
-          sha256sum Choroboros-linux-x64.zip > Choroboros-linux-x64.zip.sha256
-          cat Choroboros-linux-x64.zip.sha256
+          zip -r Choroboros-Beta-linux-x64.zip "Choroboros Beta.vst3" "Choroboros Beta"
+          sha256sum Choroboros-Beta-linux-x64.zip > Choroboros-Beta-linux-x64.zip.sha256
+          cat Choroboros-Beta-linux-x64.zip.sha256
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Choroboros-linux-x64
+          name: Choroboros-Beta-linux-x64
           path: |
-            dist/Choroboros-linux-x64.zip
-            dist/Choroboros-linux-x64.zip.sha256
+            dist/Choroboros-Beta-linux-x64.zip
+            dist/Choroboros-Beta-linux-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -151,23 +152,23 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
           Copy-Item -Recurse `
-            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" `
+            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
           Copy-Item `
-            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" `
+            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
-          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-windows-x64.zip
-          $hash = (Get-FileHash dist\Choroboros-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  Choroboros-windows-x64.zip" | Out-File -FilePath dist\Choroboros-windows-x64.zip.sha256 -Encoding ascii
-          Get-Content dist\Choroboros-windows-x64.zip.sha256
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x64.zip
+          $hash = (Get-FileHash dist\Choroboros-Beta-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-Beta-windows-x64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x64.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-Beta-windows-x64.zip.sha256
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Choroboros-windows-x64
+          name: Choroboros-Beta-windows-x64
           path: |
-            dist/Choroboros-windows-x64.zip
-            dist/Choroboros-windows-x64.zip.sha256
+            dist/Choroboros-Beta-windows-x64.zip
+            dist/Choroboros-Beta-windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -227,22 +228,86 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
           Copy-Item -Recurse `
-            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros.vst3" `
+            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
           Copy-Item `
-            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros.exe" `
+            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
-          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-windows-x86.zip
-          $hash = (Get-FileHash dist\Choroboros-windows-x86.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  Choroboros-windows-x86.zip" | Out-File -FilePath dist\Choroboros-windows-x86.zip.sha256 -Encoding ascii
-          Get-Content dist\Choroboros-windows-x86.zip.sha256
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x86.zip
+          $hash = (Get-FileHash dist\Choroboros-Beta-windows-x86.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-Beta-windows-x86.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x86.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-Beta-windows-x86.zip.sha256
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Choroboros-windows-x86
+          name: Choroboros-Beta-windows-x86
           path: |
-            dist/Choroboros-windows-x86.zip
-            dist/Choroboros-windows-x86.zip.sha256
+            dist/Choroboros-Beta-windows-x86.zip
+            dist/Choroboros-Beta-windows-x86.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows ARM64 — VST3 + Standalone (cross-compiled for ARM64 Windows)
+  # ---------------------------------------------------------------------------
+  windows-arm64:
+    name: Windows ARM64
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-arm64-release
+          key: windows-arm64-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-arm64-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-arm64-release `
+            -G "Visual Studio 17 2022" -A ARM64
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-arm64-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-arm64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-arm64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-arm64.zip
+          $hash = (Get-FileHash dist\Choroboros-Beta-windows-arm64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-Beta-windows-arm64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-arm64.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-Beta-windows-arm64.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-windows-arm64
+          path: |
+            dist/Choroboros-Beta-windows-arm64.zip
+            dist/Choroboros-Beta-windows-arm64.zip.sha256
           if-no-files-found: error
           retention-days: 30

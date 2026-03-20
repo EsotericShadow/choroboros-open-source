@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Choroboros VERSION 2.0.4)
+project(Choroboros VERSION 2.0.41)
 
 # Version string for feedback/reports.
 # Keep this as a normal variable so the checked-in source of truth wins over any
 # stale value left behind in an existing CMake cache.
-set(CHOROBOROS_VERSION_STRING "2.04")
+set(CHOROBOROS_VERSION_STRING "Beta v2.04.1")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,9 +37,9 @@ juce_add_plugin(Choroboros
     VST3_CATEGORIES Fx Modulation
     AU_MAIN_TYPE kAudioUnitType_Effect
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
-    PRODUCT_NAME "Choroboros"
-    DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms"
-    VERSION 2.0.4
+    PRODUCT_NAME "Choroboros Beta"
+    DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms (Beta)"
+    VERSION 2.0.41
 )
 
 target_sources(Choroboros PRIVATE

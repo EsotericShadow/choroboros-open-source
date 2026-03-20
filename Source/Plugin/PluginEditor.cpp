@@ -565,7 +565,7 @@ class DevPanelWindow : public juce::DocumentWindow
 {
 public:
     DevPanelWindow(ChoroborosPluginEditor& editor, ChoroborosAudioProcessor& processor)
-        : juce::DocumentWindow("Choroboros Dev Panel",
+        : juce::DocumentWindow("Choroboros Beta Dev Panel",
                                juce::Colour(0xff202020),
                                juce::DocumentWindow::closeButton)
     {
@@ -839,6 +839,12 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
     stopDeferredThemePrewarm();
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
+
+    // Explicitly destroy child windows BEFORE component teardown.
+    // On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
+    // can trigger cascading HWND messages that deadlock or crash (Cubase).
+    devWindow.reset();
+
     setLookAndFeel(nullptr);
 }
 
