@@ -837,14 +837,39 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
-    stopDeferredThemePrewarm();
+    // 1. Remove parameter listener FIRST — prevents audio thread from calling
+    //    parameterChanged() on a half-destroyed editor (Cubase/Reaper freeze).
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
 
-    // Explicitly destroy child windows BEFORE component teardown.
-    // On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
-    // can trigger cascading HWND messages that deadlock or crash (Cubase).
+    // 2. Null out all slider callbacks that capture raw `this` — these can
+    //    fire during component teardown as attachments are destroyed.
+    rateSlider.onValueChange = nullptr;
+    depthSlider.onValueChange = nullptr;
+    offsetSlider.onValueChange = nullptr;
+    widthSlider.onValueChange = nullptr;
+    colorSlider.onValueChange = nullptr;
+    mixSlider.onValueChange = nullptr;
+
+    // 3. Destroy attachments before sliders — prevents dangling parameter
+    //    callbacks during member destruction order.
+    rateAttachment.reset();
+    depthAttachment.reset();
+    offsetAttachment.reset();
+    widthAttachment.reset();
+    colorAttachment.reset();
+    mixAttachment.reset();
+    hqAttachment.reset();
+    engineColorAttachment.reset();
+
+    // 4. Stop background theme thread.
+    stopDeferredThemePrewarm();
+
+    // 5. Explicitly destroy child windows BEFORE component teardown.
+    //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
+    //    can trigger cascading HWND messages that deadlock or crash (Cubase).
     devWindow.reset();
 
+    // 6. Detach look-and-feel last.
     setLookAndFeel(nullptr);
 }
 
@@ -853,21 +878,32 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
     if (parameterID == ChoroborosAudioProcessor::ENGINE_COLOR_ID)
     {
         const int colorIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
-        customLookAndFeel.setColorTheme(colorIndex);
-        loadBackgroundImage(colorIndex);
-        updateValueLabelColors(colorIndex);
-        topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
-        if (topHeaderBar_)
-            topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
 
-        // Engine colour changed — if this wasn't triggered by a preset load,
-        // invalidate the current preset so the dropdown shows the placeholder.
-        if (audioProcessor.presetManager
-            && ! audioProcessor.presetManager->isLoadInProgress())
-            audioProcessor.presetManager->invalidatePreset();
+        // parameterChanged can be called from the audio thread — all GUI
+        // work MUST happen on the message thread.  Using SafePointer so the
+        // lambda is a no-op if the editor is destroyed before delivery.
+        juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+        juce::MessageManager::callAsync([safeThis, colorIndex]()
+        {
+            if (safeThis == nullptr)
+                return;
 
-        PluginEditorSetup::applyLayout(*this, layoutTuning);
-        repaint();
+            safeThis->customLookAndFeel.setColorTheme(colorIndex);
+            safeThis->loadBackgroundImage(colorIndex);
+            safeThis->updateValueLabelColors(colorIndex);
+            safeThis->topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+            if (safeThis->topHeaderBar_)
+                safeThis->topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+
+            // Engine colour changed — if this wasn't triggered by a preset load,
+            // invalidate the current preset so the dropdown shows the placeholder.
+            if (safeThis->audioProcessor.presetManager
+                && ! safeThis->audioProcessor.presetManager->isLoadInProgress())
+                safeThis->audioProcessor.presetManager->invalidatePreset();
+
+            PluginEditorSetup::applyLayout(*safeThis, safeThis->layoutTuning);
+            safeThis->repaint();
+        });
     }
 }
 
