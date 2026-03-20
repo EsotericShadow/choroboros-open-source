@@ -939,50 +939,56 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
-    {
+    auto procLog = [](const char* s) {
+        juce::String msg = juce::String("[CHORO][PROC] ") + s;
+      #if JUCE_WINDOWS
+        OutputDebugStringA((msg + "\n").toRawUTF8());
+      #endif
+        fprintf(stderr, "%s\n", msg.toRawUTF8());
+        fflush(stderr);
         static const juce::File logFile(
             juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
                 .getChildFile("choroboros_dtor_log.txt"));
-        auto log = [&](const char* s) { logFile.appendText(juce::String("[PROC] ") + s + "\n"); };
+        logFile.appendText(msg + "\n");
+    };
 
-        log("PROC DTOR START");
+    procLog("PROC DTOR START");
 
-        log("stopTimer");
-        stopTimer();
+    procLog("stopTimer");
+    stopTimer();
 
-        log("analyzerWorker stop");
-        if (analyzerWorker != nullptr)
-        {
-            analyzerWorker->signalThreadShouldExit();
-            analyzerWorker->notify();
-            analyzerWorker->stopThread(500);
-        }
-
-        log("removeParameterListeners");
-        parameters.removeParameterListener(ENGINE_COLOR_ID, this);
-        parameters.removeParameterListener(RATE_ID, this);
-        parameters.removeParameterListener(DEPTH_ID, this);
-        parameters.removeParameterListener(OFFSET_ID, this);
-        parameters.removeParameterListener(WIDTH_ID, this);
-        parameters.removeParameterListener(COLOR_ID, this);
-        parameters.removeParameterListener(HQ_ID, this);
-        parameters.removeParameterListener(MIX_ID, this);
-
-        log("sessionLog prepareForShutdown");
-        if (sessionLog)
-            sessionLog->prepareForShutdown();
-
-        log("CrashReporter::uninstall");
-        CrashReporter::uninstall();
-
-        log("feedbackCollector.reset");
-        feedbackCollector.reset();
-
-        log("sessionLog.reset");
-        sessionLog.reset();
-
-        log("PROC DTOR COMPLETE");
+    procLog("analyzerWorker stop");
+    if (analyzerWorker != nullptr)
+    {
+        analyzerWorker->signalThreadShouldExit();
+        analyzerWorker->notify();
+        analyzerWorker->stopThread(500);
     }
+
+    procLog("removeParameterListeners");
+    parameters.removeParameterListener(ENGINE_COLOR_ID, this);
+    parameters.removeParameterListener(RATE_ID, this);
+    parameters.removeParameterListener(DEPTH_ID, this);
+    parameters.removeParameterListener(OFFSET_ID, this);
+    parameters.removeParameterListener(WIDTH_ID, this);
+    parameters.removeParameterListener(COLOR_ID, this);
+    parameters.removeParameterListener(HQ_ID, this);
+    parameters.removeParameterListener(MIX_ID, this);
+
+    procLog("sessionLog prepareForShutdown");
+    if (sessionLog)
+        sessionLog->prepareForShutdown();
+
+    procLog("CrashReporter::uninstall");
+    CrashReporter::uninstall();
+
+    procLog("feedbackCollector.reset");
+    feedbackCollector.reset();
+
+    procLog("sessionLog.reset");
+    sessionLog.reset();
+
+    procLog("PROC DTOR COMPLETE");
 }
 
 juce::File ChoroborosAudioProcessor::getLoadTraceLogFile()

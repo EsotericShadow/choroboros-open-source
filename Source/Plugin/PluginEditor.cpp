@@ -588,6 +588,7 @@ public:
 ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
+    choroLog("EDITOR CTOR START");
     editorCtorStartMs = juce::Time::getMillisecondCounterHiRes();
     setLookAndFeel(&customLookAndFeel);
 
@@ -837,30 +838,41 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 namespace
 {
-void dtorLog(const char* step)
+void choroLog(const char* step)
 {
-    // Breadcrumb logging — writes each destructor step to a file so we can
-    // see exactly where a freeze occurs.  The file is flushed after every
-    // write so the last line is always the step that hung.
+    // Real-time breadcrumb logging via two channels:
+    // 1. OutputDebugString (visible in Sysinternals DebugView on Windows)
+    // 2. File append to Desktop (if file I/O is still available)
+    juce::String msg = juce::String("[CHORO] ") + step;
+
+  #if JUCE_WINDOWS
+    OutputDebugStringA((msg + "\n").toRawUTF8());
+  #endif
+
+    // Also stderr so PowerShell can capture it from standalone
+    fprintf(stderr, "%s\n", msg.toRawUTF8());
+    fflush(stderr);
+
+    // File backup — may not work if frozen during DLL_PROCESS_DETACH
     static const juce::File logFile(
         juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
             .getChildFile("choroboros_dtor_log.txt"));
-    logFile.appendText(juce::String(step) + "\n");
+    logFile.appendText(msg + "\n");
 }
 }
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
-    dtorLog("DTOR START");
+    choroLog("DTOR START");
 
     // 1. Remove parameter listener FIRST — prevents audio thread from calling
     //    parameterChanged() on a half-destroyed editor (Cubase/Reaper freeze).
-    dtorLog("1. removeParameterListener");
+    choroLog("1. removeParameterListener");
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
 
     // 2. Null out all slider callbacks that capture raw `this` — these can
     //    fire during component teardown as attachments are destroyed.
-    dtorLog("2. null slider callbacks");
+    choroLog("2. null slider callbacks");
     rateSlider.onValueChange = nullptr;
     depthSlider.onValueChange = nullptr;
     offsetSlider.onValueChange = nullptr;
@@ -870,7 +882,7 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
 
     // 3. Destroy attachments before sliders — prevents dangling parameter
     //    callbacks during member destruction order.
-    dtorLog("3. reset attachments");
+    choroLog("3. reset attachments");
     rateAttachment.reset();
     depthAttachment.reset();
     offsetAttachment.reset();
@@ -881,20 +893,20 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     engineColorAttachment.reset();
 
     // 4. Stop background theme thread.
-    dtorLog("4. stopDeferredThemePrewarm");
+    choroLog("4. stopDeferredThemePrewarm");
     stopDeferredThemePrewarm();
 
     // 5. Explicitly destroy child windows BEFORE component teardown.
     //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
     //    can trigger cascading HWND messages that deadlock or crash (Cubase).
-    dtorLog("5. devWindow.reset()");
+    choroLog("5. devWindow.reset()");
     devWindow.reset();
 
     // 6. Detach look-and-feel last.
-    dtorLog("6. setLookAndFeel(nullptr)");
+    choroLog("6. setLookAndFeel(nullptr)");
     setLookAndFeel(nullptr);
 
-    dtorLog("DTOR COMPLETE");
+    choroLog("DTOR COMPLETE");
 }
 
 void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
