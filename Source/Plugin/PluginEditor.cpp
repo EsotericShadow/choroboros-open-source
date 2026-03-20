@@ -42,25 +42,24 @@ void choroLog(const char* step)
     juce::String msg = juce::String("[CHORO] ") + step;
 
   #if JUCE_WINDOWS
-    // Force a console window open so we can see output in real-time.
-    // Only allocates once — subsequent calls are no-ops.
-    static bool consoleAllocated = [] {
-        AllocConsole();
-        freopen("CONOUT$", "w", stderr);
-        freopen("CONOUT$", "w", stdout);
-        return true;
-    }();
-    (void)consoleAllocated;
+    // Show a popup ONCE to prove the code runs, then just log to file
+    static bool firstCall = true;
+    if (firstCall)
+    {
+        firstCall = false;
+        MessageBoxA(nullptr, "Choroboros debug logging active!\nCheck %%TEMP%%\\choroboros_log.txt",
+                     "Choroboros Debug", MB_OK | MB_SYSTEMMODAL);
+    }
 
-    OutputDebugStringA((msg + "\n").toRawUTF8());
+    // Write to user's temp folder (always writable, unlike C:\)
+    char tempPath[MAX_PATH];
+    if (GetTempPathA(MAX_PATH, tempPath))
+    {
+        juce::String filePath = juce::String(tempPath) + "choroboros_log.txt";
+        FILE* f = fopen(filePath.toRawUTF8(), "a");
+        if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
+    }
   #endif
-
-    fprintf(stderr, "%s\n", msg.toRawUTF8());
-    fflush(stderr);
-
-    // Write to a hardcoded path (JUCE desktop path may resolve wrong in VST3)
-    FILE* f = fopen("C:\\choroboros_log.txt", "a");
-    if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
 }
 
 struct BackgroundAssetPack

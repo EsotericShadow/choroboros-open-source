@@ -945,12 +945,14 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     auto procLog = [](const char* s) {
         juce::String msg = juce::String("[CHORO][PROC] ") + s;
       #if JUCE_WINDOWS
-        OutputDebugStringA((msg + "\n").toRawUTF8());
+        char tempPath[MAX_PATH];
+        if (GetTempPathA(MAX_PATH, tempPath))
+        {
+            juce::String filePath = juce::String(tempPath) + "choroboros_log.txt";
+            FILE* f = fopen(filePath.toRawUTF8(), "a");
+            if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
+        }
       #endif
-        fprintf(stderr, "%s\n", msg.toRawUTF8());
-        fflush(stderr);
-        FILE* f = fopen("C:\\choroboros_log.txt", "a");
-        if (f) { fprintf(f, "%s\n", msg.toRawUTF8()); fclose(f); }
     };
 
     procLog("PROC DTOR START");
