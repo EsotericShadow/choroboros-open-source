@@ -835,14 +835,32 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
     return font;
 }
 
+namespace
+{
+void dtorLog(const char* step)
+{
+    // Breadcrumb logging — writes each destructor step to a file so we can
+    // see exactly where a freeze occurs.  The file is flushed after every
+    // write so the last line is always the step that hung.
+    static const juce::File logFile(
+        juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
+            .getChildFile("choroboros_dtor_log.txt"));
+    logFile.appendText(juce::String(step) + "\n");
+}
+}
+
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
+    dtorLog("DTOR START");
+
     // 1. Remove parameter listener FIRST — prevents audio thread from calling
     //    parameterChanged() on a half-destroyed editor (Cubase/Reaper freeze).
+    dtorLog("1. removeParameterListener");
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
 
     // 2. Null out all slider callbacks that capture raw `this` — these can
     //    fire during component teardown as attachments are destroyed.
+    dtorLog("2. null slider callbacks");
     rateSlider.onValueChange = nullptr;
     depthSlider.onValueChange = nullptr;
     offsetSlider.onValueChange = nullptr;
@@ -852,6 +870,7 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
 
     // 3. Destroy attachments before sliders — prevents dangling parameter
     //    callbacks during member destruction order.
+    dtorLog("3. reset attachments");
     rateAttachment.reset();
     depthAttachment.reset();
     offsetAttachment.reset();
@@ -862,15 +881,20 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     engineColorAttachment.reset();
 
     // 4. Stop background theme thread.
+    dtorLog("4. stopDeferredThemePrewarm");
     stopDeferredThemePrewarm();
 
     // 5. Explicitly destroy child windows BEFORE component teardown.
     //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
     //    can trigger cascading HWND messages that deadlock or crash (Cubase).
+    dtorLog("5. devWindow.reset()");
     devWindow.reset();
 
     // 6. Detach look-and-feel last.
+    dtorLog("6. setLookAndFeel(nullptr)");
     setLookAndFeel(nullptr);
+
+    dtorLog("DTOR COMPLETE");
 }
 
 void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)

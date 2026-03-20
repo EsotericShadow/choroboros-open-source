@@ -939,38 +939,50 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
-    stopTimer();
-
-    if (analyzerWorker != nullptr)
     {
-        analyzerWorker->signalThreadShouldExit();
-        analyzerWorker->notify();  // wake from wait() so it exits promptly
-        analyzerWorker->stopThread(500);
+        static const juce::File logFile(
+            juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
+                .getChildFile("choroboros_dtor_log.txt"));
+        auto log = [&](const char* s) { logFile.appendText(juce::String("[PROC] ") + s + "\n"); };
+
+        log("PROC DTOR START");
+
+        log("stopTimer");
+        stopTimer();
+
+        log("analyzerWorker stop");
+        if (analyzerWorker != nullptr)
+        {
+            analyzerWorker->signalThreadShouldExit();
+            analyzerWorker->notify();
+            analyzerWorker->stopThread(500);
+        }
+
+        log("removeParameterListeners");
+        parameters.removeParameterListener(ENGINE_COLOR_ID, this);
+        parameters.removeParameterListener(RATE_ID, this);
+        parameters.removeParameterListener(DEPTH_ID, this);
+        parameters.removeParameterListener(OFFSET_ID, this);
+        parameters.removeParameterListener(WIDTH_ID, this);
+        parameters.removeParameterListener(COLOR_ID, this);
+        parameters.removeParameterListener(HQ_ID, this);
+        parameters.removeParameterListener(MIX_ID, this);
+
+        log("sessionLog prepareForShutdown");
+        if (sessionLog)
+            sessionLog->prepareForShutdown();
+
+        log("CrashReporter::uninstall");
+        CrashReporter::uninstall();
+
+        log("feedbackCollector.reset");
+        feedbackCollector.reset();
+
+        log("sessionLog.reset");
+        sessionLog.reset();
+
+        log("PROC DTOR COMPLETE");
     }
-
-    parameters.removeParameterListener(ENGINE_COLOR_ID, this);
-    parameters.removeParameterListener(RATE_ID, this);
-    parameters.removeParameterListener(DEPTH_ID, this);
-    parameters.removeParameterListener(OFFSET_ID, this);
-    parameters.removeParameterListener(WIDTH_ID, this);
-    parameters.removeParameterListener(COLOR_ID, this);
-    parameters.removeParameterListener(HQ_ID, this);
-    parameters.removeParameterListener(MIX_ID, this);
-
-    // Flush the session log and write the clean-shutdown marker NOW, while
-    // the message thread and file system are still fully available.  The
-    // SessionLog destructor intentionally does NOT do file I/O to avoid
-    // blocking during DLL_PROCESS_DETACH on Windows.
-    if (sessionLog)
-        sessionLog->prepareForShutdown();
-
-    // Uninstall crash handlers after the session log is flushed (a crash
-    // between flush and here would still leave a valid log on disk).
-    CrashReporter::uninstall();
-
-    // feedbackCollector must be destroyed before sessionLog (it holds a raw pointer)
-    feedbackCollector.reset();
-    sessionLog.reset();
 }
 
 juce::File ChoroborosAudioProcessor::getLoadTraceLogFile()
