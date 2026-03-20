@@ -31,9 +31,26 @@
 #include <cmath>
 #include <future>
 #include <vector>
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
 
 namespace
 {
+void choroLog(const char* step)
+{
+    juce::String msg = juce::String("[CHORO] ") + step;
+  #if JUCE_WINDOWS
+    OutputDebugStringA((msg + "\n").toRawUTF8());
+  #endif
+    fprintf(stderr, "%s\n", msg.toRawUTF8());
+    fflush(stderr);
+    static const juce::File logFile(
+        juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
+            .getChildFile("choroboros_dtor_log.txt"));
+    logFile.appendText(msg + "\n");
+}
+
 struct BackgroundAssetPack
 {
     juce::Image off;
@@ -834,31 +851,6 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
     if (bold)
         font.setBold(true);
     return font;
-}
-
-namespace
-{
-void choroLog(const char* step)
-{
-    // Real-time breadcrumb logging via two channels:
-    // 1. OutputDebugString (visible in Sysinternals DebugView on Windows)
-    // 2. File append to Desktop (if file I/O is still available)
-    juce::String msg = juce::String("[CHORO] ") + step;
-
-  #if JUCE_WINDOWS
-    OutputDebugStringA((msg + "\n").toRawUTF8());
-  #endif
-
-    // Also stderr so PowerShell can capture it from standalone
-    fprintf(stderr, "%s\n", msg.toRawUTF8());
-    fflush(stderr);
-
-    // File backup — may not work if frozen during DLL_PROCESS_DETACH
-    static const juce::File logFile(
-        juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
-            .getChildFile("choroboros_dtor_log.txt"));
-    logFile.appendText(msg + "\n");
-}
 }
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()

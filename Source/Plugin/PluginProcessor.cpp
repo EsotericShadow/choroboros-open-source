@@ -24,6 +24,9 @@
 #include <juce_dsp/juce_dsp.h>
 #include <algorithm>
 #include <cmath>
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
 
 namespace BinaryData
 {
