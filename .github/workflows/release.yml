@@ -1,0 +1,473 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v2.04.1)'
+        required: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PRODUCT: "Choroboros Beta"
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # macOS Universal (arm64 + x86_64) — VST3 + AU + Standalone
+  # ---------------------------------------------------------------------------
+  macos:
+    name: macOS Universal
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install build tools
+        run: brew install ninja
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/macos-universal-release
+          key: macos-universal-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            macos-universal-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/macos-universal-release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Build all targets
+        run: |
+          cmake --build build/macos-universal-release \
+            --target Choroboros_VST3 Choroboros_AU Choroboros_Standalone \
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/macos-universal-release \
+            --target ChoroborosRegressionTests \
+            --parallel
+
+      - name: Run DSP regression tests
+        run: |
+          ./build/macos-universal-release/ChoroborosRegressionTests --dsp-only
+
+      - name: Verify Universal Binary
+        run: |
+          echo "=== VST3 ==="
+          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3/Contents/MacOS/Choroboros Beta"
+          echo "=== AU ==="
+          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component/Contents/MacOS/Choroboros Beta"
+          echo "=== Standalone ==="
+          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app/Contents/MacOS/Choroboros Beta"
+
+      - name: Package and checksum
+        run: |
+          mkdir -p dist
+          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
+          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component" dist/
+          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app" dist/
+          cd dist
+          zip -r Choroboros-Beta-macOS-Universal.zip \
+            "Choroboros Beta.vst3" \
+            "Choroboros Beta.component" \
+            "Choroboros Beta.app"
+          shasum -a 256 Choroboros-Beta-macOS-Universal.zip > Choroboros-Beta-macOS-Universal.zip.sha256
+          cat Choroboros-Beta-macOS-Universal.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-macOS-Universal
+          path: |
+            dist/Choroboros-Beta-macOS-Universal.zip
+            dist/Choroboros-Beta-macOS-Universal.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Linux x64 — VST3 + Standalone
+  # ---------------------------------------------------------------------------
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install JUCE system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            libasound2-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libgl1-mesa-dev \
+            xvfb \
+            ninja-build \
+            pkg-config
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/linux-x64-release
+          key: linux-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            linux-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/linux-x64-release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/linux-x64-release \
+            --target Choroboros_VST3 Choroboros_Standalone \
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/linux-x64-release \
+            --target ChoroborosRegressionTests \
+            --parallel
+
+      - name: Run DSP regression tests
+        run: |
+          xvfb-run --auto-servernum \
+            ./build/linux-x64-release/ChoroborosRegressionTests --dsp-only
+
+      - name: Package and checksum
+        run: |
+          mkdir -p dist
+          cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
+          cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta" dist/
+          cd dist
+          zip -r Choroboros-Beta-linux-x64.zip "Choroboros Beta.vst3" "Choroboros Beta"
+          sha256sum Choroboros-Beta-linux-x64.zip > Choroboros-Beta-linux-x64.zip.sha256
+          cat Choroboros-Beta-linux-x64.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-linux-x64
+          path: |
+            dist/Choroboros-Beta-linux-x64.zip
+            dist/Choroboros-Beta-linux-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows x64 — VST3 + Standalone
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-x64-release
+          key: windows-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-x64-release `
+            -G "Visual Studio 17 2022" -A x64
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-x64-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/windows-x64-release `
+            --config Release `
+            --target ChoroborosRegressionTests `
+            --parallel
+
+      - name: Run DSP regression tests
+        shell: cmd
+        run: |
+          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --dsp-only
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x64.zip
+          $hash = (Get-FileHash dist\Choroboros-Beta-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-Beta-windows-x64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x64.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-Beta-windows-x64.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-windows-x64
+          path: |
+            dist/Choroboros-Beta-windows-x64.zip
+            dist/Choroboros-Beta-windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows x86 — VST3 + Standalone (legacy 32-bit host support)
+  # ---------------------------------------------------------------------------
+  windows-x86:
+    name: Windows x86
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-x86-release
+          key: windows-x86-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-x86-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-x86-release `
+            -G "Visual Studio 17 2022" -A Win32
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-x86-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/windows-x86-release `
+            --config Release `
+            --target ChoroborosRegressionTests `
+            --parallel
+
+      - name: Run DSP regression tests
+        shell: cmd
+        run: |
+          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --dsp-only
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x86.zip
+          $hash = (Get-FileHash dist\Choroboros-Beta-windows-x86.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-Beta-windows-x86.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x86.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-Beta-windows-x86.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-windows-x86
+          path: |
+            dist/Choroboros-Beta-windows-x86.zip
+            dist/Choroboros-Beta-windows-x86.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Windows ARM64 — VST3 + Standalone (cross-compiled, no regression tests)
+  # ---------------------------------------------------------------------------
+  windows-arm64:
+    name: Windows ARM64
+    runs-on: windows-latest
+
+    steps:
+      - name: Enable long paths
+        shell: cmd
+        run: |
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" ^
+            /v LongPathsEnabled /t REG_DWORD /d 1 /f
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/windows-arm64-release
+          key: windows-arm64-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            windows-arm64-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/windows-arm64-release `
+            -G "Visual Studio 17 2022" -A ARM64
+
+      - name: Build VST3 + Standalone
+        run: |
+          cmake --build build/windows-arm64-release `
+            --config Release `
+            --target Choroboros_VST3 Choroboros_Standalone `
+            --parallel
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          Copy-Item -Recurse `
+            "build\windows-arm64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
+            dist\contents\
+          Copy-Item `
+            "build\windows-arm64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
+            dist\contents\
+          Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-arm64.zip
+          $hash = (Get-FileHash dist\Choroboros-Beta-windows-arm64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  Choroboros-Beta-windows-arm64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-arm64.zip.sha256 -Encoding ascii
+          Get-Content dist\Choroboros-Beta-windows-arm64.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-windows-arm64
+          path: |
+            dist/Choroboros-Beta-windows-arm64.zip
+            dist/Choroboros-Beta-windows-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Create GitHub Release — collects all platform artifacts
+  # ---------------------------------------------------------------------------
+  create-release:
+    name: Create GitHub Release
+    needs: [macos, linux, windows, windows-x86, windows-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (for changelog)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: List artifacts
+        run: find release-artifacts -type f | sort
+
+      - name: Collect release files
+        run: |
+          mkdir -p release-files
+          find release-artifacts -name "*.zip" -exec cp {} release-files/ \;
+          find release-artifacts -name "*.sha256" -exec cp {} release-files/ \;
+          echo "=== Release files ==="
+          ls -lh release-files/
+
+      - name: Generate release notes
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          echo "Generating release notes for ${RELEASE_TAG}"
+          cat > release-notes.md << 'NOTES_EOF'
+          ## What's Fixed
+
+          - **Cubase engine-switch crash** — Automating engine colour no longer crashes. The parameter profile restore is now thread-safe against `processBlock`.
+          - **HQ toggle clicks** — Quality toggle is now protected by the DSP lock, eliminating rare clicks when switching NQ↔HQ under load.
+          - **Depth smoothing on engine switch** — Switching engines (especially Purple) no longer causes audible pitch warble. The depth smoother now operates in raw parameter space.
+          - **Windows freeze on close (D3D11)** — JUCE 8's Direct2D renderer disabled. GDI forced per-window. No more deadlock on plugin unload.
+
+          ## Downloads
+
+          | Platform | File |
+          |----------|------|
+          | macOS (Universal) | `Choroboros-Beta-macOS-Universal.zip` |
+          | Windows x64 | `Choroboros-Beta-windows-x64.zip` |
+          | Windows x86 (32-bit) | `Choroboros-Beta-windows-x86.zip` |
+          | Windows ARM64 | `Choroboros-Beta-windows-arm64.zip` |
+          | Linux x64 | `Choroboros-Beta-linux-x64.zip` |
+
+          ## Who Should Update
+
+          **All Cubase users on Windows** — this fixes the P1 crash. Everyone else benefits from smoother engine transitions.
+
+          ## Install
+
+          Replace your existing Choroboros Beta VST3/AU/Standalone with the builds from this release.
+
+          ---
+          *Choroboros Beta — Kaizen DSP*
+          NOTES_EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
+          body_path: release-notes.md
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          draft: false
+          prerelease: false

@@ -748,7 +748,6 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
 
 void seedPersistedDefaultsFromBundledFactory()
 {
-#if JUCE_MAC || JUCE_WINDOWS
     const auto userFile = DefaultsPersistence::getUserDefaultsFile();
     const auto factoryFile = DefaultsPersistence::getFactoryDefaultsFile();
     const bool seedUser = !userFile.existsAsFile() || userFile.getSize() <= 0;
@@ -756,10 +755,11 @@ void seedPersistedDefaultsFromBundledFactory()
     if (!seedUser && !seedFactory)
         return;
 
-#if JUCE_MAC
-    const char* resourceName = "json_defaults_dump_json";
-#else
+#if JUCE_WINDOWS
     const char* resourceName = "windows_factory_defaults_json";
+#else
+    // macOS and Linux both use the same bundled factory defaults.
+    const char* resourceName = "json_defaults_dump_json";
 #endif
 
     int dataSize = 0;
@@ -776,7 +776,6 @@ void seedPersistedDefaultsFromBundledFactory()
         DefaultsPersistence::saveFactory(bundledJson, &writeError);
     if (seedUser)
         DefaultsPersistence::saveUser(bundledJson, &writeError);
-#endif
 }
 } // namespace
 
