@@ -409,14 +409,14 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRate;  // Rate smoothing
     // Use exponential smoothing (one-pole) for depth - more responsive to rapid changes
     // This prevents crackling when knob is turned fast
-    float smoothedDepthValue = 0.5f;  // Depth value
+    float smoothedDepthValue = 0.5f;  // Raw depth value
     float depthSmoothingCoeff = 0.0f;  // One-pole filter coefficient
     
     // Rate limiter for depth - prevents rapid changes that overwhelm the smoother
     // Maximum change rate: 2.0 per second (full range in 0.5 seconds)
     float depthRateLimit = 2.0f;  // Maximum change per second
     float depthRateLimitPerSample = 0.0f;  // Calculated per-sample limit
-    float currentDepthTarget = 0.5f;  // Current rate-limited target
+    float currentDepthTarget = 0.5f;  // Current raw rate-limited target
     
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedCentreDelay;  // Centre delay smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedColor;  // Color smoothing

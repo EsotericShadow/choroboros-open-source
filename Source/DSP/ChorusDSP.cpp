@@ -400,9 +400,10 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     // CRITICAL: Smooth ALL delay-related parameters to prevent read pointer discontinuities
     applyRuntimeTuning();
 
-    // Map depth to engine-specific range
-    smoothedDepthValue = mapDepthToEngineRange(depth);
-    currentDepthTarget = mapDepthToEngineRange(depth);
+    // Depth smoothing state now stores the raw 0-1 depth. Engine-specific
+    // mapping is applied later in processChorusParameters().
+    smoothedDepthValue = depth;
+    currentDepthTarget = depth;
     
     // Set initial values
     smoothedRate.setCurrentAndTargetValue(rateHz);
@@ -488,9 +489,9 @@ void ChorusDSP::reset()
     bluePresenceCachedGainDb = -1000.0f;
     colorBlockValue = smoothedColor.getCurrentValue();
     
-    // Reset smoothed depth and rate-limited target to current value (mapped to engine range)
-    smoothedDepthValue = mapDepthToEngineRange(depth);
-    currentDepthTarget = mapDepthToEngineRange(depth);
+    // Reset raw depth smoothing state to the current 0-1 parameter value.
+    smoothedDepthValue = depth;
+    currentDepthTarget = depth;
 }
 
 float ChorusDSP::calculateCentreDelay(float depthValue)
@@ -808,8 +809,8 @@ void ChorusDSP::setEngineColor(int colorIndex)
     if (currentColorIndex != colorIndex)
     {
         currentColorIndex = colorIndex;
-        // Keep depth transitions smooth across engine switches.
-        currentDepthTarget = mapDepthToEngineRange(depth);
+        // Preserve the raw depth smoother state across engine switches. The
+        // per-engine mapping is applied after smoothing during processing.
         smoothedColor.setTargetValue(mapColorToEngineRange(color));
         switchCore(currentColorIndex, currentQualityHQ);
     }

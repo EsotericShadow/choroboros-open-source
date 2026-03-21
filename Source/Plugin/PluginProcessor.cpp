@@ -1843,9 +1843,12 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
 
         const int newEngine = juce::jlimit (0, 4, static_cast<int> (newValue));
 
-        saveCurrentParamsToEngineProfile (lastEngineIndex);
-        lastEngineIndex = newEngine;
-        applyEngineParamProfile (newEngine);
+        {
+            const juce::ScopedLock lock (dspLock);
+            saveCurrentParamsToEngineProfile (lastEngineIndex);
+            lastEngineIndex = newEngine;
+            applyEngineParamProfile (newEngine);
+        }
         return;
     }
 
@@ -1857,7 +1860,10 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         const bool hqEnabled = (newValue >= 0.5f);
 
         if (chorusDSP != nullptr)
+        {
+            const juce::ScopedLock lock (dspLock);
             chorusDSP->setQualityEnabled (hqEnabled);
+        }
 
         return;
     }

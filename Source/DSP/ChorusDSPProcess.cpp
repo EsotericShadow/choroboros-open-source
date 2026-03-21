@@ -224,20 +224,23 @@ void ChorusDSPProcess::processOutputPeakCatch(ChorusDSP& chorusDSP,
 
 void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNumSamples, float& currentDepth, float& currentRate, float& currentCentreDelayMs)
 {
-    // Map depth to engine-specific range (Purple uses compressed range)
-    float mappedDepth = chorusDSP.mapDepthToEngineRange(chorusDSP.depth);
-    
-    float targetDiff = mappedDepth - chorusDSP.currentDepthTarget;
+    // Smooth the raw 0-1 depth first so engine switches do not inject a step
+    // into the smoother just because the engine-specific mapping changed.
+    const float rawDepth = chorusDSP.depth;
+
+    float targetDiff = rawDepth - chorusDSP.currentDepthTarget;
     float maxChange = chorusDSP.depthRateLimit * (blockNumSamples / chorusDSP.spec.sampleRate);
     if (std::abs(targetDiff) > maxChange)
         chorusDSP.currentDepthTarget += (targetDiff > 0.0f ? maxChange : -maxChange);
     else
-        chorusDSP.currentDepthTarget = mappedDepth;
-    
+        chorusDSP.currentDepthTarget = rawDepth;
+
     float aN = std::pow(chorusDSP.depthSmoothingCoeff, static_cast<float>(blockNumSamples));
-    currentDepth = aN * chorusDSP.smoothedDepthValue + (1.0f - aN) * chorusDSP.currentDepthTarget;
-    chorusDSP.smoothedDepthValue = currentDepth;
-    
+    const float smoothedRaw = aN * chorusDSP.smoothedDepthValue + (1.0f - aN) * chorusDSP.currentDepthTarget;
+    chorusDSP.smoothedDepthValue = smoothedRaw;
+
+    currentDepth = chorusDSP.mapDepthToEngineRange(smoothedRaw);
+
     currentRate = chorusDSP.smoothedRate.getNextValue();
     chorusDSP.smoothedRate.skip(blockNumSamples - 1);
 
