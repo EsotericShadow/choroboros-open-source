@@ -130,6 +130,9 @@ target_compile_definitions(Choroboros
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        # Disable JUCE 8's Direct2D renderer on Windows — D3D11/WARP device
+        # teardown during DLL unload deadlocks the message thread in Cubase.
+        JUCE_DIRECT2D=0
         "CHOROBOROS_VERSION_STRING=\"${CHOROBOROS_VERSION_STRING}\""
 )
 
