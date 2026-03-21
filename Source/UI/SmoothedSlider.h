@@ -22,71 +22,52 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 /**
- * A slider with visual smoothing for a more natural, weighted feel.
- * The actual parameter value updates immediately, but the visual position
- * follows smoothly with a slight drag/weight effect.
+ * A juce::Slider with custom scroll-wheel handling and configurable drag weight.
  *
- * Supports both linear and exponential smoothing to match audio processing.
+ * The "heavy knob" feel comes from JUCE's native setMouseDragSensitivity() -
+ * higher values = more mouse travel to turn the knob = deliberate, weighted feel.
+ * NO visual smoothing, NO ghost/body desync. The knob, text, parameter, and
+ * automation are always perfectly in sync.
  *
- * Wheel handling design:
- *   - Inertial (momentum) events are ignored so the knob stops when you stop.
- *   - Each non-inertial event is applied immediately with a linear scale +
- *     per-event saturation cap; no accumulation queue.
- *   - Visual smoothing (SmoothedValue / one-pole filter) handles animation.
+ * Custom behaviour:
+ *   - Scroll wheel: inertial events ignored, per-event saturation cap,
+ *     configurable sensitivity, Cmd/Ctrl fine-adjust mode.
+ *   - onMouseUpCallback: used for the Rate knob's right-click sync menu.
+ *   - setDragSensitivity: maps to JUCE's setMouseDragSensitivity.
+ *
+ * Compatibility note:
+ *   - The open-source UI still calls setSmoothingTime() / setUseExponential()
+ *     and reads getVisualValue(). These are kept as no-ops / passthrough so
+ *     the beta build uses the same knob physics as commercial.
  */
-class SmoothedSlider : public juce::Slider, public juce::Timer
+class SmoothedSlider : public juce::Slider
 {
 public:
     SmoothedSlider(float smoothingTimeMs = 60.0f, bool useExponential = false);
-    ~SmoothedSlider() override;
+    ~SmoothedSlider() override = default;
 
-    void valueChanged() override;
-    void timerCallback() override;
-    void mouseDown(const juce::MouseEvent& e) override;
-    void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
-    void setSmoothingTime(float timeMs);
-    void setUseExponential(bool useExp);
+    void setSmoothingTime(float) {}
+    void setUseExponential(bool) {}
     void setDragSensitivity(float sensitivityScale);
     void setScrollWheelSensitivity(float sensitivityScale);
-    float getVisualValue() const;
+    float getVisualValue() const { return static_cast<float>(getValue()); }
     std::function<void(const juce::MouseEvent&)> onMouseUpCallback;
 
 private:
-    float verticalDragStartY = 0.0f;
-    double valueAtVerticalDragStart = 0.0;
     double wheelAnchorProportion = 0.0;
     float lastWheelDirection = 0.0f;
     bool hasWheelAnchor = false;
-    bool dragFineAdjustActive = false;
-    bool wheelFineAdjustActive = false;
-
-    // Linear smoothing (default)
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> visualValueLinear;
-
-    // Exponential smoothing (one-pole, for depth knob to match audio)
-    float visualValueExp = 0.5f;
-    float smoothingCoeff = 0.0f;
-
-    float smoothingTimeMs = 60.0f;
-    bool useExponential = false;
-    bool needsRepaint = false;
-    float dragSensitivityScale = 1.0f;
     float scrollWheelScale = 0.25f;
     int64_t lastScrollTimeMs = 0;
 
-    float getSampleRate() const { return 120.0f; }
     double clampWheelAnchorProportion(double proportion) const;
-    double getDragSensitivity(const juce::MouseEvent& e) const;
     float getWheelAmount(const juce::MouseWheelDetails& wheel) const;
     bool isFineWheelAdjustActive(const juce::MouseEvent& e) const;
     bool shouldIgnoreWheelEvent(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) const;
     double computeDirectWheelDelta(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) const;
     void prepareWheelAnchor(float wheelAmount, int64_t now);
-    void resetDragAnchor(const juce::MouseEvent& e);
     void resetWheelAnchor();
-    void updateSmoothingCoeff();
-    void snapVisualToValue();
 };

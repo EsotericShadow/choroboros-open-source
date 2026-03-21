@@ -45,6 +45,13 @@ AnimatedToggleButton::~AnimatedToggleButton()
     stopTimer();
 }
 
+void AnimatedToggleButton::resized()
+{
+    cachedFrameWidth = 0;
+    cachedFrameHeight = 0;
+    scaledFrames.fill({});
+}
+
 float AnimatedToggleButton::getAnimationProgress() const
 {
     // Frame 0 = switch UP = HQ on = light on. Frame 17 = switch DOWN = HQ off = light off.
@@ -59,11 +66,20 @@ void AnimatedToggleButton::paint(juce::Graphics& g)
     if (!isTimerRunning() && std::abs(animatedFrame - targetFrame) > 0.01f)
         animatedFrame = targetFrame;
 
+    rebuildScaledFramesIfNeeded();
+
     const auto& sheet = spritesheetImage;
     if (!sheet.isValid())
         return;
 
     const int frameIndex = juce::jlimit(0, kNumFrames - 1, juce::roundToInt(animatedFrame));
+    const auto& cachedFrame = scaledFrames[static_cast<size_t>(frameIndex)];
+    if (cachedFrame.isValid())
+    {
+        g.drawImageAt(cachedFrame, 0, 0);
+        return;
+    }
+
     const int row = frameIndex / kCols;
     const int col = frameIndex % kCols;
     const juce::Rectangle<int> src(col * kFramePx, row * kFramePx, kFramePx, kFramePx);
@@ -75,15 +91,60 @@ void AnimatedToggleButton::paint(juce::Graphics& g)
     g.drawImageWithin(frame, 0, 0, getWidth(), getHeight(), juce::RectanglePlacement::centred, false);
 }
 
+void AnimatedToggleButton::rebuildScaledFramesIfNeeded()
+{
+    const int width = getWidth();
+    const int height = getHeight();
+
+    if (width <= 0 || height <= 0 || !spritesheetImage.isValid())
+        return;
+
+    if (cachedFrameWidth == width && cachedFrameHeight == height
+        && scaledFrames[0].isValid() && scaledFrames[static_cast<size_t>(kNumFrames - 1)].isValid())
+        return;
+
+    cachedFrameWidth = width;
+    cachedFrameHeight = height;
+    scaledFrames.fill({});
+
+    for (int frameIndex = 0; frameIndex < kNumFrames; ++frameIndex)
+    {
+        const int row = frameIndex / kCols;
+        const int col = frameIndex % kCols;
+        const juce::Rectangle<int> src(col * kFramePx, row * kFramePx, kFramePx, kFramePx);
+
+        if (!spritesheetImage.getBounds().contains(src))
+            continue;
+
+        juce::Image scaledFrame(juce::Image::ARGB, width, height, true);
+        juce::Graphics frameGraphics(scaledFrame);
+        frameGraphics.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        frameGraphics.drawImage(spritesheetImage,
+                                0, 0, width, height,
+                                src.getX(), src.getY(), src.getWidth(), src.getHeight());
+        scaledFrames[static_cast<size_t>(frameIndex)] = scaledFrame;
+    }
+}
+
 void AnimatedToggleButton::startAnimationToState(bool on)
 {
     // Frame 0 = up = on, frame 17 = down = off
     const float target = on ? 0.0f : static_cast<float>(kNumFrames - 1);
+
+    if (animationRunning && std::abs(animationEndFrame - target) <= 0.01f)
+        return;
+
+    if (! animationRunning && std::abs(animatedFrame - target) <= 0.01f)
+    {
+        animatedFrame = target;
+        return;
+    }
+
     animationStartFrame = animatedFrame;
     animationEndFrame = target;
     animationStartMs = juce::Time::getMillisecondCounterHiRes();
     animationRunning = true;
-    startTimerHz(120);
+    startTimerHz(kAnimationTimerHz);
 }
 
 void AnimatedToggleButton::commitToggleState(bool newState, juce::NotificationType notificationType)
@@ -104,7 +165,7 @@ void AnimatedToggleButton::mouseDown(const juce::MouseEvent& e)
     pointerIsDown = true;
     dragToggled = false;
     if (!isTimerRunning())
-        startTimerHz(120);
+        startTimerHz(kAnimationTimerHz);
 }
 
 void AnimatedToggleButton::mouseDrag(const juce::MouseEvent& e)

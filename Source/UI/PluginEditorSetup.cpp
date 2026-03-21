@@ -466,8 +466,8 @@ void PluginEditorSetup::setupHQButton(ChoroborosPluginEditor& editor)
     editor.hqButton.setTooltip("High Quality Mode: Enables higher-quality algorithm variant for the selected engine. Increases CPU usage but improves audio fidelity.");
     editor.hqLabel.setVisible(false);
 
-    // Repaint editor when HQ switch animates so lit backpanel overlay stays synced (all themes)
-    editor.hqButton.onAnimationTick = [&editor] { editor.repaint(); };
+    // Repaint only the lightweight lit overlay while the switch animates.
+    editor.hqButton.onAnimationTick = [&editor] { editor.repaintHQLitOverlay(); };
 
     applyLayout(editor, editor.layoutTuning);
 }

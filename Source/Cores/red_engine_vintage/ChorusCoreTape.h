@@ -76,6 +76,7 @@ private:
     int maxDelaySamples = 0;
     float currentFixedDelay = -1.0f;
     float smoothedToneCutoff = 14000.0f;
+    float smoothedDepth = 0.0f; // Per-sample depth smoother to eliminate block-rate zipper
 
     float resampleHermite(const float* buf, int mask, float realPos, float tension) const;
     float tapeSaturate(float sample, float drive) const;

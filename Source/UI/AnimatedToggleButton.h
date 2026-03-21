@@ -19,6 +19,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <array>
 #include <functional>
 
 class AnimatedToggleButton : public juce::Slider, public juce::Timer
@@ -34,6 +35,7 @@ public:
     std::function<void()> onAnimationTick;
 
     void paint(juce::Graphics& g) override;
+    void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
@@ -41,9 +43,11 @@ public:
     void timerCallback() override;
     
 private:
+    void rebuildScaledFramesIfNeeded();
     void startAnimationToState(bool on);
     void commitToggleState(bool newState, juce::NotificationType notificationType = juce::sendNotificationSync);
     void tryCommitDragAtScreenY(int screenY);
+    static constexpr int kAnimationTimerHz = 120;
     static constexpr int kNumFrames = 18;
     static constexpr int kCols = 5;
     static constexpr int kFramePx = 512;
@@ -60,6 +64,9 @@ private:
     bool pointerIsDown = false;
     bool dragToggled = false;  // true if drag already changed state during this gesture
     juce::Image spritesheetImage;  // loaded once in ctor, avoids static in DLL
+    std::array<juce::Image, kNumFrames> scaledFrames;
+    int cachedFrameWidth = 0;
+    int cachedFrameHeight = 0;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnimatedToggleButton)
 };

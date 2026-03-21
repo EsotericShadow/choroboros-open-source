@@ -61,12 +61,15 @@ public:
     juce::Font makeUiTextFont(float heightPx, bool bold = true) const;
 
 private:
+    class HQLitOverlay;
+
     ChoroborosAudioProcessor& audioProcessor;
     LayoutTuning layoutTuning;
     
     CustomLookAndFeel customLookAndFeel;
     juce::Image backgroundImage;
     juce::Image backgroundImageLit;  // Light-on overlay (opacity synced to HQ switch) for all themes
+    std::unique_ptr<HQLitOverlay> hqLitOverlay_;
     
     // Sliders (with visual smoothing for natural feel)
     SmoothedSlider rateSlider;
@@ -127,6 +130,8 @@ private:
     void loadValueLabelTypeface();
     void loadUiTextTypeface();
     void updateValueLabelColors(int colorIndex);
+    void repaintHQLitOverlay();
+    void invalidateHQLitOverlayCache();
     void setupSlider(juce::Slider& slider, LabelWithContainer& label, LabelWithContainer& valueLabel,
                      const juce::String& name, const juce::String& paramId);
     void updateValueLabel(LabelWithContainer& label, float value, const juce::String& paramId);

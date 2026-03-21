@@ -84,6 +84,7 @@ void ChorusCoreTape::reset()
 
     currentFixedDelay = -1.0f;
     smoothedToneCutoff = 14000.0f;
+    smoothedDepth = 0.0f;
 }
 
 float ChorusCoreTape::getMaxDelaySamples() const
@@ -152,7 +153,10 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
         currentFixedDelay = a * currentFixedDelay + (1.0f - a) * targetDelay;
     }
 
-    const float depth = juce::jlimit(0.0f, 1.0f, dsp.smoothedDepthValue);
+    const float targetDepth = juce::jlimit(0.0f, 1.0f, dsp.smoothedDepthValue);
+    // Per-sample depth smoothing coefficient: ~5ms time constant at any sample rate.
+    // This eliminates block-boundary staircase steps when the depth knob moves.
+    const float depthSmoothCoeff = std::exp(-1.0f / (0.005f * sampleRate));
     const float color = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
 
     float toneMax = tuning.tapeToneMaxHz;
@@ -188,6 +192,7 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
 
         for (int i = 0; i < numSamples; ++i)
         {
+            smoothedDepth = depthSmoothCoeff * smoothedDepth + (1.0f - depthSmoothCoeff) * targetDepth;
             const float in = samples[i];
 
             // 1. Calculate Modulation (Tape Wow/Flutter)
@@ -196,8 +201,8 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             if (mod.wowPhase >= 1.0f) mod.wowPhase -= 1.0f;
             if (mod.flutterPhase >= 1.0f) mod.flutterPhase -= 1.0f;
 
-            const float wow = std::sin(juce::MathConstants<float>::twoPi * mod.wowPhase) * mod.wowDepth * depth;
-            const float flutter = std::sin(juce::MathConstants<float>::twoPi * mod.flutterPhase) * mod.flutterDepth * depth;
+            const float wow = std::sin(juce::MathConstants<float>::twoPi * mod.wowPhase) * mod.wowDepth * smoothedDepth;
+            const float flutter = std::sin(juce::MathConstants<float>::twoPi * mod.flutterPhase) * mod.flutterDepth * smoothedDepth;
 
             // 2. LFO Modulation
             // The LFO buffer from ChorusDSP is typically scaled to ±0.5 max amplitude (controlled by depth).

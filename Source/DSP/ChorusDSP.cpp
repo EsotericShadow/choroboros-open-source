@@ -934,12 +934,25 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
         float warmupMs, crossfadeMs;
         if (qualityToggleOnly)
         {
-            // Quality toggles stay within the same engine family (e.g. BBD↔Tape,
-            // Cubic↔Thiran) so the delay characteristics are similar.  Use a short
-            // transition that feels instantaneous but is still long enough for a
-            // click-free equal-power crossfade.
-            warmupMs  = 18.0f;   // populate ~18ms of delay buffer
-            crossfadeMs = 25.0f; // fast equal-power crossfade
+            // Most quality toggles stay within similar architectures (Lagrange3↔5,
+            // Cubic↔Thiran) and need only a quick crossfade.  Red (BBD↔Tape) and
+            // Purple (PhaseWarp↔Orbit) cross fundamentally different DSP cores, so
+            // give them enough warmup for the target core to stabilise its internal
+            // state (phase integrator, leaky spring, etc.).
+            const bool structurallyDifferent = (colorIndex == 2 || colorIndex == 4);
+            //                                  Red=2           Black=4 (if applicable)
+            // Purple (3) also crosses different core types (PhaseWarp↔Orbit)
+            const bool deepSwitch = structurallyDifferent || (colorIndex == 3);
+            if (deepSwitch)
+            {
+                warmupMs  = juce::jmap(switchSeverity, 35.0f, 70.0f);
+                crossfadeMs = juce::jmap(switchSeverity, 55.0f, 120.0f);
+            }
+            else
+            {
+                warmupMs  = 18.0f;
+                crossfadeMs = 25.0f;
+            }
         }
         else
         {

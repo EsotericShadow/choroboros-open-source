@@ -467,15 +467,11 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
             const float shapedProgress = std::pow(progress, crossfadeCurveExp);
             const float newGain = std::sin(shapedProgress * juce::MathConstants<float>::halfPi);
             const float oldGain = std::cos(shapedProgress * juce::MathConstants<float>::halfPi);
-            // Extra edge de-click treatment: short attenuation at transition start/end
-            // suppresses single-sample discontinuities when switching core states.
-            constexpr float edgeWindow = 0.08f; // 8% of crossfade length
-            const float edgeIn = juce::jlimit(0.0f, 1.0f, progress / edgeWindow);
-            const float edgeOut = juce::jlimit(0.0f, 1.0f, (1.0f - progress) / edgeWindow);
-            const float edgeBlend = juce::jmin(edgeIn, edgeOut);
-            const float edgeDuckGain = 0.82f + 0.18f * edgeBlend;
-            const float midDuckGain = 1.0f - 0.08f * std::sin(progress * juce::MathConstants<float>::pi);
-            const float duckGain = edgeDuckGain * midDuckGain;
+            // Gentle mid-crossfade duck: sin²(π·progress) is exactly 1.0 at
+            // both boundaries (no level discontinuity) and dips ~0.5 dB at the
+            // midpoint where two uncorrelated cores sum loudest.
+            const float envelope = std::sin(progress * juce::MathConstants<float>::pi);
+            const float duckGain = 1.0f - 0.06f * envelope * envelope;
             for (int ch = 0; ch < numChannels; ++ch)
             {
                 const float wetNew = chorusDSP.coreCrossfadeBufferA.getSample(ch, i)

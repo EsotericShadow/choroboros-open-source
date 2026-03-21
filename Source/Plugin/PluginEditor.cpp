@@ -614,6 +614,80 @@ public:
 };
 } // namespace
 
+class ChoroborosPluginEditor::HQLitOverlay : public juce::Component
+{
+public:
+    explicit HQLitOverlay(ChoroborosPluginEditor& owner) : editor(owner)
+    {
+        setInterceptsMouseClicks(false, false);
+    }
+
+    void resized() override
+    {
+        invalidateCache();
+    }
+
+    void invalidateCache()
+    {
+        cachedScaledImage = {};
+        cachedWidth = 0;
+        cachedHeight = 0;
+        cachedSourceWidth = 0;
+        cachedSourceHeight = 0;
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        if (!editor.backgroundImageLit.isValid())
+            return;
+
+        const float litOpacity = editor.hqButton.getAnimationProgress();
+        if (litOpacity <= 0.0f)
+            return;
+
+        refreshCachedImageIfNeeded();
+        if (!cachedScaledImage.isValid())
+            return;
+
+        g.setOpacity(litOpacity);
+        g.drawImageAt(cachedScaledImage, 0, 0);
+    }
+
+private:
+    void refreshCachedImageIfNeeded()
+    {
+        const auto& source = editor.backgroundImageLit;
+        const int width = getWidth();
+        const int height = getHeight();
+
+        if (!source.isValid() || width <= 0 || height <= 0)
+            return;
+
+        if (cachedScaledImage.isValid()
+            && cachedWidth == width && cachedHeight == height
+            && cachedSourceWidth == source.getWidth()
+            && cachedSourceHeight == source.getHeight())
+            return;
+
+        cachedScaledImage = juce::Image(juce::Image::ARGB, width, height, true);
+        juce::Graphics cachedGraphics(cachedScaledImage);
+        cachedGraphics.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        cachedGraphics.drawImage(source, 0, 0, width, height, 0, 0, source.getWidth(), source.getHeight());
+
+        cachedWidth = width;
+        cachedHeight = height;
+        cachedSourceWidth = source.getWidth();
+        cachedSourceHeight = source.getHeight();
+    }
+
+    ChoroborosPluginEditor& editor;
+    juce::Image cachedScaledImage;
+    int cachedWidth = 0;
+    int cachedHeight = 0;
+    int cachedSourceWidth = 0;
+    int cachedSourceHeight = 0;
+};
+
 //==============================================================================
 ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
@@ -621,6 +695,9 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     choroLog("EDITOR CTOR START");
     editorCtorStartMs = juce::Time::getMillisecondCounterHiRes();
     setLookAndFeel(&customLookAndFeel);
+    hqLitOverlay_ = std::make_unique<HQLitOverlay>(*this);
+    addAndMakeVisible(*hqLitOverlay_);
+    hqLitOverlay_->toBack();
 
     int initialEngineIndex = 0;
     if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
@@ -1007,26 +1084,33 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
                    backgroundImage.getWidth(), backgroundImage.getHeight());
     }
 
-    // Overlay lit panel with opacity synced to HQ switch animation (all themes)
-    if (backgroundImageLit.isValid())
-    {
-        const float litOpacity = hqButton.getAnimationProgress();
-        if (litOpacity > 0.0f)
-        {
-            g.setOpacity(litOpacity);
-            g.drawImage(backgroundImageLit, 0, yOff, getWidth(), contentH, 0, 0,
-                        backgroundImageLit.getWidth(), backgroundImageLit.getHeight());
-        }
-    }
-
     // (Top-bar container is now painted by the TopBarDrawer component)
 }
 
 void ChoroborosPluginEditor::resized()
 {
+    const int yOff = getHeaderBarHeight();
+    if (hqLitOverlay_ != nullptr)
+    {
+        hqLitOverlay_->setBounds(0, yOff, getWidth(), juce::jmax(0, getHeight() - yOff));
+        hqLitOverlay_->toBack();
+    }
+
     // Position header bar across the full width at the very top
     if (topHeaderBar_)
         topHeaderBar_->setBounds (0, 0, getWidth(), topHeaderBar_->getBarHeight());
+}
+
+void ChoroborosPluginEditor::repaintHQLitOverlay()
+{
+    if (hqLitOverlay_ != nullptr)
+        hqLitOverlay_->repaint();
+}
+
+void ChoroborosPluginEditor::invalidateHQLitOverlayCache()
+{
+    if (hqLitOverlay_ != nullptr)
+        hqLitOverlay_->invalidateCache();
 }
 
 void ChoroborosPluginEditor::applyLayout()
@@ -1168,6 +1252,7 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
                     {
                         safeThis->backgroundImage = backgroundPack.off;
                         safeThis->backgroundImageLit = backgroundPack.lit;
+                        safeThis->invalidateHQLitOverlayCache();
                         safeThis->audioProcessor.logLoadTraceEvent(
                             "editor_active_theme_ready_ms",
                             juce::Time::getMillisecondCounterHiRes() - safeThis->editorCtorStartMs,
@@ -1343,6 +1428,7 @@ void ChoroborosPluginEditor::loadBackgroundImage(int colorIndex)
     const auto pack = getOrDecodeBackgroundAssetPack(colorIndex);
     backgroundImage = pack.off;
     backgroundImageLit = pack.lit;
+    invalidateHQLitOverlayCache();
 }
 
 int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const
