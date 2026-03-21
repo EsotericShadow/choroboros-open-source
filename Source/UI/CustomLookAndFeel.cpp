@@ -23,10 +23,22 @@
 #include <cmath>
 #include <utility>
 
+namespace
+{
+juce::Image toSoftwareImage(const juce::Image& image)
+{
+    if (! image.isValid())
+        return {};
+
+    juce::SoftwareImageType softwareType;
+    return softwareType.convert(image);
+}
+}
+
 // Returns a copy of the image with every non-transparent pixel set to full opacity (fixes PNGs exported at <100% opacity).
 static juce::Image makeImageFullyOpaque(const juce::Image& image)
 {
-    juce::Image copy = image.createCopy();
+    juce::Image copy = toSoftwareImage(image.createCopy());
     if (copy.getFormat() != juce::Image::ARGB)
         return copy;
     juce::Image::BitmapData bd(copy, 0, 0, copy.getWidth(), copy.getHeight(), juce::Image::BitmapData::readWrite);
@@ -51,7 +63,7 @@ static juce::Image loadImageFromBinary(const char* data, int size)
 {
     if (data == nullptr || size <= 0)
         return {};
-    return juce::ImageFileFormat::loadFrom(data, static_cast<size_t>(size));
+    return toSoftwareImage(juce::ImageFileFormat::loadFrom(data, static_cast<size_t>(size)));
 }
 
 namespace

@@ -13,9 +13,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Generate compile_commands.json for IDE language servers
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Look for JUCE in the repo first, then as a sibling directory (common layout
+# when multiple repos live under a shared parent like CHOROS_MASTER/).
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/CMakeLists.txt")
-    message(STATUS "Using local JUCE directory")
-    add_subdirectory(JUCE)
+    set(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/JUCE")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE/CMakeLists.txt")
+    get_filename_component(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE" ABSOLUTE)
+endif()
+
+if(DEFINED _JUCE_DIR)
+    message(STATUS "Using local JUCE directory: ${_JUCE_DIR}")
+    add_subdirectory("${_JUCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/JUCE")
 else()
     message(STATUS "Local JUCE not found. Fetching JUCE 6.0.8...")
     include(FetchContent)

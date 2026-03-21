@@ -23,6 +23,11 @@
 
 namespace
 {
+juce::Image makeSoftwareImage(juce::Image::PixelFormat format, int width, int height, bool clearImage)
+{
+    return juce::Image(format, width, height, clearImage, juce::SoftwareImageType());
+}
+
 
 //==============================================================================
 // Colour helpers — extremely dark, barely tinted by the engine accent.
@@ -316,7 +321,7 @@ TopHeaderBar::TopHeaderBar (PresetManager& presetManager, float uiScale)
             const int renderH = barHeight_ * 3;
             const int renderW = juce::roundToInt (static_cast<float> (renderH) * (375.0f / 225.0f));
 
-            juce::Image rendered (juce::Image::ARGB, renderW, renderH, true);
+            juce::Image rendered = makeSoftwareImage (juce::Image::ARGB, renderW, renderH, true);
             {
                 juce::Graphics ig (rendered);
                 drawable->drawWithin (ig,
@@ -327,7 +332,7 @@ TopHeaderBar::TopHeaderBar (PresetManager& presetManager, float uiScale)
             // Convert: use pixel brightness as alpha, set colour to white.
             // This strips the black background (black → transparent) and turns
             // all visible content white.
-            logoImage_ = juce::Image (juce::Image::ARGB, renderW, renderH, true);
+            logoImage_ = makeSoftwareImage (juce::Image::ARGB, renderW, renderH, true);
             juce::Image::BitmapData src (rendered, juce::Image::BitmapData::readOnly);
             juce::Image::BitmapData dst (logoImage_, juce::Image::BitmapData::writeOnly);
 

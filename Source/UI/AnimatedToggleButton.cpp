@@ -30,8 +30,9 @@ AnimatedToggleButton::AnimatedToggleButton()
     setMouseDragSensitivity(500);
     setScrollWheelEnabled(false);
     setWantsKeyboardFocus(false);
-    spritesheetImage = juce::ImageCache::getFromMemory(BinaryData::switch_a_spritesheet_png,
-                                                        BinaryData::switch_a_spritesheet_pngSize);
+    juce::SoftwareImageType softwareType;
+    spritesheetImage = softwareType.convert(juce::ImageCache::getFromMemory(BinaryData::switch_a_spritesheet_png,
+                                                                            BinaryData::switch_a_spritesheet_pngSize));
     onValueChange = [this]
     {
         const bool isOn = getValue() >= 0.5;

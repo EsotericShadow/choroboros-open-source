@@ -48,6 +48,7 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+    void parentHierarchyChanged() override;
     void applyLayout();
     void applyTuningToUI();
     void refreshValueLabels();
@@ -144,6 +145,8 @@ private:
     void stopDeferredThemePrewarm();
     void scheduleDeferredDevPanelPrewarm();
     void ensureDevPanelWindowCreated(bool triggeredByUser);
+    void forceSoftwareRenderingForPeer();
+    static void forceSoftwareRenderingForWindow(juce::DocumentWindow* window);
     double getHostBpm() const;
     void showRateSyncMenu(juce::Slider& rateControl);
     std::unique_ptr<RateSyncOverlay> rateSyncOverlay_;

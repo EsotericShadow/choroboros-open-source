@@ -37,6 +37,20 @@
 
 namespace
 {
+juce::Image toSoftwareImage(const juce::Image& image)
+{
+    if (! image.isValid())
+        return {};
+
+    juce::SoftwareImageType softwareType;
+    return softwareType.convert(image);
+}
+
+juce::Image loadSoftwareImageFromMemory(const void* data, int dataSize)
+{
+    return toSoftwareImage(juce::ImageCache::getFromMemory(data, dataSize));
+}
+
 void choroLog(const char* step)
 {
     // Hardcoded path — C:\Users\Public is writable by all users, no
@@ -547,9 +561,9 @@ BackgroundAssetPack decodeBackgroundAssetPack(int colorIndex)
 
     BackgroundAssetPack pack;
     if (offName && offSize > 0)
-        pack.off = juce::ImageCache::getFromMemory(offName, offSize);
+        pack.off = loadSoftwareImageFromMemory(offName, offSize);
     if (onName && onSize > 0)
-        pack.lit = juce::ImageCache::getFromMemory(onName, onSize);
+        pack.lit = loadSoftwareImageFromMemory(onName, onSize);
     return pack;
 }
 
@@ -705,13 +719,13 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     
     // ---- Top-bar sliding icon-button drawer -----------------------------------
     {
-        auto devIcon = juce::ImageCache::getFromMemory (
+        auto devIcon = loadSoftwareImageFromMemory (
             BinaryData::dev_png, BinaryData::dev_pngSize);
-        auto aboutIcon = juce::ImageCache::getFromMemory (
+        auto aboutIcon = loadSoftwareImageFromMemory (
             BinaryData::about_png, BinaryData::about_pngSize);
-        auto helpIcon = juce::ImageCache::getFromMemory (
+        auto helpIcon = loadSoftwareImageFromMemory (
             BinaryData::help_png, BinaryData::help_pngSize);
-        auto feedbackIcon = juce::ImageCache::getFromMemory (
+        auto feedbackIcon = loadSoftwareImageFromMemory (
             BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
 
         topBarDrawer.setupIcons (devIcon, aboutIcon, helpIcon, feedbackIcon);
@@ -735,7 +749,10 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             const bool shouldShow = !devWindow->isVisible();
             devWindow->setVisible (shouldShow);
             if (shouldShow)
+            {
+                forceSoftwareRenderingForWindow(devWindow.get());
                 devWindow->toFront (true);
+            }
         };
 
         topBarDrawer.aboutButton.onClick = [] { AboutDialog::show(); };
@@ -758,6 +775,12 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh + 40);
         addAndMakeVisible (topBarDrawer);
     }
+
+    juce::Timer::callAfterDelay(0, [safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]()
+    {
+        if (safeThis != nullptr)
+            safeThis->forceSoftwareRenderingForPeer();
+    });
     
     // Listen for engine color changes (preset load or manual) to update value label colors
     audioProcessor.getValueTreeState().addParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
@@ -898,6 +921,12 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     setLookAndFeel(nullptr);
 
     choroLog("DTOR COMPLETE");
+}
+
+void ChoroborosPluginEditor::parentHierarchyChanged()
+{
+    AudioProcessorEditor::parentHierarchyChanged();
+    forceSoftwareRenderingForPeer();
 }
 
 void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
@@ -1183,6 +1212,34 @@ void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)
                                      juce::Time::getMillisecondCounterHiRes() - startMs);
 
     devPanelPrewarmComplete = true;
+    forceSoftwareRenderingForWindow(devWindow.get());
+}
+
+void ChoroborosPluginEditor::forceSoftwareRenderingForPeer()
+{
+    if (auto* peer = getPeer())
+    {
+        const auto engines = peer->getAvailableRenderingEngines();
+        const auto gdiIndex = engines.indexOf("GDI");
+
+        if (gdiIndex >= 0 && peer->getCurrentRenderingEngine() != gdiIndex)
+            peer->setCurrentRenderingEngine(gdiIndex);
+    }
+}
+
+void ChoroborosPluginEditor::forceSoftwareRenderingForWindow(juce::DocumentWindow* window)
+{
+    if (window == nullptr)
+        return;
+
+    if (auto* peer = window->getPeer())
+    {
+        const auto engines = peer->getAvailableRenderingEngines();
+        const auto gdiIndex = engines.indexOf("GDI");
+
+        if (gdiIndex >= 0 && peer->getCurrentRenderingEngine() != gdiIndex)
+            peer->setCurrentRenderingEngine(gdiIndex);
+    }
 }
 
 void ChoroborosPluginEditor::scheduleDeferredDevPanelPrewarm()
