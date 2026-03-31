@@ -34,8 +34,8 @@ Welcome to the command-line documentation for the **Choroboros Dev Panel**. If t
     *   6.1 Serialization: `export script` and `cp json`
     *   6.2 Instantiation: `import script` and `save defaults`
 7.  **The Interactive Tutorial Engine**
-    *   7.1 Running sequential HUD layers
-    *   7.2 Granular Topic Indexes
+    *   7.1 Map Behaviors
+    *   7.2 The Topic Index
 8.  **The Master Index: All Parameter Slugs**
     *   8.1 Globals
     *   8.2 Engine Specific Architectures (BBD, Tape, Orbit, Fast-Fourier Transforms)
@@ -242,29 +242,30 @@ A hyper-specific alias of `cp json` that writes the JSON payload directly into `
 
 ## 7. The Interactive Tutorial Engine
 
-The console is connected heavily to the UI components. Typing `tutorial` hooks into the top-level View engine and launches the first of 6 hard-coded guided lesson maps.
+The console is connected heavily to the UI components. The tutorial runner executes **13** scripted topic maps (step sequences with optional tab navigation, focus highlights, and forced engine/HQ context). Typing **`tutorial` with no topic** starts the **core** full walkthrough—the same as `tutorial core`. For a short spatial tour of the Dev Panel layout (tabs, panels, where to look first), use **`tutorial orientation`** (that topic is also listed first in the in-app tutorial picker).
 
 ### 7.1 Map Behaviors
 When running, the HUD automatically invokes `view <tab>` commands, draws vector borders around specific UI elements, forces specific `engine` variables to clarify DSP context, and waits for user interaction before proceeding to the next step.
 
 *   `tutorial next`: Moves to the next component highlight block.
 *   `tutorial next section`: Bypasses granular analysis to hit macro level summaries.
-*   `tutorial skip`: Forcefully terminates the active script logic, dumping the user back into unrestricted dev panel manipulation.
+*   `tutorial skip` / `tutorial exit`: Forcefully terminates the active script logic, dumping the user back into unrestricted dev panel manipulation.
 
 ### 7.2 The Topic Index
 You can jump directly into specific lesson maps by supplying the correct topic:
-1. `tutorial core` (also `full`, `walkthrough`, `tutorial`)
-2. `tutorial overview`
-3. `tutorial modulation`
-4. `tutorial tone`
-5. `tutorial engine`
-6. `tutorial validation`
-7. `tutorial bbd`
-8. `tutorial tape`
-9. `tutorial phase`
-10. `tutorial bimodulation` (also `bi-modulation`, `bimod`, `warp`)
-11. `tutorial saturation`
-12. `tutorial envelope` (also `dynamic`, `dynamics`)
+1. `tutorial orientation` — UI layout and navigation (recommended before **core** if you are new to the panel)
+2. `tutorial core` (also `full`, `walkthrough`, `tutorial`) — full walkthrough; same as bare `tutorial`
+3. `tutorial overview`
+4. `tutorial modulation`
+5. `tutorial tone`
+6. `tutorial engine`
+7. `tutorial validation`
+8. `tutorial bbd`
+9. `tutorial tape`
+10. `tutorial phase`
+11. `tutorial bimodulation` (also `bi-modulation`, `bimod`, `warp`)
+12. `tutorial saturation`
+13. `tutorial envelope` (also `dynamic`, `dynamics`)
 
 ---
 
