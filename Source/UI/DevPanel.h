@@ -413,6 +413,7 @@ private:
     bool settingsConsoleWrapLines = true;
     int settingsConsoleMaxLines = 600;
     bool settingsShowScopeHintLine = true;
+    bool settingsTooltipsEnabled = true;
     bool settingsLazyUiEnabled = true;
     bool settingsModularCoresEnabled = false;
     bool settingsConfirmResetFactory = true;

@@ -1367,6 +1367,18 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         "Show Scope Hint", "Show");
     showScopeHintProp->setTooltip("Show or hide the active scope hint line under Active Profile.");
     settingsAccessibility.add(showScopeHintProp);
+
+    auto* tooltipsProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return settingsTooltipsEnabled; },
+            [this](bool enabled)
+            {
+                settingsTooltipsEnabled = enabled;
+                applyUiPreferences();
+            }),
+        "Show Tooltips", "Show");
+    tooltipsProp->setTooltip("Show or hide tooltips across the Dev Panel and main plugin UI.");
+    settingsAccessibility.add(tooltipsProp);
     addPanelSection(settingsPanel, "Accessibility", settingsAccessibility, false);
 
     juce::Array<juce::PropertyComponent*> settingsPerformance;

@@ -59,6 +59,7 @@ public:
     LayoutTuning& getLayoutTuning() { return layoutTuning; }
     juce::Font makeValueLabelFont(float heightPx, bool bold = true) const;
     juce::Font makeUiTextFont(float heightPx, bool bold = true) const;
+    void setTooltipsEnabled(bool enabled);
 
 private:
     class HQLitOverlay;

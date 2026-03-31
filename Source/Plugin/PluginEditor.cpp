@@ -604,7 +604,7 @@ public:
         setResizeLimits(1028, 525, 8192, 8192);
         setAlwaysOnTop(true);
         setContentOwned(new DevPanel(editor, processor), true);
-        centreAroundComponent(&editor, 900, 700);
+        centreAroundComponent(&editor, 1100, 700);
     }
 
     void closeButtonPressed() override
@@ -903,6 +903,12 @@ struct UiTextTypefaceCache
                                                    static_cast<size_t>(BinaryData::Retroica_ttfSize))
         : nullptr;
 };
+
+void ChoroborosPluginEditor::setTooltipsEnabled(bool enabled)
+{
+    if (tooltipWindow != nullptr)
+        tooltipWindow->setEnabled(enabled);
+}
 
 void ChoroborosPluginEditor::loadValueLabelTypeface()
 {

@@ -559,7 +559,8 @@ void DevPanel::resized()
 
     const int tabHeight = 38;
     const int tabGap = 6;
-    const int tabButtonWidth = juce::jmax(82, (rightColumnWidth - (tabGap * 6)) / 7);
+    const int numTabs = 7;
+    const int tabButtonWidth = juce::jmax(54, (rightColumnWidth - (tabGap * (numTabs - 1))) / numTabs);
     int tabX = rightColumnX;
     tabOverviewButton.setBounds(tabX, rightY, tabButtonWidth, tabHeight);
     tabX += tabButtonWidth + tabGap;
@@ -1431,6 +1432,10 @@ void DevPanel::applyUiPreferences()
     setDevPanelReducedMotion(settingsReducedMotion);
     setDevPanelLargeHitTargets(settingsLargeHitTargets);
     setDevPanelStrongFocusRing(settingsStrongFocusRing);
+
+    if (tooltipWindow != nullptr)
+        tooltipWindow->setEnabled(settingsTooltipsEnabled);
+    editor.setTooltipsEnabled(settingsTooltipsEnabled);
 
     const int currentEngine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
     setCurrentEngineSkinColour(currentEngine);
