@@ -43,7 +43,12 @@ private:
     int bufferMask = 0; // For power-of-2 size
     juce::dsp::ProcessSpec spec;
     int maxDelaySamples = 0;
-    
+
+    // Per-channel one-pole smoothing for centre delay to eliminate block-boundary zippering
+    std::array<float, 2> smoothedCentreDelay {{ 0.0f, 0.0f }};
+    std::array<bool, 2> centreDelayInitialized {{ false, false }};
+    float centreDelaySmoothAlpha = 0.0f;
+
     // Cubic interpolation read
     float readCubic(int channel, float delaySamples) const;
 };

@@ -27,25 +27,32 @@ ChorusCoreLagrange3rd::ChorusCoreLagrange3rd()
 void ChorusCoreLagrange3rd::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
 {
     spec = processSpec;
-    
+
     // Calculate maximum delay needed
     constexpr float maximumDelayModulation = 20.0f;
     constexpr float oscVolumeMultiplier = 0.5f;
     constexpr float maxDepth = 1.0f;
     constexpr float maxCentreDelayMs = 100.0f;
     constexpr int guardMarginSamples = 4;
-    
+
     maxDelaySamples = static_cast<int>(std::ceil(
         (maximumDelayModulation * maxDepth * oscVolumeMultiplier + maxCentreDelayMs)
         * spec.sampleRate / 1000.0)) + guardMarginSamples;
-    
+
     delayLine.setMaximumDelayInSamples(maxDelaySamples);
     delayLine.prepare(spec);
+
+    // ~3ms one-pole smoothing to eliminate block-boundary staircase steps
+    centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 void ChorusCoreLagrange3rd::reset()
 {
     delayLine.reset();
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 float ChorusCoreLagrange3rd::getMaxDelaySamples() const
@@ -74,15 +81,24 @@ void ChorusCoreLagrange3rd::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
         auto* inputSamples = block.getChannelPointer(ch);
         auto* outputSamples = block.getChannelPointer(ch);
         const float* channelLfo = (ch == 0) ? lfoLeft : lfoRight;
-        
+        const auto chIdx = static_cast<size_t>(ch);
+
+        if (!centreDelayInitialized[chIdx])
+        {
+            smoothedCentreDelay[chIdx] = centreDelaySamples;
+            centreDelayInitialized[chIdx] = true;
+        }
+
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            float delaySamp = centreDelaySamples + depthSamples * channelLfo[i];
+            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
+
+            float delaySamp = smoothedCentreDelay[chIdx] + depthSamples * channelLfo[i];
             delaySamp = juce::jlimit(guardSamples, maxDelaySamples, delaySamp);
-            
+
             const float in = inputSamples[i];
             delayLine.pushSample(ch, in);
-            
+
             const float out = delayLine.popSample(ch, delaySamp, true);
             outputSamples[i] = out;
         }

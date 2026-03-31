@@ -728,23 +728,23 @@ void ChorusDSP::processWidth(juce::dsp::AudioBlock<float>& block)
     float currentWidth = smoothedWidth.getNextValue();
     smoothedWidth.skip(numSamples - 1);
     
-    // Simplified width processing: scale side channel based on width parameter
-    // This avoids the incorrect band-splitting approach that can cause artifacts
+    // M/S width processing with energy compensation.
+    // Without compensation, widening amplifies the side channel causing the louder
+    // channel (often R in Tape mode) to gain disproportionately.
+    const float widthGainComp = 1.0f / std::sqrt(0.5f + 0.5f * currentWidth * currentWidth);
+
     for (int i = 0; i < numSamples; ++i)
     {
         float l = left[i];
         float r = right[i];
-        
-        // M/S conversion
+
         float mid = (l + r) * 0.5f;
         float side = (l - r) * 0.5f;
-        
-        // Apply width: scale side channel (0.0 = mono, 2.0 = full width)
+
         side *= currentWidth;
-        
-        // Back to L/R
-        left[i] = mid + side;
-        right[i] = mid - side;
+
+        left[i]  = (mid + side) * widthGainComp;
+        right[i] = (mid - side) * widthGainComp;
     }
 }
 
@@ -929,35 +929,41 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     pendingCore = newCore;
     pendingCoreId = resolvedCoreId;
 
+    // Reset the pending core's delay buffers and internal state so warmup
+    // starts from silence rather than stale content from a previous engine
+    // configuration. Without this, residual buffer data can produce a click
+    // at the start of the crossfade.
+    pendingCore->reset();
+
     if (spec.sampleRate > 0.0)
     {
         float warmupMs, crossfadeMs;
         if (qualityToggleOnly)
         {
-            // Most quality toggles stay within similar architectures (Lagrange3↔5,
-            // Cubic↔Thiran) and need only a quick crossfade.  Red (BBD↔Tape) and
-            // Purple (PhaseWarp↔Orbit) cross fundamentally different DSP cores, so
-            // give them enough warmup for the target core to stabilise its internal
-            // state (phase integrator, leaky spring, etc.).
-            const bool structurallyDifferent = (colorIndex == 2 || colorIndex == 4);
-            //                                  Red=2           Black=4 (if applicable)
+            // Quality toggles within the same engine family. Blue (Cubic↔Thiran)
+            // and Red (BBD↔Tape) cross fundamentally different DSP architectures
+            // that need longer warmup for internal state to settle (allpass filters,
+            // phase integrators, leaky springs, etc.).
+            const bool structurallyDifferent = (colorIndex == 1 || colorIndex == 2 || colorIndex == 4);
+            //                                  Blue=1         Red=2           Black=4
             // Purple (3) also crosses different core types (PhaseWarp↔Orbit)
             const bool deepSwitch = structurallyDifferent || (colorIndex == 3);
             if (deepSwitch)
             {
-                warmupMs  = juce::jmap(switchSeverity, 35.0f, 70.0f);
-                crossfadeMs = juce::jmap(switchSeverity, 55.0f, 120.0f);
+                warmupMs  = juce::jmap(switchSeverity, 50.0f, 100.0f);
+                crossfadeMs = juce::jmap(switchSeverity, 65.0f, 140.0f);
             }
             else
             {
-                warmupMs  = 18.0f;
-                crossfadeMs = 25.0f;
+                // Green (Lagrange3↔5) — similar architectures, shorter crossfade
+                warmupMs  = 30.0f;
+                crossfadeMs = 40.0f;
             }
         }
         else
         {
-            warmupMs = juce::jmap(switchSeverity, 22.0f, 95.0f);
-            crossfadeMs = juce::jmap(switchSeverity, 45.0f, 170.0f);
+            warmupMs = juce::jmap(switchSeverity, 35.0f, 100.0f);
+            crossfadeMs = juce::jmap(switchSeverity, 55.0f, 180.0f);
         }
         coreSwitchWarmupTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * warmupMs * 0.001f)));
         coreSwitchTargetCrossfadeSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * crossfadeMs * 0.001f)));

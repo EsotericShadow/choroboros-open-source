@@ -55,6 +55,11 @@ void ChorusCoreLagrange5th::prepare(const juce::dsp::ProcessSpec& processSpec, C
         delayBuffers[ch].assign(static_cast<size_t>(bufferSize), 0.0f);
         writePositions[ch] = 0;
     }
+
+    // ~3ms one-pole smoothing to eliminate block-boundary staircase steps
+    centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 void ChorusCoreLagrange5th::reset()
@@ -62,6 +67,8 @@ void ChorusCoreLagrange5th::reset()
     for (auto& buffer : delayBuffers)
         std::fill(buffer.begin(), buffer.end(), 0.0f);
     std::fill(writePositions.begin(), writePositions.end(), 0);
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 float ChorusCoreLagrange5th::getMaxDelaySamples() const
@@ -140,19 +147,26 @@ void ChorusCoreLagrange5th::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
         const float* channelLfo = (ch == 0) ? lfoLeft : lfoRight;
         auto& buffer = delayBuffers[static_cast<size_t>(ch)];
         int& writePos = writePositions[static_cast<size_t>(ch)];
-        
+        const auto chIdx = static_cast<size_t>(ch);
+
+        if (!centreDelayInitialized[chIdx])
+        {
+            smoothedCentreDelay[chIdx] = centreDelaySamples;
+            centreDelayInitialized[chIdx] = true;
+        }
+
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            float delaySamp = centreDelaySamples + depthSamples * channelLfo[i];
+            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
+
+            float delaySamp = smoothedCentreDelay[chIdx] + depthSamples * channelLfo[i];
             delaySamp = juce::jlimit(guardSamples, maxDelaySamples, delaySamp);
-            
+
             const float in = inputSamples[i];
-            
-            // Write to buffer
+
             buffer[static_cast<size_t>(writePos)] = in;
             writePos = (writePos + 1) & bufferMask;
-            
-            // Read with Lagrange 5th order
+
             const float out = readLagrange5th(ch, delaySamp);
             outputSamples[i] = out;
         }

@@ -154,10 +154,13 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     }
 
     const float targetDepth = juce::jlimit(0.0f, 1.0f, dsp.smoothedDepthValue);
-    // Per-sample depth smoothing coefficient: ~5ms time constant at any sample rate.
-    // This eliminates block-boundary staircase steps when the depth knob moves.
-    const float depthSmoothCoeff = std::exp(-1.0f / (0.005f * sampleRate));
+    // Per-sample depth smoothing coefficient: ~8ms time constant at any sample rate.
+    // Longer than before (was 5ms) to better suppress staircase steps when the depth knob moves.
+    const float depthSmoothCoeff = std::exp(-1.0f / (0.008f * sampleRate));
     const float color = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
+    // Sample-rate-aware smoothing coefficients
+    const float lfoModSmoothAlpha = 1.0f - std::exp(-1.0f / (0.005f * sampleRate));
+    const float ratioSmoothAlpha = 1.0f - std::exp(-1.0f / (0.004f * sampleRate));
 
     float toneMax = tuning.tapeToneMaxHz;
     float toneMin = tuning.tapeToneMinHz;
@@ -211,8 +214,8 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             // 0.5 * 0.02 = 0.01 (1%).
             // Increased from 0.006 to 0.02 to ensure audible classic chorus effect.
             const float targetLfoMod = channelLfo[i] * tuning.tapeLfoRatioScale;
-            // Very slow response to suppress zipper when Depth changes quickly.
-            resampler.smoothedLfoMod += tuning.tapeLfoModSmoothingCoeff * (targetLfoMod - resampler.smoothedLfoMod);
+            // Sample-rate-aware smoothing to suppress zipper when Depth changes quickly.
+            resampler.smoothedLfoMod += lfoModSmoothAlpha * (targetLfoMod - resampler.smoothedLfoMod);
 
             // Target Ratio: 1.0 = normal speed
             float targetRatio = 1.0f + resampler.smoothedLfoMod + wow + flutter;
@@ -225,9 +228,8 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
                 std::swap(ratioMin, ratioMax);
             targetRatio = juce::jlimit(ratioMin, ratioMax, targetRatio);
 
-            // Smooth the ratio to avoid zipper noise from rapid LFO/Wow changes
-            // Slower ratio tracking to further de-emphasize fast control transients.
-            resampler.smoothedRatio += tuning.tapeRatioSmoothingCoeff * (targetRatio - resampler.smoothedRatio);
+            // Smooth the ratio to avoid zipper noise from rapid LFO/Wow changes.
+            resampler.smoothedRatio += ratioSmoothAlpha * (targetRatio - resampler.smoothedRatio);
 
             // 3. Integrate Varispeed to get Position Offset
             // If ratio > 1.0, we consume samples faster, so read head moves closer to write head (delay decreases).

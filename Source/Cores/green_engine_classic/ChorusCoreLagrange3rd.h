@@ -39,4 +39,9 @@ private:
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> delayLine;
     juce::dsp::ProcessSpec spec;
     int maxDelaySamples = 0;
+
+    // Per-channel one-pole smoothing for centre delay to eliminate block-boundary zippering
+    std::array<float, 2> smoothedCentreDelay {{ 0.0f, 0.0f }};
+    std::array<bool, 2> centreDelayInitialized {{ false, false }};
+    float centreDelaySmoothAlpha = 0.0f;
 };

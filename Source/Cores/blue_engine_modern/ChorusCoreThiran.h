@@ -25,19 +25,12 @@
 // Thiran allpass fractional delay chorus core
 // Blue HQ mode — 5th-order maximally flat group delay allpass filter
 //
-// A Thiran allpass filter of order N provides fractional delay D where
-// N <= D < N+1. The transfer function is:
-//
-//     H(z) = z^{-N} * A(z^{-1}) / A(z)
-//
-// where A(z) = sum_{k=0}^{N} a_k * z^{-k} and the coefficients a_k are
-// computed to maximise group delay flatness at DC (Thiran 1971).
-//
-// For time-varying chorus modulation, the allpass coefficients are
-// recomputed every INTERP_LENGTH samples and linearly ramped to
-// prevent DFII-T state transients (zippering / noise).
-// A 5th-order filter provides excellent phase accuracy across the
-// audible band while keeping CPU cost well below polyphase FIR.
+// Uses a dual-allpass crossfade strategy to handle integer delay boundary
+// crossings cleanly. When the integer part of the delay changes, the active
+// allpass (with settled DFII-T state) becomes the "fading out" instance while
+// a fresh allpass (with coefficients for the new integer delay) fades in.
+// A short sin²/cos² crossfade (~48 samples) masks the coefficient discontinuity
+// that would otherwise produce scratchy artifacts.
 //
 // Reference: J.-P. Thiran, "Recursive digital filters with maximally
 // flat group delay," IEEE Trans. Circuit Theory, vol. CT-18, no. 6,
@@ -60,48 +53,51 @@ private:
     // 5th-order Thiran allpass for HQ fractional delay
     static constexpr int ORDER = 5;
 
-    // Per-channel allpass state
+    // Single allpass filter instance
+    struct AllpassInstance
+    {
+        std::array<float, ORDER + 1> a {};
+        std::array<float, ORDER> state {};
+        int intDelay = 0;
+
+        void resetState()
+        {
+            a.fill(0.0f);
+            a[0] = 1.0f;
+            state.fill(0.0f);
+            intDelay = 0;
+        }
+    };
+
+    // Per-channel state with dual-allpass crossfade
     struct ThiranChannel
     {
-        // Current (smoothly interpolated) allpass coefficients a[0..ORDER] where a[0] = 1.0
-        std::array<float, ORDER + 1> a {};
+        AllpassInstance apA;   // Currently active allpass
+        AllpassInstance apB;   // Secondary allpass (used during crossfade)
 
-        // Target coefficients — recomputed every INTERP_LENGTH samples
-        std::array<float, ORDER + 1> aTarget {};
-
-        // Per-sample coefficient increment for linear interpolation from a → aTarget
-        std::array<float, ORDER + 1> aStep {};
-
-        // Filter state (direct form II transposed)
-        std::array<float, ORDER> state {};
+        // Crossfade state: when integer delay changes, we fade from apA to apB
+        // over XFADE_LENGTH samples using sin²/cos² envelope
+        static constexpr int XFADE_LENGTH = 48;
+        int xfadeCounter = 0;      // Counts down from XFADE_LENGTH to 0; 0 = no crossfade active
+        bool aIsActive = true;     // Which instance is the "new" one after crossfade
 
         // Smoothed delay for stability
         float smoothedDelay = 0.0f;
         bool delayInitialized = false;
+        int lastIntDelay = 0;
 
-        // Coefficient interpolation: recompute targets every INTERP_LENGTH samples
-        // and linearly ramp current coefficients toward them. This prevents the
-        // DFII-T state from seeing abrupt coefficient jumps that cause zippering.
-        int interpCounter = 0;
-        static constexpr int INTERP_LENGTH = 32;
-
-        // Gentle one-pole lowpass on output (~16 kHz) to attenuate content above
-        // the allpass's useful range. Unlike polynomial interpolators (Lagrange,
-        // Catmull-Rom) which naturally roll off above Nyquist, an allpass passes
-        // ALL frequencies at unity gain — this shelf provides the safety net.
+        // Gentle one-pole lowpass on output (~16 kHz)
         float outputLpState = 0.0f;
 
         void resetState()
         {
-            state.fill(0.0f);
-            a.fill(0.0f);
-            a[0] = 1.0f;
-            aTarget.fill(0.0f);
-            aTarget[0] = 1.0f;
-            aStep.fill(0.0f);
+            apA.resetState();
+            apB.resetState();
+            xfadeCounter = 0;
+            aIsActive = true;
             smoothedDelay = 0.0f;
             delayInitialized = false;
-            interpCounter = 0;
+            lastIntDelay = 0;
             outputLpState = 0.0f;
         }
     };
@@ -111,7 +107,7 @@ private:
     static void computeCoefficients(float D, std::array<float, ORDER + 1>& a);
 
     // Process one sample through Nth-order allpass
-    static float processAllpass(ThiranChannel& ch, float input);
+    static float processAllpass(AllpassInstance& ap, float input);
 
     std::vector<ThiranChannel> channels;
 
@@ -125,6 +121,10 @@ private:
     int maxDelaySamples = 0;
 
     // One-pole output lowpass coefficient: y[n] = (1-a)*x[n] + a*y[n-1]
-    // Computed once in prepare() from sample rate. Cutoff ~16 kHz.
     float outputLpAlpha = 0.0f;
+
+    // Per-channel one-pole centre delay smoothing
+    std::array<float, 2> smoothedCentreDelay {{ 0.0f, 0.0f }};
+    std::array<bool, 2> centreDelayInitialized {{ false, false }};
+    float centreDelaySmoothAlpha = 0.0f;
 };

@@ -38,12 +38,24 @@ void ChorusCoreLinearEnsemble::prepare(const juce::dsp::ProcessSpec& processSpec
     delayLineB.setMaximumDelayInSamples(maxDelaySamples);
     delayLineA.prepare(spec);
     delayLineB.prepare(spec);
+
+    // ~5ms colour smoothing, ~3ms centre delay smoothing
+    colourSmoothAlpha = 1.0f - std::exp(-1.0f / (0.005f * static_cast<float>(spec.sampleRate)));
+    centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
+    smoothedColour = 0.0f;
+    colourInitialized = false;
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 void ChorusCoreLinearEnsemble::reset()
 {
     delayLineA.reset();
     delayLineB.reset();
+    smoothedColour = 0.0f;
+    colourInitialized = false;
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 float ChorusCoreLinearEnsemble::getMaxDelaySamples() const
@@ -67,31 +79,51 @@ void ChorusCoreLinearEnsemble::processDelay(ChorusDSP& dsp, juce::dsp::AudioBloc
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
 
     const auto& tuning = dsp.runtimeTuningSnapshot;
-    const float colour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
-    // In Black HQ mode, Color controls modulation intensity and ensemble spread.
-    const float tap2Mix = juce::jlimit(0.0f, 1.0f,
-        tuning.blackHqTap2MixBase + tuning.blackHqTap2MixScale * colour);
-    const float tap1Mix = 1.0f - tap2Mix;
-    const float secondTapDepthScale = juce::jmax(0.0f,
-        tuning.blackHqSecondTapDepthBase + tuning.blackHqSecondTapDepthScale * colour);
-    const float secondTapDelayOffsetSamples = juce::jmax(0.0f,
-        tuning.blackHqSecondTapDelayOffsetBase + tuning.blackHqSecondTapDelayOffsetScale * colour);
+    const float targetColour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
+
+    if (!colourInitialized)
+    {
+        smoothedColour = targetColour;
+        colourInitialized = true;
+    }
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* channelSamples = block.getChannelPointer(ch);
         const float* primaryLfo = (ch == 0) ? lfoLeft : lfoRight;
         const float* oppositeLfo = (ch == 0) ? lfoRight : lfoLeft;
+        const auto chIdx = static_cast<size_t>(ch);
+
+        if (!centreDelayInitialized[chIdx])
+        {
+            smoothedCentreDelay[chIdx] = centreDelaySamples;
+            centreDelayInitialized[chIdx] = true;
+        }
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
+            // Per-sample colour and centre delay smoothing
+            smoothedColour += colourSmoothAlpha * (targetColour - smoothedColour);
+            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
+
+            const float col = smoothedColour;
+            const float centre = smoothedCentreDelay[chIdx];
+
+            const float tap2Mix = juce::jlimit(0.0f, 1.0f,
+                tuning.blackHqTap2MixBase + tuning.blackHqTap2MixScale * col);
+            const float tap1Mix = 1.0f - tap2Mix;
+            const float secondTapDepthScale = juce::jmax(0.0f,
+                tuning.blackHqSecondTapDepthBase + tuning.blackHqSecondTapDepthScale * col);
+            const float secondTapDelayOffsetSamples = juce::jmax(0.0f,
+                tuning.blackHqSecondTapDelayOffsetBase + tuning.blackHqSecondTapDelayOffsetScale * col);
+
             const float in = channelSamples[i];
             delayLineA.pushSample(ch, in);
             delayLineB.pushSample(ch, in);
 
-            float delayTap1 = centreDelaySamples + depthSamples * primaryLfo[i];
-            const float spreadLfo = juce::jmap(colour, primaryLfo[i], oppositeLfo[i]);
-            float delayTap2 = centreDelaySamples
+            float delayTap1 = centre + depthSamples * primaryLfo[i];
+            const float spreadLfo = juce::jmap(col, primaryLfo[i], oppositeLfo[i]);
+            float delayTap2 = centre
                             + depthSamples * secondTapDepthScale * spreadLfo
                             + secondTapDelayOffsetSamples;
 
