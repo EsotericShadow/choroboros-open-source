@@ -371,7 +371,7 @@ juce::StringArray DevPanel::buildConsoleAutocompleteCommands() const
         "core list", "core show lagrange3",
         "slot show", "slot set green nq lagrange3",
         "tutorial", "tutorial next", "tutorial next section", "tutorial section", "tutorial tab", "tutorial next tab",
-        "tutorial skip", "tutorial exit", "tutorial core", "tutorial overview", "tutorial modulation", "tutorial tone",
+        "tutorial skip", "tutorial exit", "tutorial orientation", "tutorial core", "tutorial overview", "tutorial modulation", "tutorial tone",
         "tutorial engine", "tutorial validation", "tutorial bbd", "tutorial tape", "tutorial phase", "tutorial bimodulation",
         "tutorial bi-modulation", "tutorial bimod", "tutorial warp", "tutorial saturation", "tutorial envelope",
         "tutorial full", "tutorial walkthrough", "tutorial dynamic", "tutorial dynamics", "tutorial tutorial",

@@ -500,7 +500,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         stopTutorial(true, status);
     };
 
-    overviewTutorialPopupLabel.setText("Need a quick walkthrough?\nStart the Core DSP tutorial here.",
+    overviewTutorialPopupLabel.setText("Need a quick walkthrough?\nStart the orientation tutorial here.",
                                        juce::dontSendNotification);
     overviewTutorialPopupLabel.setJustificationType(juce::Justification::topLeft);
     overviewTutorialPopupLabel.setMinimumHorizontalScale(1.0f);
@@ -508,11 +508,11 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     overviewTutorialPopupLabel.setFont(makeLabelFont(Typography::description, false));
 
     overviewTutorialPopupStartButton.setButtonText("Start Tutorial");
-    overviewTutorialPopupStartButton.setTooltip("Launch the core walkthrough tutorial.");
+    overviewTutorialPopupStartButton.setTooltip("Launch the orientation tutorial.");
     overviewTutorialPopupStartButton.onClick = [this]
     {
         juce::String status;
-        if (startTutorial("core", status))
+        if (startTutorial("orientation", status))
         {
             overviewTutorialPopupHasOpenedSession = true;
             overviewTutorialPopupVisible = false;
@@ -1125,6 +1125,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     settingsPanel.clear();
 
     const juce::StringArray tutorialTopicLabels {
+        "Getting Around",
         "Core Walkthrough",
         "Overview",
         "Modulation",
@@ -1139,6 +1140,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         "Envelope"
     };
     const juce::StringArray tutorialTopicKeys {
+        "orientation",
         "core",
         "overview",
         "modulation",
