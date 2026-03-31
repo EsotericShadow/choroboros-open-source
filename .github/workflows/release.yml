@@ -94,7 +94,7 @@ jobs:
             dist/Choroboros-Beta-macOS-Universal.zip
             dist/Choroboros-Beta-macOS-Universal.zip.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
   # Linux x64 — VST3 + Standalone
@@ -177,7 +177,7 @@ jobs:
             dist/Choroboros-Beta-linux-x64.zip
             dist/Choroboros-Beta-linux-x64.zip.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
   # Windows x64 — VST3 + Standalone
@@ -253,7 +253,7 @@ jobs:
             dist/Choroboros-Beta-windows-x64.zip
             dist/Choroboros-Beta-windows-x64.zip.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
   # Windows x86 — VST3 + Standalone (legacy 32-bit host support)
@@ -329,7 +329,7 @@ jobs:
             dist/Choroboros-Beta-windows-x86.zip
             dist/Choroboros-Beta-windows-x86.zip.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
   # Windows ARM64 — VST3 + Standalone (cross-compiled, no regression tests)
@@ -393,7 +393,7 @@ jobs:
             dist/Choroboros-Beta-windows-arm64.zip
             dist/Choroboros-Beta-windows-arm64.zip.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   # ---------------------------------------------------------------------------
   # Create GitHub Release — collects all platform artifacts
