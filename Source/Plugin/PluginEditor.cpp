@@ -53,7 +53,7 @@ juce::Image loadSoftwareImageFromMemory(const void* data, int dataSize)
 
 void choroLog(const char* step)
 {
-    // Hardcoded path — C:\Users\Public is writable by all users, no
+    // Hardcoded path -- C:\Users\Public is writable by all users, no
     // path expansion, no API calls, no short-name issues.
     FILE* f = fopen("C:\\Users\\Public\\choroboros_log.txt", "a");
     if (f)
@@ -880,13 +880,13 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             auto crashReport = SessionLog::readPendingCrashReport();
             if (crashReport.isNotEmpty() && safeThis->audioProcessor.feedbackCollector)
                 FeedbackDialog::showCrashReport(*safeThis->audioProcessor.feedbackCollector, crashReport);
-            // Crash report file is NOT deleted here — FeedbackDialog clears
+            // Crash report file is NOT deleted here -- FeedbackDialog clears
             // it after the user sends, saves, or dismisses.
         });
     }
 }
 
-// Shared typeface caches — ref-counted via SharedResourcePointer so they are
+// Shared typeface caches -- ref-counted via SharedResourcePointer so they are
 // destroyed when the last editor instance dies, not during DLL_PROCESS_DETACH.
 struct ValueLabelTypefaceCache
 {
@@ -962,12 +962,12 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
     choroLog("DTOR START");
 
-    // 1. Remove parameter listener FIRST — prevents audio thread from calling
+    // 1. Remove parameter listener FIRST -- prevents audio thread from calling
     //    parameterChanged() on a half-destroyed editor (Cubase/Reaper freeze).
     choroLog("1. removeParameterListener");
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
 
-    // 2. Null out all slider callbacks that capture raw `this` — these can
+    // 2. Null out all slider callbacks that capture raw `this` -- these can
     //    fire during component teardown as attachments are destroyed.
     choroLog("2. null slider callbacks");
     rateSlider.onValueChange = nullptr;
@@ -977,7 +977,7 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     colorSlider.onValueChange = nullptr;
     mixSlider.onValueChange = nullptr;
 
-    // 3. Destroy attachments before sliders — prevents dangling parameter
+    // 3. Destroy attachments before sliders -- prevents dangling parameter
     //    callbacks during member destruction order.
     choroLog("3. reset attachments");
     rateAttachment.reset();
@@ -1018,7 +1018,7 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
     {
         const int colorIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
 
-        // parameterChanged can be called from the audio thread — all GUI
+        // parameterChanged can be called from the audio thread -- all GUI
         // work MUST happen on the message thread.  Using SafePointer so the
         // lambda is a no-op if the editor is destroyed before delivery.
         juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
@@ -1034,7 +1034,7 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
             if (safeThis->topHeaderBar_)
                 safeThis->topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
 
-            // Engine colour changed — if this wasn't triggered by a preset load,
+            // Engine colour changed -- if this wasn't triggered by a preset load,
             // invalidate the current preset so the dropdown shows the placeholder.
             if (safeThis->audioProcessor.presetManager
                 && ! safeThis->audioProcessor.presetManager->isLoadInProgress())
@@ -1220,7 +1220,7 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
     // Each thread invocation gets its own stop flag so that detaching the
     // previous thread and resetting the flag doesn't create a race.
     themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
-    auto stopFlag = themePrewarmStopFlag;  // shared_ptr copy — thread owns a ref
+    auto stopFlag = themePrewarmStopFlag;  // shared_ptr copy -- thread owns a ref
 
     juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
 
@@ -1281,7 +1281,7 @@ void ChoroborosPluginEditor::stopDeferredThemePrewarm()
     // message thread to process its callback.  Calling join() here would
     // deadlock: message thread blocked in join(), worker blocked in callAsync().
     //
-    // Instead we detach the thread and let it exit on its own — it checks
+    // Instead we detach the thread and let it exit on its own -- it checks
     // its own stop flag every iteration, and all callAsync lambdas use a
     // SafePointer that will be null once the editor is destroyed.
     if (themePrewarmThread.joinable())
@@ -1464,7 +1464,7 @@ void ChoroborosPluginEditor::setupSlider(juce::Slider& slider, LabelWithContaine
     else if (paramId == ChoroborosAudioProcessor::DEPTH_ID)
         slider.setTooltip("Modulation Depth: Controls how much the delay time is modulated. 0% = no effect, 100% = maximum modulation. Engine-specific scaling applied.");
     else if (paramId == ChoroborosAudioProcessor::OFFSET_ID)
-        slider.setTooltip("LFO Phase Offset: Shifts the modulation phase from 0° to 180°. Useful for stereo width and avoiding phase cancellation.");
+        slider.setTooltip("LFO Phase Offset: Shifts the modulation phase from 0 to 180 degrees. Useful for stereo width and avoiding phase cancellation.");
     else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
         slider.setTooltip("Stereo Width: Controls the stereo spread from 0% (mono) to 200% (wide). Adjusts the phase relationship between left and right channels.");
     else if (paramId == ChoroborosAudioProcessor::COLOR_ID)
@@ -1584,7 +1584,7 @@ void ChoroborosPluginEditor::updateValueLabel(LabelWithContainer& label, float v
     }
     else if (paramId == ChoroborosAudioProcessor::OFFSET_ID)
     {
-        text = juce::String(static_cast<int>(mappedValue)) + "°";
+        text = juce::String(static_cast<int>(mappedValue)) + " deg";
     }
     else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
     {
@@ -1696,7 +1696,7 @@ float ChoroborosPluginEditor::parseDepthValue(const juce::String& trimmed)
 
 float ChoroborosPluginEditor::parseOffsetValue(const juce::String& trimmed)
 {
-    juce::String clean = trimmed.removeCharacters("°").trim();
+    juce::String clean = trimmed;
     if (clean.endsWithIgnoreCase("deg"))
         clean = clean.substring(0, clean.length() - 3).trim();
     const float value = clean.getFloatValue();

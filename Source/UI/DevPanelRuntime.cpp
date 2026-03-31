@@ -2161,7 +2161,7 @@ void DevPanel::applyTutorialStep()
         effectiveTab = nextTab;
         effectiveSubTab = nextSub;
     }
-    tutorialStepLabel.setText("Tutorial: " + tutorialTopicTitle + "  •  Step "
+    tutorialStepLabel.setText("Tutorial: " + tutorialTopicTitle + "  -  Step "
                               + juce::String(tutorialStepIndex + 1) + "/" + juce::String(totalSteps),
                               juce::dontSendNotification);
     tutorialTitleLabel.setText(step.title, juce::dontSendNotification);
@@ -2646,45 +2646,45 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "orientation";
         resolvedTitle = "Getting Around the Dev Panel";
         steps.push_back(makeStep("Welcome to the Dev Panel",
-                                 "The Dev Panel has two main areas. On the RIGHT is the Visual Deck — it shows real-time feedback like signal flow diagrams, scopes, and analyzers. On the LEFT is the Inspector — it shows values and controls. Let's tour the layout.",
+                                 "The Dev Panel has two main areas. On the RIGHT is the Visual Deck -- it shows real-time feedback like signal flow diagrams, scopes, and analyzers. On the LEFT is the Inspector -- it shows values and controls. Let's tour the layout.",
                                  0, 0, -1, -1, "overview_visual",
                                  "The visual deck fills the right side of the window."));
         steps.push_back(makeStep("The Inspector (Left Panel)",
                                  "This left panel is the Inspector. It shows readout values and editable controls for whichever tab you're on. When you switch tabs, the inspector updates to match. Scroll down to see more sections.",
                                  0, 0, -1, -1, "overview_inspector",
-                                 "Inspector panel — left side of the window."));
+                                 "Inspector panel -- left side of the window."));
         steps.push_back(makeStep("The Visual Deck (Right Panel)",
                                  "The right panel is the Visual Deck. It shows real-time visualizations: signal flow, LFO scopes, spectrum analyzers, and response curves. The content changes with each tab. This is where you watch the effect of your edits.",
                                  0, 0, -1, -1, "overview_visual",
-                                 "Visual deck — right side of the window."));
+                                 "Visual deck -- right side of the window."));
         steps.push_back(makeStep("Profile, Core, and HQ",
                                  "These three controls at the top define WHAT you are editing. Profile chooses the engine slot (Green, Blue, Red, Purple, Black). Core chooses the algorithm. HQ toggles High Quality mode. Everything below writes to this target. Always check these first.",
                                  0, 0, -1, -1, "dev_profile_controls",
-                                 "Top row — defines your edit target."));
+                                 "Top row -- defines your edit target."));
         steps.push_back(makeStep("The Tab Bar",
                                  "The 7 tabs across the top are your workflow: Overview, Modulation, Tone, Engine, Look & Feel, Validation, Settings. We just moved to Modulation. Notice the inspector on the left updated, and the visual deck now shows LFO scope cards.",
                                  1, 0, -1, -1, "lfo_scope",
-                                 "We just switched tabs — notice the visual deck changed."));
+                                 "We just switched tabs -- notice the visual deck changed."));
         steps.push_back(makeStep("Subtabs",
-                                 "Some tabs have subtabs below the tab bar. Tone has two: Spectrum and Engine Response. We're on Spectrum now — the visual deck shows a frequency analyzer. Click the subtab buttons to switch views within a tab.",
+                                 "Some tabs have subtabs below the tab bar. Tone has two: Spectrum and Engine Response. We're on Spectrum now -- the visual deck shows a frequency analyzer. Click the subtab buttons to switch views within a tab.",
                                  2, 0, -1, -1, "spectrum_visual",
-                                 "Tone tab — Spectrum subtab is selected."));
+                                 "Tone tab -- Spectrum subtab is selected."));
         steps.push_back(makeStep("Engine Tab",
                                  "Engine has four subtabs: Signal Flow, Routing, Macros, and Internals. Signal Flow shows the active processing path. Routing assigns algorithms. Macros gives you quick musical controls. Internals exposes low-level DSP parameters.",
                                  3, 0, -1, -1, "engine_signal_flow",
-                                 "Engine tab — Signal Flow subtab."));
+                                 "Engine tab -- Signal Flow subtab."));
         steps.push_back(makeStep("Validation and Health",
                                  "Validation is your health check. Telemetry shows CPU cost, peak levels, and callback stats. Trace Matrix verifies value flow from UI to DSP. Always check Validation after making changes and before saving.",
                                  5, 0, -1, -1, "validation_readouts",
-                                 "Validation tab — Telemetry subtab."));
+                                 "Validation tab -- Telemetry subtab."));
         steps.push_back(makeStep("The Console",
-                                 "The Console (Validation → Console) is a command line for direct control. Type 'help' to see all commands. Use 'set' to change values, 'search' to find parameters, 'undo' to reverse changes, and 'watch' to monitor values in real time.",
+                                 "The Console (Validation -> Console) is a command line for direct control. Type 'help' to see all commands. Use 'set' to change values, 'search' to find parameters, 'undo' to reverse changes, and 'watch' to monitor values in real time.",
                                  5, 2, -1, -1, "validation_console",
-                                 "Console — type commands here."));
+                                 "Console -- type commands here."));
         steps.push_back(makeStep("Ready to Explore",
-                                 "You're back at Overview — your home base. You now know the layout: Inspector (left), Visual Deck (right), 7 tabs (top), and Profile/Core/HQ (targeting). For a deeper walkthrough, open Settings and choose a tutorial topic.",
+                                 "You're back at Overview -- your home base. You now know the layout: Inspector (left), Visual Deck (right), 7 tabs (top), and Profile/Core/HQ (targeting). For a deeper walkthrough, open Settings and choose a tutorial topic.",
                                  0, 0, -1, -1, "overview_visual",
-                                 "Back at Overview — your starting point."));
+                                 "Back at Overview -- your starting point."));
         return steps;
     }
 
@@ -2701,11 +2701,11 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  0, 0, -1, -1, "core_selector",
                                  "Core selector is next to Profile at the top."));
         steps.push_back(makeStep("Step 3: HQ and NQ",
-                                 "The HQ toggle switches between Normal Quality and High Quality mode. Each profile stores separate settings for NQ and HQ — different algorithms, different tuning. Toggle it and watch the inspector values change.",
+                                 "The HQ toggle switches between Normal Quality and High Quality mode. Each profile stores separate settings for NQ and HQ -- different algorithms, different tuning. Toggle it and watch the inspector values change.",
                                  0, 0, -1, -1, "hq_toggle",
                                  "HQ toggle changes which side of the slot you are editing."));
         steps.push_back(makeStep("Step 4: Overview / Signal Flow",
-                                 "You're on Overview → Signal Flow. The visual deck on the right shows a signal flow diagram — your audio path from input to output. The inspector on the left shows current parameter values. This is your starting point and reset view.",
+                                 "You're on Overview -> Signal Flow. The visual deck on the right shows a signal flow diagram -- your audio path from input to output. The inspector on the left shows current parameter values. This is your starting point and reset view.",
                                  0, 0, -1, -1, "overview_visual",
                                  "Overview is your start and reset point."));
         steps.push_back(makeStep("Step 5: Raw and Mapped",
@@ -2713,19 +2713,19 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  0, 0, -1, -1, "overview_readouts",
                                  "Read raw->mapped rows before tuning deeply."));
         steps.push_back(makeStep("Step 6: Overview / Delay Visual",
-                                 "We switched to Overview → Delay Visual (second subtab). The visual deck now shows delay movement over time. Look for smooth curves — jagged lines mean abrupt changes that may cause audible artifacts.",
+                                 "We switched to Overview -> Delay Visual (second subtab). The visual deck now shows delay movement over time. Look for smooth curves -- jagged lines mean abrupt changes that may cause audible artifacts.",
                                  0, 1, -1, -1, "overview_visual",
                                  "Delay shape check before deeper edits."));
         steps.push_back(makeStep("Step 7: Modulation Basics",
-                                 "You're on the Modulation tab. The visual deck shows two scope cards side by side — Left and Right channels. Each draws the delay modulation in real time. Watch them while audio plays: the shapes you see ARE the chorus movement.",
+                                 "You're on the Modulation tab. The visual deck shows two scope cards side by side -- Left and Right channels. Each draws the delay modulation in real time. Watch them while audio plays: the shapes you see ARE the chorus movement.",
                                  1, 0, -1, -1, "lfo_scope",
                                  "Watch both sides at the same time."));
         steps.push_back(makeStep("Step 8: Anti-Phase and Width",
-                                 "Watch the Left and Right scopes. When they move in opposite directions — one rises while the other falls — that's anti-phase, and it creates stereo width. The Offset and Width parameters in the workbench below control this relationship.",
+                                 "Watch the Left and Right scopes. When they move in opposite directions -- one rises while the other falls -- that's anti-phase, and it creates stereo width. The Offset and Width parameters in the workbench below control this relationship.",
                                  1, 0, -1, -1, "lfo_scope",
                                  "Use scope shape plus ears to set stereo width."));
         steps.push_back(makeStep("Step 9: Trajectory and Zipper",
-                                 "Below the scope cards is the Trajectory card. It shows how parameter values change over time. Smooth trajectories sound clean. Sharp jumps or staircases mean 'zipper noise' — audible stepping from abrupt value changes.",
+                                 "Below the scope cards is the Trajectory card. It shows how parameter values change over time. Smooth trajectories sound clean. Sharp jumps or staircases mean 'zipper noise' -- audible stepping from abrupt value changes.",
                                  1, 0, -1, -1, "modulation_visual",
                                  "Smooth movement sounds better than abrupt jumps."));
         steps.push_back(makeStep("Step 10: Modulation Workbench",
@@ -2733,67 +2733,67 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  1, 0, -1, -1, "modulation_controls",
                                  "Controls are in the workbench, not the left inspector."));
         steps.push_back(makeStep("Step 11: Tone / Spectrum",
-                                 "You're on Tone → Spectrum. The visual deck shows a frequency analyzer — tall bars mean more energy at that frequency. The inspector on the left has HPF and LPF controls. Drag HPF up to cut lows. Drag LPF down to tame highs. Watch the analyzer respond.",
+                                 "You're on Tone -> Spectrum. The visual deck shows a frequency analyzer -- tall bars mean more energy at that frequency. The inspector on the left has HPF and LPF controls. Drag HPF up to cut lows. Drag LPF down to tame highs. Watch the analyzer respond.",
                                  2, 0, -1, -1, "spectrum_visual",
                                  "Use analyzer plus readouts to shape tone."));
         steps.push_back(makeStep("Step 12: Aliasing and Filtering",
-                                 "Stay on the spectrum analyzer and watch the high-frequency area (right side). If you see unexpected energy building up there, that's likely aliasing — unwanted artifacts from non-linear processing. Use filtering and moderate drive settings to control it.",
+                                 "Stay on the spectrum analyzer and watch the high-frequency area (right side). If you see unexpected energy building up there, that's likely aliasing -- unwanted artifacts from non-linear processing. Use filtering and moderate drive settings to control it.",
                                  2, 0, -1, -1, "tone_readouts",
                                  "Watch analyzer peaks while adjusting HPF/LPF."));
         steps.push_back(makeStep("Step 13: Tone / Engine Response",
-                                 "Switch to Tone → Engine Response (second subtab). The visual deck now shows a transfer curve — how the engine shapes signal amplitude. This view is engine-specific: each Profile/Core/HQ combination shows its own response.",
+                                 "Switch to Tone -> Engine Response (second subtab). The visual deck now shows a transfer curve -- how the engine shapes signal amplitude. This view is engine-specific: each Profile/Core/HQ combination shows its own response.",
                                  2, 1, -1, -1, "transfer_visual",
                                  "Response cards change with Profile/Core/HQ."));
         steps.push_back(makeStep("Step 14: Harmonics and Saturation",
-                                 "The controls below the transfer curve let you adjust drive and saturation. Watch the curve bend as you increase drive — a straighter line is cleaner, more bend means more harmonic color. Red engine modes have the strongest saturation controls.",
+                                 "The controls below the transfer curve let you adjust drive and saturation. Watch the curve bend as you increase drive -- a straighter line is cleaner, more bend means more harmonic color. Red engine modes have the strongest saturation controls.",
                                  2, 1, -1, -1, "tone_controls",
                                  "Adjust controls while watching the curve."));
         steps.push_back(makeStep("Step 15: Engine / Signal Flow",
-                                 "You're on Engine → Signal Flow. The right panel shows the active processing chain for your current Profile/Core/HQ target. The Core row confirms which algorithm is running. Always verify this before making deep edits.",
+                                 "You're on Engine -> Signal Flow. The right panel shows the active processing chain for your current Profile/Core/HQ target. The Core row confirms which algorithm is running. Always verify this before making deep edits.",
                                  3, 0, -1, -1, "engine_signal_flow",
                                  "Confirm active core before making deep edits."));
         steps.push_back(makeStep("Step 16: Engine / Routing",
-                                 "Engine → Routing is the control center for core assignment. Here you see the identity guide, the modular-core toggle, and NQ/HQ core selection. Duplicate warnings appear if two profiles share the same algorithm. This is the source of truth for what runs where.",
+                                 "Engine -> Routing is the control center for core assignment. Here you see the identity guide, the modular-core toggle, and NQ/HQ core selection. Duplicate warnings appear if two profiles share the same algorithm. This is the source of truth for what runs where.",
                                  3, 1, -1, -1, "engine_routing",
                                  "Routing is the source-of-truth for engine/core assignment."));
         steps.push_back(makeStep("Step 17: Macro Definition",
-                                 "Engine → Macros shows the macro workbench. Macros are high-level controls that steer multiple DSP parameters at once: Rate, Depth, Offset, Width, Color, Mix. Use these for fast musical changes before diving into detailed internals.",
+                                 "Engine -> Macros shows the macro workbench. Macros are high-level controls that steer multiple DSP parameters at once: Rate, Depth, Offset, Width, Color, Mix. Use these for fast musical changes before diving into detailed internals.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Rate/Depth/Offset/Width/Color/Mix macro row."));
         steps.push_back(makeStep("Step 18: Engine / Macros",
-                                 "Below the macro workbench are engine-specific macro controls. These change with the active Profile/Core/HQ target. They provide musical-level adjustments tuned to each engine's character — different from the raw internals.",
+                                 "Below the macro workbench are engine-specific macro controls. These change with the active Profile/Core/HQ target. They provide musical-level adjustments tuned to each engine's character -- different from the raw internals.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Macros are split from routing and internals on purpose."));
         steps.push_back(makeStep("Step 19: Engine / Internals",
-                                 "Engine → Internals is the deepest level. The left inspector fills with low-level DSP parameters specific to the active core: filter coefficients, delay lengths, smoothing values. Edit here only after you've set the macro-level behavior you want.",
+                                 "Engine -> Internals is the deepest level. The left inspector fills with low-level DSP parameters specific to the active core: filter coefficients, delay lengths, smoothing values. Edit here only after you've set the macro-level behavior you want.",
                                  3, 3, -1, -1, "engine_internals",
                                  "Use internals after macro-level tuning."));
         steps.push_back(makeStep("Step 20: Look & Feel / Mapping",
-                                 "You're on Look & Feel → Mapping. This tab controls how UI controls map to DSP values — curve shapes, ranges, and sensitivity. Changes here affect control feel, not the DSP algorithm itself.",
+                                 "You're on Look & Feel -> Mapping. This tab controls how UI controls map to DSP values -- curve shapes, ranges, and sensitivity. Changes here affect control feel, not the DSP algorithm itself.",
                                  4, 0, -1, -1, "layout_active_inspector",
                                  "Mapping is for control behavior and wiring feel."));
         steps.push_back(makeStep("Step 21: Look & Feel / UI Feel",
-                                 "Look & Feel → UI Feel controls interaction behavior: drag sensitivity, visual response timing, and edit precision. Adjust these if knobs feel too fast, too slow, or imprecise.",
+                                 "Look & Feel -> UI Feel controls interaction behavior: drag sensitivity, visual response timing, and edit precision. Adjust these if knobs feel too fast, too slow, or imprecise.",
                                  4, 1, -1, -1, "layout_active_inspector",
                                  "Use this for interaction polish."));
         steps.push_back(makeStep("Step 22: Look & Feel / Engine Layout",
-                                 "Look & Feel → Engine Layout shows per-engine positioning and sizing values for the main plugin window. Each engine can have its own knob/slider placement. These values only affect the main UI, not the Dev Panel.",
+                                 "Look & Feel -> Engine Layout shows per-engine positioning and sizing values for the main plugin window. Each engine can have its own knob/slider placement. These values only affect the main UI, not the Dev Panel.",
                                  4, 2, -1, -1, "layout_active_inspector",
                                  "These values are per engine slot."));
         steps.push_back(makeStep("Step 23: Look & Feel / Global Layout",
-                                 "Look & Feel → Global Layout controls shared visual values used across all engines — positions and sizes that stay consistent regardless of which engine is active.",
+                                 "Look & Feel -> Global Layout controls shared visual values used across all engines -- positions and sizes that stay consistent regardless of which engine is active.",
                                  4, 3, -1, -1, "layout_active_inspector",
                                  "Global values affect multiple views."));
         steps.push_back(makeStep("Step 24: Look & Feel / Text Animations",
-                                 "Look & Feel → Text Animations controls per-engine glow, reflection, and flip behavior on value displays. Right-click a control to copy its settings to all engines or a specific engine color.",
+                                 "Look & Feel -> Text Animations controls per-engine glow, reflection, and flip behavior on value displays. Right-click a control to copy its settings to all engines or a specific engine color.",
                                  4, 4, -1, -1, "layout_active_inspector",
                                  "Tune animation intensity and behavior here."));
         steps.push_back(makeStep("Step 25: Validation / Telemetry",
-                                 "You're on Validation → Telemetry. The inspector on the left shows runtime stats: process time per callback, peak levels, write counts, mode switches, and host audio configuration. This is your performance dashboard.",
+                                 "You're on Validation -> Telemetry. The inspector on the left shows runtime stats: process time per callback, peak levels, write counts, mode switches, and host audio configuration. This is your performance dashboard.",
                                  5, 0, -1, -1, "validation_readouts",
                                  "Always check telemetry before saving defaults."));
         steps.push_back(makeStep("Step 26: Timing Thresholds",
-                                 "Read the process time in the telemetry readouts. Green means under 50% of your audio buffer budget. Yellow is 50-80%. Red is above 80% or spiking. Budget in ms = bufferSize ÷ sampleRate × 1000.",
+                                 "Read the process time in the telemetry readouts. Green means under 50% of your audio buffer budget. Yellow is 50-80%. Red is above 80% or spiking. Budget in ms = bufferSize / sampleRate x 1000.",
                                  5, 0, -1, -1, "validation_readouts",
                                  "Compare process time against host block budget."));
         steps.push_back(makeStep("Step 27: Write-Rate Thresholds",
@@ -2801,11 +2801,11 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  5, 0, -1, -1, "validation_readouts",
                                  "Too many writes can destabilize behavior."));
         steps.push_back(makeStep("Step 28: Validation / Trace Matrix",
-                                 "Validation → Trace Matrix tracks value flow through four stages: raw (UI knob position), mapped (engineering value), snapshot (stored profile value), effective (what DSP is actually using). If these disagree, something is out of sync.",
+                                 "Validation -> Trace Matrix tracks value flow through four stages: raw (UI knob position), mapped (engineering value), snapshot (stored profile value), effective (what DSP is actually using). If these disagree, something is out of sync.",
                                  5, 1, -1, -1, "trace_matrix",
                                  "Use this to verify mapping and sync."));
         steps.push_back(makeStep("Step 29: Validation / Console",
-                                 "Validation → Console is a text command interface. Core commands: 'engine' and 'hq' to switch targets, 'set'/'get'/'reset' to edit values, 'undo'/'redo' for history, 'watch' to monitor live, 'search' to find parameters, 'list' to see everything.",
+                                 "Validation -> Console is a text command interface. Core commands: 'engine' and 'hq' to switch targets, 'set'/'get'/'reset' to edit values, 'undo'/'redo' for history, 'watch' to monitor live, 'search' to find parameters, 'list' to see everything.",
                                  5, 2, -1, -1, "validation_console",
                                  "Type `help` any time for the full command list."));
         steps.push_back(makeStep("Step 30: Safe Console Workflow",
@@ -2825,7 +2825,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  0, 0, -1, -1, "overview_visual",
                                  "This workflow is the fastest safe path."));
         steps.push_back(makeStep("Step 34: Complete",
-                                 "Tutorial complete. You're back at Overview. For deeper guides on specific topics — BBD saturation, tape warmth, stereo width, and more — open Settings and choose a tutorial from the topic picker.",
+                                 "Tutorial complete. You're back at Overview. For deeper guides on specific topics -- BBD saturation, tape warmth, stereo width, and more -- open Settings and choose a tutorial from the topic picker.",
                                  0, 0, -1, -1, "overview_visual",
                                  "Start your next pass from here."));
         return steps;
@@ -2836,7 +2836,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "overview";
         resolvedTitle = "Overview Primer";
         steps.push_back(makeStep("Overview: Start Here",
-                                 "You're on Overview → Signal Flow. Read the signal flow diagram and verify the active Profile/Core/HQ at the top. The inspector on the left shows current parameter values.",
+                                 "You're on Overview -> Signal Flow. Read the signal flow diagram and verify the active Profile/Core/HQ at the top. The inspector on the left shows current parameter values.",
                                  0, 0, -1, -1, "overview_visual",
                                  "Fast sanity pass before deeper tabs."));
         steps.push_back(makeStep("Overview: Readouts",
@@ -2844,7 +2844,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  0, 0, -1, -1, "overview_inspector",
                                  "Inspector is for verification here."));
         steps.push_back(makeStep("Overview: Delay Visual Subtab",
-                                 "Switch to Overview → Delay Visual (second subtab). Watch the delay movement curve to verify range and smoothness before deeper edits.",
+                                 "Switch to Overview -> Delay Visual (second subtab). Watch the delay movement curve to verify range and smoothness before deeper edits.",
                                  0, 1, -1, -1, "overview_visual",
                                  "Delay visual check before editing."));
         return steps;
@@ -2855,7 +2855,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "modulation";
         resolvedTitle = "Modulation Deep Dive";
         steps.push_back(makeStep("Modulation: LFO Shape",
-                                 "You're on the Modulation tab. The visual deck shows LFO scope cards for Left and Right channels. Watch these shapes while audio plays — they show delay movement in real time.",
+                                 "You're on the Modulation tab. The visual deck shows LFO scope cards for Left and Right channels. Watch these shapes while audio plays -- they show delay movement in real time.",
                                  1, 0, -1, -1, "lfo_scope",
                                  "Left/Right scope cards show movement directly."));
         steps.push_back(makeStep("Modulation: Stereo Motion",
@@ -2863,7 +2863,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  1, 0, -1, -1, "lfo_scope",
                                  "Anti-phase behavior is easiest to see here."));
         steps.push_back(makeStep("Modulation: Trajectory",
-                                 "Below the scope cards is the Trajectory card. It shows how delay values evolve over time. Watch for smooth curves — sharp jumps cause 'zipper noise'.",
+                                 "Below the scope cards is the Trajectory card. It shows how delay values evolve over time. Watch for smooth curves -- sharp jumps cause 'zipper noise'.",
                                  1, 0, -1, -1, "modulation_visual",
                                  "Trajectory is the lower visual card."));
         steps.push_back(makeStep("Modulation: Workbench",
@@ -2878,7 +2878,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "tone";
         resolvedTitle = "Tone Deep Dive";
         steps.push_back(makeStep("Tone: Spectral Control",
-                                 "You're on Tone → Spectrum. The visual deck shows a frequency analyzer — tall bars mean more energy at that frequency. Use HPF to cut lows, LPF to tame highs. Watch the analyzer respond to your edits.",
+                                 "You're on Tone -> Spectrum. The visual deck shows a frequency analyzer -- tall bars mean more energy at that frequency. Use HPF to cut lows, LPF to tame highs. Watch the analyzer respond to your edits.",
                                  2, 0, -1, -1, "tone_visual",
                                  "Analyzer plus readouts gives fast feedback."));
         steps.push_back(makeStep("Tone: Analyzer Controls",
@@ -2886,7 +2886,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  2, 0, -1, -1, "tone_readouts",
                                  "Use these when you need stable visual analysis."));
         steps.push_back(makeStep("Tone: Engine Response",
-                                 "Switch to Tone → Engine Response (second subtab). The visual deck now shows a transfer curve — how the active Profile/Core/HQ shapes signal amplitude.",
+                                 "Switch to Tone -> Engine Response (second subtab). The visual deck now shows a transfer curve -- how the active Profile/Core/HQ shapes signal amplitude.",
                                  2, 1, -1, -1, "transfer_visual",
                                  "Response cards are not one-size-fits-all."));
         steps.push_back(makeStep("Tone: Response Workbench",
@@ -2905,19 +2905,19 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  3, 0, -1, -1, "dev_profile_controls",
                                  "These three controls define the active edit target."));
         steps.push_back(makeStep("Engine: Signal Flow Subtab",
-                                 "You're on Engine → Signal Flow. The right panel shows the active processing path and core label for your current Profile/Core/HQ target. Always confirm this before deep edits.",
+                                 "You're on Engine -> Signal Flow. The right panel shows the active processing path and core label for your current Profile/Core/HQ target. Always confirm this before deep edits.",
                                  3, 0, -1, -1, "engine_signal_flow",
                                  "Always confirm this before deep edits."));
         steps.push_back(makeStep("Engine: Routing Subtab",
-                                 "Engine → Routing is the control center. Here you manage identity guides, modular-core toggles, NQ/HQ core assignment, and see duplicate warnings.",
+                                 "Engine -> Routing is the control center. Here you manage identity guides, modular-core toggles, NQ/HQ core assignment, and see duplicate warnings.",
                                  3, 1, -1, -1, "engine_routing",
                                  "Use Routing for engine/core ownership decisions."));
         steps.push_back(makeStep("Engine: Macros Subtab",
-                                 "Engine → Macros has the main macro workbench plus engine-specific macro controls. Macros let you make broad musical changes quickly.",
+                                 "Engine -> Macros has the main macro workbench plus engine-specific macro controls. Macros let you make broad musical changes quickly.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Macros are quick and broad."));
         steps.push_back(makeStep("Engine: Internals Subtab",
-                                 "Engine → Internals is the lowest level. The inspector fills with raw DSP parameters for the active Profile/Core/HQ. Edit here intentionally, after macro-level tuning.",
+                                 "Engine -> Internals is the lowest level. The inspector fills with raw DSP parameters for the active Profile/Core/HQ. Edit here intentionally, after macro-level tuning.",
                                  3, 3, -1, -1, "engine_internals",
                                  "Keep internals changes intentional and validated."));
         return steps;
@@ -2928,15 +2928,15 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "validation";
         resolvedTitle = "Validation Deep Dive";
         steps.push_back(makeStep("Validation: Telemetry Subtab",
-                                 "You're on Validation → Telemetry. The left inspector shows runtime data: process time, peak levels, write counts, mode switches, and host audio configuration. This is your performance dashboard.",
+                                 "You're on Validation -> Telemetry. The left inspector shows runtime data: process time, peak levels, write counts, mode switches, and host audio configuration. This is your performance dashboard.",
                                  5, 0, -1, -1, "validation_readouts",
                                  "Validation second-level subtab: Telemetry."));
         steps.push_back(makeStep("Validation: Trace Matrix",
-                                 "Switch to Validation → Trace Matrix. This subtab tracks value flow from UI to DSP through four stages: raw, mapped, snapshot, effective. Use it to verify value sync.",
+                                 "Switch to Validation -> Trace Matrix. This subtab tracks value flow from UI to DSP through four stages: raw, mapped, snapshot, effective. Use it to verify value sync.",
                                  5, 1, -1, -1, "trace_matrix",
                                  "Trace matrix in validation visual deck."));
         steps.push_back(makeStep("Validation: Interactive Console",
-                                 "Validation → Console is a command line. Use it for state edits ('set'/'get'), history ('undo'/'redo'), diagnostics ('watch'/'search'), and core/slot inspection ('core list'/'slot show').",
+                                 "Validation -> Console is a command line. Use it for state edits ('set'/'get'), history ('undo'/'redo'), diagnostics ('watch'/'search'), and core/slot inspection ('core list'/'slot show').",
                                  5, 2, -1, -1, "validation_console",
                                  "Validation console card."));
         return steps;
@@ -2947,7 +2947,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "bbd";
         resolvedTitle = "Get That Vintage BBD Sound";
         steps.push_back(makeStep("Step 1: Target Red NQ",
-                                 "You're on Engine → Routing. Switch Profile to Red and set HQ off to target Red NQ for this lesson.",
+                                 "You're on Engine -> Routing. Switch Profile to Red and set HQ off to target Red NQ for this lesson.",
                                  3, 1, 2, 0, "engine_selector",
                                  "Red + NQ selected."));
         steps.push_back(makeStep("Step 2: Confirm Core Token",
@@ -2955,19 +2955,19 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  3, 1, -1, -1, "core_selector",
                                  "Core token must be bbd for this walkthrough."));
         steps.push_back(makeStep("Step 3: Signal Flow Check",
-                                 "Go to Engine → Signal Flow. The right panel should show BBD behavior in the Core row.",
+                                 "Go to Engine -> Signal Flow. The right panel should show BBD behavior in the Core row.",
                                  3, 0, -1, -1, "engine_signal_flow",
                                  "Core row should match your selection."));
         steps.push_back(makeStep("Step 4: BBD Macro Controls",
-                                 "Switch to Engine → Macros. Adjust the BBD-specific macro controls (depth, clock, filtering) and listen for vintage chorus character.",
+                                 "Switch to Engine -> Macros. Adjust the BBD-specific macro controls (depth, clock, filtering) and listen for vintage chorus character.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Macros subtab holds BBD macro controls."));
         steps.push_back(makeStep("Step 5: Spectrum Reality Check",
-                                 "Switch to Tone → Spectrum. Watch the frequency analyzer while tuning BBD clock and filters to keep brightness balanced.",
+                                 "Switch to Tone -> Spectrum. Watch the frequency analyzer while tuning BBD clock and filters to keep brightness balanced.",
                                  2, 0, -1, -1, "spectrum_visual",
                                  "Spectrum analyzer in Tone tab."));
         steps.push_back(makeStep("Step 6: Validate Mapping",
-                                 "Go to Validation → Trace Matrix. Verify that Color and Mix parameters map correctly while you A/B test the BBD sound.",
+                                 "Go to Validation -> Trace Matrix. Verify that Color and Mix parameters map correctly while you A/B test the BBD sound.",
                                  5, 1, -1, -1, "trace_matrix",
                                  "Trace matrix confirms control-to-runtime mapping."));
         return steps;
@@ -2978,7 +2978,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "tape";
         resolvedTitle = "Add Tape Warmth and Flutter";
         steps.push_back(makeStep("Step 1: Target Red HQ",
-                                 "You're on Engine → Routing. Switch Profile to Red and set HQ on to target Red HQ for this tape lesson.",
+                                 "You're on Engine -> Routing. Switch Profile to Red and set HQ on to target Red HQ for this tape lesson.",
                                  3, 1, 2, 1, "engine_selector",
                                  "Red + HQ selected."));
         steps.push_back(makeStep("Step 2: Confirm Core Token",
@@ -2986,19 +2986,19 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  3, 1, -1, -1, "core_selector",
                                  "Core token must be tape for this walkthrough."));
         steps.push_back(makeStep("Step 3: Tape Macro Controls",
-                                 "Switch to Engine → Macros. Adjust the tape-specific controls: drive, tone, and wow/flutter spread. Listen for warmth.",
+                                 "Switch to Engine -> Macros. Adjust the tape-specific controls: drive, tone, and wow/flutter spread. Listen for warmth.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Macros subtab holds tape macro controls."));
         steps.push_back(makeStep("Step 4: Tone Response",
-                                 "Go to Tone → Engine Response. Watch the transfer curve bend as you increase tape drive. Curve bending = harmonic color.",
+                                 "Go to Tone -> Engine Response. Watch the transfer curve bend as you increase tape drive. Curve bending = harmonic color.",
                                  2, 1, -1, -1, "transfer_visual",
                                  "Curve confirms response change."));
         steps.push_back(makeStep("Step 5: Spectrum Balance",
-                                 "Switch to Tone → Spectrum. Adjust HPF and LPF to frame the tape character musically in the mix.",
+                                 "Switch to Tone -> Spectrum. Adjust HPF and LPF to frame the tape character musically in the mix.",
                                  2, 0, -1, -1, "spectrum_visual",
                                  "Analyzer helps keep brightness under control."));
         steps.push_back(makeStep("Step 6: Verify Runtime Health",
-                                 "Go to Validation → Telemetry. Confirm that your tape tuning stays within safe CPU and write-rate limits.",
+                                 "Go to Validation -> Telemetry. Confirm that your tape tuning stays within safe CPU and write-rate limits.",
                                  5, 0, -1, -1, "validation_readouts",
                                  "Do not skip telemetry after heavy tuning."));
         return steps;
@@ -3009,7 +3009,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "phase";
         resolvedTitle = "Widen Your Stereo Image";
         steps.push_back(makeStep("Step 1: Dual Delay Concept",
-                                 "You're on the Modulation tab. The visual deck shows Left and Right LFO scopes. Stereo width is controlled by their phase relationship — how out-of-sync they move.",
+                                 "You're on the Modulation tab. The visual deck shows Left and Right LFO scopes. Stereo width is controlled by their phase relationship -- how out-of-sync they move.",
                                  1, 0, -1, -1, "lfo_scope",
                                  "Modulation scope for left/right motion."));
         steps.push_back(makeStep("Step 2: Read the Scope",
@@ -3017,11 +3017,11 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  1, 0, -1, -1, "lfo_scope",
                                  "LFO scope in modulation visual deck."));
         steps.push_back(makeStep("Step 3: Width Offset",
-                                 "Scroll to the LFO Control Workbench. The 'Offset' control is your main phase lever — it shifts the right channel's delay relative to the left.",
+                                 "Scroll to the LFO Control Workbench. The 'Offset' control is your main phase lever -- it shifts the right channel's delay relative to the left.",
                                  1, 0, -1, -1, "modulation_controls",
                                  "Use offset in the LFO workbench."));
         steps.push_back(makeStep("Step 4: 180 Degree Anti-Phase",
-                                 "Near 180 degrees offset, one scope card rises while the other falls — perfect anti-phase. This often sounds widest. Watch and listen together.",
+                                 "Near 180 degrees offset, one scope card rises while the other falls -- perfect anti-phase. This often sounds widest. Watch and listen together.",
                                  1, 0, -1, -1, "modulation_controls",
                                  "Listen in stereo and watch both scope cards."));
         steps.push_back(makeStep("Step 5: Musical Balance",
@@ -3036,7 +3036,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "bimodulation";
         resolvedTitle = "Create Evolving Motion";
         steps.push_back(makeStep("Step 1: Target Purple NQ",
-                                 "You're on Engine → Routing. Switch Profile to Purple and set HQ off to target Purple NQ for this bi-modulation lesson.",
+                                 "You're on Engine -> Routing. Switch Profile to Purple and set HQ off to target Purple NQ for this bi-modulation lesson.",
                                  3, 1, 3, 0, "engine_selector",
                                  "Purple + NQ selected."));
         steps.push_back(makeStep("Step 2: Confirm Core Token",
@@ -3056,7 +3056,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  1, 0, -1, -1, "lfo_scope",
                                  "Right/left LFO views for compound behavior."));
         steps.push_back(makeStep("Step 6: Organic Motion",
-                                 "Go to Engine → Macros. Fine-tune Purple's bi-modulation macro controls to create an animated, organic chorus texture.",
+                                 "Go to Engine -> Macros. Fine-tune Purple's bi-modulation macro controls to create an animated, organic chorus texture.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Use Purple-specific macro controls in Engine -> Macros."));
         return steps;
@@ -3067,7 +3067,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "saturation";
         resolvedTitle = "Add Harmonic Richness";
         steps.push_back(makeStep("Step 1: Red NQ Saturation Path",
-                                 "You're on Tone → Engine Response. Switch to Red NQ and set Core to 'bbd'. Watch the transfer curve to start learning Red NQ saturation behavior.",
+                                 "You're on Tone -> Engine Response. Switch to Red NQ and set Core to 'bbd'. Watch the transfer curve to start learning Red NQ saturation behavior.",
                                  2, 1, 2, 0, "core_selector",
                                  "Target Red NQ with bbd core."));
         steps.push_back(makeStep("Step 2: Response Curve Reference",
@@ -3083,7 +3083,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  2, 1, 2, 1, "core_selector",
                                  "A/B NQ and HQ behavior with same source audio."));
         steps.push_back(makeStep("Step 5: Context Check in Spectrum",
-                                 "After tuning, go to Tone → Spectrum. Verify the frequency balance — ensure high-end doesn't build up too much from saturation artifacts.",
+                                 "After tuning, go to Tone -> Spectrum. Verify the frequency balance -- ensure high-end doesn't build up too much from saturation artifacts.",
                                  2, 0, -1, -1, "spectrum_visual",
                                  "Always check final tonal balance."));
         return steps;
@@ -3094,7 +3094,7 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "envelope";
         resolvedTitle = "Make Chorus Respond to Dynamics";
         steps.push_back(makeStep("Step 1: Target Green HQ",
-                                 "You're on Engine → Routing. Switch Profile to Green and set HQ on to target Green HQ for this dynamic response lesson.",
+                                 "You're on Engine -> Routing. Switch Profile to Green and set HQ on to target Green HQ for this dynamic response lesson.",
                                  3, 1, 0, 1, "engine_selector",
                                  "Green + HQ selected."));
         steps.push_back(makeStep("Step 2: Confirm Core Token",
@@ -3102,11 +3102,11 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  3, 1, -1, -1, "core_selector",
                                  "Core choice changes dynamic behavior."));
         steps.push_back(makeStep("Step 3: Macro Baseline",
-                                 "Go to Engine → Macros. First, set a stable macro baseline (Rate, Depth, Mix) to anchor your dynamic tuning.",
+                                 "Go to Engine -> Macros. First, set a stable macro baseline (Rate, Depth, Mix) to anchor your dynamic tuning.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Create a stable starting point."));
         steps.push_back(makeStep("Step 4: Engine-Specific Dynamic Controls",
-                                 "Below the main macros, adjust Green's dynamic macro controls — the ones specific to lagrange5 and HQ mode. Make small changes.",
+                                 "Below the main macros, adjust Green's dynamic macro controls -- the ones specific to lagrange5 and HQ mode. Make small changes.",
                                  3, 2, -1, -1, "engine_macros",
                                  "Engine-specific macro controls drive the dynamic effect."));
         steps.push_back(makeStep("Step 5: Confirm in Modulation",
