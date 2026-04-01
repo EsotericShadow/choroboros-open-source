@@ -340,6 +340,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     dualScopeCard->getProperties().set("devpanelModRole", "lfo_dual_scope");
     dualScopeCard->setPreferredHeight(200);
     modulationVisuals.add(dualScopeCard);
+    modulationVisualizerProperties.add(dualScopeCard);
 
     // Lissajous Scope
     auto* lissajousCard = new LissajousScopeCard(
@@ -356,6 +357,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     lissajousCard->getProperties().set("devpanelModRole", "lfo_lissajous");
     lissajousCard->setPreferredHeight(170);
     modulationVisuals.add(lissajousCard);
+    modulationVisualizerProperties.add(lissajousCard);
 
     auto* modulationDelayTrajectoryCard = makeSparkline("Delay Trajectory", [readAnalyzerSnapshot]() -> std::vector<float>
     {
