@@ -268,7 +268,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                                          readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
         return juce::String(mapped * 100.0f, 1) + " %";
     }));
-    modulationReadouts.add(makeReadOnly("Modulation Depth", [this, readAnalyzerSnapshot]() -> juce::String
+    modulationReadouts.add(makeReadOnly("Measured Swing", [this, readAnalyzerSnapshot]() -> juce::String
     {
         const auto snapshot = readAnalyzerSnapshot();
         // Find min/max of delay trajectory to get modulation depth range
@@ -283,7 +283,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
         return juce::String(depth, 2) + " ms";
     }));
     setSectionRowHeight(modulationReadouts, kRowHeightCompact);
-    addPanelSection(modulationPanel, "Modulation Readouts", modulationReadouts, false);
+    addPanelSection(modulationPanel, "Modulation Readouts -- live values from DSP", modulationReadouts, false);
 
     // Stereo Readouts section
     juce::Array<juce::PropertyComponent*> stereoReadouts;
@@ -299,7 +299,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                                          readRawParam(ChoroborosAudioProcessor::WIDTH_ID));
         return juce::String(mapped, 2) + " x";
     }));
-    stereoReadouts.add(makeReadOnly("Phase Difference", [this, readRawParam]() -> juce::String
+    stereoReadouts.add(makeReadOnly("Effective Phase Spread", [this, readRawParam]() -> juce::String
     {
         const float offsetDeg = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
                                                             readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
@@ -309,7 +309,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
         const float phaseDiff = offsetDeg * juce::jlimit(0.0f, 1.0f, width);
         return juce::String(phaseDiff, 1) + " deg";
     }));
-    stereoReadouts.add(makeReadOnly("Stereo Correlation (est.)", [this, readRawParam]() -> juce::String
+    stereoReadouts.add(makeReadOnly("Stereo Coherence", [this, readRawParam]() -> juce::String
     {
         const float offsetDeg = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
                                                             readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
@@ -321,7 +321,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
         return juce::String(correlation, 3);
     }));
     setSectionRowHeight(stereoReadouts, kRowHeightCompact);
-    addPanelSection(modulationPanel, "Stereo Readouts", stereoReadouts, false);
+    addPanelSection(modulationPanel, "Stereo Readouts -- derived from offset + width", stereoReadouts, false);
 
     juce::Array<juce::PropertyComponent*> modulationVisuals;
 
@@ -378,7 +378,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
 
     auto* modulationWorkbenchCard = new HorizontalControlStripCard(
         "LFO Control Workbench (active profile)",
-        "Main modulation controls. Edits write to the active profile shown above.");
+        "Drag sliders to adjust -- changes appear in the scopes above in real time");
     modulationWorkbenchCard->setName("Modulation LFO Workbench Card");
     modulationWorkbenchCard->getProperties().set("devpanelModRole", "lfo_workbench");
     modulationWorkbenchCard->addControl("LFO Rate (Hz)",

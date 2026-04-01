@@ -2725,19 +2725,19 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
                                  0, 1, -1, -1, "overview_visual",
                                  "Delay shape check before deeper edits."));
         steps.push_back(makeStep("Step 7: Modulation Basics",
-                                 "You're on the Modulation tab. The visual deck shows two scope cards side by side -- Left and Right channels. Each draws the delay modulation in real time. Watch them while audio plays: the shapes you see ARE the chorus movement.",
+                                 "You're on the Modulation tab. The LFO Oscilloscope shows delay modulation over one LFO cycle -- the L ch and R ch waveforms are the chorus movement. Watch them while audio plays.",
                                  1, 0, -1, -1, "lfo_scope",
-                                 "Watch both sides at the same time."));
-        steps.push_back(makeStep("Step 8: Anti-Phase and Width",
-                                 "Watch the Left and Right scopes. When they move in opposite directions -- one rises while the other falls -- that's anti-phase, and it creates stereo width. The Offset and Width parameters in the workbench below control this relationship.",
-                                 1, 0, -1, -1, "lfo_scope",
-                                 "Use scope shape plus ears to set stereo width."));
-        steps.push_back(makeStep("Step 9: Trajectory and Zipper",
-                                 "Below the scope cards is the Trajectory card. It shows how parameter values change over time. Smooth trajectories sound clean. Sharp jumps or staircases mean 'zipper noise' -- audible stepping from abrupt value changes.",
+                                 "L ch and R ch waveforms show stereo delay movement."));
+        steps.push_back(makeStep("Step 8: Stereo Field",
+                                 "The Stereo Field card below plots L vs R as a shape. A diagonal line means mono. A wide ellipse means strong stereo width. The axis labels show L on horizontal, R on vertical. Check the shape hints for orientation.",
+                                 1, 0, -1, -1, "lfo_lissajous",
+                                 "Shape tells you stereo width at a glance."));
+        steps.push_back(makeStep("Step 9: Trajectory and Swing",
+                                 "The Delay Trajectory shows how delay values evolve in milliseconds. Smooth curves sound clean. Sharp jumps cause audible artifacts. The Measured Swing readout in the inspector shows total delay range.",
                                  1, 0, -1, -1, "modulation_visual",
                                  "Smooth movement sounds better than abrupt jumps."));
         steps.push_back(makeStep("Step 10: Modulation Workbench",
-                                 "Scroll down in the right panel to find the LFO Control Workbench. This is where you make edits: Rate, Depth, Stereo Offset, Stereo Width. The inspector on the left shows readout values, but the workbench is your control surface.",
+                                 "The LFO Control Workbench at the bottom is your control surface. Drag Rate, Depth, Offset, and Width sliders -- watch the scopes above update in real time. The left inspector shows live readout values from DSP.",
                                  1, 0, -1, -1, "modulation_controls",
                                  "Controls are in the workbench, not the left inspector."));
         steps.push_back(makeStep("Step 11: Tone / Spectrum",
@@ -2863,19 +2863,19 @@ std::vector<DevPanel::TutorialStep> DevPanel::buildTutorialScript(const juce::St
         resolvedTopic = "modulation";
         resolvedTitle = "Modulation Deep Dive";
         steps.push_back(makeStep("Modulation: LFO Shape",
-                                 "You're on the Modulation tab. The visual deck shows LFO scope cards for Left and Right channels. Watch these shapes while audio plays -- they show delay movement in real time.",
+                                 "The LFO Oscilloscope shows delay modulation over one LFO cycle. The L ch and R ch waveforms show how each stereo channel moves. Watch these shapes while audio plays -- taller peaks mean deeper pitch movement.",
                                  1, 0, -1, -1, "lfo_scope",
-                                 "Left/Right scope cards show movement directly."));
-        steps.push_back(makeStep("Modulation: Stereo Motion",
-                                 "Compare Left and Right scopes together. When they move apart, you're hearing stereo width. Offset and Width parameters control this anti-phase relationship.",
-                                 1, 0, -1, -1, "lfo_scope",
-                                 "Anti-phase behavior is easiest to see here."));
+                                 "L ch and R ch waveforms show stereo delay movement."));
+        steps.push_back(makeStep("Modulation: Stereo Field",
+                                 "The Stereo Field card plots L vs R as an XY shape. A diagonal line means mono (both channels move together). A wide ellipse means strong stereo separation. The axis labels show L on horizontal, R on vertical.",
+                                 1, 0, -1, -1, "lfo_lissajous",
+                                 "Shape tells you stereo width at a glance."));
         steps.push_back(makeStep("Modulation: Trajectory",
-                                 "Below the scope cards is the Trajectory card. It shows how delay values evolve over time. Watch for smooth curves -- sharp jumps cause 'zipper noise'.",
+                                 "The Delay Trajectory card shows how delay values evolve over time in milliseconds. Watch for smooth curves -- sharp jumps cause audible artifacts. The Measured Swing readout on the left shows the total delay range.",
                                  1, 0, -1, -1, "modulation_visual",
                                  "Trajectory is the lower visual card."));
         steps.push_back(makeStep("Modulation: Workbench",
-                                 "Scroll down to the LFO Control Workbench below the visuals. This is where you edit Rate, Depth, Stereo Offset, and Stereo Width. The inspector is readouts; the workbench is your control surface.",
+                                 "The LFO Control Workbench at the bottom is your control surface. Drag Rate, Depth, Offset, and Width sliders and watch the scopes above update in real time. The left inspector shows live readout values from DSP.",
                                  1, 0, -1, -1, "modulation_controls",
                                  "Left inspector is readouts; workbench is control surface."));
         return steps;

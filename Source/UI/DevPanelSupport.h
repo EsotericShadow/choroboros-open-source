@@ -2919,6 +2919,7 @@ public:
     {
         auto b = getLocalBounds().reduced(6, 4);
         titleArea = b.removeFromTop(18);
+        subtitleArea = b.removeFromTop(14);
         b.removeFromTop(2);
         plotBounds = b;
     }
@@ -2930,7 +2931,7 @@ private:
     std::function<void(std::vector<float>&, std::vector<float>&)> valueProvider;
     std::function<juce::Colour()> accentColourProvider;
     std::vector<float> lfoL, lfoR;
-    juce::Rectangle<int> titleArea, plotBounds;
+    juce::Rectangle<int> titleArea, subtitleArea, plotBounds;
 };
 
 class LissajousScopeCard : public juce::PropertyComponent
@@ -2961,6 +2962,7 @@ public:
     {
         auto b = getLocalBounds().reduced(6, 4);
         titleArea = b.removeFromTop(18);
+        subtitleArea = b.removeFromTop(14);
         b.removeFromTop(2);
         plotBounds = b;
     }
@@ -2972,7 +2974,7 @@ private:
     std::function<void(std::vector<float>&, std::vector<float>&)> valueProvider;
     std::function<juce::Colour()> accentColourProvider;
     std::vector<float> lfoL, lfoR;
-    juce::Rectangle<int> titleArea, plotBounds;
+    juce::Rectangle<int> titleArea, subtitleArea, plotBounds;
 };
 
 inline void DualWaveformScopeCard::paint(juce::Graphics& g)
@@ -2989,6 +2991,12 @@ inline void DualWaveformScopeCard::paint(juce::Graphics& g)
     g.setFont(makeRetroFont(Typography::vizTitle, true));
     g.setColour(juce::Colour(HackerTheme::text));
     g.drawText(titleText, titleArea.toFloat(), juce::Justification::centredLeft);
+
+    // Subtitle
+    g.setFont(makeRetroFont(Typography::vizBody, false));
+    g.setColour(juce::Colour(HackerTheme::textDim).withAlpha(0.7f));
+    g.drawText("Delay modulation over one LFO cycle", subtitleArea.toFloat(),
+               juce::Justification::centredLeft);
 
     // Plot area
     auto plot = plotBounds.toFloat().reduced(2.0f);
@@ -3024,6 +3032,20 @@ inline void DualWaveformScopeCard::paint(juce::Graphics& g)
         float x = plot.getX() + (plot.getWidth() * i / 4.0f);
         g.drawText(phaseLabels[i], static_cast<int>(x) - 15, static_cast<int>(plot.getBottom()) - 14,
                    30, 14, juce::Justification::centred);
+    }
+
+    // Y-axis label
+    {
+        g.setFont(makeRetroFont(Typography::vizBody, false));
+        g.setColour(juce::Colour(HackerTheme::textDim).withAlpha(0.4f));
+        g.saveState();
+        g.addTransform(juce::AffineTransform::rotation(
+            -juce::MathConstants<float>::halfPi,
+            plot.getX() + 4, plot.getCentreY()));
+        g.drawText("depth", static_cast<int>(plot.getX() - 10),
+                   static_cast<int>(plot.getCentreY() - 6), 40, 12,
+                   juce::Justification::centred);
+        g.restoreState();
     }
 
     // Accent color
@@ -3063,19 +3085,20 @@ inline void DualWaveformScopeCard::paint(juce::Graphics& g)
         g.strokePath(pathR, juce::PathStrokeType(1.5f));
     }
 
-    // Legend (top-right): "L" and "R" color swatches
-    float legendX = plot.getRight() - 80;
+    // Legend (top-right): "L ch" and "R ch" color swatches
+    float legendX = plot.getRight() - 100;
     float legendY = titleArea.toFloat().getY() + 2;
     g.setColour(accent.withAlpha(0.9f));
     g.fillRect(legendX, legendY, 10.0f, 10.0f);
+    g.setFont(makeRetroFont(Typography::vizBody, false));
     g.setColour(juce::Colour(HackerTheme::textDim));
-    g.drawText("L", static_cast<int>(legendX + 13), static_cast<int>(legendY), 20, 12,
+    g.drawText("L ch", static_cast<int>(legendX + 13), static_cast<int>(legendY), 30, 12,
                juce::Justification::centredLeft);
     juce::Colour rLegend = accent.withRotatedHue(0.33f);
     g.setColour(rLegend.withAlpha(0.7f));
-    g.fillRect(legendX + 38, legendY, 10.0f, 10.0f);
+    g.fillRect(legendX + 48, legendY, 10.0f, 10.0f);
     g.setColour(juce::Colour(HackerTheme::textDim));
-    g.drawText("R", static_cast<int>(legendX + 51), static_cast<int>(legendY), 20, 12,
+    g.drawText("R ch", static_cast<int>(legendX + 61), static_cast<int>(legendY), 30, 12,
                juce::Justification::centredLeft);
 }
 
@@ -3094,6 +3117,12 @@ inline void LissajousScopeCard::paint(juce::Graphics& g)
     g.setColour(juce::Colour(HackerTheme::text));
     g.drawText(titleText, titleArea.toFloat(), juce::Justification::centredLeft);
 
+    // Subtitle
+    g.setFont(makeRetroFont(Typography::vizBody, false));
+    g.setColour(juce::Colour(HackerTheme::textDim).withAlpha(0.7f));
+    g.drawText("L vs R phase relationship", subtitleArea.toFloat(),
+               juce::Justification::centredLeft);
+
     // Square plot area (maintain aspect ratio)
     auto plot = plotBounds.toFloat().reduced(2.0f);
     float side = juce::jmin(plot.getWidth(), plot.getHeight());
@@ -3106,6 +3135,27 @@ inline void LissajousScopeCard::paint(juce::Graphics& g)
                          squarePlot.getX(), squarePlot.getRight());
     g.drawVerticalLine(static_cast<int>(squarePlot.getCentreX()),
                        squarePlot.getY(), squarePlot.getBottom());
+
+    // Axis labels
+    g.setFont(makeRetroFont(Typography::vizBody, false));
+    g.setColour(juce::Colour(HackerTheme::textDim).withAlpha(0.6f));
+    g.drawText("L", static_cast<int>(squarePlot.getRight() - 16),
+               static_cast<int>(squarePlot.getBottom() - 14), 14, 12,
+               juce::Justification::centredRight);
+    g.drawText("R", static_cast<int>(squarePlot.getX() + 2),
+               static_cast<int>(squarePlot.getY() + 2), 14, 12,
+               juce::Justification::centredLeft);
+
+    // Shape hints (very subtle)
+    g.setColour(juce::Colour(HackerTheme::textDim).withAlpha(0.25f));
+    g.setFont(makeRetroFont(Typography::vizBody, false));
+    g.drawText("wide", static_cast<int>(squarePlot.getX() + 4),
+               static_cast<int>(squarePlot.getY() + 16), 30, 12,
+               juce::Justification::centredLeft);
+    // "mono" hint along diagonal
+    g.drawText("mono", static_cast<int>(squarePlot.getCentreX() + 6),
+               static_cast<int>(squarePlot.getCentreY() - 18), 30, 12,
+               juce::Justification::centredLeft);
 
     if (lfoL.empty() || lfoR.empty()) return;
 

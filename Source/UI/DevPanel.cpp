@@ -789,14 +789,22 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             return "UI-only smoothing for knob movement. Changes feel, not DSP audio.";
         if (n.contains("mix"))
             return "Dry/wet balance behavior. Lower values keep more source signal; higher values emphasize chorus.";
+        if (n.contains("measured swing"))
+            return "The actual delay swing measured at runtime, in milliseconds. This is how much the delay time is actually moving -- affected by Depth, Rate, and the delay engine.";
+        if (n.contains("effective phase spread"))
+            return "How far apart the L and R modulation channels actually are in degrees. Combines your Offset and Width settings -- the real stereo separation you hear.";
+        if (n.contains("stereo coherence"))
+            return "How similar the L and R channels sound. +1.0 = identical (mono), 0.0 = unrelated, -1.0 = opposite (widest stereo). Values near zero or below create spacious, wide effects.";
+        if (n.contains("period"))
+            return "Time for one complete LFO cycle. This is 1/Rate -- lower rate means longer period means slower sweep.";
         if (n.contains("rate"))
-            return "LFO speed behavior. Slower rates sound lush/swimmy; faster rates move toward vibrato-like motion.";
+            return "How fast the modulation cycles. Lower = gentle swimming, higher = vibrato-like wobble.";
         if (n.contains("depth"))
-            return "Modulation amount. More depth means stronger pitch/time motion.";
+            return "How much the delay time moves. 0% = no modulation, 100% = full range. Higher values create more dramatic pitch movement.";
         if (n.contains("width"))
-            return "Stereo spread behavior. Wider settings increase side information and perceived space.";
+            return "Multiplier for the stereo effect. 0 = mono modulation. 1 = normal stereo. Higher values exaggerate the L/R difference.";
         if (n.contains("offset"))
-            return "Stereo phase offset behavior between modulation channels, shaping width and motion character.";
+            return "Phase angle between L and R modulation. 0 deg = both channels move together. 90-180 deg = channels move apart, creating stereo width.";
 
         return "Live DSP/UI tuning control. Use small moves, listen for tone/motion changes, then refine with A/B comparisons.";
     };
