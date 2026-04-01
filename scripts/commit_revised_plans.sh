@@ -28,7 +28,15 @@ done
 
 # Stage the revised architectural plans and this script only.
 git add -- \
+    docs/developer/PLAN_META_EXECUTION.md \
     docs/developer/PLAN_0_STATE_DOMAIN_BOUNDARIES.md \
+    docs/developer/PLAN_0_CURRENT_STATE_INVENTORY.md \
+    docs/developer/PLAN_0_EXECUTION_SUMMARY.md \
+    docs/developer/DECISION_PRESET_CONTRACT.md \
+    docs/developer/DECISION_APPLY_CONTEXTS.md \
+    docs/developer/DECISION_CONSENT_MATRIX.md \
+    docs/developer/DECISION_SERVICE_BOUNDARIES.md \
+    docs/developer/DECISION_REALTIME_MUTATION_STRATEGY.md \
     docs/developer/PLAN_1_CANONICAL_STATE_LAYER.md \
     docs/developer/PLAN_2_AUDIO_THREAD_OWNERSHIP.md \
     docs/developer/PLAN_3_TESTABLE_SERVICES.md \
