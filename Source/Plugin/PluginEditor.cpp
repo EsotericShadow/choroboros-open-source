@@ -824,8 +824,8 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         topBarDrawer.helpButton.onClick = [] { HelpDialog::show(); };
 
         topBarDrawer.feedbackButton.onClick = [this] {
-            if (audioProcessor.feedbackCollector)
-                FeedbackDialog::show (*audioProcessor.feedbackCollector);
+            if (auto* collector = audioProcessor.getFeedbackCollector())
+                FeedbackDialog::show (*collector);
         };
 
         // Position drawer inside the header bar (right-aligned, vertically centred).
@@ -865,8 +865,8 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         {
             if (safeThis == nullptr) return;
             auto crashReport = SessionLog::readPendingCrashReport();
-            if (crashReport.isNotEmpty() && safeThis->audioProcessor.feedbackCollector)
-                FeedbackDialog::showCrashReport(*safeThis->audioProcessor.feedbackCollector, crashReport);
+            if (crashReport.isNotEmpty())
+                FeedbackDialog::showCrashReport(crashReport, safeThis->audioProcessor.getFeedbackCollector());
             // Crash report file is NOT deleted here -- FeedbackDialog clears
             // it after the user sends, saves, or dismisses.
         });
@@ -1171,12 +1171,12 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
             topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
         PluginEditorSetup::applyLayout(*this, layoutTuning);
         
-        // Track engine switch for feedback
-        if (audioProcessor.feedbackCollector)
+        // Track engine switch for feedback (only if analytics enabled)
+        if (auto* collector = audioProcessor.getFeedbackCollector())
         {
             auto hqParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::HQ_ID);
             bool hq = hqParam ? (hqParam->load() > 0.5f) : false;
-            audioProcessor.feedbackCollector->trackEngineSwitch(colorIndex, hq);
+            collector->trackEngineSwitch(colorIndex, hq);
         }
         
         // Force sliders to repaint with new thumb image

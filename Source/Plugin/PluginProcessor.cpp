@@ -813,15 +813,22 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 #endif
     parameters(*this, nullptr, juce::Identifier("Choroboros"), createParameterLayout()),
     chorusDSP(std::make_unique<ChorusDSP>()),
-    feedbackCollector(std::make_unique<FeedbackCollector>()),
     sessionLog(std::make_unique<SessionLog>())
 {
+    // Create consent service (reads PropertiesFile once, caches in memory)
+    consent_ = std::make_unique<ConsentService>();
+
+    // Construct FeedbackCollector only if analytics consent is enabled
+    if (consent_->isAnalyticsEnabled())
+    {
+        feedbackCollector = std::make_unique<FeedbackCollector>();
+        // Link session log to feedback collector for richer diagnostics
+        feedbackCollector->setSessionLog(sessionLog.get());
+    }
+
     // Create preset manager early — it only scans the user presets directory
     // and doesn't call back into the processor during construction.
     presetManager = std::make_unique<PresetManager> (*this);
-
-    // Link session log to feedback collector for richer diagnostics
-    feedbackCollector->setSessionLog(sessionLog.get());
 
     // Install crash handlers — on crash, the handler deletes the clean-shutdown
     // marker (using async-signal-safe unlink()) so next launch detects the crash.
@@ -916,6 +923,35 @@ void ChoroborosAudioProcessor::logLoadTraceEvent(const juce::String& eventName,
     // Plan 4: logLoadTraceEvent disabled (load trace disk writes removed).
     // Collapse to no-op to avoid breaking all call sites.
     (void)eventName; (void)elapsedMs; (void)notes;
+}
+
+//==============================================================================
+// Consent management (mid-session analytics toggle)
+//==============================================================================
+
+void ChoroborosAudioProcessor::setAnalyticsConsentEnabled(bool enabled)
+{
+    if (consent_->isAnalyticsEnabled() == enabled)
+        return;  // No change
+
+    consent_->setAnalyticsEnabled(enabled);
+
+    if (enabled && !feedbackCollector)
+    {
+        // Enable: construct FeedbackCollector and link session log
+        feedbackCollector = std::make_unique<FeedbackCollector>();
+        feedbackCollector->setSessionLog(sessionLog.get());
+    }
+    else if (!enabled && feedbackCollector)
+    {
+        // Disable: destroy FeedbackCollector (optionally clear data)
+        feedbackCollector.reset();
+    }
+}
+
+bool ChoroborosAudioProcessor::isAnalyticsConsentEnabled() const
+{
+    return consent_->isAnalyticsEnabled();
 }
 
 //==============================================================================
@@ -1039,8 +1075,8 @@ void ChoroborosAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     if (analyzerWorker != nullptr && !analyzerWorker->isThreadRunning())
         analyzerWorker->startThread(juce::Thread::Priority::low);
 
-    // Log host/session info for diagnostics
-    if (sessionLog != nullptr)
+    // Log host/session info for diagnostics (usage-like event, gated by analytics consent)
+    if (sessionLog != nullptr && consent_->isAnalyticsEnabled())
     {
         auto hostDesc = juce::PluginHostType().getHostDescription();
         auto wrapperDesc = juce::AudioProcessor::getWrapperTypeDescription(wrapperType);
@@ -1258,14 +1294,21 @@ float ChoroborosAudioProcessor::mapTunedValue(float rawValue, float baseMin, flo
     if (baseMax <= baseMin)
         return rawValue;
 
-    const float normalised = juce::jlimit(0.0f, 1.0f, (rawValue - baseMin) / (baseMax - baseMin));
-    const float curve = juce::jmax(0.001f, tuningParam.curve.load());
-    const float shaped = std::pow(normalised, curve);
-
     float tunedMin = tuningParam.min.load();
     float tunedMax = tuningParam.max.load();
     if (tunedMax < tunedMin)
         std::swap(tunedMax, tunedMin);
+
+    const float curve = juce::jmax(0.001f, tuningParam.curve.load());
+    if (std::abs(tunedMin - baseMin) <= 1.0e-6f
+        && std::abs(tunedMax - baseMax) <= 1.0e-6f
+        && std::abs(curve - 1.0f) <= 1.0e-6f)
+    {
+        return rawValue;
+    }
+
+    const float normalised = juce::jlimit(0.0f, 1.0f, (rawValue - baseMin) / (baseMax - baseMin));
+    const float shaped = std::pow(normalised, curve);
 
     return tunedMin + (tunedMax - tunedMin) * shaped;
 }
@@ -1280,12 +1323,19 @@ float ChoroborosAudioProcessor::unmapTunedValue(float mappedValue, float baseMin
     if (tunedMax < tunedMin)
         std::swap(tunedMax, tunedMin);
 
+    const float curve = juce::jmax(0.001f, tuningParam.curve.load());
+    if (std::abs(tunedMin - baseMin) <= 1.0e-6f
+        && std::abs(tunedMax - baseMax) <= 1.0e-6f
+        && std::abs(curve - 1.0f) <= 1.0e-6f)
+    {
+        return mappedValue;
+    }
+
     const float tunedSpan = tunedMax - tunedMin;
     if (tunedSpan <= 1.0e-6f)
         return baseMin;
 
     const float shaped = juce::jlimit(0.0f, 1.0f, (mappedValue - tunedMin) / tunedSpan);
-    const float curve = juce::jmax(0.001f, tuningParam.curve.load());
     const float normalised = std::pow(shaped, 1.0f / curve);
     return baseMin + (baseMax - baseMin) * normalised;
 }
@@ -1373,9 +1423,6 @@ bool ChoroborosAudioProcessor::setCoreAssignment(int colorIndex, bool hqEnabled,
 
 std::vector<choroboros::SlotAssignment> ChoroborosAudioProcessor::getDuplicateAssignmentWarnings() const
 {
-    if (chorusDSP != nullptr)
-        return chorusDSP->getDuplicateAssignmentWarnings();
-
     std::vector<choroboros::SlotAssignment> warnings;
     for (std::size_t i = 0; i < choroboros::coreIdCount(); ++i)
     {
@@ -1456,19 +1503,20 @@ PresetState ChoroborosAudioProcessor::capturePresetState() const
     PresetState state;
     state.version = 1;
 
-    // Capture all APVTS parameters
+    // Capture base/raw APVTS parameter values. PresetState must not depend on
+    // runtime tuning because tuning is explicitly outside the preset contract.
     if (const auto* rateParam = parameters.getRawParameterValue(RATE_ID))
-        state.rate = mapParameterValue(RATE_ID, rateParam->load());
+        state.rate = rateParam->load();
     if (const auto* depthParam = parameters.getRawParameterValue(DEPTH_ID))
-        state.depth = mapParameterValue(DEPTH_ID, depthParam->load());
+        state.depth = depthParam->load();
     if (const auto* offsetParam = parameters.getRawParameterValue(OFFSET_ID))
-        state.offset = mapParameterValue(OFFSET_ID, offsetParam->load());
+        state.offset = offsetParam->load();
     if (const auto* widthParam = parameters.getRawParameterValue(WIDTH_ID))
-        state.width = mapParameterValue(WIDTH_ID, widthParam->load());
+        state.width = widthParam->load();
     if (const auto* colorParam = parameters.getRawParameterValue(COLOR_ID))
-        state.color = mapParameterValue(COLOR_ID, colorParam->load());
+        state.color = colorParam->load();
     if (const auto* mixParam = parameters.getRawParameterValue(MIX_ID))
-        state.mix = mapParameterValue(MIX_ID, mixParam->load());
+        state.mix = mixParam->load();
 
     // Capture HQ
     if (const auto* hqParam = parameters.getRawParameterValue(HQ_ID))
@@ -1490,24 +1538,24 @@ bool ChoroborosAudioProcessor::applyPresetState(const PresetState& state, ApplyC
     // Guard: suppress bulk parameter listeners during apply
     const bool wasBulkChange = presetLoadInProgress.exchange(true);
 
-    // Set APVTS parameters (in mapped/display space)
-    const auto setMappedParam = [this](const juce::String& paramId, float mappedValue)
+    // Apply base/raw APVTS parameter values. Runtime tuning stays out of the
+    // preset contract, so we do not remap preset values through tuning here.
+    const auto setRawParam = [this](const juce::String& paramId, float rawValue)
     {
         if (auto* param = parameters.getParameter(paramId))
         {
-            const float rawValue = unmapParameterValue(paramId, mappedValue);
             float normalizedValue = param->convertTo0to1(rawValue);
             normalizedValue = juce::jlimit(0.0f, 1.0f, normalizedValue);
             param->setValueNotifyingHost(normalizedValue);
         }
     };
 
-    setMappedParam(RATE_ID, state.rate);
-    setMappedParam(DEPTH_ID, state.depth);
-    setMappedParam(OFFSET_ID, state.offset);
-    setMappedParam(WIDTH_ID, state.width);
-    setMappedParam(COLOR_ID, state.color);
-    setMappedParam(MIX_ID, state.mix);
+    setRawParam(RATE_ID, state.rate);
+    setRawParam(DEPTH_ID, state.depth);
+    setRawParam(OFFSET_ID, state.offset);
+    setRawParam(WIDTH_ID, state.width);
+    setRawParam(COLOR_ID, state.color);
+    setRawParam(MIX_ID, state.mix);
 
     // Set HQ
     if (auto* param = parameters.getParameter(HQ_ID))
@@ -1601,7 +1649,8 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
     // Session-log events fire unconditionally so that preset loads, state
     // restores, and automation all get recorded.
     // ------------------------------------------------------------------
-    if (parameterID == ENGINE_COLOR_ID && sessionLog != nullptr)
+    // Gate usage-like events behind analytics consent
+    if (parameterID == ENGINE_COLOR_ID && sessionLog != nullptr && consent_->isAnalyticsEnabled())
     {
         static const char* names[] = { "Green", "Blue", "Red", "Purple", "Black" };
         const int idx = juce::jlimit (0, 4, static_cast<int> (newValue));
@@ -1611,7 +1660,7 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         sessionLog->log (SessionLog::EventType::EngineSwitch,
                          juce::String (names[idx]) + (hq ? " HQ" : " NQ"));
     }
-    else if (parameterID == HQ_ID && sessionLog != nullptr)
+    else if (parameterID == HQ_ID && sessionLog != nullptr && consent_->isAnalyticsEnabled())
     {
         sessionLog->log (SessionLog::EventType::HqToggle,
                          newValue >= 0.5f ? "HQ on" : "HQ off");

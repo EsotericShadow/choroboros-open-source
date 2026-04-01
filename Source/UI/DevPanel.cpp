@@ -1540,6 +1540,16 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         }));
     addPanelSection(settingsPanel, "Help & Feedback", settingsHelp, false);
 
+    juce::Array<juce::PropertyComponent*> settingsAnalytics;
+    auto* analyticsProp = new juce::BooleanPropertyComponent(
+        makeBoolValue(
+            [this] { return processor.isAnalyticsConsentEnabled(); },
+            [this](bool enabled) { processor.setAnalyticsConsentEnabled(enabled); }),
+        "Share anonymous usage data", "Off by default");
+    analyticsProp->setTooltip("Enables collection of anonymous usage statistics (engine switches, preset loads) stored locally. No data leaves your machine. Off by default.");
+    settingsAnalytics.add(analyticsProp);
+    addPanelSection(settingsPanel, "Analytics & Privacy", settingsAnalytics, false);
+
     for (auto* property : lockableProperties)
     {
         if (property == nullptr)

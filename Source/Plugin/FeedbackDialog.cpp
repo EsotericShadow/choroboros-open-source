@@ -23,18 +23,34 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
 
+namespace
+{
+bool saveFeedbackBodyToFile(const juce::String& body)
+{
+    auto feedbackDir = FeedbackCollector::getFeedbackDirectory();
+    if (! feedbackDir.createDirectory())
+        return false;
+
+    auto timestamp = juce::Time::getCurrentTime()
+                         .toString(true, true)
+                         .replaceCharacters(":", "-");
+    auto feedbackFile = feedbackDir.getChildFile("feedback_" + timestamp + ".txt");
+    return feedbackFile.replaceWithText(body);
+}
+}
+
 //==============================================================================
 // Constructors
 //==============================================================================
 
 FeedbackDialog::FeedbackDialog (FeedbackCollector& collector)
-    : feedbackCollector (collector)
+    : feedbackCollector (&collector)
 {
     initCommon();
 }
 
-FeedbackDialog::FeedbackDialog (FeedbackCollector& collector,
-                                const juce::String& crashReport)
+FeedbackDialog::FeedbackDialog (const juce::String& crashReport,
+                                FeedbackCollector* collector)
     : feedbackCollector (collector),
       crashReportMode (true),
       crashReportText (crashReport)
@@ -217,7 +233,10 @@ void FeedbackDialog::sendToDeveloper()
 
     juce::URL (mailto).launchInDefaultBrowser();
 
-    feedbackCollector.saveFeedbackToFile (body);
+    if (feedbackCollector != nullptr)
+        feedbackCollector->saveFeedbackToFile (body);
+    else
+        saveFeedbackBodyToFile(body);
 
     if (crashReportMode)
         SessionLog::clearPendingCrashReport();
@@ -241,11 +260,14 @@ juce::String FeedbackDialog::buildEmailBody() const
         body << "CRASH LOG:\n" << truncated << "\n\n";
     }
 
-    body << feedbackCollector.getUsageSummary();
+    if (feedbackCollector != nullptr)
+    {
+        body << feedbackCollector->getUsageSummary();
 
-    auto sessionSummary = feedbackCollector.getSessionLogSummary();
-    if (sessionSummary.isNotEmpty())
-        body << "\nSESSION LOG (last events):\n" << sessionSummary << "\n";
+        auto sessionSummary = feedbackCollector->getSessionLogSummary();
+        if (sessionSummary.isNotEmpty())
+            body << "\nSESSION LOG (last events):\n" << sessionSummary << "\n";
+    }
 
     return body;
 }
@@ -253,7 +275,11 @@ juce::String FeedbackDialog::buildEmailBody() const
 void FeedbackDialog::saveFeedback()
 {
     auto body = buildEmailBody();
-    if (feedbackCollector.saveFeedbackToFile (body))
+    const bool saved = feedbackCollector != nullptr
+        ? feedbackCollector->saveFeedbackToFile(body)
+        : saveFeedbackBodyToFile(body);
+
+    if (saved)
     {
         if (crashReportMode)
             SessionLog::clearPendingCrashReport();
@@ -304,10 +330,10 @@ void FeedbackDialog::show (FeedbackCollector& collector)
         window->setResizeLimits (500, 440, 800, 800);
 }
 
-void FeedbackDialog::showCrashReport (FeedbackCollector& collector,
-                                       const juce::String& crashReport)
+void FeedbackDialog::showCrashReport (const juce::String& crashReport,
+                                      FeedbackCollector* collector)
 {
-    auto* dialog = new FeedbackDialog (collector, crashReport);
+    auto* dialog = new FeedbackDialog (crashReport, collector);
 
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned (dialog);

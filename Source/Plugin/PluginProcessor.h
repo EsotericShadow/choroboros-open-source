@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <vector>
 #include "../DSP/ChorusDSP.h"
+#include "ConsentService.h"
 #include "FeedbackCollector.h"
 #include "SessionLog.h"
 #include "CrashReporter.h"
@@ -220,11 +221,20 @@ public:
                            double elapsedMs,
                            const juce::String& notes = {}) const;
     std::uint64_t getInstanceId() const noexcept { return instanceId; }
-    
-    // Feedback collector (public for editor access)
-    std::unique_ptr<FeedbackCollector> feedbackCollector;
 
-    // Session log (public for editor crash-report check)
+    // Consent service (source of truth for analytics/diagnostics consent)
+    ConsentService& getConsentService() { return *consent_; }
+    const ConsentService& getConsentService() const { return *consent_; }
+
+    // Mid-session analytics toggle (enables/disables FeedbackCollector construction)
+    void setAnalyticsConsentEnabled(bool enabled);
+    bool isAnalyticsConsentEnabled() const;
+
+    // Feedback collector (nullptr when analytics disabled, non-null when enabled)
+    FeedbackCollector* getFeedbackCollector() { return feedbackCollector.get(); }
+    const FeedbackCollector* getFeedbackCollector() const { return feedbackCollector.get(); }
+
+    // Session log (always available for crash recovery)
     std::unique_ptr<SessionLog> sessionLog;
 
     // Preset manager (public for editor header bar access)
@@ -255,8 +265,11 @@ public:
 
 private:
     //==============================================================================
+    std::unique_ptr<ConsentService> consent_;
+    std::unique_ptr<FeedbackCollector> feedbackCollector;
+
     juce::AudioProcessorValueTreeState parameters;
-    
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     // Build DspConfig from current processor state (for publishing)

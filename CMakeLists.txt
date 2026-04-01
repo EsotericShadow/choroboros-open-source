@@ -56,6 +56,8 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/PluginProcessor.h
     Source/Plugin/PluginEditor.cpp
     Source/Plugin/PluginEditor.h
+    Source/Plugin/ConsentService.cpp
+    Source/Plugin/ConsentService.h
     Source/Plugin/FeedbackCollector.cpp
     Source/Plugin/FeedbackCollector.h
     Source/Plugin/FeedbackDialog.cpp

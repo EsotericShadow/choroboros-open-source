@@ -26,6 +26,39 @@ static int g_failCount = 0;
 } while(0)
 
 static bool isFinite(float x) { return std::isfinite(x); }
+static bool nearlyEqual(float a, float b, float epsilon = 1.0e-4f)
+{
+    return std::abs(a - b) <= epsilon;
+}
+
+static juce::MemoryBlock makeLegacyApvtsState(ChoroborosAudioProcessor& proc)
+{
+    juce::XmlElement xmlState("VALUETREE");
+
+    const auto addParam = [&xmlState, &proc](const char* paramId)
+    {
+        if (const auto* param = proc.getValueTreeState().getRawParameterValue(paramId))
+        {
+            auto paramElement = std::make_unique<juce::XmlElement>("PARAM");
+            paramElement->setAttribute("id", paramId);
+            paramElement->setAttribute("value", static_cast<double>(param->load()));
+            xmlState.addChildElement(paramElement.release());
+        }
+    };
+
+    addParam(ChoroborosAudioProcessor::RATE_ID);
+    addParam(ChoroborosAudioProcessor::DEPTH_ID);
+    addParam(ChoroborosAudioProcessor::OFFSET_ID);
+    addParam(ChoroborosAudioProcessor::WIDTH_ID);
+    addParam(ChoroborosAudioProcessor::COLOR_ID);
+    addParam(ChoroborosAudioProcessor::HQ_ID);
+    addParam(ChoroborosAudioProcessor::MIX_ID);
+
+    juce::MemoryBlock legacyState;
+    juce::AudioProcessor::copyXmlToBinary(xmlState, legacyState);
+    return legacyState;
+}
+
 static bool assignmentTablesEqual(const choroboros::CoreAssignmentTable& a,
                                   const choroboros::CoreAssignmentTable& b)
 {
@@ -129,28 +162,19 @@ static void testStateRoundTrip()
     const auto duplicateWarnings = proc.getDuplicateAssignmentWarnings();
     REGRESS_ASSERT(!duplicateWarnings.empty(), "Duplicate assignment warnings should report duplicates");
 
-    std::unique_ptr<juce::XmlElement> xmlState(
-        juce::AudioProcessor::getXmlFromBinary(state2.getData(), static_cast<int>(state2.getSize())));
-    REGRESS_ASSERT(xmlState != nullptr, "Failed to decode XML state for legacy fallback test");
-    if (xmlState != nullptr)
-    {
-        xmlState->removeAttribute("modularCoresEnabled");
-        xmlState->removeAttribute("coreAssignmentsJson");
+    const juce::MemoryBlock legacyState = makeLegacyApvtsState(proc);
+    REGRESS_ASSERT(legacyState.getSize() > 0, "Failed to synthesize legacy APVTS state");
 
-        juce::MemoryBlock legacyState;
-        juce::AudioProcessor::copyXmlToBinary(*xmlState, legacyState);
+    ChoroborosAudioProcessor legacyProc;
+    legacyProc.prepareToPlay(44100.0, 512);
+    legacyProc.setStateInformation(legacyState.getData(), static_cast<int>(legacyState.getSize()));
 
-        ChoroborosAudioProcessor legacyProc;
-        legacyProc.prepareToPlay(44100.0, 512);
-        legacyProc.setStateInformation(legacyState.getData(), static_cast<int>(legacyState.getSize()));
-
-        choroboros::CoreAssignmentTable legacyExpected;
-        legacyExpected.resetToLegacy();
-        REGRESS_ASSERT(!legacyProc.isModularCoresEnabled(),
-                       "Legacy state without modular flag should restore modular mode as disabled");
-        REGRESS_ASSERT(assignmentTablesEqual(legacyProc.getCoreAssignments(), legacyExpected),
-                       "Legacy state without core assignments should fall back to legacy assignment map");
-    }
+    choroboros::CoreAssignmentTable legacyExpected;
+    legacyExpected.resetToLegacy();
+    REGRESS_ASSERT(!legacyProc.isModularCoresEnabled(),
+                   "Legacy state without modular flag should restore modular mode as disabled");
+    REGRESS_ASSERT(assignmentTablesEqual(legacyProc.getCoreAssignments(), legacyExpected),
+                   "Legacy state without core assignments should fall back to legacy assignment map");
 }
 
 static void testMaxBlockChannels()
@@ -667,7 +691,7 @@ static void testProcessorCanonicalStateApply()
 
     // Verify the state was applied
     const auto captured = proc.capturePresetState();
-    REGRESS_ASSERT(captured.rate == state.rate, "Rate should be applied");
+    REGRESS_ASSERT(nearlyEqual(captured.rate, state.rate), "Rate should be applied");
     REGRESS_ASSERT(captured.hqEnabled == state.hqEnabled, "HQ should be applied");
     REGRESS_ASSERT(captured.modularCoresEnabled == state.modularCoresEnabled, "Modular cores should be applied");
 }

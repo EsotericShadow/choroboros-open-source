@@ -262,8 +262,11 @@ ConsoleEngine::Result ConsoleEngine::executeAliasCommand(const juce::StringArray
         return result;
     }
 
-    const juce::String fullCommand = juce::String::join(
-        juce::StringArray(tokens.begin() + 2, tokens.end()), " ");
+    juce::StringArray commandTokens;
+    for (int i = 2; i < tokens.size(); ++i)
+        commandTokens.add(tokens[i]);
+
+    const juce::String fullCommand = commandTokens.joinIntoString(" ");
 
     if (fullCommand.isEmpty())
     {

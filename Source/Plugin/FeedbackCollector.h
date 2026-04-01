@@ -58,8 +58,7 @@ public:
 
     // ---- Paths / preferences -----------------------------------------------
     static juce::File getFeedbackDirectory();
-    static bool isOptedOut();
-    static void setOptedOut (bool optedOut);
+    static void clearPersistedAnalyticsData();
 
 private:
     struct UsageStats

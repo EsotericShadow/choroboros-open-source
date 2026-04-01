@@ -226,39 +226,19 @@ juce::File FeedbackCollector::getFeedbackDirectory()
 }
 
 //==============================================================================
-// Opt-out
+// Data cleanup (called when user disables analytics consent)
 //==============================================================================
 
-bool FeedbackCollector::isOptedOut()
+void FeedbackCollector::clearPersistedAnalyticsData()
 {
-    juce::PropertiesFile::Options options;
-    options.applicationName     = "Choroboros";
-    options.filenameSuffix      = "settings";
-    options.osxLibrarySubFolder = "Application Support";
+    // Delete the stats file and feedback directory
+    auto statsFile = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                         .getChildFile ("Choroboros")
+                         .getChildFile ("usage_stats.json");
+    statsFile.deleteFile();
 
-    juce::PropertiesFile props (
-        juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-            .getChildFile ("Choroboros")
-            .getChildFile ("Choroboros.settings"),
-        options);
-
-    return props.getBoolValue ("feedbackOptedOut", false);
-}
-
-void FeedbackCollector::setOptedOut (bool optedOut)
-{
-    juce::PropertiesFile::Options options;
-    options.applicationName     = "Choroboros";
-    options.filenameSuffix      = "settings";
-    options.osxLibrarySubFolder = "Application Support";
-
-    auto settingsFile = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                            .getChildFile ("Choroboros")
-                            .getChildFile ("Choroboros.settings");
-
-    juce::PropertiesFile props (settingsFile, options);
-    props.setValue ("feedbackOptedOut", optedOut);
-    props.save();
+    auto feedbackDir = getFeedbackDirectory();
+    feedbackDir.deleteRecursively();
 }
 
 //==============================================================================

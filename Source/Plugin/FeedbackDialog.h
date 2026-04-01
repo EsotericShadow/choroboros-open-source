@@ -28,8 +28,8 @@ public:
     /** Normal feedback mode. */
     FeedbackDialog (FeedbackCollector& collector);
 
-    /** Crash report mode — pre-fills with crash context. */
-    FeedbackDialog (FeedbackCollector& collector, const juce::String& crashReport);
+    /** Crash report mode — pre-fills with crash context. Collector is optional. */
+    FeedbackDialog (const juce::String& crashReport, FeedbackCollector* collector = nullptr);
 
     ~FeedbackDialog() override = default;
 
@@ -41,11 +41,11 @@ public:
     static void show (FeedbackCollector& collector);
 
     /** Launch crash report dialog (pre-filled with crash log). */
-    static void showCrashReport (FeedbackCollector& collector,
-                                 const juce::String& crashReport);
+    static void showCrashReport (const juce::String& crashReport,
+                                 FeedbackCollector* collector = nullptr);
 
 private:
-    FeedbackCollector& feedbackCollector;
+    FeedbackCollector* feedbackCollector = nullptr;
     bool crashReportMode = false;
     juce::String crashReportText;
 
