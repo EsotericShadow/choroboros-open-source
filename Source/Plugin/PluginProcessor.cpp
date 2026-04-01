@@ -1056,169 +1056,23 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
 {
     if (index < 0 || index >= getNumPrograms())
         return;
-    
-    presetLoadInProgress = true;
+
     currentProgram = index;
-    
+
     // Track preset load for feedback
     if (feedbackCollector)
     {
         feedbackCollector->trackPresetLoad(index, getProgramName(index));
     }
 
-    // Preset targets are defined in mapped/display space.
-    const auto setMappedParam = [this](const juce::String& paramId, float mappedValue)
+    // Load factory preset through canonical state path
+    if (const auto presetState = PresetState::makeFactoryPreset(index))
     {
-        if (auto* param = parameters.getParameter(paramId))
-        {
-            const float rawValue = unmapParameterValue(paramId, mappedValue);
-            float normalizedValue = param->convertTo0to1(rawValue);
-            normalizedValue = juce::jlimit(0.0f, 1.0f, normalizedValue);
-            param->setValueNotifyingHost(normalizedValue);
-        }
-    };
-    
-    // Apply preset values
-    if (index == 0) // Classic (Green): NQ, R=0.65Hz, D=21%, O=33°, W=150%, M=50%, C=16%
-    {
-        setMappedParam(RATE_ID, 0.65f);
-        setMappedParam(DEPTH_ID, 0.21f);
-        setMappedParam(OFFSET_ID, 33.0f);
-        setMappedParam(WIDTH_ID, 1.5f);
-        setMappedParam(MIX_ID, 0.5f);
-        setMappedParam(COLOR_ID, 0.16f);
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(0.0f);
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(0.0f);
+        applyPresetState(presetState.value(), ApplyContext::FactoryPresetLoad);
     }
-    else if (index == 1) // Vintage (Red): HQ, R=0.62Hz, D=21%, O=56°, W=150%, M=50%, C=50%
-    {
-        setMappedParam(RATE_ID, 0.62f);
-        setMappedParam(DEPTH_ID, 0.21f);
-        setMappedParam(OFFSET_ID, 56.0f);
-        setMappedParam(WIDTH_ID, 1.5f);
-        setMappedParam(MIX_ID, 0.5f);
-        setMappedParam(COLOR_ID, 0.5f);
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(2.0f));
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(1.0f);
-    }
-    else if (index == 2) // Modern (Blue): HQ, R=0.26Hz, D=53%, O=59°, W=100%, M=50%, C=41%
-    {
-        setMappedParam(RATE_ID, 0.26f);
-        setMappedParam(DEPTH_ID, 0.53f);
-        setMappedParam(OFFSET_ID, 59.0f);
-        setMappedParam(WIDTH_ID, 1.0f);
-        setMappedParam(MIX_ID, 0.5f);
-        setMappedParam(COLOR_ID, 0.41f);
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(1.0f));
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(1.0f);
-    }
-    else if (index == 3) // Psychedelic (Purple): NQ, R=0.12Hz, D=52%, O=52°, W=200%, M=69%, C=13%
-    {
-        setMappedParam(RATE_ID, 0.12f);
-        setMappedParam(DEPTH_ID, 0.52f);
-        setMappedParam(OFFSET_ID, 52.0f);
-        setMappedParam(WIDTH_ID, 2.0f);
-        setMappedParam(MIX_ID, 0.69f);
-        setMappedParam(COLOR_ID, 0.13f);
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(3.0f));
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(0.0f);
-    }
-    else if (index == 4) // Core (Black): HQ, R=0.8Hz, D=35%, O=41°, W=159%, M=50%, C=28%
-    {
-        setMappedParam(RATE_ID, 0.8f);
-        setMappedParam(DEPTH_ID, 0.35f);
-        setMappedParam(OFFSET_ID, 41.0f);
-        setMappedParam(WIDTH_ID, 1.59f);
-        setMappedParam(MIX_ID, 0.5f);
-        setMappedParam(COLOR_ID, 0.28f);
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(4.0f));
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(1.0f);
-    }
-    else if (index == 5) // Duck preset
-    {
-        // Rate: 10.0 Hz
-        if (auto* param = parameters.getParameter(RATE_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(10.0f));
-        
-        // Depth: 14% (old percentage) - For Purple, this means 0.14 actual depth
-        // Purple maps 0-1 to 0-0.45, so to get 0.14 actual: 0.14 / 0.45 = 0.311
-        if (auto* param = parameters.getParameter(DEPTH_ID))
-        {
-            // Set to 0.311 so that after Purple mapping (0.311 * 0.45 = 0.14), we get 14% actual depth
-            param->setValueNotifyingHost(0.311f);
-        }
-        
-        // Offset: 50°
-        if (auto* param = parameters.getParameter(OFFSET_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(50.0f));
-        
-        // Width: 50%
-        if (auto* param = parameters.getParameter(WIDTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(0.5f));
-        
-        // Color: 10%
-        if (auto* param = parameters.getParameter(COLOR_ID))
-            param->setValueNotifyingHost(0.10f);
-        
-        // Engine Color: Purple (3)
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(3.0f));
-        
-        // HQ: On
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(1.0f);
-        
-        // Mix: 100%
-        if (auto* param = parameters.getParameter(MIX_ID))
-            param->setValueNotifyingHost(1.0f);
-    }
-    else if (index == 6) // Ouroboros preset
-    {
-        // Rate: 2.0 Hz
-        if (auto* param = parameters.getParameter(RATE_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(RATE_ID).convertTo0to1(2.0f));
-        
-        // Depth: 11%
-        if (auto* param = parameters.getParameter(DEPTH_ID))
-            param->setValueNotifyingHost(0.11f);
-        
-        // Offset: 33°
-        if (auto* param = parameters.getParameter(OFFSET_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(OFFSET_ID).convertTo0to1(33.0f));
-        
-        // Width: 33%
-        if (auto* param = parameters.getParameter(WIDTH_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(WIDTH_ID).convertTo0to1(0.33f));
-        
-        // Color: 65%
-        if (auto* param = parameters.getParameter(COLOR_ID))
-            param->setValueNotifyingHost(0.65f);
-        
-        // Engine Color: Blue (1)
-        if (auto* param = parameters.getParameter(ENGINE_COLOR_ID))
-            param->setValueNotifyingHost(parameters.getParameterRange(ENGINE_COLOR_ID).convertTo0to1(1.0f));
-        
-        // HQ: On
-        if (auto* param = parameters.getParameter(HQ_ID))
-            param->setValueNotifyingHost(1.0f);
-        
-        // Mix: 100%
-        if (auto* param = parameters.getParameter(MIX_ID))
-            param->setValueNotifyingHost(1.0f);
-    }
+
     if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
         lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
-    presetLoadInProgress = false;
 }
 
 const juce::String ChoroborosAudioProcessor::getProgramName (int index)
@@ -1302,6 +1156,12 @@ void ChoroborosAudioProcessor::releaseResources()
 
 void ChoroborosAudioProcessor::timerCallback()
 {
+    // RESIDUAL ISSUE: applyRuntimeTuning() allocates (IIR coefficient calculation),
+    // so it must run on message thread, not audio thread. However, it modifies
+    // runtimeTuningSnapshot which the audio thread reads during process().
+    // We keep tryEnter(dspLock) as a synchronization mechanism.
+    // Plan 3 should replace this with a narrower tuning lock or make tuning
+    // snapshots atomic.
     if (dspLock.tryEnter())
     {
         if (chorusDSP)
@@ -1366,14 +1226,13 @@ void ChoroborosAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     const float inputPeakL = (totalNumInputChannels > 0) ? buffer.getMagnitude(0, 0, numSamples) : 0.0f;
     const float inputPeakR = (totalNumInputChannels > 1) ? buffer.getMagnitude(1, 0, numSamples) : inputPeakL;
 
+    // PLAN 2: Audio thread ownership - consume pending config at block start (O(1), lock-free)
     const auto startTicks = juce::Time::getHighResolutionTicks();
-    updateDSPParameters();
+    dspConfigManager.consumeAndApplyIfChanged(*chorusDSP);
 
-    {
-        juce::ScopedLock sl(dspLock);
-        juce::dsp::AudioBlock<float> block(buffer);
-        chorusDSP->process(block);
-    }
+    // Process audio (no lock needed; audio thread is sole mutator of live DSP state)
+    juce::dsp::AudioBlock<float> block(buffer);
+    chorusDSP->process(block);
 
     const auto elapsedTicks = juce::Time::getHighResolutionTicks() - startTicks;
     const float processMs = static_cast<float>(juce::Time::highResolutionTicksToSeconds(elapsedTicks) * 1000.0);
@@ -1553,45 +1412,6 @@ float ChoroborosAudioProcessor::unmapParameterValue(const juce::String& paramId,
     return mappedValue;
 }
 
-void ChoroborosAudioProcessor::updateDSPParameters()
-{
-    // Avoid exposing partial/transactional APVTS states to DSP while a preset/state/profile
-    // write is in progress on another thread. Apply once after the transaction completes.
-    if (presetLoadInProgress || stateLoadInProgress || engineProfileApplyInProgress)
-        return;
-
-    auto rateParam = parameters.getRawParameterValue(RATE_ID);
-    auto depthParam = parameters.getRawParameterValue(DEPTH_ID);
-    auto offsetParam = parameters.getRawParameterValue(OFFSET_ID);
-    auto widthParam = parameters.getRawParameterValue(WIDTH_ID);
-    auto colorParam = parameters.getRawParameterValue(COLOR_ID);
-    auto engineColorParam = parameters.getRawParameterValue(ENGINE_COLOR_ID);
-    auto hqParam = parameters.getRawParameterValue(HQ_ID);
-    
-    if (rateParam) chorusDSP->setRate(mapParameterValue(RATE_ID, rateParam->load()));
-    if (depthParam) chorusDSP->setDepth(mapParameterValue(DEPTH_ID, depthParam->load()));
-    if (offsetParam) chorusDSP->setOffset(mapParameterValue(OFFSET_ID, offsetParam->load()));
-    if (widthParam) chorusDSP->setWidth(mapParameterValue(WIDTH_ID, widthParam->load()));
-    if (colorParam) chorusDSP->setColor(mapParameterValue(COLOR_ID, colorParam->load()));
-    
-    const int colorIndex = engineColorParam ? juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()))
-                                            : getCurrentEngineColorIndex();
-    const bool hqEnabled = hqParam ? (hqParam->load() >= 0.5f) : false;
-
-    if (colorIndex != activeInternalsEngine || hqEnabled != activeInternalsHQ)
-    {
-        persistActiveEngineInternalsFromDsp();
-        restoreEngineInternalsToDsp(colorIndex, hqEnabled);
-        activeInternalsEngine = colorIndex;
-        activeInternalsHQ = hqEnabled;
-    }
-
-    chorusDSP->setEngineColor(colorIndex);
-    chorusDSP->setQualityEnabled(hqEnabled);
-    
-    auto mixParam = parameters.getRawParameterValue(MIX_ID);
-    if (mixParam) chorusDSP->setMix(mapParameterValue(MIX_ID, mixParam->load()));
-}
 
 ChorusDSP::RuntimeTuning& ChoroborosAudioProcessor::getEngineDspInternals(int colorIndex, bool hqEnabled)
 {
@@ -1611,15 +1431,15 @@ void ChoroborosAudioProcessor::setModularCoresEnabled(bool enabled)
         return;
 
     modularCoresEnabled = enabled;
-    if (chorusDSP != nullptr)
-        chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
+    // PLAN 2: Publish config instead of direct DSP mutation (lock-free)
+    publishDspConfig();
 }
 
 void ChoroborosAudioProcessor::setCoreAssignments(const choroboros::CoreAssignmentTable& assignments)
 {
     coreAssignments = assignments;
-    if (chorusDSP != nullptr)
-        chorusDSP->setCoreAssignments(coreAssignments);
+    // PLAN 2: Publish config instead of direct DSP mutation (lock-free)
+    publishDspConfig();
 }
 
 bool ChoroborosAudioProcessor::setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId)
@@ -1632,8 +1452,8 @@ bool ChoroborosAudioProcessor::setCoreAssignment(int colorIndex, bool hqEnabled,
 
     const bool duplicate = choroboros::assignmentIsDuplicate(coreAssignments, safeEngine, hqEnabled, safeCore);
     coreAssignments.set(safeEngine, hqEnabled, safeCore);
-    if (chorusDSP != nullptr)
-        chorusDSP->setCoreAssignment(safeEngine, hqEnabled, safeCore);
+    // PLAN 2: Publish config instead of direct DSP mutation (lock-free)
+    publishDspConfig();
     return duplicate;
 }
 
@@ -1715,65 +1535,134 @@ juce::AudioProcessorEditor* ChoroborosAudioProcessor::createEditor()
 }
 
 //==============================================================================
+// Canonical Preset State Capture and Apply
+
+PresetState ChoroborosAudioProcessor::capturePresetState() const
+{
+    PresetState state;
+    state.version = 1;
+
+    // Capture all APVTS parameters
+    if (const auto* rateParam = parameters.getRawParameterValue(RATE_ID))
+        state.rate = mapParameterValue(RATE_ID, rateParam->load());
+    if (const auto* depthParam = parameters.getRawParameterValue(DEPTH_ID))
+        state.depth = mapParameterValue(DEPTH_ID, depthParam->load());
+    if (const auto* offsetParam = parameters.getRawParameterValue(OFFSET_ID))
+        state.offset = mapParameterValue(OFFSET_ID, offsetParam->load());
+    if (const auto* widthParam = parameters.getRawParameterValue(WIDTH_ID))
+        state.width = mapParameterValue(WIDTH_ID, widthParam->load());
+    if (const auto* colorParam = parameters.getRawParameterValue(COLOR_ID))
+        state.color = mapParameterValue(COLOR_ID, colorParam->load());
+    if (const auto* mixParam = parameters.getRawParameterValue(MIX_ID))
+        state.mix = mapParameterValue(MIX_ID, mixParam->load());
+
+    // Capture HQ
+    if (const auto* hqParam = parameters.getRawParameterValue(HQ_ID))
+        state.hqEnabled = (hqParam->load() >= 0.5f);
+
+    // Capture modular core state
+    state.modularCoresEnabled = modularCoresEnabled;
+    state.coreAssignments = coreAssignments;
+
+    return state;
+}
+
+bool ChoroborosAudioProcessor::applyPresetState(const PresetState& state, ApplyContext context)
+{
+    // Validate preset state
+    if (!state.isValid())
+        return false;
+
+    // Guard: suppress bulk parameter listeners during apply
+    const bool wasBulkChange = presetLoadInProgress.exchange(true);
+
+    // Set APVTS parameters (in mapped/display space)
+    const auto setMappedParam = [this](const juce::String& paramId, float mappedValue)
+    {
+        if (auto* param = parameters.getParameter(paramId))
+        {
+            const float rawValue = unmapParameterValue(paramId, mappedValue);
+            float normalizedValue = param->convertTo0to1(rawValue);
+            normalizedValue = juce::jlimit(0.0f, 1.0f, normalizedValue);
+            param->setValueNotifyingHost(normalizedValue);
+        }
+    };
+
+    setMappedParam(RATE_ID, state.rate);
+    setMappedParam(DEPTH_ID, state.depth);
+    setMappedParam(OFFSET_ID, state.offset);
+    setMappedParam(WIDTH_ID, state.width);
+    setMappedParam(COLOR_ID, state.color);
+    setMappedParam(MIX_ID, state.mix);
+
+    // Set HQ
+    if (auto* param = parameters.getParameter(HQ_ID))
+        param->setValueNotifyingHost(state.hqEnabled ? 1.0f : 0.0f);
+
+    // Apply modular core state (update local state, will be published once at end)
+    modularCoresEnabled = state.modularCoresEnabled;
+    coreAssignments = state.coreAssignments;
+
+    // PLAN 2: Publish config once (all parameters updated atomically, lock-free)
+    publishDspConfig();
+
+    // Update preset manager state based on context
+    if (presetManager != nullptr)
+    {
+        switch (context)
+        {
+            case ApplyContext::UserPresetLoad:
+            case ApplyContext::FactoryPresetLoad:
+                // Preset is now active; PresetManager will handle the index update
+                break;
+
+            case ApplyContext::HostRestore:
+            case ApplyContext::Migration:
+                // Invalidate preset (host restore or migration, not a user preset load)
+                if (presetManager != nullptr)
+                    presetManager->invalidatePreset();
+                break;
+        }
+    }
+
+    // Restore bulk change flag
+    if (!wasBulkChange)
+        presetLoadInProgress = false;
+
+    return true;
+}
+
+//==============================================================================
 void ChoroborosAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    auto state = parameters.copyState();
-    state.setProperty("modularCoresEnabled", modularCoresEnabled, nullptr);
-    state.setProperty("coreAssignmentsJson", encodeCoreAssignmentsForStateProperty(coreAssignments), nullptr);
-    std::unique_ptr<juce::XmlElement> xml (state.createXml());
-    copyXmlToBinary (*xml, destData);
+    const double stateCapStartMs = juce::Time::getMillisecondCounterHiRes();
+
+    // Capture canonical preset state
+    const auto presetState = capturePresetState();
+
+    // Serialize to binary (JSON-based format)
+    destData = presetState.serializeToBinary();
+
+    logLoadTraceEvent("processor_get_state_information_ms",
+                      juce::Time::getMillisecondCounterHiRes() - stateCapStartMs,
+                      juce::String("bytes=") + juce::String(destData.getSize()));
 }
 
 void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     const double stateLoadStartMs = juce::Time::getMillisecondCounterHiRes();
     bool stateApplied = false;
-    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
-    if (xmlState.get() != nullptr)
+    // Deserialize preset state (with legacy XML migration)
+    if (const auto presetState = PresetState::deserializeFromBinary(data, sizeInBytes))
     {
-        if (xmlState->hasTagName (parameters.state.getType()))
+        // Apply preset state through the canonical path
+        stateLoadInProgress = true;
+        if (applyPresetState(presetState.value(), ApplyContext::HostRestore))
         {
-            stateLoadInProgress = true;
-            parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
-            if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
-                lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
-
-            bool restoredModular = false;
-            if (parameters.state.hasProperty("modularCoresEnabled"))
-            {
-                const auto value = parameters.state.getProperty("modularCoresEnabled");
-                if (value.isBool())
-                    restoredModular = static_cast<bool>(value);
-                else if (value.isInt() || value.isInt64() || value.isDouble())
-                    restoredModular = static_cast<double>(value) >= 0.5;
-                else
-                    restoredModular = value.toString().equalsIgnoreCase("true") || value.toString() == "1";
-            }
-            setModularCoresEnabled(restoredModular);
-
-            choroboros::CoreAssignmentTable restoredAssignments;
-            restoredAssignments.resetToLegacy();
-            bool loadedAssignments = false;
-            if (parameters.state.hasProperty("coreAssignmentsJson"))
-            {
-                loadedAssignments = decodeCoreAssignmentsFromStateProperty(
-                    parameters.state.getProperty("coreAssignmentsJson").toString(),
-                    restoredAssignments);
-            }
-            if (parameters.state.hasProperty("coreAssignments"))
-            {
-                loadedAssignments = parseCoreAssignmentsFromVar(
-                    parameters.state.getProperty("coreAssignments"),
-                    restoredAssignments) || loadedAssignments;
-            }
-            if (!loadedAssignments)
-                restoredAssignments.resetToLegacy();
-            setCoreAssignments(restoredAssignments);
-
-            stateLoadInProgress = false;
             stateApplied = true;
         }
+        stateLoadInProgress = false;
     }
 
     logLoadTraceEvent("processor_set_state_information_ms",
@@ -1842,12 +1731,12 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
 
         const int newEngine = juce::jlimit (0, 4, static_cast<int> (newValue));
 
-        {
-            const juce::ScopedLock lock (dspLock);
-            saveCurrentParamsToEngineProfile (lastEngineIndex);
-            lastEngineIndex = newEngine;
-            applyEngineParamProfile (newEngine);
-        }
+        saveCurrentParamsToEngineProfile (lastEngineIndex);
+        lastEngineIndex = newEngine;
+        applyEngineParamProfile (newEngine);
+
+        // PLAN 2: Publish config after engine profile apply (lock-free)
+        publishDspConfig();
         return;
     }
 
@@ -1856,14 +1745,8 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
         liveTelemetry.hqToggleCount.fetch_add (1, std::memory_order_relaxed);
 
-        const bool hqEnabled = (newValue >= 0.5f);
-
-        if (chorusDSP != nullptr)
-        {
-            const juce::ScopedLock lock (dspLock);
-            chorusDSP->setQualityEnabled (hqEnabled);
-        }
-
+        // PLAN 2: Publish config instead of direct DSP mutation
+        publishDspConfig();
         return;
     }
 
@@ -1876,6 +1759,9 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
     {
         liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
         saveCurrentParamsToEngineProfile (getCurrentEngineColorIndex());
+
+        // PLAN 2: Publish config instead of waiting for updateDSPParameters (lock-free)
+        publishDspConfig();
     }
 }
 
@@ -1900,11 +1786,6 @@ void ChoroborosAudioProcessor::resetToFactoryDefaults()
 
     coreAssignments.resetToLegacy();
     modularCoresEnabled = false;
-    if (chorusDSP != nullptr)
-    {
-        chorusDSP->setCoreAssignments(coreAssignments);
-        chorusDSP->setModularCoreModeEnabled(modularCoresEnabled);
-    }
 
     const auto setToDefault = [this](const juce::String& parameterId)
     {
@@ -1928,7 +1809,8 @@ void ChoroborosAudioProcessor::resetToFactoryDefaults()
     syncEngineInternalsToActiveDsp(getCurrentEngineColorIndex(), isHqEnabled());
     stateLoadInProgress.store(false, std::memory_order_relaxed);
 
-    updateDSPParameters();
+    // PLAN 2: Publish config with all factory defaults (lock-free, atomic)
+    publishDspConfig();
     resetLiveTelemetryPeakHold();
 }
 
@@ -2364,6 +2246,47 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChoroborosAudioProcessor::cr
     ));
     
     return { params.begin(), params.end() };
+}
+
+//==============================================================================
+// DspConfig publishing (Plan 2: Audio Thread Ownership)
+
+DspConfig ChoroborosAudioProcessor::buildCurrentDspConfig() const
+{
+    DspConfig config;
+
+    // Capture current APVTS parameters (in mapped/display space)
+    if (auto* rateParam = parameters.getRawParameterValue(RATE_ID))
+        config.rate = mapParameterValue(RATE_ID, rateParam->load());
+    if (auto* depthParam = parameters.getRawParameterValue(DEPTH_ID))
+        config.depth = mapParameterValue(DEPTH_ID, depthParam->load());
+    if (auto* offsetParam = parameters.getRawParameterValue(OFFSET_ID))
+        config.offset = mapParameterValue(OFFSET_ID, offsetParam->load());
+    if (auto* widthParam = parameters.getRawParameterValue(WIDTH_ID))
+        config.width = mapParameterValue(WIDTH_ID, widthParam->load());
+    if (auto* colorParam = parameters.getRawParameterValue(COLOR_ID))
+        config.color = mapParameterValue(COLOR_ID, colorParam->load());
+    if (auto* mixParam = parameters.getRawParameterValue(MIX_ID))
+        config.mix = mapParameterValue(MIX_ID, mixParam->load());
+
+    // Quality and engine selection
+    if (auto* hqParam = parameters.getRawParameterValue(HQ_ID))
+        config.hqEnabled = hqParam->load() >= 0.5f;
+
+    if (auto* engineColorParam = parameters.getRawParameterValue(ENGINE_COLOR_ID))
+        config.engineColorIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
+
+    // Modular core state
+    config.modularCoresEnabled = modularCoresEnabled;
+    config.coreAssignments = coreAssignments;
+
+    return config;
+}
+
+void ChoroborosAudioProcessor::publishDspConfig()
+{
+    const DspConfig config = buildCurrentDspConfig();
+    dspConfigManager.publishConfig(config);
 }
 
 //==============================================================================

@@ -28,6 +28,10 @@
 #include "SessionLog.h"
 #include "CrashReporter.h"
 #include "PresetManager.h"
+#include "PresetState.h"
+#include "ApplyContext.h"
+#include "DspConfig.h"
+#include "DspConfigManager.h"
 
 //==============================================================================
 /**
@@ -90,6 +94,17 @@ public:
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    //==============================================================================
+    // Canonical preset state capture and apply
+
+    /** Capture current processor state into canonical PresetState. */
+    PresetState capturePresetState() const;
+
+    /** Apply preset state to processor with context-aware semantics.
+        Suppresses bulk parameter listeners during apply.
+        Returns true on success, false on validation failure. */
+    bool applyPresetState(const PresetState& state, ApplyContext context);
 
     //==============================================================================
     juce::AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
@@ -244,8 +259,13 @@ private:
     juce::AudioProcessorValueTreeState parameters;
     
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-    
-    void updateDSPParameters();
+
+    // Build DspConfig from current processor state (for publishing)
+    DspConfig buildCurrentDspConfig() const;
+
+    // Publish new config to audio thread (lock-free, non-blocking)
+    void publishDspConfig();
+
     void timerCallback() override;
 
     void initTuningDefaults();
@@ -263,6 +283,7 @@ private:
     
     juce::CriticalSection dspLock;
     std::unique_ptr<ChorusDSP> chorusDSP;
+    DspConfigManager dspConfigManager;
     TuningState tuning;
     std::array<std::array<ChorusDSP::RuntimeTuning, 2>, 5> engineInternals;
     choroboros::CoreAssignmentTable coreAssignments;

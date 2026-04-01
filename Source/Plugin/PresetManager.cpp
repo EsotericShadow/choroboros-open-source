@@ -18,6 +18,8 @@
 
 #include "PresetManager.h"
 #include "PluginProcessor.h"
+#include "PresetState.h"
+#include "ApplyContext.h"
 
 //==============================================================================
 PresetManager::PresetManager (ChoroborosAudioProcessor& processor)
@@ -53,11 +55,17 @@ void PresetManager::scanUserPresets()
     userPresetFiles_.clear();
 
     auto dir = getUserPresetsDirectory();
-    auto files = dir.findChildFiles (juce::File::findFiles, false, "*.xml");
 
-    files.sort();
+    // Support both new .json format and legacy .xml format
+    auto jsonFiles = dir.findChildFiles (juce::File::findFiles, false, "*.json");
+    auto xmlFiles = dir.findChildFiles (juce::File::findFiles, false, "*.xml");
 
-    for (auto& f : files)
+    juce::Array<juce::File> allFiles;
+    allFiles.addArray(jsonFiles);
+    allFiles.addArray(xmlFiles);
+    allFiles.sort();
+
+    for (auto& f : allFiles)
     {
         userPresetNames_.add (f.getFileNameWithoutExtension());
         userPresetFiles_.add (f);
@@ -129,20 +137,22 @@ void PresetManager::loadPreset (int index)
 
     if (currentIndex_ < getNumFactoryPresets())
     {
-        // Factory preset
-        processor_.setCurrentProgram (currentIndex_);
+        // Factory preset — load through canonical path
+        if (const auto presetState = PresetState::makeFactoryPreset(currentIndex_))
+        {
+            processor_.applyPresetState(presetState.value(), ApplyContext::FactoryPresetLoad);
+        }
     }
     else
     {
-        // User preset — load XML state
+        // User preset — load through canonical path
         const int userIdx = currentIndex_ - getNumFactoryPresets();
         if (userIdx >= 0 && userIdx < userPresetFiles_.size())
         {
             auto file = userPresetFiles_[userIdx];
-            if (auto xml = juce::XmlDocument::parse (file))
+            if (const auto presetState = PresetState::loadFromFile(file))
             {
-                processor_.getValueTreeState().replaceState (
-                    juce::ValueTree::fromXml (*xml));
+                processor_.applyPresetState(presetState.value(), ApplyContext::UserPresetLoad);
             }
         }
     }
@@ -194,11 +204,15 @@ void PresetManager::saveUserPreset (const juce::String& name)
     if (name.isEmpty())
         return;
 
-    auto dir = getUserPresetsDirectory();
-    auto file = dir.getChildFile (name + ".xml");
+    // Capture current state through canonical path
+    const auto presetState = processor_.capturePresetState();
 
-    if (auto xml = processor_.getValueTreeState().copyState().createXml())
-        xml->writeTo (file);
+    // Save to file
+    auto dir = getUserPresetsDirectory();
+    auto file = dir.getChildFile (name + ".json");
+
+    if (!presetState.saveToFile(file))
+        return;
 
     scanUserPresets();
 

@@ -66,6 +66,12 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/HelpDialog.h
     Source/Plugin/PresetManager.cpp
     Source/Plugin/PresetManager.h
+    Source/Plugin/PresetState.cpp
+    Source/Plugin/PresetState.h
+    Source/Plugin/ApplyContext.h
+    Source/Plugin/DspConfig.h
+    Source/Plugin/DspConfigManager.h
+    Source/Plugin/DspConfigManager.cpp
     Source/UI/TopHeaderBar.cpp
     Source/UI/TopHeaderBar.h
     Source/Plugin/SessionLog.cpp

@@ -558,6 +558,120 @@ static void testConsoleCommandLatencyUnderAudioLoad()
     REGRESS_ASSERT(warmP95For("stats") <= 140.0, "Warm p95 for `stats` exceeded 140ms");
 }
 
+static void testCanonicalPresetStateValidation()
+{
+    // Test that invalid preset states are rejected
+    PresetState validState;
+    REGRESS_ASSERT(validState.isValid(), "Default PresetState should be valid");
+
+    PresetState invalidRate;
+    invalidRate.rate = 999.0f;  // Out of range
+    REGRESS_ASSERT(!invalidRate.isValid(), "PresetState with out-of-range rate should be invalid");
+
+    PresetState invalidDepth;
+    invalidDepth.depth = -0.5f;  // Negative
+    REGRESS_ASSERT(!invalidDepth.isValid(), "PresetState with negative depth should be invalid");
+}
+
+static void testCanonicalPresetStateRoundTrip()
+{
+    PresetState original;
+    original.rate = 1.5f;
+    original.depth = 0.3f;
+    original.offset = 45.0f;
+    original.width = 1.2f;
+    original.color = 0.7f;
+    original.mix = 0.8f;
+    original.hqEnabled = true;
+    original.modularCoresEnabled = true;
+    original.coreAssignments.set(0, false, choroboros::CoreId::tape);
+    original.coreAssignments.set(1, true, choroboros::CoreId::bbd);
+
+    // Serialize to JSON
+    const auto json = original.serializeToJson();
+    REGRESS_ASSERT(!json.empty(), "JSON serialization should not be empty");
+
+    // Deserialize from JSON
+    const auto restored = PresetState::deserializeFromJson(json);
+    REGRESS_ASSERT(restored.has_value(), "JSON deserialization should succeed");
+
+    if (restored.has_value())
+    {
+        const auto& r = restored.value();
+        REGRESS_ASSERT(r.rate == original.rate, "Rate should round-trip through JSON");
+        REGRESS_ASSERT(r.depth == original.depth, "Depth should round-trip through JSON");
+        REGRESS_ASSERT(r.hqEnabled == original.hqEnabled, "HQ should round-trip through JSON");
+        REGRESS_ASSERT(r.modularCoresEnabled == original.modularCoresEnabled, "Modular cores should round-trip");
+        REGRESS_ASSERT(assignmentTablesEqual(r.coreAssignments, original.coreAssignments),
+                       "Core assignments should round-trip through JSON");
+    }
+}
+
+static void testCanonicalPresetStateBinaryRoundTrip()
+{
+    ChoroborosAudioProcessor proc;
+    proc.prepareToPlay(44100.0, 512);
+
+    // Capture state through canonical path
+    const auto original = proc.capturePresetState();
+
+    // Serialize to binary
+    const auto binary = original.serializeToBinary();
+    REGRESS_ASSERT(binary.getSize() > 0, "Binary serialization should not be empty");
+
+    // Deserialize from binary
+    const auto restored = PresetState::deserializeFromBinary(binary.getData(),
+                                                             static_cast<int>(binary.getSize()));
+    REGRESS_ASSERT(restored.has_value(), "Binary deserialization should succeed");
+
+    if (restored.has_value())
+    {
+        const auto& r = restored.value();
+        REGRESS_ASSERT(r.rate == original.rate, "Rate should round-trip through binary");
+        REGRESS_ASSERT(r.hqEnabled == original.hqEnabled, "HQ should round-trip through binary");
+    }
+}
+
+static void testFactoryPresetStates()
+{
+    // Test that all factory presets can be created and are valid
+    for (int i = 0; i < 7; ++i)
+    {
+        const auto preset = PresetState::makeFactoryPreset(i);
+        REGRESS_ASSERT(preset.has_value(), juce::String("Factory preset ") + juce::String(i) + " should be creatable");
+
+        if (preset.has_value())
+        {
+            REGRESS_ASSERT(preset.value().isValid(),
+                          juce::String("Factory preset ") + juce::String(i) + " should be valid");
+        }
+    }
+}
+
+static void testProcessorCanonicalStateApply()
+{
+    ChoroborosAudioProcessor proc;
+    proc.prepareToPlay(44100.0, 512);
+
+    // Create a preset state
+    PresetState state;
+    state.rate = 2.5f;
+    state.depth = 0.6f;
+    state.hqEnabled = true;
+    state.modularCoresEnabled = true;
+    state.coreAssignments.set(0, false, choroboros::CoreId::tape);
+
+    // Apply through canonical path
+    const bool applied = proc.applyPresetState(state, ApplyContext::UserPresetLoad);
+    REGRESS_ASSERT(applied, "applyPresetState should succeed with valid state");
+
+    // Verify the state was applied
+    const auto captured = proc.capturePresetState();
+    REGRESS_ASSERT(captured.rate == state.rate, "Rate should be applied");
+    REGRESS_ASSERT(captured.hqEnabled == state.hqEnabled, "HQ should be applied");
+    REGRESS_ASSERT(captured.modularCoresEnabled == state.modularCoresEnabled, "Modular cores should be applied");
+}
+
 int main(int argc, char** argv)
 {
     bool runGuiSuite = true;
@@ -582,6 +696,14 @@ int main(int argc, char** argv)
     std::cout << "Choroboros Regression Harness\n";
     std::cout << "----------------------------\n";
 
+    // Canonical preset state tests
+    testCanonicalPresetStateValidation();
+    testCanonicalPresetStateRoundTrip();
+    testCanonicalPresetStateBinaryRoundTrip();
+    testFactoryPresetStates();
+    testProcessorCanonicalStateApply();
+
+    // Existing tests
     testProcessBlockSizes();
     testEngineHQTorture();
     testStateRoundTrip();
