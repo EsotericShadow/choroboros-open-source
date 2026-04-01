@@ -361,6 +361,322 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningApplied = true;
 }
 
+TuningSnapshot ChorusDSP::precomputeTuningSnapshot()
+{
+    // Message thread: precompute all filter coefficients and snapshot parameters.
+    // Allocation is safe here (not on audio thread).
+
+    if (spec.sampleRate <= 0.0)
+        return TuningSnapshot{};
+
+    auto clampMs = [](float value, float minValue, float maxValue)
+    {
+        return juce::jlimit(minValue, maxValue, value);
+    };
+
+    auto clamp01 = [](float value)
+    {
+        return juce::jlimit(0.0f, 1.0f, value);
+    };
+
+    TuningSnapshot snapshot;
+
+    // Read all atomic parameters and clamp them
+    snapshot.rateSmoothingMs = clampMs(runtimeTuning.rateSmoothingMs.load(), 0.0f, 1000.0f);
+    snapshot.depthSmoothingMs = clampMs(runtimeTuning.depthSmoothingMs.load(), 0.0f, 2000.0f);
+    snapshot.depthRateLimit = juce::jmax(0.0f, runtimeTuning.depthRateLimit.load());
+    snapshot.centreDelaySmoothingMs = clampMs(runtimeTuning.centreDelaySmoothingMs.load(), 0.0f, 2000.0f);
+    snapshot.colorSmoothingMs = clampMs(runtimeTuning.colorSmoothingMs.load(), 0.0f, 1000.0f);
+    snapshot.widthSmoothingMs = clampMs(runtimeTuning.widthSmoothingMs.load(), 0.0f, 1000.0f);
+    snapshot.centreDelayBaseMs = runtimeTuning.centreDelayBaseMs.load();
+    snapshot.centreDelayScale = runtimeTuning.centreDelayScale.load();
+
+    snapshot.hpfCutoffHz = juce::jmax(5.0f, runtimeTuning.hpfCutoffHz.load());
+    snapshot.hpfQ = juce::jmax(0.1f, runtimeTuning.hpfQ.load());
+    snapshot.lpfCutoffHz = juce::jlimit(20.0f, 20000.0f, runtimeTuning.lpfCutoffHz.load());
+    snapshot.lpfQ = juce::jmax(0.1f, runtimeTuning.lpfQ.load());
+    snapshot.preEmphasisFreqHz = juce::jmax(20.0f, runtimeTuning.preEmphasisFreqHz.load());
+    snapshot.preEmphasisQ = juce::jmax(0.1f, runtimeTuning.preEmphasisQ.load());
+    snapshot.preEmphasisGain = juce::jmax(0.01f, runtimeTuning.preEmphasisGain.load());
+    snapshot.preEmphasisLevelSmoothing = clamp01(runtimeTuning.preEmphasisLevelSmoothing.load());
+    snapshot.preEmphasisQuietThreshold = juce::jmax(0.0f, runtimeTuning.preEmphasisQuietThreshold.load());
+    snapshot.preEmphasisMaxAmount = juce::jmax(0.0f, runtimeTuning.preEmphasisMaxAmount.load());
+    snapshot.compressorAttackMs = juce::jmax(0.1f, runtimeTuning.compressorAttackMs.load());
+    snapshot.compressorReleaseMs = juce::jmax(0.1f, runtimeTuning.compressorReleaseMs.load());
+    snapshot.compressorThresholdDb = runtimeTuning.compressorThresholdDb.load();
+    snapshot.compressorRatio = juce::jmax(1.0f, runtimeTuning.compressorRatio.load());
+    snapshot.saturationDriveScale = juce::jmax(0.0f, runtimeTuning.saturationDriveScale.load());
+
+    snapshot.greenBloomExponent = juce::jlimit(0.1f, 4.0f, runtimeTuning.greenBloomExponent.load());
+    snapshot.greenBloomDepthScale = juce::jmax(0.0f, runtimeTuning.greenBloomDepthScale.load());
+    snapshot.greenBloomCentreOffsetMs = juce::jmax(0.0f, runtimeTuning.greenBloomCentreOffsetMs.load());
+    snapshot.greenBloomCutoffMaxHz = juce::jmax(20.0f, runtimeTuning.greenBloomCutoffMaxHz.load());
+    snapshot.greenBloomCutoffMinHz = juce::jlimit(20.0f, snapshot.greenBloomCutoffMaxHz, runtimeTuning.greenBloomCutoffMinHz.load());
+    snapshot.greenBloomWetBlend = juce::jlimit(0.0f, 1.0f, runtimeTuning.greenBloomWetBlend.load());
+    snapshot.greenBloomGain = juce::jmax(0.0f, runtimeTuning.greenBloomGain.load());
+
+    snapshot.blueFocusExponent = juce::jlimit(0.1f, 4.0f, runtimeTuning.blueFocusExponent.load());
+    snapshot.blueFocusHpMinHz = juce::jmax(20.0f, runtimeTuning.blueFocusHpMinHz.load());
+    snapshot.blueFocusHpMaxHz = juce::jmax(snapshot.blueFocusHpMinHz, runtimeTuning.blueFocusHpMaxHz.load());
+    snapshot.blueFocusLpMaxHz = juce::jmax(20.0f, runtimeTuning.blueFocusLpMaxHz.load());
+    snapshot.blueFocusLpMinHz = juce::jlimit(20.0f, snapshot.blueFocusLpMaxHz, runtimeTuning.blueFocusLpMinHz.load());
+    snapshot.bluePresenceFreqMinHz = juce::jmax(20.0f, runtimeTuning.bluePresenceFreqMinHz.load());
+    snapshot.bluePresenceFreqMaxHz = juce::jmax(snapshot.bluePresenceFreqMinHz, runtimeTuning.bluePresenceFreqMaxHz.load());
+    snapshot.bluePresenceQMin = juce::jmax(0.1f, runtimeTuning.bluePresenceQMin.load());
+    snapshot.bluePresenceQMax = juce::jmax(snapshot.bluePresenceQMin, runtimeTuning.bluePresenceQMax.load());
+    snapshot.bluePresenceGainMaxDb = juce::jmax(0.0f, runtimeTuning.bluePresenceGainMaxDb.load());
+    snapshot.blueFocusWetBlend = juce::jlimit(0.0f, 1.0f, runtimeTuning.blueFocusWetBlend.load());
+    snapshot.blueFocusOutputGain = juce::jmax(0.0f, runtimeTuning.blueFocusOutputGain.load());
+
+    snapshot.purpleWarpA = juce::jmax(0.0f, runtimeTuning.purpleWarpA.load());
+    snapshot.purpleWarpB = juce::jmax(0.0f, runtimeTuning.purpleWarpB.load());
+    snapshot.purpleWarpKBase = juce::jmax(0.1f, runtimeTuning.purpleWarpKBase.load());
+    snapshot.purpleWarpKScale = juce::jmax(0.0f, runtimeTuning.purpleWarpKScale.load());
+    snapshot.purpleWarpDelaySmoothingMs = clampMs(runtimeTuning.purpleWarpDelaySmoothingMs.load(), 0.0f, 2000.0f);
+
+    snapshot.purpleOrbitEccentricity = juce::jmax(0.0f, runtimeTuning.purpleOrbitEccentricity.load());
+    snapshot.purpleOrbitThetaRateBaseHz = juce::jmax(0.0f, runtimeTuning.purpleOrbitThetaRateBaseHz.load());
+    snapshot.purpleOrbitThetaRateScaleHz = juce::jmax(0.0f, runtimeTuning.purpleOrbitThetaRateScaleHz.load());
+    snapshot.purpleOrbitThetaRate2Ratio = juce::jmax(0.1f, runtimeTuning.purpleOrbitThetaRate2Ratio.load());
+    snapshot.purpleOrbitEccentricity2Ratio = juce::jmax(0.0f, runtimeTuning.purpleOrbitEccentricity2Ratio.load());
+    snapshot.purpleOrbitMix1 = juce::jlimit(0.0f, 1.0f, runtimeTuning.purpleOrbitMix1.load());
+    snapshot.purpleOrbitStereoThetaOffset = runtimeTuning.purpleOrbitStereoThetaOffset.load();
+    snapshot.purpleOrbitDelaySmoothingMs = clampMs(runtimeTuning.purpleOrbitDelaySmoothingMs.load(), 0.0f, 2000.0f);
+
+    snapshot.blackNqDepthBase = juce::jmax(0.0f, runtimeTuning.blackNqDepthBase.load());
+    snapshot.blackNqDepthScale = juce::jmax(0.0f, runtimeTuning.blackNqDepthScale.load());
+    snapshot.blackNqDelayGlideMs = clampMs(runtimeTuning.blackNqDelayGlideMs.load(), 0.0f, 2000.0f);
+
+    snapshot.blackHqTap2MixBase = juce::jlimit(0.0f, 1.0f, runtimeTuning.blackHqTap2MixBase.load());
+    snapshot.blackHqTap2MixScale = juce::jmax(0.0f, runtimeTuning.blackHqTap2MixScale.load());
+    snapshot.blackHqSecondTapDepthBase = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDepthBase.load());
+    snapshot.blackHqSecondTapDepthScale = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDepthScale.load());
+    snapshot.blackHqSecondTapDelayOffsetBase = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDelayOffsetBase.load());
+    snapshot.blackHqSecondTapDelayOffsetScale = juce::jmax(0.0f, runtimeTuning.blackHqSecondTapDelayOffsetScale.load());
+
+    snapshot.bbdDelaySmoothingMs = clampMs(runtimeTuning.bbdDelaySmoothingMs.load(), 0.0f, 2000.0f);
+    snapshot.bbdDelayMinMs = juce::jmax(0.0f, runtimeTuning.bbdDelayMinMs.load());
+    snapshot.bbdDelayMaxMs = juce::jmax(snapshot.bbdDelayMinMs, runtimeTuning.bbdDelayMaxMs.load());
+    snapshot.bbdCentreBaseMs = runtimeTuning.bbdCentreBaseMs.load();
+    snapshot.bbdCentreScale = runtimeTuning.bbdCentreScale.load();
+    snapshot.bbdDepthMs = juce::jmax(0.0f, runtimeTuning.bbdDepthMs.load());
+    snapshot.bbdClockSmoothingMs = clampMs(runtimeTuning.bbdClockSmoothingMs.load(), 0.0f, 2000.0f);
+    snapshot.bbdFilterSmoothingMs = clampMs(runtimeTuning.bbdFilterSmoothingMs.load(), 0.0f, 2000.0f);
+    snapshot.bbdFilterCutoffMinHz = juce::jmax(20.0f, runtimeTuning.bbdFilterCutoffMinHz.load());
+    snapshot.bbdFilterCutoffMaxHz = juce::jmax(snapshot.bbdFilterCutoffMinHz, runtimeTuning.bbdFilterCutoffMaxHz.load());
+    snapshot.bbdFilterCutoffScale = juce::jmax(0.0f, runtimeTuning.bbdFilterCutoffScale.load());
+    snapshot.bbdClockMinHz = juce::jmax(20.0f, runtimeTuning.bbdClockMinHz.load());
+    snapshot.bbdClockMaxRatio = clamp01(runtimeTuning.bbdClockMaxRatio.load());
+    snapshot.bbdStages = juce::jlimit(256.0f, 2048.0f, runtimeTuning.bbdStages.load());
+    snapshot.bbdFilterMaxRatio = juce::jlimit(0.1f, 0.5f, runtimeTuning.bbdFilterMaxRatio.load());
+
+    snapshot.tapeDelaySmoothingMs = clampMs(runtimeTuning.tapeDelaySmoothingMs.load(), 0.0f, 5000.0f);
+    snapshot.tapeCentreBaseMs = runtimeTuning.tapeCentreBaseMs.load();
+    snapshot.tapeCentreScale = runtimeTuning.tapeCentreScale.load();
+    snapshot.tapeToneMaxHz = juce::jmax(20.0f, runtimeTuning.tapeToneMaxHz.load());
+    snapshot.tapeToneMinHz = juce::jmax(20.0f, runtimeTuning.tapeToneMinHz.load());
+    snapshot.tapeToneSmoothingCoeff = clamp01(runtimeTuning.tapeToneSmoothingCoeff.load());
+    snapshot.tapeDriveScale = juce::jmax(0.0f, runtimeTuning.tapeDriveScale.load());
+    snapshot.tapeLfoRatioScale = runtimeTuning.tapeLfoRatioScale.load();
+    snapshot.tapeLfoModSmoothingCoeff = clamp01(runtimeTuning.tapeLfoModSmoothingCoeff.load());
+    snapshot.tapeRatioSmoothingCoeff = clamp01(runtimeTuning.tapeRatioSmoothingCoeff.load());
+    snapshot.tapePhaseDamping = clamp01(runtimeTuning.tapePhaseDamping.load());
+    snapshot.tapeWowFreqBase = juce::jmax(0.0f, runtimeTuning.tapeWowFreqBase.load());
+    snapshot.tapeWowFreqSpread = runtimeTuning.tapeWowFreqSpread.load();
+    snapshot.tapeFlutterFreqBase = juce::jmax(0.0f, runtimeTuning.tapeFlutterFreqBase.load());
+    snapshot.tapeFlutterFreqSpread = runtimeTuning.tapeFlutterFreqSpread.load();
+    snapshot.tapeWowDepthBase = juce::jmax(0.0f, runtimeTuning.tapeWowDepthBase.load());
+    snapshot.tapeWowDepthSpread = runtimeTuning.tapeWowDepthSpread.load();
+    snapshot.tapeFlutterDepthBase = juce::jmax(0.0f, runtimeTuning.tapeFlutterDepthBase.load());
+    snapshot.tapeFlutterDepthSpread = runtimeTuning.tapeFlutterDepthSpread.load();
+    snapshot.tapeRatioMin = runtimeTuning.tapeRatioMin.load();
+    snapshot.tapeRatioMax = runtimeTuning.tapeRatioMax.load();
+    snapshot.tapeWetGain = juce::jmax(0.0f, runtimeTuning.tapeWetGain.load());
+    snapshot.tapeHermiteTension = juce::jlimit(0.0f, 1.0f, runtimeTuning.tapeHermiteTension.load());
+
+    // Precompute filter coefficients (heap allocation OK on message thread)
+    auto hpfCoeffsPtr = juce::dsp::IIR::Coefficients<float>::makeHighPass(
+        spec.sampleRate, snapshot.hpfCutoffHz, snapshot.hpfQ);
+    auto lpfCoeffsPtr = juce::dsp::IIR::Coefficients<float>::makeLowPass(
+        spec.sampleRate, snapshot.lpfCutoffHz, snapshot.lpfQ);
+    auto preEmphCoeffsPtr = juce::dsp::IIR::Coefficients<float>::makePeakFilter(
+        spec.sampleRate, snapshot.preEmphasisFreqHz, snapshot.preEmphasisQ, snapshot.preEmphasisGain);
+
+    // Extract raw normalized coefficient values. JUCE stores second-order IIR
+    // coefficients as [b0, b1, b2, a0, a1, a2].
+    if (hpfCoeffsPtr && hpfCoeffsPtr->coefficients.size() >= 6)
+    {
+        const auto* rawCoeffs = hpfCoeffsPtr->getRawCoefficients();
+        for (int i = 0; i < 6; ++i)
+            snapshot.hpfCoeffs[i] = rawCoeffs[i];
+        snapshot.hpfChanged = true;
+    }
+
+    if (lpfCoeffsPtr && lpfCoeffsPtr->coefficients.size() >= 6)
+    {
+        const auto* rawCoeffs = lpfCoeffsPtr->getRawCoefficients();
+        for (int i = 0; i < 6; ++i)
+            snapshot.lpfCoeffs[i] = rawCoeffs[i];
+        snapshot.lpfChanged = true;
+    }
+
+    if (preEmphCoeffsPtr && preEmphCoeffsPtr->coefficients.size() >= 6)
+    {
+        const auto* rawCoeffs = preEmphCoeffsPtr->getRawCoefficients();
+        for (int i = 0; i < 6; ++i)
+            snapshot.preEmphasisCoeffs[i] = rawCoeffs[i];
+        snapshot.preEmphasisChanged = true;
+    }
+
+    return snapshot;
+}
+
+void ChorusDSP::applyTuningOnAudioThread(const TuningSnapshot& snapshot)
+{
+    // Audio thread: install precomputed filter coefficients and snapshot values.
+    // Zero allocation: reuses pre-allocated Coefficients objects by overwriting
+    // their internal coefficient arrays in-place.
+
+    // Update runtimeTuningSnapshot (now safe because it's only read from the snapshot)
+    runtimeTuningSnapshot.rateSmoothingMs = snapshot.rateSmoothingMs;
+    runtimeTuningSnapshot.depthSmoothingMs = snapshot.depthSmoothingMs;
+    runtimeTuningSnapshot.depthRateLimit = snapshot.depthRateLimit;
+    runtimeTuningSnapshot.centreDelaySmoothingMs = snapshot.centreDelaySmoothingMs;
+    runtimeTuningSnapshot.colorSmoothingMs = snapshot.colorSmoothingMs;
+    runtimeTuningSnapshot.widthSmoothingMs = snapshot.widthSmoothingMs;
+    runtimeTuningSnapshot.centreDelayBaseMs = snapshot.centreDelayBaseMs;
+    runtimeTuningSnapshot.centreDelayScale = snapshot.centreDelayScale;
+    runtimeTuningSnapshot.hpfCutoffHz = snapshot.hpfCutoffHz;
+    runtimeTuningSnapshot.hpfQ = snapshot.hpfQ;
+    runtimeTuningSnapshot.lpfCutoffHz = snapshot.lpfCutoffHz;
+    runtimeTuningSnapshot.lpfQ = snapshot.lpfQ;
+    runtimeTuningSnapshot.preEmphasisFreqHz = snapshot.preEmphasisFreqHz;
+    runtimeTuningSnapshot.preEmphasisQ = snapshot.preEmphasisQ;
+    runtimeTuningSnapshot.preEmphasisGain = snapshot.preEmphasisGain;
+    runtimeTuningSnapshot.preEmphasisLevelSmoothing = snapshot.preEmphasisLevelSmoothing;
+    runtimeTuningSnapshot.preEmphasisQuietThreshold = snapshot.preEmphasisQuietThreshold;
+    runtimeTuningSnapshot.preEmphasisMaxAmount = snapshot.preEmphasisMaxAmount;
+    runtimeTuningSnapshot.compressorAttackMs = snapshot.compressorAttackMs;
+    runtimeTuningSnapshot.compressorReleaseMs = snapshot.compressorReleaseMs;
+    runtimeTuningSnapshot.compressorThresholdDb = snapshot.compressorThresholdDb;
+    runtimeTuningSnapshot.compressorRatio = snapshot.compressorRatio;
+    runtimeTuningSnapshot.saturationDriveScale = snapshot.saturationDriveScale;
+
+    // Copy all other tuning fields...
+    runtimeTuningSnapshot.greenBloomExponent = snapshot.greenBloomExponent;
+    runtimeTuningSnapshot.greenBloomDepthScale = snapshot.greenBloomDepthScale;
+    runtimeTuningSnapshot.greenBloomCentreOffsetMs = snapshot.greenBloomCentreOffsetMs;
+    runtimeTuningSnapshot.greenBloomCutoffMaxHz = snapshot.greenBloomCutoffMaxHz;
+    runtimeTuningSnapshot.greenBloomCutoffMinHz = snapshot.greenBloomCutoffMinHz;
+    runtimeTuningSnapshot.greenBloomWetBlend = snapshot.greenBloomWetBlend;
+    runtimeTuningSnapshot.greenBloomGain = snapshot.greenBloomGain;
+
+    runtimeTuningSnapshot.blueFocusExponent = snapshot.blueFocusExponent;
+    runtimeTuningSnapshot.blueFocusHpMinHz = snapshot.blueFocusHpMinHz;
+    runtimeTuningSnapshot.blueFocusHpMaxHz = snapshot.blueFocusHpMaxHz;
+    runtimeTuningSnapshot.blueFocusLpMaxHz = snapshot.blueFocusLpMaxHz;
+    runtimeTuningSnapshot.blueFocusLpMinHz = snapshot.blueFocusLpMinHz;
+    runtimeTuningSnapshot.bluePresenceFreqMinHz = snapshot.bluePresenceFreqMinHz;
+    runtimeTuningSnapshot.bluePresenceFreqMaxHz = snapshot.bluePresenceFreqMaxHz;
+    runtimeTuningSnapshot.bluePresenceQMin = snapshot.bluePresenceQMin;
+    runtimeTuningSnapshot.bluePresenceQMax = snapshot.bluePresenceQMax;
+    runtimeTuningSnapshot.bluePresenceGainMaxDb = snapshot.bluePresenceGainMaxDb;
+    runtimeTuningSnapshot.blueFocusWetBlend = snapshot.blueFocusWetBlend;
+    runtimeTuningSnapshot.blueFocusOutputGain = snapshot.blueFocusOutputGain;
+
+    runtimeTuningSnapshot.purpleWarpA = snapshot.purpleWarpA;
+    runtimeTuningSnapshot.purpleWarpB = snapshot.purpleWarpB;
+    runtimeTuningSnapshot.purpleWarpKBase = snapshot.purpleWarpKBase;
+    runtimeTuningSnapshot.purpleWarpKScale = snapshot.purpleWarpKScale;
+    runtimeTuningSnapshot.purpleWarpDelaySmoothingMs = snapshot.purpleWarpDelaySmoothingMs;
+
+    runtimeTuningSnapshot.purpleOrbitEccentricity = snapshot.purpleOrbitEccentricity;
+    runtimeTuningSnapshot.purpleOrbitThetaRateBaseHz = snapshot.purpleOrbitThetaRateBaseHz;
+    runtimeTuningSnapshot.purpleOrbitThetaRateScaleHz = snapshot.purpleOrbitThetaRateScaleHz;
+    runtimeTuningSnapshot.purpleOrbitThetaRate2Ratio = snapshot.purpleOrbitThetaRate2Ratio;
+    runtimeTuningSnapshot.purpleOrbitEccentricity2Ratio = snapshot.purpleOrbitEccentricity2Ratio;
+    runtimeTuningSnapshot.purpleOrbitMix1 = snapshot.purpleOrbitMix1;
+    runtimeTuningSnapshot.purpleOrbitStereoThetaOffset = snapshot.purpleOrbitStereoThetaOffset;
+    runtimeTuningSnapshot.purpleOrbitDelaySmoothingMs = snapshot.purpleOrbitDelaySmoothingMs;
+
+    runtimeTuningSnapshot.blackNqDepthBase = snapshot.blackNqDepthBase;
+    runtimeTuningSnapshot.blackNqDepthScale = snapshot.blackNqDepthScale;
+    runtimeTuningSnapshot.blackNqDelayGlideMs = snapshot.blackNqDelayGlideMs;
+
+    runtimeTuningSnapshot.blackHqTap2MixBase = snapshot.blackHqTap2MixBase;
+    runtimeTuningSnapshot.blackHqTap2MixScale = snapshot.blackHqTap2MixScale;
+    runtimeTuningSnapshot.blackHqSecondTapDepthBase = snapshot.blackHqSecondTapDepthBase;
+    runtimeTuningSnapshot.blackHqSecondTapDepthScale = snapshot.blackHqSecondTapDepthScale;
+    runtimeTuningSnapshot.blackHqSecondTapDelayOffsetBase = snapshot.blackHqSecondTapDelayOffsetBase;
+    runtimeTuningSnapshot.blackHqSecondTapDelayOffsetScale = snapshot.blackHqSecondTapDelayOffsetScale;
+
+    runtimeTuningSnapshot.bbdDelaySmoothingMs = snapshot.bbdDelaySmoothingMs;
+    runtimeTuningSnapshot.bbdDelayMinMs = snapshot.bbdDelayMinMs;
+    runtimeTuningSnapshot.bbdDelayMaxMs = snapshot.bbdDelayMaxMs;
+    runtimeTuningSnapshot.bbdCentreBaseMs = snapshot.bbdCentreBaseMs;
+    runtimeTuningSnapshot.bbdCentreScale = snapshot.bbdCentreScale;
+    runtimeTuningSnapshot.bbdDepthMs = snapshot.bbdDepthMs;
+    runtimeTuningSnapshot.bbdClockSmoothingMs = snapshot.bbdClockSmoothingMs;
+    runtimeTuningSnapshot.bbdFilterSmoothingMs = snapshot.bbdFilterSmoothingMs;
+    runtimeTuningSnapshot.bbdFilterCutoffMinHz = snapshot.bbdFilterCutoffMinHz;
+    runtimeTuningSnapshot.bbdFilterCutoffMaxHz = snapshot.bbdFilterCutoffMaxHz;
+    runtimeTuningSnapshot.bbdFilterCutoffScale = snapshot.bbdFilterCutoffScale;
+    runtimeTuningSnapshot.bbdClockMinHz = snapshot.bbdClockMinHz;
+    runtimeTuningSnapshot.bbdClockMaxRatio = snapshot.bbdClockMaxRatio;
+    runtimeTuningSnapshot.bbdStages = snapshot.bbdStages;
+    runtimeTuningSnapshot.bbdFilterMaxRatio = snapshot.bbdFilterMaxRatio;
+
+    runtimeTuningSnapshot.tapeDelaySmoothingMs = snapshot.tapeDelaySmoothingMs;
+    runtimeTuningSnapshot.tapeCentreBaseMs = snapshot.tapeCentreBaseMs;
+    runtimeTuningSnapshot.tapeCentreScale = snapshot.tapeCentreScale;
+    runtimeTuningSnapshot.tapeToneMaxHz = snapshot.tapeToneMaxHz;
+    runtimeTuningSnapshot.tapeToneMinHz = snapshot.tapeToneMinHz;
+    runtimeTuningSnapshot.tapeToneSmoothingCoeff = snapshot.tapeToneSmoothingCoeff;
+    runtimeTuningSnapshot.tapeDriveScale = snapshot.tapeDriveScale;
+    runtimeTuningSnapshot.tapeLfoRatioScale = snapshot.tapeLfoRatioScale;
+    runtimeTuningSnapshot.tapeLfoModSmoothingCoeff = snapshot.tapeLfoModSmoothingCoeff;
+    runtimeTuningSnapshot.tapeRatioSmoothingCoeff = snapshot.tapeRatioSmoothingCoeff;
+    runtimeTuningSnapshot.tapePhaseDamping = snapshot.tapePhaseDamping;
+    runtimeTuningSnapshot.tapeWowFreqBase = snapshot.tapeWowFreqBase;
+    runtimeTuningSnapshot.tapeWowFreqSpread = snapshot.tapeWowFreqSpread;
+    runtimeTuningSnapshot.tapeFlutterFreqBase = snapshot.tapeFlutterFreqBase;
+    runtimeTuningSnapshot.tapeFlutterFreqSpread = snapshot.tapeFlutterFreqSpread;
+    runtimeTuningSnapshot.tapeWowDepthBase = snapshot.tapeWowDepthBase;
+    runtimeTuningSnapshot.tapeWowDepthSpread = snapshot.tapeWowDepthSpread;
+    runtimeTuningSnapshot.tapeFlutterDepthBase = snapshot.tapeFlutterDepthBase;
+    runtimeTuningSnapshot.tapeFlutterDepthSpread = snapshot.tapeFlutterDepthSpread;
+    runtimeTuningSnapshot.tapeRatioMin = snapshot.tapeRatioMin;
+    runtimeTuningSnapshot.tapeRatioMax = snapshot.tapeRatioMax;
+    runtimeTuningSnapshot.tapeWetGain = snapshot.tapeWetGain;
+    runtimeTuningSnapshot.tapeHermiteTension = snapshot.tapeHermiteTension;
+
+    // Install filter coefficients into pre-allocated Coefficients objects.
+    // Overwrite the internal coefficient arrays without allocating new shared_ptr.
+    if (snapshot.hpfChanged && preallocatedHpfCoeffs && preallocatedHpfCoeffs->coefficients.size() >= 6)
+    {
+        auto* rawCoeffs = preallocatedHpfCoeffs->getRawCoefficients();
+        for (int i = 0; i < 6; ++i)
+            rawCoeffs[i] = snapshot.hpfCoeffs[i];
+        hpf.coefficients = preallocatedHpfCoeffs;
+    }
+
+    if (snapshot.lpfChanged && preallocatedLpfCoeffs && preallocatedLpfCoeffs->coefficients.size() >= 6)
+    {
+        auto* rawCoeffs = preallocatedLpfCoeffs->getRawCoefficients();
+        for (int i = 0; i < 6; ++i)
+            rawCoeffs[i] = snapshot.lpfCoeffs[i];
+        lpf.coefficients = preallocatedLpfCoeffs;
+    }
+
+    if (snapshot.preEmphasisChanged && preallocatedPreEmphasisCoeffs && preallocatedPreEmphasisCoeffs->coefficients.size() >= 6)
+    {
+        auto* rawCoeffs = preallocatedPreEmphasisCoeffs->getRawCoefficients();
+        for (int i = 0; i < 6; ++i)
+            rawCoeffs[i] = snapshot.preEmphasisCoeffs[i];
+        preEmphasis.coefficients = preallocatedPreEmphasisCoeffs;
+    }
+}
+
 void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
 {
     spec = processSpec;
@@ -420,7 +736,13 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     lfo.setFrequency(rateHz);
     float mappedDepth = mapDepthToEngineRange(depth);
     oscVolume.setCurrentAndTargetValue(mappedDepth * 0.5f);  // oscVolumeMultiplier = 0.5
-    
+
+    // Pre-allocate filter coefficient objects for in-place reuse on audio thread.
+    // These will be reused by overwriting their internal coefficient arrays.
+    preallocatedHpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 30.0f, 0.707f);
+    preallocatedLpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 20000.0f, 0.707f);
+    preallocatedPreEmphasisCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter(spec.sampleRate, 3000.0f, 0.707f, 1.2f);
+
     reset();
 }
 

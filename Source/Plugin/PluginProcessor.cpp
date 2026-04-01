@@ -1106,17 +1106,13 @@ void ChoroborosAudioProcessor::releaseResources()
 
 void ChoroborosAudioProcessor::timerCallback()
 {
-    // RESIDUAL ISSUE: applyRuntimeTuning() allocates (IIR coefficient calculation),
-    // so it must run on message thread, not audio thread. However, it modifies
-    // runtimeTuningSnapshot which the audio thread reads during process().
-    // We keep tryEnter(dspLock) as a synchronization mechanism.
-    // Plan 3 should replace this with a narrower tuning lock or make tuning
-    // snapshots atomic.
-    if (dspLock.tryEnter())
+    // Precompute tuning snapshot on message thread (allocation OK here)
+    // then publish lock-free to double-buffer for audio thread to consume.
+    // No locks required.
+    if (chorusDSP)
     {
-        if (chorusDSP)
-            chorusDSP->applyRuntimeTuning();
-        dspLock.exit();
+        auto snapshot = chorusDSP->precomputeTuningSnapshot();
+        chorusDSP->getTuningConfigManager().publishTuning(snapshot);
     }
 }
 
@@ -1179,6 +1175,12 @@ void ChoroborosAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // PLAN 2: Audio thread ownership - consume pending config at block start (O(1), lock-free)
     const auto startTicks = juce::Time::getHighResolutionTicks();
     dspConfigManager.consumeAndApplyIfChanged(*chorusDSP);
+
+    // Consume and apply tuning snapshot if changed (lock-free, O(1))
+    if (const auto* tuningSnapshot = chorusDSP->getTuningConfigManager().consumeIfChanged())
+    {
+        chorusDSP->applyTuningOnAudioThread(*tuningSnapshot);
+    }
 
     // Process audio (no lock needed; audio thread is sole mutator of live DSP state)
     juce::dsp::AudioBlock<float> block(buffer);
@@ -1387,6 +1389,15 @@ const ChorusDSP::RuntimeTuning& ChoroborosAudioProcessor::getEngineDspInternals(
 {
     const int clampedColor = juce::jlimit(0, 4, colorIndex);
     return engineInternals[clampedColor][hqEnabled ? 1 : 0];
+}
+
+void ChoroborosAudioProcessor::publishRuntimeTuningSnapshot()
+{
+    if (chorusDSP == nullptr)
+        return;
+
+    auto snapshot = chorusDSP->precomputeTuningSnapshot();
+    chorusDSP->getTuningConfigManager().publishTuning(snapshot);
 }
 
 void ChoroborosAudioProcessor::setModularCoresEnabled(bool enabled)

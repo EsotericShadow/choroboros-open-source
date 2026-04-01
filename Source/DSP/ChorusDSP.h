@@ -21,6 +21,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "CoreAssignments.h"
+#include "TuningConfigManager.h"
 #include <atomic>
 #include <array>
 #include <memory>
@@ -186,7 +187,20 @@ public:
 
     RuntimeTuning& getRuntimeTuning() { return runtimeTuning; }
     const RuntimeTuning& getRuntimeTuning() const { return runtimeTuning; }
-    
+
+    /** Precompute tuning snapshot from atomic parameters (message thread).
+        Allocates filter coefficients here (on message thread, safe).
+        Returns a TuningSnapshot ready to publish. */
+    TuningSnapshot precomputeTuningSnapshot();
+
+    /** Apply tuning snapshot on audio thread (zero allocation).
+        Installs precomputed filter coefficients without allocation,
+        reconfigures smoothers. Call from processBlock() after dspConfigManager. */
+    void applyTuningOnAudioThread(const TuningSnapshot& snapshot);
+
+    /** Access tuning config manager (for testing and integration). */
+    TuningConfigManager& getTuningConfigManager() { return tuningConfigManager; }
+
     // Make members accessible to helper classes and cores
     friend class ChorusDSPPrepare;
     friend class ChorusDSPProcess;
@@ -492,4 +506,14 @@ private:
     RuntimeTuningSnapshot runtimeTuningSnapshot;
     RuntimeTuningSnapshot lastAppliedTuningSnapshot;
     bool runtimeTuningApplied = false;
+
+    // Lock-free tuning parameter double-buffer (replaces dspLock)
+    TuningConfigManager tuningConfigManager;
+
+    // Pre-allocated filter coefficient objects for in-place reuse on audio thread.
+    // These are allocated once in prepare() and reused by overwriting their
+    // internal coefficient arrays (no new shared_ptr creation on audio thread).
+    juce::dsp::IIR::Coefficients<float>::Ptr preallocatedHpfCoeffs;
+    juce::dsp::IIR::Coefficients<float>::Ptr preallocatedLpfCoeffs;
+    juce::dsp::IIR::Coefficients<float>::Ptr preallocatedPreEmphasisCoeffs;
 };

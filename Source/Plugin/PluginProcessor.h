@@ -132,6 +132,7 @@ public:
     TuningState& getTuningState() { return tuning; }
     ChorusDSP::RuntimeTuning& getDspInternals() { return chorusDSP->getRuntimeTuning(); }
     const ChorusDSP::RuntimeTuning& getDspInternals() const { return chorusDSP->getRuntimeTuning(); }
+    void publishRuntimeTuningSnapshot();
     ChorusDSP::RuntimeTuning& getEngineDspInternals(int colorIndex, bool hqEnabled = false);
     const ChorusDSP::RuntimeTuning& getEngineDspInternals(int colorIndex, bool hqEnabled = false) const;
     bool isModularCoresEnabled() const { return modularCoresEnabled; }
@@ -292,8 +293,7 @@ private:
     void persistActiveEngineInternalsFromDsp();
     void restoreEngineInternalsToDsp(int colorIndex, bool hqEnabled);
     void runAnalyzerPass();
-    
-    juce::CriticalSection dspLock;
+
     std::unique_ptr<ChorusDSP> chorusDSP;
     DspConfigManager dspConfigManager;
     TuningState tuning;

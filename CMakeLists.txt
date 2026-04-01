@@ -90,6 +90,8 @@ target_sources(Choroboros PRIVATE
     Source/DSP/ChorusDSPPrepare.h
     Source/DSP/ChorusDSPProcess.cpp
     Source/DSP/ChorusDSPProcess.h
+    Source/DSP/TuningConfigManager.h
+    Source/DSP/TuningConfigManager.cpp
     
     # Chorus cores
     Source/DSP/CoreAssignments.h

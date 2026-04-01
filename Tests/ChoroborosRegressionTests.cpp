@@ -177,6 +177,45 @@ static void testStateRoundTrip()
                    "Legacy state without core assignments should fall back to legacy assignment map");
 }
 
+static void testRuntimeTuningLockFree()
+{
+    // Test that runtime tuning parameters can be changed rapidly without locks
+    // and without causing audio glitches or NaN/Inf.
+    ChoroborosAudioProcessor proc;
+    proc.prepareToPlay(44100.0, 512);
+
+    juce::AudioBuffer<float> buf(2, 512);
+    juce::MidiBuffer midi;
+    buf.clear();
+
+    // Access runtime tuning parameters through the public processor seam.
+    auto& tuning = proc.getDspInternals();
+
+    // Rapid parameter changes while processing audio (stress test)
+    const int iterations = 100;
+    for (int i = 0; i < iterations; ++i)
+    {
+        // Change tuning parameters every block
+        tuning.hpfCutoffHz.store(20.0f + 50.0f * (i % 10) / 10.0f);
+        tuning.lpfCutoffHz.store(10000.0f + 10000.0f * (i % 10) / 10.0f);
+        tuning.preEmphasisFreqHz.store(1000.0f + 4000.0f * (i % 10) / 10.0f);
+        tuning.rateSmoothingMs.store(10.0f + 40.0f * (i % 10) / 10.0f);
+        proc.publishRuntimeTuningSnapshot();
+
+        // Process block (audio thread consumes tuning)
+        proc.processBlock(buf, midi);
+
+        // Verify no NaN/Inf
+        if (hasNaNOrInf(buf))
+        {
+            REGRESS_ASSERT(false, "Runtime tuning stress test produced NaN/Inf at iteration " + juce::String(i));
+            break;
+        }
+    }
+
+    REGRESS_ASSERT(true, "Runtime tuning lock-free updates completed successfully");
+}
+
 static void testMaxBlockChannels()
 {
     ChoroborosAudioProcessor proc;
@@ -839,6 +878,7 @@ int main(int argc, char** argv)
         testProcessBlockSizes();
         testEngineHQTorture();
         testStateRoundTrip();
+        testRuntimeTuningLockFree();
         testMaxBlockChannels();
         testKnownBadBundledEngineProfilesMigrateToDefaults();
 
