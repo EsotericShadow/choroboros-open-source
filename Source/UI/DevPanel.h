@@ -59,6 +59,7 @@ class VisualDeckContent : public juce::Component,
 {
 public:
     void setAccentColour(juce::Colour c) { accentColour = c; repaint(); }
+    juce::Colour getAccentColour() const noexcept { return accentColour; }
 
     void paint(juce::Graphics& g) override
     {

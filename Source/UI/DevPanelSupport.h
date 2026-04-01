@@ -2891,6 +2891,254 @@ private:
     Plot plot;
 };
 
+class DualWaveformScopeCard : public juce::PropertyComponent
+{
+public:
+    DualWaveformScopeCard(const juce::String& title,
+                          std::function<void(std::vector<float>&, std::vector<float>&)> dataProvider,
+                          std::function<juce::Colour()> accentProvider)
+        : juce::PropertyComponent(""),
+          titleText(title),
+          valueProvider(std::move(dataProvider)),
+          accentColourProvider(std::move(accentProvider))
+    {
+        setOpaque(true);
+        setPreferredHeight(200);
+        lfoL.resize(ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS, 0.0f);
+        lfoR.resize(ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS, 0.0f);
+    }
+
+    void refresh() override
+    {
+        if (valueProvider)
+            valueProvider(lfoL, lfoR);
+        repaint(plotBounds);
+    }
+
+    void resized() override
+    {
+        auto b = getLocalBounds().reduced(6, 4);
+        titleArea = b.removeFromTop(18);
+        b.removeFromTop(2);
+        plotBounds = b;
+    }
+
+    void paint(juce::Graphics& g) override;
+
+private:
+    juce::String titleText;
+    std::function<void(std::vector<float>&, std::vector<float>&)> valueProvider;
+    std::function<juce::Colour()> accentColourProvider;
+    std::vector<float> lfoL, lfoR;
+    juce::Rectangle<int> titleArea, plotBounds;
+};
+
+class LissajousScopeCard : public juce::PropertyComponent
+{
+public:
+    LissajousScopeCard(const juce::String& title,
+                       std::function<void(std::vector<float>&, std::vector<float>&)> dataProvider,
+                       std::function<juce::Colour()> accentProvider)
+        : juce::PropertyComponent(""),
+          titleText(title),
+          valueProvider(std::move(dataProvider)),
+          accentColourProvider(std::move(accentProvider))
+    {
+        setOpaque(true);
+        setPreferredHeight(170);
+        lfoL.resize(ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS, 0.0f);
+        lfoR.resize(ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS, 0.0f);
+    }
+
+    void refresh() override
+    {
+        if (valueProvider)
+            valueProvider(lfoL, lfoR);
+        repaint(plotBounds);
+    }
+
+    void resized() override
+    {
+        auto b = getLocalBounds().reduced(6, 4);
+        titleArea = b.removeFromTop(18);
+        b.removeFromTop(2);
+        plotBounds = b;
+    }
+
+    void paint(juce::Graphics& g) override;
+
+private:
+    juce::String titleText;
+    std::function<void(std::vector<float>&, std::vector<float>&)> valueProvider;
+    std::function<juce::Colour()> accentColourProvider;
+    std::vector<float> lfoL, lfoR;
+    juce::Rectangle<int> titleArea, plotBounds;
+};
+
+inline void DualWaveformScopeCard::paint(juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+
+    // Background -- fully opaque
+    g.setColour(juce::Colour(HackerTheme::bgElevated));
+    g.fillRoundedRectangle(bounds, 3.0f);
+    g.setColour(juce::Colour(HackerTheme::border));
+    g.drawRoundedRectangle(bounds.reduced(0.25f), 3.0f, 0.5f);
+
+    // Title
+    g.setFont(makeRetroFont(Typography::vizTitle, true));
+    g.setColour(juce::Colour(HackerTheme::text));
+    g.drawText(titleText, titleArea.toFloat(), juce::Justification::centredLeft);
+
+    // Plot area
+    auto plot = plotBounds.toFloat().reduced(2.0f);
+    if (plot.getWidth() < 10 || plot.getHeight() < 10 || lfoL.empty()) return;
+
+    const int numPoints = static_cast<int>(lfoL.size());
+    float minVal = 0.0f, maxVal = 0.0f;
+    for (int i = 0; i < numPoints; ++i)
+    {
+        minVal = juce::jmin(minVal, lfoL[static_cast<size_t>(i)], lfoR[static_cast<size_t>(i)]);
+        maxVal = juce::jmax(maxVal, lfoL[static_cast<size_t>(i)], lfoR[static_cast<size_t>(i)]);
+    }
+    if (maxVal - minVal < 1e-6f) { maxVal = 1.0f; minVal = -1.0f; }
+
+    // Grid -- zero line and phase markers
+    const float zeroY = juce::jmap(0.0f, minVal, maxVal, plot.getBottom() - 2, plot.getY() + 2);
+    g.setColour(juce::Colour(HackerTheme::grid).withAlpha(0.5f));
+    g.drawHorizontalLine(static_cast<int>(zeroY), plot.getX(), plot.getRight());
+
+    // Phase markers at 90, 180, 270 degrees
+    for (int phase = 1; phase <= 3; ++phase)
+    {
+        float x = plot.getX() + (plot.getWidth() * phase / 4.0f);
+        g.drawVerticalLine(static_cast<int>(x), plot.getY(), plot.getBottom());
+    }
+
+    // Phase labels at bottom
+    g.setFont(makeRetroFont(Typography::vizBody, false));
+    g.setColour(juce::Colour(HackerTheme::textDim));
+    const juce::String phaseLabels[] = { "0", "90", "180", "270", "360" };
+    for (int i = 0; i <= 4; ++i)
+    {
+        float x = plot.getX() + (plot.getWidth() * i / 4.0f);
+        g.drawText(phaseLabels[i], static_cast<int>(x) - 15, static_cast<int>(plot.getBottom()) - 14,
+                   30, 14, juce::Justification::centred);
+    }
+
+    // Accent color
+    juce::Colour accent = accentColourProvider ? accentColourProvider() : juce::Colour(0xff4fc3f7);
+
+    // L waveform path
+    {
+        juce::Path pathL;
+        for (int i = 0; i < numPoints; ++i)
+        {
+            float x = juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(numPoints - 1),
+                                 plot.getX() + 2, plot.getRight() - 2);
+            float y = juce::jmap(lfoL[static_cast<size_t>(i)], minVal, maxVal,
+                                 plot.getBottom() - 2, plot.getY() + 2);
+            if (i == 0) pathL.startNewSubPath(x, y);
+            else pathL.lineTo(x, y);
+        }
+        g.setColour(accent.withAlpha(0.9f));
+        g.strokePath(pathL, juce::PathStrokeType(2.0f));
+    }
+
+    // R waveform path
+    {
+        juce::Path pathR;
+        for (int i = 0; i < numPoints; ++i)
+        {
+            float x = juce::jmap(static_cast<float>(i), 0.0f, static_cast<float>(numPoints - 1),
+                                 plot.getX() + 2, plot.getRight() - 2);
+            float y = juce::jmap(lfoR[static_cast<size_t>(i)], minVal, maxVal,
+                                 plot.getBottom() - 2, plot.getY() + 2);
+            if (i == 0) pathR.startNewSubPath(x, y);
+            else pathR.lineTo(x, y);
+        }
+        // Complementary color for R -- rotate hue
+        juce::Colour rColour = accent.withRotatedHue(0.33f);
+        g.setColour(rColour.withAlpha(0.7f));
+        g.strokePath(pathR, juce::PathStrokeType(1.5f));
+    }
+
+    // Legend (top-right): "L" and "R" color swatches
+    float legendX = plot.getRight() - 80;
+    float legendY = titleArea.toFloat().getY() + 2;
+    g.setColour(accent.withAlpha(0.9f));
+    g.fillRect(legendX, legendY, 10.0f, 10.0f);
+    g.setColour(juce::Colour(HackerTheme::textDim));
+    g.drawText("L", static_cast<int>(legendX + 13), static_cast<int>(legendY), 20, 12,
+               juce::Justification::centredLeft);
+    juce::Colour rLegend = accent.withRotatedHue(0.33f);
+    g.setColour(rLegend.withAlpha(0.7f));
+    g.fillRect(legendX + 38, legendY, 10.0f, 10.0f);
+    g.setColour(juce::Colour(HackerTheme::textDim));
+    g.drawText("R", static_cast<int>(legendX + 51), static_cast<int>(legendY), 20, 12,
+               juce::Justification::centredLeft);
+}
+
+inline void LissajousScopeCard::paint(juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+
+    // Background
+    g.setColour(juce::Colour(HackerTheme::bgElevated));
+    g.fillRoundedRectangle(bounds, 3.0f);
+    g.setColour(juce::Colour(HackerTheme::border));
+    g.drawRoundedRectangle(bounds.reduced(0.25f), 3.0f, 0.5f);
+
+    // Title
+    g.setFont(makeRetroFont(Typography::vizTitle, true));
+    g.setColour(juce::Colour(HackerTheme::text));
+    g.drawText(titleText, titleArea.toFloat(), juce::Justification::centredLeft);
+
+    // Square plot area (maintain aspect ratio)
+    auto plot = plotBounds.toFloat().reduced(2.0f);
+    float side = juce::jmin(plot.getWidth(), plot.getHeight());
+    auto squarePlot = juce::Rectangle<float>(
+        plot.getCentreX() - side / 2, plot.getCentreY() - side / 2, side, side);
+
+    // Grid -- center crosshair
+    g.setColour(juce::Colour(HackerTheme::grid).withAlpha(0.5f));
+    g.drawHorizontalLine(static_cast<int>(squarePlot.getCentreY()),
+                         squarePlot.getX(), squarePlot.getRight());
+    g.drawVerticalLine(static_cast<int>(squarePlot.getCentreX()),
+                       squarePlot.getY(), squarePlot.getBottom());
+
+    if (lfoL.empty() || lfoR.empty()) return;
+
+    // Find data range for both channels
+    float minL = *std::min_element(lfoL.begin(), lfoL.end());
+    float maxL = *std::max_element(lfoL.begin(), lfoL.end());
+    float minR = *std::min_element(lfoR.begin(), lfoR.end());
+    float maxR = *std::max_element(lfoR.begin(), lfoR.end());
+
+    // Use symmetric range for both axes
+    float rangeL = juce::jmax(std::abs(minL), std::abs(maxL), 0.001f);
+    float rangeR = juce::jmax(std::abs(minR), std::abs(maxR), 0.001f);
+    float range = juce::jmax(rangeL, rangeR);  // Uniform scale
+
+    // Plot XY path
+    juce::Colour accent = accentColourProvider ? accentColourProvider() : juce::Colour(0xff4fc3f7);
+    const int numPoints = static_cast<int>(lfoL.size());
+
+    juce::Path xyPath;
+    for (int i = 0; i < numPoints; ++i)
+    {
+        float x = juce::jmap(lfoL[static_cast<size_t>(i)], -range, range,
+                             squarePlot.getX() + 2, squarePlot.getRight() - 2);
+        float y = juce::jmap(lfoR[static_cast<size_t>(i)], -range, range,
+                             squarePlot.getBottom() - 2, squarePlot.getY() + 2);  // Invert Y
+        if (i == 0) xyPath.startNewSubPath(x, y);
+        else xyPath.lineTo(x, y);
+    }
+
+    g.setColour(accent.withAlpha(0.85f));
+    g.strokePath(xyPath, juce::PathStrokeType(1.5f));
+}
+
 class TransferCurvePropertyComponent : public juce::PropertyComponent
 {
 public:

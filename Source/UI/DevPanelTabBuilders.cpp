@@ -247,6 +247,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     const auto& readRawParam = ctx.readRawParam;
     const auto& readAnalyzerSnapshot = ctx.readAnalyzerSnapshot;
 
+    // Modulation Readouts section
     juce::Array<juce::PropertyComponent*> modulationReadouts;
     modulationReadouts.add(makeReadOnly("LFO Rate", [this, readRawParam]() -> juce::String
     {
@@ -254,11 +255,12 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                                          readRawParam(ChoroborosAudioProcessor::RATE_ID));
         return juce::String(mapped, 3) + " Hz";
     }));
-    modulationReadouts.add(makeReadOnly("Stereo Offset", [this, readRawParam]() -> juce::String
+    modulationReadouts.add(makeReadOnly("LFO Period", [this, readRawParam]() -> juce::String
     {
-        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
-                                                         readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
-        return juce::String(mapped, 2) + " deg";
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::RATE_ID,
+                                                         readRawParam(ChoroborosAudioProcessor::RATE_ID));
+        const float period = 1000.0f / juce::jmax(0.001f, mapped);
+        return juce::String(period, 1) + " ms";
     }));
     modulationReadouts.add(makeReadOnly("Depth", [this, readRawParam]() -> juce::String
     {
@@ -266,7 +268,48 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                                          readRawParam(ChoroborosAudioProcessor::DEPTH_ID));
         return juce::String(mapped * 100.0f, 1) + " %";
     }));
-    modulationReadouts.add(makeReadOnly("Stereo Correlation (est.)", [this, readRawParam]() -> juce::String
+    modulationReadouts.add(makeReadOnly("Modulation Depth", [this, readAnalyzerSnapshot]() -> juce::String
+    {
+        const auto snapshot = readAnalyzerSnapshot();
+        // Find min/max of delay trajectory to get modulation depth range
+        float minDelay = snapshot.delayTrajectoryMs[0];
+        float maxDelay = snapshot.delayTrajectoryMs[0];
+        for (int i = 0; i < ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS; ++i)
+        {
+            minDelay = juce::jmin(minDelay, snapshot.delayTrajectoryMs[static_cast<size_t>(i)]);
+            maxDelay = juce::jmax(maxDelay, snapshot.delayTrajectoryMs[static_cast<size_t>(i)]);
+        }
+        const float depth = maxDelay - minDelay;
+        return juce::String(depth, 2) + " ms";
+    }));
+    setSectionRowHeight(modulationReadouts, kRowHeightCompact);
+    addPanelSection(modulationPanel, "Modulation Readouts", modulationReadouts, false);
+
+    // Stereo Readouts section
+    juce::Array<juce::PropertyComponent*> stereoReadouts;
+    stereoReadouts.add(makeReadOnly("Stereo Offset", [this, readRawParam]() -> juce::String
+    {
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
+                                                         readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
+        return juce::String(mapped, 1) + " deg";
+    }));
+    stereoReadouts.add(makeReadOnly("Stereo Width", [this, readRawParam]() -> juce::String
+    {
+        const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID,
+                                                         readRawParam(ChoroborosAudioProcessor::WIDTH_ID));
+        return juce::String(mapped, 2) + " x";
+    }));
+    stereoReadouts.add(makeReadOnly("Phase Difference", [this, readRawParam]() -> juce::String
+    {
+        const float offsetDeg = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
+                                                            readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
+        const float width = processor.mapParameterValue(ChoroborosAudioProcessor::WIDTH_ID,
+                                                        readRawParam(ChoroborosAudioProcessor::WIDTH_ID));
+        // Effective phase difference accounting for width
+        const float phaseDiff = offsetDeg * juce::jlimit(0.0f, 1.0f, width);
+        return juce::String(phaseDiff, 1) + " deg";
+    }));
+    stereoReadouts.add(makeReadOnly("Stereo Correlation (est.)", [this, readRawParam]() -> juce::String
     {
         const float offsetDeg = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
                                                             readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
@@ -277,39 +320,42 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                                * juce::jlimit(0.0f, 2.0f, width));
         return juce::String(correlation, 3);
     }));
-    setSectionRowHeight(modulationReadouts, kRowHeightCompact);
-    addPanelSection(modulationPanel, "LFO Readouts (passive monitor)", modulationReadouts, false);
+    setSectionRowHeight(stereoReadouts, kRowHeightCompact);
+    addPanelSection(modulationPanel, "Stereo Readouts", stereoReadouts, false);
 
     juce::Array<juce::PropertyComponent*> modulationVisuals;
-    auto* lfoLeftCard = makeSparkline("LFO Left", [readAnalyzerSnapshot]() -> std::vector<float>
-    {
-        std::vector<float> values;
-        constexpr int pointCount = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS;
-        values.reserve(pointCount);
-        const auto snapshot = readAnalyzerSnapshot();
-        for (int i = 0; i < pointCount; ++i)
-            values.push_back(snapshot.lfoLeft[static_cast<size_t>(i)]);
-        return values;
-    }, LinkGroup::modulation);
-    lfoLeftCard->setName("Modulation LFO Left Card");
-    lfoLeftCard->getProperties().set("devpanelModRole", "lfo_left");
-    lfoLeftCard->setPreferredHeight(150);
-    modulationVisuals.add(lfoLeftCard);
 
-    auto* lfoRightCard = makeSparkline("LFO Right", [readAnalyzerSnapshot]() -> std::vector<float>
-    {
-        std::vector<float> values;
-        constexpr int pointCount = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS;
-        values.reserve(pointCount);
-        const auto snapshot = readAnalyzerSnapshot();
-        for (int i = 0; i < pointCount; ++i)
-            values.push_back(snapshot.lfoRight[static_cast<size_t>(i)]);
-        return values;
-    }, LinkGroup::modulation);
-    lfoRightCard->setName("Modulation LFO Right Card");
-    lfoRightCard->getProperties().set("devpanelModRole", "lfo_right");
-    lfoRightCard->setPreferredHeight(150);
-    modulationVisuals.add(lfoRightCard);
+    // Dual Waveform Scope (replaces separate L/R sparklines)
+    auto* dualScopeCard = new DualWaveformScopeCard(
+        "LFO Oscilloscope",
+        [readAnalyzerSnapshot](std::vector<float>& lfoL, std::vector<float>& lfoR)
+        {
+            const auto snapshot = readAnalyzerSnapshot();
+            lfoL.assign(snapshot.lfoLeft.begin(), snapshot.lfoLeft.end());
+            lfoR.assign(snapshot.lfoRight.begin(), snapshot.lfoRight.end());
+        },
+        [this]() { return modulationVisualDeck.getAccentColour(); }
+    );
+    dualScopeCard->setName("Modulation Dual Waveform Scope Card");
+    dualScopeCard->getProperties().set("devpanelModRole", "lfo_dual_scope");
+    dualScopeCard->setPreferredHeight(200);
+    modulationVisuals.add(dualScopeCard);
+
+    // Lissajous Scope
+    auto* lissajousCard = new LissajousScopeCard(
+        "Stereo Field",
+        [readAnalyzerSnapshot](std::vector<float>& lfoL, std::vector<float>& lfoR)
+        {
+            const auto snapshot = readAnalyzerSnapshot();
+            lfoL.assign(snapshot.lfoLeft.begin(), snapshot.lfoLeft.end());
+            lfoR.assign(snapshot.lfoRight.begin(), snapshot.lfoRight.end());
+        },
+        [this]() { return modulationVisualDeck.getAccentColour(); }
+    );
+    lissajousCard->setName("Modulation Lissajous Scope Card");
+    lissajousCard->getProperties().set("devpanelModRole", "lfo_lissajous");
+    lissajousCard->setPreferredHeight(170);
+    modulationVisuals.add(lissajousCard);
 
     auto* modulationDelayTrajectoryCard = makeSparkline("Delay Trajectory", [readAnalyzerSnapshot]() -> std::vector<float>
     {
@@ -323,7 +369,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     }, LinkGroup::modulation);
     modulationDelayTrajectoryCard->setName("Modulation Trajectory Card");
     modulationDelayTrajectoryCard->getProperties().set("devpanelModRole", "trajectory");
-    modulationDelayTrajectoryCard->setPreferredHeight(160);
+    modulationDelayTrajectoryCard->setPreferredHeight(170);
     modulationVisuals.add(modulationDelayTrajectoryCard);
 
     auto* modulationWorkbenchCard = new HorizontalControlStripCard(

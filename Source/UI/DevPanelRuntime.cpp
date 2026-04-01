@@ -452,21 +452,21 @@ void DevPanel::resized()
             card->setBounds(0, 0, 0, 0);
         }
 
-        auto* lfoLeftCard = findRoleCard("lfo_left");
-        auto* lfoRightCard = findRoleCard("lfo_right");
+        auto* dualScopeCard = findRoleCard("lfo_dual_scope");
+        auto* lissajousCard = findRoleCard("lfo_lissajous");
         auto* trajectoryCard = findRoleCard("trajectory");
         auto* workbenchCard = findRoleCard("lfo_workbench");
 
-        if (lfoLeftCard == nullptr && modulationVisualDeckCards.size() > 0)
-            lfoLeftCard = modulationVisualDeckCards[0];
-        if (lfoRightCard == nullptr && modulationVisualDeckCards.size() > 1)
-            lfoRightCard = modulationVisualDeckCards[1];
+        if (dualScopeCard == nullptr && modulationVisualDeckCards.size() > 0)
+            dualScopeCard = modulationVisualDeckCards[0];
+        if (lissajousCard == nullptr && modulationVisualDeckCards.size() > 1)
+            lissajousCard = modulationVisualDeckCards[1];
         if (trajectoryCard == nullptr && modulationVisualDeckCards.size() > 2)
             trajectoryCard = modulationVisualDeckCards[2];
         if (workbenchCard == nullptr && modulationVisualDeckCards.size() > 3)
             workbenchCard = modulationVisualDeckCards[3];
 
-        if (lfoLeftCard == nullptr && lfoRightCard == nullptr
+        if (dualScopeCard == nullptr && lissajousCard == nullptr
             && trajectoryCard == nullptr && workbenchCard == nullptr)
         {
             modulationVisualDeck.setBounds(0, 0, 0, 0);
@@ -476,22 +476,22 @@ void DevPanel::resized()
         const int innerWidth = juce::jmax(40, width - spacing.deckPadding * 2);
         const int rowGap = juce::jmax(8, spacing.cardGap);
         int rowTopY = spacing.deckPadding;
-        int topRowHeight = 0;
-        int trajectoryHeight = 0;
+        int dualScopeHeight = 0;
+        int secondRowHeight = 0;
         int workbenchHeight = 0;
 
-        if (lfoLeftCard != nullptr || lfoRightCard != nullptr)
+        if (dualScopeCard != nullptr)
         {
-            const int leftHeight = lfoLeftCard != nullptr ? lfoLeftCard->getPreferredHeight() : 0;
-            const int rightHeight = lfoRightCard != nullptr ? lfoRightCard->getPreferredHeight() : 0;
-            topRowHeight = juce::jmax(leftHeight, rightHeight);
-            rowTopY += topRowHeight + rowGap;
+            dualScopeHeight = dualScopeCard->getPreferredHeight();
+            rowTopY += dualScopeHeight + rowGap;
         }
 
-        if (trajectoryCard != nullptr)
+        if (lissajousCard != nullptr || trajectoryCard != nullptr)
         {
-            trajectoryHeight = trajectoryCard->getPreferredHeight();
-            rowTopY += trajectoryHeight + rowGap;
+            const int lissHeight = lissajousCard != nullptr ? lissajousCard->getPreferredHeight() : 0;
+            const int trajHeight = trajectoryCard != nullptr ? trajectoryCard->getPreferredHeight() : 0;
+            secondRowHeight = juce::jmax(lissHeight, trajHeight);
+            rowTopY += secondRowHeight + rowGap;
         }
 
         if (workbenchCard != nullptr)
@@ -506,44 +506,37 @@ void DevPanel::resized()
 
         int cy = spacing.deckPadding;
 
-        if (lfoLeftCard != nullptr || lfoRightCard != nullptr)
+        // Row 1: Dual scope card (full width)
+        if (dualScopeCard != nullptr)
         {
-            const int sharedHeight = topRowHeight;
-            if (lfoLeftCard != nullptr && lfoRightCard != nullptr)
-            {
-                const int twoUpGap = juce::jmax(10, rowGap);
-                const int leftWidth = juce::jmax(80, (innerWidth - twoUpGap) / 2);
-                const int rightWidth = juce::jmax(80, innerWidth - leftWidth - twoUpGap);
-                lfoLeftCard->setVisible(true);
-                lfoRightCard->setVisible(true);
-                lfoLeftCard->setBounds(spacing.deckPadding, cy, leftWidth, sharedHeight);
-                lfoRightCard->setBounds(spacing.deckPadding + leftWidth + twoUpGap, cy, rightWidth, sharedHeight);
-            }
-            else if (lfoLeftCard != nullptr)
-            {
-                lfoLeftCard->setVisible(true);
-                lfoLeftCard->setBounds(spacing.deckPadding, cy, innerWidth, sharedHeight);
-            }
-            else if (lfoRightCard != nullptr)
-            {
-                lfoRightCard->setVisible(true);
-                lfoRightCard->setBounds(spacing.deckPadding, cy, innerWidth, sharedHeight);
-            }
-            cy += sharedHeight + rowGap;
+            dualScopeCard->setVisible(true);
+            dualScopeCard->setBounds(spacing.deckPadding, cy, innerWidth, dualScopeHeight);
+            cy += dualScopeHeight + rowGap;
         }
 
-        if (trajectoryCard != nullptr)
+        // Row 2: Lissajous (45%) and Trajectory (55%) side by side
+        if (lissajousCard != nullptr || trajectoryCard != nullptr)
         {
-            int trajectoryWidth = innerWidth;
-            if (innerWidth > 560)
-                trajectoryWidth = juce::roundToInt(static_cast<float>(innerWidth) * 0.76f);
-            trajectoryWidth = juce::jlimit(220, innerWidth, trajectoryWidth);
-            const int trajectoryX = spacing.deckPadding + (innerWidth - trajectoryWidth) / 2;
-            trajectoryCard->setVisible(true);
-            trajectoryCard->setBounds(trajectoryX, cy, trajectoryWidth, trajectoryHeight);
-            cy += trajectoryHeight + rowGap;
+            const int twoUpGap = juce::jmax(10, rowGap);
+            const int lissWidth = juce::jmax(80, juce::roundToInt(static_cast<float>(innerWidth) * 0.45f));
+            const int trajWidth = juce::jmax(80, innerWidth - lissWidth - twoUpGap);
+
+            if (lissajousCard != nullptr)
+            {
+                lissajousCard->setVisible(true);
+                lissajousCard->setBounds(spacing.deckPadding, cy, lissWidth, secondRowHeight);
+            }
+
+            if (trajectoryCard != nullptr)
+            {
+                trajectoryCard->setVisible(true);
+                trajectoryCard->setBounds(spacing.deckPadding + lissWidth + twoUpGap, cy, trajWidth, secondRowHeight);
+            }
+
+            cy += secondRowHeight + rowGap;
         }
 
+        // Row 3: Workbench card (full width)
         if (workbenchCard != nullptr)
         {
             workbenchCard->setVisible(true);
@@ -2508,7 +2501,22 @@ juce::Component* DevPanel::resolveTutorialFocusComponent(const juce::String& foc
     if (key == "overview_visual") return const_cast<VisualDeckContent*>(&overviewVisualDeck);
     if (key == "overview_inspector" || key == "overview_readouts")
         return const_cast<juce::PropertyPanel*>(&overviewPanel);
-    if (key == "modulation_visual" || key == "lfo_scope") return const_cast<VisualDeckContent*>(&modulationVisualDeck);
+    if (key == "lfo_scope")
+    {
+        if (auto* card = findDeckRole(modulationVisualDeckCards, "devpanelModRole", "lfo_dual_scope", true))
+            return card;
+        if (auto* card = findDeckRole(modulationVisualDeckCards, "devpanelModRole", "lfo_dual_scope", false))
+            return card;
+        return const_cast<VisualDeckContent*>(&modulationVisualDeck);
+    }
+    if (key == "modulation_visual")
+    {
+        if (auto* card = findDeckRole(modulationVisualDeckCards, "devpanelModRole", "lfo_lissajous", true))
+            return card;
+        if (auto* card = findDeckRole(modulationVisualDeckCards, "devpanelModRole", "lfo_lissajous", false))
+            return card;
+        return const_cast<VisualDeckContent*>(&modulationVisualDeck);
+    }
     if (key == "tone_visual" || key == "spectrum_visual" || key == "transfer_visual") return const_cast<VisualDeckContent*>(&toneVisualDeck);
     if (key == "engine_visual") return const_cast<VisualDeckContent*>(&engineVisualDeck);
     if (key == "engine_signal_flow")
