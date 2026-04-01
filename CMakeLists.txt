@@ -72,6 +72,8 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/DspConfig.h
     Source/Plugin/DspConfigManager.h
     Source/Plugin/DspConfigManager.cpp
+    Source/Plugin/ConsoleEngine.cpp
+    Source/Plugin/ConsoleEngine.h
     Source/UI/TopHeaderBar.cpp
     Source/UI/TopHeaderBar.h
     Source/Plugin/SessionLog.cpp

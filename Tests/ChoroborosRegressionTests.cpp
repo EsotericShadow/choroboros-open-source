@@ -672,49 +672,196 @@ static void testProcessorCanonicalStateApply()
     REGRESS_ASSERT(captured.modularCoresEnabled == state.modularCoresEnabled, "Modular cores should be applied");
 }
 
-int main(int argc, char** argv)
+/** Parse tier specification from command line.
+ *
+ * Tier 1: Headless service tests (no UI construction).
+ *   - Canonical preset state validation and round-trip
+ *   - DSP regression tests (no audio load)
+ *   - Headless console command behavior tests
+ *
+ * Tier 2: GUI smoke tests (editor/DevPanel construction, no interaction).
+ *   - Editor and DevPanel construction
+ *   - Tab and component presence verification
+ *   - Layout resizing
+ *
+ * Tier 3: Integration tests (full UI interaction under load).
+ *   - Console command latency benchmarks under audio load
+ *   - Preset round-trips with file I/O
+ *   - Full state save/restore cycles
+ *
+ * Usage:
+ *   ./ChoroborosRegressionTests --tier=1          (Tier 1 only, fast)
+ *   ./ChoroborosRegressionTests --tier=1,2        (Tiers 1+2, smoke test)
+ *   ./ChoroborosRegressionTests --tier=1,2,3      (All tiers, full suite)
+ *   ./ChoroborosRegressionTests (default: --tier=1,2,3 for backward compat)
+ */
+struct TierConfig
 {
-    bool runGuiSuite = true;
-    for (int i = 1; i < argc; ++i)
+    bool tier1 = false;  // Headless / service tests
+    bool tier2 = false;  // GUI smoke tests
+    bool tier3 = false;  // Integration / interaction tests
+
+    static TierConfig parseFromArgs(int argc, char** argv)
     {
-        const juce::String arg(argv[i] != nullptr ? argv[i] : "");
-        if (arg == "--dsp-only")
-            runGuiSuite = false;
-        else if (arg == "--gui")
-            runGuiSuite = true;
-        else if (arg == "--help" || arg == "-h")
+        TierConfig cfg;
+
+        // Default: all tiers (backward compat with old --gui behavior)
+        cfg.tier1 = true;
+        cfg.tier2 = true;
+        cfg.tier3 = true;
+
+        for (int i = 1; i < argc; ++i)
         {
-            std::cout << "Usage: ChoroborosRegressionTests [--dsp-only] [--gui]\n";
-            std::cout << "  --dsp-only  Skip GUI-dependent regression suite (CI-safe on headless runners)\n";
-            std::cout << "  --gui       Force full suite (default)\n";
-            return 0;
+            const juce::String arg(argv[i] != nullptr ? argv[i] : "");
+
+            if (arg == "--help" || arg == "-h")
+            {
+                std::cout << "Choroboros Regression Test Tiers\n"
+                          << "================================\n"
+                          << "\n"
+                          << "Usage: ChoroborosRegressionTests [--tier=SPEC]\n"
+                          << "\n"
+                          << "Tier Specification:\n"
+                          << "  --tier=1          Run Tier 1 only (headless, fast)\n"
+                          << "  --tier=1,2        Run Tiers 1-2 (with GUI smoke tests)\n"
+                          << "  --tier=1,2,3      Run all tiers (full suite, slow)\n"
+                          << "  (no argument)     Default: all tiers\n"
+                          << "\n"
+                          << "Backward Compatibility:\n"
+                          << "  --dsp-only        Equivalent to --tier=1\n"
+                          << "  --gui             Equivalent to --tier=1,2,3\n"
+                          << "\n"
+                          << "Tier Descriptions:\n"
+                          << "  Tier 1 (Headless/Service): No UI construction. Tests DSP, presets, service logic.\n"
+                          << "  Tier 2 (GUI Smoke):        Editor/DevPanel construction, basic presence checks.\n"
+                          << "  Tier 3 (Integration):      Full UI interaction, console latency under audio load.\n";
+                exit(0);
+            }
+
+            // Backward compatibility: --dsp-only => tier 1 only
+            if (arg == "--dsp-only")
+            {
+                cfg.tier1 = true;
+                cfg.tier2 = false;
+                cfg.tier3 = false;
+            }
+            // Backward compatibility: --gui => all tiers
+            else if (arg == "--gui")
+            {
+                cfg.tier1 = true;
+                cfg.tier2 = true;
+                cfg.tier3 = true;
+            }
+            // New syntax: --tier=SPEC
+            else if (arg.startsWith("--tier="))
+            {
+                cfg.tier1 = false;
+                cfg.tier2 = false;
+                cfg.tier3 = false;
+
+                const juce::String spec = arg.substring(7);  // "1,2,3"
+                juce::StringArray parts;
+                parts.addTokens(spec, ",", "");
+                for (const auto& part : parts)
+                {
+                    const int tier = part.trim().getIntValue();
+                    if (tier == 1) cfg.tier1 = true;
+                    else if (tier == 2) cfg.tier2 = true;
+                    else if (tier == 3) cfg.tier3 = true;
+                }
+            }
         }
+
+        return cfg;
     }
 
+    juce::String describe() const
+    {
+        juce::StringArray parts;
+        if (tier1) parts.add("1");
+        if (tier2) parts.add("2");
+        if (tier3) parts.add("3");
+        if (parts.isEmpty())
+            return "(none)";
+        return parts.joinIntoString(",");
+    }
+};
+
+int main(int argc, char** argv)
+{
+    const TierConfig tiers = TierConfig::parseFromArgs(argc, argv);
+
+    // GUI initialization (needed for Tiers 2-3, but safe to call anyway)
     juce::ScopedJuceInitialiser_GUI init;
 
     std::cout << "Choroboros Regression Harness\n";
-    std::cout << "----------------------------\n";
+    std::cout << "=============================\n";
+    std::cout << "Running Tiers: " << tiers.describe() << "\n";
+    std::cout << "\n";
 
-    // Canonical preset state tests
-    testCanonicalPresetStateValidation();
-    testCanonicalPresetStateRoundTrip();
-    testCanonicalPresetStateBinaryRoundTrip();
-    testFactoryPresetStates();
-    testProcessorCanonicalStateApply();
+    if (tiers.tier1)
+    {
+        std::cout << "Tier 1: Headless / Service Tests\n";
+        std::cout << "--------------------------------\n";
 
-    // Existing tests
-    testProcessBlockSizes();
-    testEngineHQTorture();
-    testStateRoundTrip();
-    testMaxBlockChannels();
-    testKnownBadBundledEngineProfilesMigrateToDefaults();
-    if (runGuiSuite)
+        // Canonical preset state tests
+        testCanonicalPresetStateValidation();
+        testCanonicalPresetStateRoundTrip();
+        testCanonicalPresetStateBinaryRoundTrip();
+        testFactoryPresetStates();
+        testProcessorCanonicalStateApply();
+
+        // DSP regression tests (no UI, no audio load complexity)
+        testProcessBlockSizes();
+        testEngineHQTorture();
+        testStateRoundTrip();
+        testMaxBlockChannels();
+        testKnownBadBundledEngineProfilesMigrateToDefaults();
+
+        // TODO: Add Tier 1 headless console command behavior tests here
+        // when ConsoleEngine API stabilizes.
+
+        std::cout << "Tier 1 complete.\n";
+        std::cout << "\n";
+    }
+
+    if (tiers.tier2)
+    {
+        std::cout << "Tier 2: GUI Smoke Tests\n";
+        std::cout << "----------------------\n";
+
+        // TODO: Add editor/DevPanel construction and presence verification tests
+        // Lightweight checks: can we construct without crashing?
+        // Example:
+        //   ChoroborosAudioProcessor proc;
+        //   ChoroborosPluginEditor editor(proc);
+        //   editor.setBounds(0, 0, 1024, 600);
+        //   editor.resized();
+        //   DevPanel panel(editor, proc);
+        //   panel.setBounds(0, 0, 1280, 760);
+        //   panel.resized();
+        //   // Verify components exist
+
+        std::cout << "Tier 2 smoke tests not yet implemented.\n";
+        std::cout << "Tier 2 complete.\n";
+        std::cout << "\n";
+    }
+
+    if (tiers.tier3)
+    {
+        std::cout << "Tier 3: Integration Tests\n";
+        std::cout << "------------------------\n";
+
+        // Console command latency benchmark (heavier UI interaction test)
         testConsoleCommandLatencyUnderAudioLoad();
-    else
-        std::cout << "Skipping GUI-dependent console latency suite (--dsp-only)\n";
 
-    std::cout << "----------------------------\n";
+        // TODO: Add other integration tests (file I/O, full state cycles, etc.)
+
+        std::cout << "Tier 3 complete.\n";
+        std::cout << "\n";
+    }
+
+    std::cout << "=============================\n";
     if (g_failCount == 0)
         std::cout << "PASS: All regression tests passed.\n";
     else

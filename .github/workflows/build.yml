@@ -71,10 +71,10 @@ jobs:
             --target ChoroborosRegressionTests \
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run Tier 1+2 regression tests
         run: |
           xvfb-run --auto-servernum \
-            ./build/linux-x64-release/ChoroborosRegressionTests --dsp-only
+            ./build/linux-x64-release/ChoroborosRegressionTests --tier=1,2
 
       - name: Package and checksum
         run: |
@@ -142,10 +142,10 @@ jobs:
             --target ChoroborosRegressionTests `
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run Tier 1+2 regression tests
         shell: cmd
         run: |
-          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --dsp-only
+          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --tier=1,2
 
       - name: Package and checksum
         shell: pwsh
@@ -218,10 +218,10 @@ jobs:
             --target ChoroborosRegressionTests `
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run Tier 1+2 regression tests
         shell: cmd
         run: |
-          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --dsp-only
+          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --tier=1,2
 
       - name: Package and checksum
         shell: pwsh

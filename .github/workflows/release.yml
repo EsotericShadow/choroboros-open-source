@@ -59,9 +59,9 @@ jobs:
             --target ChoroborosRegressionTests \
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run full regression tests (Tier 1+2+3)
         run: |
-          ./build/macos-universal-release/ChoroborosRegressionTests --dsp-only
+          ./build/macos-universal-release/ChoroborosRegressionTests --tier=1,2,3
 
       - name: Verify Universal Binary
         run: |
@@ -154,10 +154,10 @@ jobs:
             --target ChoroborosRegressionTests \
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run full regression tests (Tier 1+2+3)
         run: |
           xvfb-run --auto-servernum \
-            ./build/linux-x64-release/ChoroborosRegressionTests --dsp-only
+            ./build/linux-x64-release/ChoroborosRegressionTests --tier=1,2,3
 
       - name: Package and checksum
         run: |
@@ -225,10 +225,10 @@ jobs:
             --target ChoroborosRegressionTests `
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run full regression tests (Tier 1+2+3)
         shell: cmd
         run: |
-          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --dsp-only
+          build\windows-x64-release\Release\ChoroborosRegressionTests.exe --tier=1,2,3
 
       - name: Package and checksum
         shell: pwsh
@@ -301,10 +301,10 @@ jobs:
             --target ChoroborosRegressionTests `
             --parallel
 
-      - name: Run DSP regression tests
+      - name: Run full regression tests (Tier 1+2+3)
         shell: cmd
         run: |
-          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --dsp-only
+          build\windows-x86-release\Release\ChoroborosRegressionTests.exe --tier=1,2,3
 
       - name: Package and checksum
         shell: pwsh
