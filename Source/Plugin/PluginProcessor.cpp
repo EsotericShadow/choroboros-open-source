@@ -52,78 +52,16 @@ public:
     }
 };
 
-std::atomic<std::uint64_t>& getLoadTraceInstanceCounter()
+
+
+// Plan 4: appendLoadTraceLine disabled (load trace disk writes removed).
+// Collapse to no-op to avoid breaking all call sites.
+inline void appendLoadTraceLine(const ChoroborosAudioProcessor&,
+                                const juce::String&,
+                                double,
+                                const juce::String&)
 {
-    static std::atomic<std::uint64_t> counter { 1 };
-    return counter;
-}
-
-std::uint64_t nextLoadTraceInstanceId()
-{
-    return getLoadTraceInstanceCounter().fetch_add(1, std::memory_order_relaxed);
-}
-
-// Intentional leak: the CriticalSection is heap-allocated and never freed.
-// A static CriticalSection would be destroyed during DLL_PROCESS_DETACH on
-// Windows while the loader lock is held — if any thread holds the CS at that
-// point, the destructor deadlocks.  Leaking a trivial amount of memory at
-// process exit is the standard workaround (Raymond Chen, "The Old New Thing").
-juce::CriticalSection& getLoadTraceFileLock()
-{
-    static auto* lock = new juce::CriticalSection();
-    return *lock;
-}
-
-juce::String getSafeHostDescription()
-{
-    const juce::PluginHostType hostType;
-    const juce::String hostDescription(hostType.getHostDescription());
-    return hostDescription.isNotEmpty() ? hostDescription : juce::String("Unknown");
-}
-
-void appendLoadTraceLine(const ChoroborosAudioProcessor& processor,
-                         const juce::String& eventName,
-                         double elapsedMs,
-                         const juce::String& notes)
-{
-    if (eventName.isEmpty())
-        return;
-
-    const juce::ScopedLock lock(getLoadTraceFileLock());
-    const auto logFile = ChoroborosAudioProcessor::getLoadTraceLogFile();
-    if (!logFile.getParentDirectory().createDirectory())
-        return;
-
-    juce::var payload(new juce::DynamicObject());
-    auto* object = payload.getDynamicObject();
-    if (object == nullptr)
-        return;
-
-    const auto wrapperType = juce::PluginHostType::getPluginLoadedAs();
-    object->setProperty("tsUtc", juce::Time::getCurrentTime().toISO8601(true));
-    object->setProperty("event", eventName);
-    object->setProperty("elapsedMs", juce::roundToInt(elapsedMs * 1000.0) / 1000.0);
-    object->setProperty("instanceId", static_cast<juce::int64>(processor.getInstanceId()));
-    object->setProperty("host", getSafeHostDescription());
-    object->setProperty("hostPath", juce::PluginHostType::getHostPath());
-    object->setProperty("wrapperType", juce::String(juce::AudioProcessor::getWrapperTypeDescription(wrapperType)));
-    object->setProperty("pluginVersion", juce::String(JucePlugin_VersionString));
-   #if JUCE_DEBUG
-    object->setProperty("buildConfig", "debug");
-   #else
-    object->setProperty("buildConfig", "release");
-   #endif
-    object->setProperty("os", juce::SystemStats::getOperatingSystemName());
-    object->setProperty("isOS64Bit", juce::SystemStats::isOperatingSystem64Bit());
-    object->setProperty("cpuVendor", juce::SystemStats::getCpuVendor());
-    object->setProperty("cpuModel", juce::SystemStats::getCpuModel());
-    object->setProperty("cpuSpeedMHz", juce::SystemStats::getCpuSpeedInMegahertz());
-    object->setProperty("cpuCores", juce::SystemStats::getNumCpus());
-    object->setProperty("ramMB", juce::SystemStats::getMemorySizeInMegabytes());
-    if (notes.isNotEmpty())
-        object->setProperty("notes", notes);
-
-    logFile.appendText(juce::JSON::toString(payload, false) + "\n", false, false, nullptr);
+    // No-op: load trace file I/O removed in Plan 4.
 }
 
 juce::String buildStartupParamSnapshotNotes(ChoroborosAudioProcessor& processor, const juce::String& sourceTag)
@@ -890,7 +828,9 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     // The session log itself is already on disk thanks to the 30s flush timer.
     CrashReporter::install(SessionLog::getCleanShutdownMarker());
 
-    instanceId = nextLoadTraceInstanceId();
+    // Plan 4: Simple instance counter (was used by load trace, now standalone).
+    static std::atomic<std::uint64_t> instanceCounter { 1 };
+    instanceId = instanceCounter.fetch_add(1, std::memory_order_relaxed);
     const double ctorStartMs = juce::Time::getMillisecondCounterHiRes();
 
     initTuningDefaults();
@@ -941,22 +881,8 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
-    auto procLog = [](const char* s) {
-        FILE* f = fopen("C:\\Users\\Public\\choroboros_log.txt", "a");
-        if (f)
-        {
-            fprintf(f, "[CHORO][PROC] %s\n", s);
-            fflush(f);
-            fclose(f);
-        }
-    };
-
-    procLog("PROC DTOR START");
-
-    procLog("stopTimer");
     stopTimer();
 
-    procLog("analyzerWorker stop");
     if (analyzerWorker != nullptr)
     {
         analyzerWorker->signalThreadShouldExit();
@@ -964,7 +890,6 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
         analyzerWorker->stopThread(500);
     }
 
-    procLog("removeParameterListeners");
     parameters.removeParameterListener(ENGINE_COLOR_ID, this);
     parameters.removeParameterListener(RATE_ID, this);
     parameters.removeParameterListener(DEPTH_ID, this);
@@ -974,34 +899,23 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     parameters.removeParameterListener(HQ_ID, this);
     parameters.removeParameterListener(MIX_ID, this);
 
-    procLog("sessionLog prepareForShutdown");
     if (sessionLog)
         sessionLog->prepareForShutdown();
 
-    procLog("CrashReporter::uninstall");
     CrashReporter::uninstall();
 
-    procLog("feedbackCollector.reset");
     feedbackCollector.reset();
 
-    procLog("sessionLog.reset");
     sessionLog.reset();
-
-    procLog("PROC DTOR COMPLETE");
-}
-
-juce::File ChoroborosAudioProcessor::getLoadTraceLogFile()
-{
-    return DefaultsPersistence::getUserDefaultsFile()
-        .getParentDirectory()
-        .getChildFile("load_trace.ndjson");
 }
 
 void ChoroborosAudioProcessor::logLoadTraceEvent(const juce::String& eventName,
                                                  double elapsedMs,
                                                  const juce::String& notes) const
 {
-    appendLoadTraceLine(*this, eventName, elapsedMs, notes);
+    // Plan 4: logLoadTraceEvent disabled (load trace disk writes removed).
+    // Collapse to no-op to avoid breaking all call sites.
+    (void)eventName; (void)elapsedMs; (void)notes;
 }
 
 //==============================================================================

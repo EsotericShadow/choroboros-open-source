@@ -396,7 +396,6 @@ private:
     bool unlockWarningVisible = false;
     bool unlockWarningUnlockingAll = false;
     std::function<void(bool)> unlockWarningDecisionCallback;
-    juce::File recentTouchesLogFile;
     int analyzerRefreshTickCounter = 0;
     int settingsTutorialTopicIndex = 0;
     bool settingsShowTutorialHintsOnOpen = true;

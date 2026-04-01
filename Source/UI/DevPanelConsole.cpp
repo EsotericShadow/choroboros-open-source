@@ -425,24 +425,10 @@ juce::StringArray DevPanel::buildConsoleAutocompleteCommands() const
     return commands;
 }
 
-void DevPanel::appendRecentTouchLogLine(const juce::String& line) const
+void DevPanel::appendRecentTouchLogLine(const juce::String&) const
 {
-    if (line.trim().isEmpty() || recentTouchesLogFile == juce::File())
-        return;
-
-    if (!recentTouchesLogFile.getParentDirectory().exists())
-        recentTouchesLogFile.getParentDirectory().createDirectory();
-
-    if (recentTouchesLogFile.existsAsFile() && recentTouchesLogFile.getSize() > 512 * 1024)
-    {
-        juce::StringArray lines;
-        lines.addLines(recentTouchesLogFile.loadFileAsString());
-        while (lines.size() > 240)
-            lines.remove(0);
-        recentTouchesLogFile.replaceWithText(lines.joinIntoString("\n") + "\n");
-    }
-
-    recentTouchesLogFile.appendText(line + "\n", false, false);
+    // Plan 4: Touch history file logging removed.
+    // In-memory recentTouchHistory is kept for UI display.
 }
 
 juce::String DevPanel::buildConsoleWatchHudText() const

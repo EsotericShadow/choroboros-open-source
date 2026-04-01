@@ -219,7 +219,6 @@ public:
     void logLoadTraceEvent(const juce::String& eventName,
                            double elapsedMs,
                            const juce::String& notes = {}) const;
-    static juce::File getLoadTraceLogFile();
     std::uint64_t getInstanceId() const noexcept { return instanceId; }
     
     // Feedback collector (public for editor access)

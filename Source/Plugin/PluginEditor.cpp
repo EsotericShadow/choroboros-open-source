@@ -51,18 +51,6 @@ juce::Image loadSoftwareImageFromMemory(const void* data, int dataSize)
     return toSoftwareImage(juce::ImageCache::getFromMemory(data, dataSize));
 }
 
-void choroLog(const char* step)
-{
-    // Hardcoded path -- C:\Users\Public is writable by all users, no
-    // path expansion, no API calls, no short-name issues.
-    FILE* f = fopen("C:\\Users\\Public\\choroboros_log.txt", "a");
-    if (f)
-    {
-        fprintf(f, "[CHORO] %s\n", step);
-        fflush(f);
-        fclose(f);
-    }
-}
 
 struct BackgroundAssetPack
 {
@@ -692,7 +680,6 @@ private:
 ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    choroLog("EDITOR CTOR START");
     editorCtorStartMs = juce::Time::getMillisecondCounterHiRes();
     setLookAndFeel(&customLookAndFeel);
     hqLitOverlay_ = std::make_unique<HQLitOverlay>(*this);
@@ -960,16 +947,12 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
-    choroLog("DTOR START");
-
     // 1. Remove parameter listener FIRST -- prevents audio thread from calling
     //    parameterChanged() on a half-destroyed editor (Cubase/Reaper freeze).
-    choroLog("1. removeParameterListener");
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
 
     // 2. Null out all slider callbacks that capture raw `this` -- these can
     //    fire during component teardown as attachments are destroyed.
-    choroLog("2. null slider callbacks");
     rateSlider.onValueChange = nullptr;
     depthSlider.onValueChange = nullptr;
     offsetSlider.onValueChange = nullptr;
@@ -979,7 +962,6 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
 
     // 3. Destroy attachments before sliders -- prevents dangling parameter
     //    callbacks during member destruction order.
-    choroLog("3. reset attachments");
     rateAttachment.reset();
     depthAttachment.reset();
     offsetAttachment.reset();
@@ -990,20 +972,15 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     engineColorAttachment.reset();
 
     // 4. Stop background theme thread.
-    choroLog("4. stopDeferredThemePrewarm");
     stopDeferredThemePrewarm();
 
     // 5. Explicitly destroy child windows BEFORE component teardown.
     //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
     //    can trigger cascading HWND messages that deadlock or crash (Cubase).
-    choroLog("5. devWindow.reset()");
     devWindow.reset();
 
     // 6. Detach look-and-feel last.
-    choroLog("6. setLookAndFeel(nullptr)");
     setLookAndFeel(nullptr);
-
-    choroLog("DTOR COMPLETE");
 }
 
 void ChoroborosPluginEditor::parentHierarchyChanged()

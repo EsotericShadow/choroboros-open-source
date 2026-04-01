@@ -58,10 +58,6 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     // Windows GDI doesn't clear before repaint; content fills background to prevent scroll ghosting
     content.setOpaque(true);
 #endif
-    recentTouchesLogFile = DefaultsPersistence::getUserDefaultsFile()
-                               .getParentDirectory()
-                               .getChildFile("devpanel_recent_touches.log");
-    recentTouchesLogFile.getParentDirectory().createDirectory();
 
     content.addAndMakeVisible(copyJsonButton);
     copyJsonButton.setButtonText("Copy JSON");
