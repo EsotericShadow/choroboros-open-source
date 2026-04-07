@@ -470,9 +470,9 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     feedbackButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4a4a4a));
     feedbackButton.setColour(juce::TextButton::textColourOffId, juce::Colours::lightgrey);
     feedbackButton.onClick = [this] {
-        if (audioProcessor.feedbackCollector)
+        if (auto* collector = audioProcessor.getFeedbackCollector())
         {
-            FeedbackDialog::show(*audioProcessor.feedbackCollector);
+            FeedbackDialog::show(*collector);
         }
     };
     feedbackButton.setTooltip("Send Feedback: Share your thoughts, bug reports, or feature requests. Usage statistics included automatically.");
@@ -687,12 +687,12 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         updateValueLabelColors(colorIndex);
         PluginEditorSetup::applyLayout(*this, layoutTuning);
         
-        // Track engine switch for feedback
-        if (audioProcessor.feedbackCollector)
+        // Track engine switch for feedback (only if analytics enabled)
+        if (auto* collector = audioProcessor.getFeedbackCollector())
         {
             auto hqParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::HQ_ID);
             bool hq = hqParam ? (hqParam->load() > 0.5f) : false;
-            audioProcessor.feedbackCollector->trackEngineSwitch(colorIndex, hq);
+            collector->trackEngineSwitch(colorIndex, hq);
         }
         
         // Force sliders to repaint with new thumb image

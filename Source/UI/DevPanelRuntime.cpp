@@ -1761,7 +1761,7 @@ void DevPanel::timerCallback()
         if (std::abs(currentOffsetRaw - lastOffsetRaw) > 1.0e-4f)
         {
             const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID, currentOffsetRaw);
-            pushTouch("Offset", juce::String(mapped, 2) + " deg");
+            pushTouch("Offset", juce::String(mapped, 2) + "\xC2\xB0");
             lastOffsetRaw = currentOffsetRaw;
         }
         if (std::abs(currentWidthRaw - lastWidthRaw) > 1.0e-4f)

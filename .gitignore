@@ -24,6 +24,7 @@ CMakeFiles/
 compile_commands.json
 .juce/
 dmg_temp/
+JUCE
 
 # IDE
 .idea/
@@ -65,4 +66,3 @@ feedback/
 
 # Removed Bloat
 /local_archive/
-/JUCE/

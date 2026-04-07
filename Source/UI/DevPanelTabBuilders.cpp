@@ -64,7 +64,7 @@ void DevPanel::buildOverviewTab(DevPanelBuildContext& ctx)
     {
         const float raw = readRawParam(ChoroborosAudioProcessor::OFFSET_ID);
         const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID, raw);
-        return juce::String(raw, 3) + " -> " + juce::String(mapped, 2) + " deg";
+        return juce::String(raw, 3) + " -> " + juce::String(mapped, 2) + "\xC2\xB0";
     }));
     overviewActiveParams.add(makeReadOnly("Width (raw -> mapped)", [this, readRawParam]() -> juce::String
     {
@@ -291,7 +291,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     {
         const float mapped = processor.mapParameterValue(ChoroborosAudioProcessor::OFFSET_ID,
                                                          readRawParam(ChoroborosAudioProcessor::OFFSET_ID));
-        return juce::String(mapped, 1) + " deg";
+        return juce::String(mapped, 1) + "\xC2\xB0";
     }));
     stereoReadouts.add(makeReadOnly("Stereo Width", [this, readRawParam]() -> juce::String
     {
@@ -307,7 +307,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                                         readRawParam(ChoroborosAudioProcessor::WIDTH_ID));
         // Effective phase difference accounting for width
         const float phaseDiff = offsetDeg * juce::jlimit(0.0f, 1.0f, width);
-        return juce::String(phaseDiff, 1) + " deg";
+        return juce::String(phaseDiff, 1) + "\xC2\xB0";
     }));
     stereoReadouts.add(makeReadOnly("Stereo Coherence", [this, readRawParam]() -> juce::String
     {
@@ -389,8 +389,8 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                         makeLiveMappedControl("LFO Depth (%)",
                                                               ChoroborosAudioProcessor::DEPTH_ID,
                                                               0.0f, 200.0f, 0.1f, 1.0f, 100.0f));
-    modulationWorkbenchCard->addControl("Stereo Offset (deg)",
-                                        makeLiveMappedControl("Stereo Offset (deg)",
+    modulationWorkbenchCard->addControl("Stereo Offset (\xC2\xB0)",
+                                        makeLiveMappedControl("Stereo Offset (\xC2\xB0)",
                                                               ChoroborosAudioProcessor::OFFSET_ID,
                                                               0.0f, 360.0f, 0.5f, 1.0f, 1.0f));
     modulationWorkbenchCard->addControl("Stereo Width (x)",
@@ -962,7 +962,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     };
     auto createOffsetMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Offset Macro (deg)",
+        return makeMappedMacroControl("Offset Macro (\xC2\xB0)",
                                       ChoroborosAudioProcessor::OFFSET_ID,
                                       ChoroborosAudioProcessor::OFFSET_MIN,
                                       ChoroborosAudioProcessor::OFFSET_MAX,
@@ -1324,7 +1324,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     engineMacroWorkbenchCard->getProperties().set("devpanelEngineRole", "macro_workbench");
     engineMacroWorkbenchCard->addControl("Rate Macro (Hz)", createRateMacroControl());
     engineMacroWorkbenchCard->addControl("Depth Macro (%)", createDepthMacroControl());
-    engineMacroWorkbenchCard->addControl("Offset Macro (deg)", createOffsetMacroControl());
+    engineMacroWorkbenchCard->addControl("Offset Macro (\xC2\xB0)", createOffsetMacroControl());
     engineMacroWorkbenchCard->addControl("Width Macro (x)", createWidthMacroControl());
     engineMacroWorkbenchCard->addControl("Color Macro (%)", createColorMacroControl());
     engineMacroWorkbenchCard->addControl("Mix Macro (%)", createMixMacroControl());
@@ -1674,7 +1674,7 @@ void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
         });
         addRow("Offset", ChoroborosAudioProcessor::OFFSET_ID, [](float mapped) -> juce::String
         {
-            return juce::String(mapped, 2) + " deg";
+            return juce::String(mapped, 2) + "\xC2\xB0";
         });
         addRow("Width", ChoroborosAudioProcessor::WIDTH_ID, [&rt](float mapped) -> juce::String
         {
@@ -2328,7 +2328,7 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
         {
             return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectShearPct;
         }, -100, 100);
-        addLayoutActiveEngine(props, "Top Reflect Rotate (deg)", [&layout, fieldIndex](int engineIndex) -> int*
+        addLayoutActiveEngine(props, "Top Reflect Rotate (\xC2\xB0)", [&layout, fieldIndex](int engineIndex) -> int*
         {
             return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.topReflectRotateDeg;
         }, -180, 180);
@@ -2348,7 +2348,7 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
         {
             return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectShearPct;
         }, -100, 100);
-        addLayoutActiveEngine(props, "Bottom Reflect Rotate (deg)", [&layout, fieldIndex](int engineIndex) -> int*
+        addLayoutActiveEngine(props, "Bottom Reflect Rotate (\xC2\xB0)", [&layout, fieldIndex](int engineIndex) -> int*
         {
             return &layout.mainValueAnimationsByEngine[static_cast<std::size_t>(engineIndex)][static_cast<std::size_t>(fieldIndex)].fx.bottomReflectRotateDeg;
         }, -180, 180);
@@ -2412,12 +2412,12 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addLayoutToGroup(layoutColorValueFxProps, "Top Reflect Offset X (x0.01 px)", layout.colorValueTopReflectOffsetXPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutColorValueFxProps, "Top Reflect Offset Y (x0.01 px)", layout.colorValueTopReflectOffsetYPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutColorValueFxProps, "Top Reflect Shear (%)", layout.colorValueTopReflectShearPct, -100, 100);
-    addLayoutToGroup(layoutColorValueFxProps, "Top Reflect Rotate (deg)", layout.colorValueTopReflectRotateDeg, -180, 180);
+    addLayoutToGroup(layoutColorValueFxProps, "Top Reflect Rotate (\xC2\xB0)", layout.colorValueTopReflectRotateDeg, -180, 180);
     addLayoutToGroup(layoutColorValueFxProps, "Bottom Reflect Alpha (%)", layout.colorValueBottomReflectAlphaPct, 0, 40);
     addLayoutToGroup(layoutColorValueFxProps, "Bottom Reflect Offset X (x0.01 px)", layout.colorValueBottomReflectOffsetXPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutColorValueFxProps, "Bottom Reflect Offset Y (x0.01 px)", layout.colorValueBottomReflectOffsetYPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutColorValueFxProps, "Bottom Reflect Shear (%)", layout.colorValueBottomReflectShearPct, -100, 100);
-    addLayoutToGroup(layoutColorValueFxProps, "Bottom Reflect Rotate (deg)", layout.colorValueBottomReflectRotateDeg, -180, 180);
+    addLayoutToGroup(layoutColorValueFxProps, "Bottom Reflect Rotate (\xC2\xB0)", layout.colorValueBottomReflectRotateDeg, -180, 180);
     addLayoutToGroup(layoutColorValueFxProps, "Reflect Blur (x0.01 px)", layout.colorValueReflectBlurPxTimes100, 0, 800);
     addLayoutToGroup(layoutColorValueFxProps, "Reflect Squash (%)", layout.colorValueReflectSquashPct, 0, 95);
     addLayoutToGroup(layoutColorValueFxProps, "Reflect Motion (%)", layout.colorValueReflectMotionPct, 0, 200);
@@ -2431,12 +2431,12 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addLayoutToGroup(layoutMixValueFxProps, "Top Reflect Offset X (x0.01 px)", layout.mixValueTopReflectOffsetXPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutMixValueFxProps, "Top Reflect Offset Y (x0.01 px)", layout.mixValueTopReflectOffsetYPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutMixValueFxProps, "Top Reflect Shear (%)", layout.mixValueTopReflectShearPct, -100, 100);
-    addLayoutToGroup(layoutMixValueFxProps, "Top Reflect Rotate (deg)", layout.mixValueTopReflectRotateDeg, -180, 180);
+    addLayoutToGroup(layoutMixValueFxProps, "Top Reflect Rotate (\xC2\xB0)", layout.mixValueTopReflectRotateDeg, -180, 180);
     addLayoutToGroup(layoutMixValueFxProps, "Bottom Reflect Alpha (%)", layout.mixValueBottomReflectAlphaPct, 0, 40);
     addLayoutToGroup(layoutMixValueFxProps, "Bottom Reflect Offset X (x0.01 px)", layout.mixValueBottomReflectOffsetXPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutMixValueFxProps, "Bottom Reflect Offset Y (x0.01 px)", layout.mixValueBottomReflectOffsetYPxTimes100, -1200, 1200);
     addLayoutToGroup(layoutMixValueFxProps, "Bottom Reflect Shear (%)", layout.mixValueBottomReflectShearPct, -100, 100);
-    addLayoutToGroup(layoutMixValueFxProps, "Bottom Reflect Rotate (deg)", layout.mixValueBottomReflectRotateDeg, -180, 180);
+    addLayoutToGroup(layoutMixValueFxProps, "Bottom Reflect Rotate (\xC2\xB0)", layout.mixValueBottomReflectRotateDeg, -180, 180);
     addLayoutToGroup(layoutMixValueFxProps, "Reflect Blur (x0.01 px)", layout.mixValueReflectBlurPxTimes100, 0, 800);
     addLayoutToGroup(layoutMixValueFxProps, "Reflect Squash (%)", layout.mixValueReflectSquashPct, 0, 95);
     addLayoutToGroup(layoutMixValueFxProps, "Reflect Motion (%)", layout.mixValueReflectMotionPct, 0, 200);
@@ -2499,8 +2499,8 @@ void DevPanel::buildLayoutTab(DevPanelBuildContext& ctx)
     addLayout(layoutGlobalKnobResponseProps, "Offset Visual Response (ms)", layout.offsetKnobVisualResponseMs, 1, 1000);
     addLayout(layoutGlobalKnobResponseProps, "Width Visual Response (ms)", layout.widthKnobVisualResponseMs, 1, 1000);
     addLayout(layoutGlobalKnobResponseProps, "Mix Visual Response (ms)", layout.mixKnobVisualResponseMs, 1, 1000);
-    addLayout(layoutGlobalKnobResponseProps, "Knob Sweep Start (deg)", layout.knobSweepStartDeg, 0, 360);
-    addLayout(layoutGlobalKnobResponseProps, "Knob Sweep End (deg)", layout.knobSweepEndDeg, 0, 360);
+    addLayout(layoutGlobalKnobResponseProps, "Knob Sweep Start (\xC2\xB0)", layout.knobSweepStartDeg, 0, 360);
+    addLayout(layoutGlobalKnobResponseProps, "Knob Sweep End (\xC2\xB0)", layout.knobSweepEndDeg, 0, 360);
     addLayout(layoutGlobalKnobResponseProps, "Knob Frame Count", layout.knobFrameCount, 2, 156);
 
     auto addEngineLayoutSections = [&](juce::PropertyPanel& panel, EngineLayoutGroups& groups)

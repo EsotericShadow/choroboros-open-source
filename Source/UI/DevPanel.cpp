@@ -800,7 +800,7 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         if (n.contains("width"))
             return "Multiplier for the stereo effect. 0 = mono modulation. 1 = normal stereo. Higher values exaggerate the L/R difference.";
         if (n.contains("offset"))
-            return "Phase angle between L and R modulation. 0 deg = both channels move together. 90-180 deg = channels move apart, creating stereo width.";
+            return "Phase angle between L and R modulation. 0\xC2\xB0 = both channels move together. 90-180\xC2\xB0 = channels move apart, creating stereo width.";
 
         return "Live DSP/UI tuning control. Use small moves, listen for tone/motion changes, then refine with A/B comparisons.";
     };
