@@ -2,7 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'codex/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -12,6 +14,87 @@ env:
   PRODUCT: "Choroboros Beta"
 
 jobs:
+
+  # ---------------------------------------------------------------------------
+  # macOS Universal (arm64 + x86_64) — VST3 + AU + Standalone
+  # ---------------------------------------------------------------------------
+  macos:
+    name: macOS Universal
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install build tools
+        run: brew install ninja
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/macos-universal-release
+          key: macos-universal-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
+          restore-keys: |
+            macos-universal-cmake-
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/macos-universal-release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Build VST3 + AU + Standalone
+        run: |
+          cmake --build build/macos-universal-release \
+            --target Choroboros_VST3 Choroboros_AU Choroboros_Standalone \
+            --parallel
+
+      - name: Build regression harness
+        run: |
+          cmake --build build/macos-universal-release \
+            --target ChoroborosRegressionTests \
+            --parallel
+
+      - name: Run Tier 1+2 regression tests
+        run: |
+          ./build/macos-universal-release/ChoroborosRegressionTests --tier=1,2
+
+      - name: Verify Universal Binary
+        run: |
+          echo "=== VST3 ==="
+          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3/Contents/MacOS/Choroboros Beta"
+          echo "=== AU ==="
+          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component/Contents/MacOS/Choroboros Beta"
+          echo "=== Standalone ==="
+          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app/Contents/MacOS/Choroboros Beta"
+
+      - name: Package and checksum
+        run: |
+          mkdir -p dist
+          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
+          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component" dist/
+          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app" dist/
+          cd dist
+          zip -r Choroboros-Beta-macOS-Universal.zip \
+            "Choroboros Beta.vst3" \
+            "Choroboros Beta.component" \
+            "Choroboros Beta.app"
+          shasum -a 256 Choroboros-Beta-macOS-Universal.zip > Choroboros-Beta-macOS-Universal.zip.sha256
+          cat Choroboros-Beta-macOS-Universal.zip.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Choroboros-Beta-macOS-Universal
+          path: |
+            dist/Choroboros-Beta-macOS-Universal.zip
+            dist/Choroboros-Beta-macOS-Universal.zip.sha256
+          if-no-files-found: error
+          retention-days: 3
 
   # ---------------------------------------------------------------------------
   # Linux x64 — VST3 + Standalone
