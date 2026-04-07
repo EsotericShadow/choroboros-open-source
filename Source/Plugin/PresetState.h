@@ -62,6 +62,14 @@ struct PresetState
     // Quality
     bool hqEnabled = false;
 
+    // Engine selection (0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black)
+    int engineColorIndex = 0;
+
+    // Custom engine identity (empty = factory engine, non-empty = custom engine UUID).
+    // When non-empty, takes precedence over engineColorIndex for engine identity.
+    // See KZN_SHARED_CONTRACT.md section 12.
+    std::string customEngineId;
+
     // Modular core routing (affects audio output)
     bool modularCoresEnabled = false;
     choroboros::CoreAssignmentTable coreAssignments;

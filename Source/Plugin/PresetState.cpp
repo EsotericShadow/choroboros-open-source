@@ -18,7 +18,6 @@
 
 #include "PresetState.h"
 #include "PluginProcessor.h"
-#include <sstream>
 #include <cmath>
 
 //==============================================================================
@@ -43,6 +42,8 @@ bool PresetState::isValid() const
     if (color < ChoroborosAudioProcessor::COLOR_MIN || color > ChoroborosAudioProcessor::COLOR_MAX)
         return false;
     if (mix < ChoroborosAudioProcessor::MIX_MIN || mix > ChoroborosAudioProcessor::MIX_MAX)
+        return false;
+    if (engineColorIndex < 0 || engineColorIndex > 4)
         return false;
 
     // Version must be positive
@@ -135,6 +136,9 @@ std::string PresetState::serializeToJson() const
     root->setProperty("color", color);
     root->setProperty("mix", mix);
     root->setProperty("hqEnabled", hqEnabled);
+    root->setProperty("engineColorIndex", engineColorIndex);
+    if (!customEngineId.empty())
+        root->setProperty("customEngineId", juce::String(customEngineId));
     root->setProperty("modularCoresEnabled", modularCoresEnabled);
     root->setProperty("coreAssignments", buildCoreAssignmentsVar(coreAssignments));
 
@@ -171,6 +175,11 @@ std::optional<PresetState> PresetState::deserializeFromJson(const std::string& j
                    || (hqVar.isDouble() && static_cast<double>(hqVar) >= 0.5)
                    || (hqVar.isInt() && static_cast<int>(hqVar) != 0)
                    || (hqVar.toString().equalsIgnoreCase("true"));
+    state.engineColorIndex = juce::jlimit(0, 4,
+        static_cast<int>(getNumberOrDefault(parsed, "engineColorIndex", 0)));
+    const auto customIdVar = obj->getProperty("customEngineId");
+    if (customIdVar.isString())
+        state.customEngineId = customIdVar.toString().toStdString();
 
     // Modular core routing
     const auto modularVar = obj->getProperty("modularCoresEnabled");
@@ -245,6 +254,14 @@ std::optional<PresetState> PresetState::deserializeFromBinary(const void* data, 
 
     const auto hqValue = readParameter(ChoroborosAudioProcessor::HQ_ID, 0.0f);
     state.hqEnabled = (hqValue >= 0.5f);
+
+    // Engine color (legacy APVTS stores this as a float choice index)
+    const float engineColorValue = readParameter(ChoroborosAudioProcessor::ENGINE_COLOR_ID, 0.0f);
+    state.engineColorIndex = juce::jlimit(0, 4, static_cast<int>(std::round(engineColorValue)));
+
+    // Custom engine ID (stored as a ValueTree property on the root element)
+    if (xmlState->hasAttribute("customEngineId"))
+        state.customEngineId = xmlState->getStringAttribute("customEngineId").toStdString();
 
     // Legacy core assignments (if present)
     state.modularCoresEnabled = false;  // Default: modular mode was off in legacy
@@ -333,6 +350,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 0.5f;
             state.color = 0.16f;
             state.hqEnabled = false;
+            state.engineColorIndex = 0;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
@@ -345,6 +363,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 0.5f;
             state.color = 0.5f;
             state.hqEnabled = true;
+            state.engineColorIndex = 2;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
@@ -357,6 +376,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 0.5f;
             state.color = 0.41f;
             state.hqEnabled = true;
+            state.engineColorIndex = 1;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
@@ -369,6 +389,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 0.69f;
             state.color = 0.13f;
             state.hqEnabled = false;
+            state.engineColorIndex = 3;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
@@ -381,6 +402,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 0.5f;
             state.color = 0.28f;
             state.hqEnabled = true;
+            state.engineColorIndex = 4;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
@@ -393,6 +415,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 1.0f;
             state.color = 0.1f;
             state.hqEnabled = true;
+            state.engineColorIndex = 3;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
@@ -405,6 +428,7 @@ std::optional<PresetState> PresetState::makeFactoryPreset(int index)
             state.mix = 1.0f;
             state.color = 0.65f;
             state.hqEnabled = true;
+            state.engineColorIndex = 1;
             state.modularCoresEnabled = false;
             state.coreAssignments.resetToLegacy();
             break;
