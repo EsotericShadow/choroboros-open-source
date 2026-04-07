@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - v2.05-dev
       - 'codex/**'
   pull_request:
     branches: [main]
