@@ -32,7 +32,16 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <future>
+#include <mutex>
 #include <thread>
+#include <vector>
+
+/** Background images for one engine theme (editor decode / prewarm). */
+struct BackgroundAssetPack
+{
+    juce::Image off;
+    juce::Image lit;
+};
 
 //==============================================================================
 /**
@@ -173,6 +182,18 @@ private:
 
     std::thread themePrewarmThread;
     std::shared_ptr<std::atomic<bool>> themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
+
+    // Prewarm results queue: worker pushes decoded packs, message-thread paint installs them.
+    struct PrewarmedTheme
+    {
+        int colorIndex = 0;
+        int activeColorIndex = 0;
+        CustomLookAndFeel::ThemeAssetPack pack;
+        BackgroundAssetPack backgroundPack;
+    };
+
+    std::mutex prewarmQueueMutex;
+    std::vector<PrewarmedTheme> prewarmQueue;
     std::future<CustomLookAndFeel::ThemeAssetPack> activeThemeDecodeFuture;
     int activeThemeDecodeColorIndex = 0;
     bool activeThemeInstalled = false;

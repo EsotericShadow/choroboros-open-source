@@ -53,12 +53,6 @@ juce::Image loadSoftwareImageFromMemory(const void* data, int dataSize)
 }
 
 
-struct BackgroundAssetPack
-{
-    juce::Image off;
-    juce::Image lit;
-};
-
 struct SharedBackgroundCache
 {
     juce::CriticalSection lock;
@@ -968,7 +962,13 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     // 5. Explicitly destroy child windows BEFORE component teardown.
     //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
     //    can trigger cascading HWND messages that deadlock or crash (Cubase).
-    devWindow.reset();
+    //    Hide first, remove native peer, THEN delete the C++ object.
+    if (devWindow != nullptr)
+    {
+        devWindow->setVisible(false);
+        devWindow->removeFromDesktop();
+        devWindow.reset();
+    }
 
     // 6. Detach look-and-feel last.
     setLookAndFeel(nullptr);
@@ -1017,6 +1017,31 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
         audioProcessor.logLoadTraceEvent("editor_theme_wait_before_first_paint_ms",
                                          juce::Time::getMillisecondCounterHiRes() - waitStartMs,
                                          "engine=" + juce::String(activeThemeDecodeColorIndex));
+    }
+
+    // Install any themes decoded by the prewarm worker thread.
+    {
+        std::vector<PrewarmedTheme> ready;
+        {
+            std::lock_guard<std::mutex> lock(prewarmQueueMutex);
+            ready.swap(prewarmQueue);
+        }
+        for (auto& t : ready)
+        {
+            customLookAndFeel.installThemeAssetPack(t.colorIndex, std::move(t.pack));
+            if (t.colorIndex == t.activeColorIndex)
+            {
+                backgroundImage = t.backgroundPack.off;
+                backgroundImageLit = t.backgroundPack.lit;
+                invalidateHQLitOverlayCache();
+                audioProcessor.logLoadTraceEvent(
+                    "editor_active_theme_ready_ms",
+                    juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs,
+                    "engine=" + juce::String(t.activeColorIndex));
+            }
+        }
+        if (!ready.empty())
+            repaint();
     }
 
     if (!firstPaintTimingLogged)
@@ -1196,75 +1221,48 @@ void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
 {
     stopDeferredThemePrewarm();
 
-    // Each thread invocation gets its own stop flag so that detaching the
-    // previous thread and resetting the flag doesn't create a race.
+    // Each thread invocation gets its own stop flag so a prior join + new start
+    // does not race on the shared atomic.
     themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
     auto stopFlag = themePrewarmStopFlag;  // shared_ptr copy -- thread owns a ref
 
-    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-
-    themePrewarmThread = std::thread([safeThis, stopFlag, activeColorIndex]()
+    themePrewarmThread = std::thread([this, stopFlag, activeColorIndex]()
     {
         std::array<int, 5> prewarmOrder { activeColorIndex, 0, 1, 2, 3 };
         int orderCursor = 1;
         for (int i = 0; i < 5 && orderCursor < 5; ++i)
         {
-            const int candidate = i;
-            if (candidate == activeColorIndex)
-                continue;
-            prewarmOrder[static_cast<size_t>(orderCursor++)] = candidate;
+            if (i == activeColorIndex) continue;
+            prewarmOrder[static_cast<size_t>(orderCursor++)] = i;
         }
 
         for (int i = 0; i < orderCursor; ++i)
         {
-            if (stopFlag->load())
-                return;
+            if (stopFlag->load()) return;
 
             const int colorIndex = prewarmOrder[static_cast<size_t>(i)];
             auto backgroundPack = getOrDecodeBackgroundAssetPack(colorIndex);
             auto pack = CustomLookAndFeel::getOrDecodeThemeAssetPack(colorIndex);
 
-            if (stopFlag->load())
-                return;
+            if (stopFlag->load()) return;
 
-            juce::MessageManager::callAsync(
-                [safeThis, colorIndex, activeColorIndex, pack = std::move(pack), backgroundPack = std::move(backgroundPack)]() mutable
-                {
-                    if (safeThis == nullptr)
-                        return;
-                    safeThis->customLookAndFeel.installThemeAssetPack(colorIndex, std::move(pack));
-                    if (colorIndex == activeColorIndex)
-                    {
-                        safeThis->backgroundImage = backgroundPack.off;
-                        safeThis->backgroundImageLit = backgroundPack.lit;
-                        safeThis->invalidateHQLitOverlayCache();
-                        safeThis->audioProcessor.logLoadTraceEvent(
-                            "editor_active_theme_ready_ms",
-                            juce::Time::getMillisecondCounterHiRes() - safeThis->editorCtorStartMs,
-                            "engine=" + juce::String(activeColorIndex));
-                        safeThis->repaint();
-                    }
-                });
+            {
+                std::lock_guard<std::mutex> lock(prewarmQueueMutex);
+                prewarmQueue.push_back({ colorIndex, activeColorIndex,
+                                         std::move(pack), std::move(backgroundPack) });
+            }
         }
     });
 }
 
 void ChoroborosPluginEditor::stopDeferredThemePrewarm()
 {
-    // Signal the current thread invocation to stop.
     themePrewarmStopFlag->store(true);
 
-    // IMPORTANT: Do NOT call themePrewarmThread.join() here.
-    // This function runs on the message thread (from the editor destructor).
-    // The worker thread calls MessageManager::callAsync(), which needs the
-    // message thread to process its callback.  Calling join() here would
-    // deadlock: message thread blocked in join(), worker blocked in callAsync().
-    //
-    // Instead we detach the thread and let it exit on its own -- it checks
-    // its own stop flag every iteration, and all callAsync lambdas use a
-    // SafePointer that will be null once the editor is destroyed.
+    // Safe to join now: the worker thread no longer calls callAsync or touches
+    // the MessageManager, so joining from the message thread cannot deadlock.
     if (themePrewarmThread.joinable())
-        themePrewarmThread.detach();
+        themePrewarmThread.join();
 }
 
 void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)

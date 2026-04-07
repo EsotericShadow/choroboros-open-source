@@ -913,6 +913,8 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 
     CrashReporter::uninstall();
 
+    if (feedbackCollector)
+        feedbackCollector->prepareForShutdown();
     feedbackCollector.reset();
 
     sessionLog.reset();

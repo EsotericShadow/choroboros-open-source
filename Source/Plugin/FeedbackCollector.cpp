@@ -29,10 +29,20 @@ FeedbackCollector::FeedbackCollector()
     trackSessionStart();
 }
 
-FeedbackCollector::~FeedbackCollector()
+void FeedbackCollector::prepareForShutdown()
 {
     trackSessionEnd();
     saveStats();
+    shutdownComplete = true;
+}
+
+FeedbackCollector::~FeedbackCollector()
+{
+    if (!shutdownComplete)
+    {
+        trackSessionEnd();
+        saveStats();
+    }
 }
 
 //==============================================================================

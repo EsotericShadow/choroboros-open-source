@@ -42,6 +42,10 @@ public:
     void trackSessionStart();
     void trackSessionEnd();
 
+    /** Flush stats to disk while the message thread is still alive.
+        Called from PluginProcessor destructor before reset(). */
+    void prepareForShutdown();
+
     // ---- Host / environment info (set once by PluginProcessor) -------------
     void setHostInfo (const juce::String& hostName,
                       const juce::String& wrapperType,
@@ -90,4 +94,6 @@ private:
     void loadStats();
     void saveStats() const;
     juce::File getStatsFile() const;
+
+    bool shutdownComplete = false;
 };
