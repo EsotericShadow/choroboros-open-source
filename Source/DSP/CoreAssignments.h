@@ -32,6 +32,16 @@ enum class CoreId : std::uint8_t
     count
 };
 
+inline bool isCommercialCore(CoreId id)
+{
+    return static_cast<std::uint8_t>(id) >= static_cast<std::uint8_t>(CoreId::count);
+}
+
+inline bool isFreeCore(CoreId id)
+{
+    return static_cast<std::uint8_t>(id) < static_cast<std::uint8_t>(CoreId::count);
+}
+
 constexpr std::size_t coreIdCount() noexcept
 {
     return static_cast<std::size_t>(CoreId::count);

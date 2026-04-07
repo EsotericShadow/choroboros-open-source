@@ -25,6 +25,7 @@
 #include "FeedbackDialog.h"
 #include "AboutDialog.h"
 #include "HelpDialog.h"
+#include "../KZN/ChoroborosKznImporter.h"
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/DevPanel.h"
 #include <array>
@@ -750,17 +751,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     PluginEditorSetup::setupLabels(*this);
     setupSliderValueChangeListeners();
     
-    // Update value label colors based on saved engine color (after all labels are set up)
-    auto engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID);
-    if (engineColorParam)
-    {
-        const int savedColorIndex = static_cast<int>(engineColorParam->load());
-        updateValueLabelColors(savedColorIndex);
-    }
-    else
-    {
-        updateValueLabelColors(0);  // Default to Green if no parameter
-    }
+    applyCurrentEngineVisual();
     
     // Set up double-click editing for value labels
     setupValueLabelEditing(rateValueLabel, rateSlider, ChoroborosAudioProcessor::RATE_ID);
@@ -993,32 +984,22 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
 {
     if (parameterID == ChoroborosAudioProcessor::ENGINE_COLOR_ID)
     {
-        const int colorIndex = juce::jlimit(0, 4, static_cast<int>(newValue));
-
-        // parameterChanged can be called from the audio thread -- all GUI
-        // work MUST happen on the message thread.  Using SafePointer so the
-        // lambda is a no-op if the editor is destroyed before delivery.
+        const int newId = juce::roundToInt(newValue) + 1;
         juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-        juce::MessageManager::callAsync([safeThis, colorIndex]()
+        juce::MessageManager::callAsync([safeThis, newId]()
         {
             if (safeThis == nullptr)
                 return;
 
-            safeThis->customLookAndFeel.setColorTheme(colorIndex);
-            safeThis->loadBackgroundImage(colorIndex);
-            safeThis->updateValueLabelColors(colorIndex);
-            safeThis->topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
-            if (safeThis->topHeaderBar_)
-                safeThis->topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
+            if (!safeThis->audioProcessor.hasActiveCustomEngine()
+                && safeThis->engineColorBox.getSelectedId() != newId)
+            {
+                safeThis->engineColorBox.setSelectedId(newId, juce::sendNotificationSync);
+            }
 
-            // Engine colour changed -- if this wasn't triggered by a preset load,
-            // invalidate the current preset so the dropdown shows the placeholder.
             if (safeThis->audioProcessor.presetManager
                 && ! safeThis->audioProcessor.presetManager->isLoadInProgress())
                 safeThis->audioProcessor.presetManager->invalidatePreset();
-
-            PluginEditorSetup::applyLayout(*safeThis, safeThis->layoutTuning);
-            safeThis->repaint();
         });
     }
 }
@@ -1133,53 +1114,52 @@ void ChoroborosPluginEditor::refreshValueLabels()
 
 void ChoroborosPluginEditor::setupEngineColorSelector()
 {
-    engineColorBox.addItem("Green", 1);
-    engineColorBox.addItem("Blue", 2);
-    engineColorBox.addItem("Red", 3);
-    engineColorBox.addItem("Purple", 4);
-    engineColorBox.addItem("Black", 5);
-    engineColorBox.setSelectedId(1);
+    rebuildEngineSelectorItems();
+    engineColorBox.setSelectedId(1, juce::dontSendNotification);
 
-    // The header bar owns layout; pass the combo to it.
-    // Styling is handled by TopHeaderBar::setEngineSelector().
     if (topHeaderBar_)
         topHeaderBar_->setEngineSelector (&engineColorBox);
-    
-    engineColorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::ENGINE_COLOR_ID, engineColorBox);
-    
-    // Read the current parameter value and update UI to match (for persistence)
-    // Do this AFTER attachment is created so ComboBox has the correct value
-    auto engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID);
-    if (engineColorParam)
-    {
-        // Use the ComboBox's selected ID to ensure consistency
-        const int actualColorIndex = engineColorBox.getSelectedId() - 1;
-        customLookAndFeel.setThemeColorIndexOnly(actualColorIndex);
-        // Value labels will be updated after they're set up in constructor
-    }
-    
+
     engineColorBox.setTooltip("Engine Selection: Choose between five distinct chorus algorithms. Green=Classic, Blue=Modern, Red=Vintage, Purple=Experimental, Black=Linear.");
-    
-    engineColorBox.onChange = [this] {
-        const int colorIndex = engineColorBox.getSelectedId() - 1;
-        customLookAndFeel.setColorTheme(colorIndex);
-        loadBackgroundImage(colorIndex);
-        updateValueLabelColors(colorIndex);
-        topBarDrawer.setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
-        if (topHeaderBar_)
-            topHeaderBar_->setAccentColour (devpanel::engineSkinColourForIndex (colorIndex));
-        PluginEditorSetup::applyLayout(*this, layoutTuning);
-        
-        // Track engine switch for feedback (only if analytics enabled)
-        if (auto* collector = audioProcessor.getFeedbackCollector())
+
+    engineColorBox.onChange = [this]
+    {
+        if (engineSwitchInProgress)
+            return;
+
+        const int selectedId = engineColorBox.getSelectedId();
+        if (selectedId <= 0 || !audioProcessor.customEngineManager)
+            return;
+
+        const auto& engines = audioProcessor.customEngineManager->getEngines();
+        const int engineIdx = selectedId - 1;
+        if (engineIdx < 0 || engineIdx >= static_cast<int>(engines.size()))
+            return;
+
+        engineSwitchInProgress = true;
+        const auto& engine = engines[static_cast<size_t>(engineIdx)];
+
+        if (engine.isFactory)
         {
-            auto hqParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::HQ_ID);
-            bool hq = hqParam ? (hqParam->load() > 0.5f) : false;
-            collector->trackEngineSwitch(colorIndex, hq);
+            if (audioProcessor.hasActiveCustomEngine())
+                audioProcessor.deactivateCustomEngine();
+
+            if (auto* param = audioProcessor.getValueTreeState().getParameter(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
+                param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(engine.factoryIndex)));
+
+            if (auto* collector = audioProcessor.getFeedbackCollector())
+            {
+                auto hqParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::HQ_ID);
+                const bool hq = hqParam ? (hqParam->load() > 0.5f) : false;
+                collector->trackEngineSwitch(engine.factoryIndex, hq);
+            }
         }
-        
-        // Force sliders to repaint with new thumb image
+        else
+        {
+            audioProcessor.activateCustomEngine(engine.id);
+        }
+
+        applyEngineVisual(engine.visual);
         rateSlider.repaint();
         depthSlider.repaint();
         offsetSlider.repaint();
@@ -1187,7 +1167,29 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         colorSlider.repaint();
         mixSlider.repaint();
         repaint();
+        engineSwitchInProgress = false;
     };
+
+    applyCurrentEngineVisual();
+}
+
+void ChoroborosPluginEditor::rebuildEngineSelectorItems()
+{
+    engineColorBox.clear(juce::dontSendNotification);
+
+    if (audioProcessor.customEngineManager)
+    {
+        const auto& engines = audioProcessor.customEngineManager->getEngines();
+        for (int i = 0; i < static_cast<int>(engines.size()); ++i)
+            engineColorBox.addItem(engines[static_cast<size_t>(i)].name, i + 1);
+        return;
+    }
+
+    engineColorBox.addItem("Green", 1);
+    engineColorBox.addItem("Blue", 2);
+    engineColorBox.addItem("Red", 3);
+    engineColorBox.addItem("Purple", 4);
+    engineColorBox.addItem("Black", 5);
 }
 
 void ChoroborosPluginEditor::startDeferredThemePrewarm(int activeColorIndex)
@@ -1406,12 +1408,145 @@ void ChoroborosPluginEditor::updateValueLabelColors(int colorIndex)
     mixValueLabel.repaint();
 }
 
+void ChoroborosPluginEditor::applyEngineVisual(const choroboros::CustomEngineVisual& visual)
+{
+    int fallbackColorIndex = juce::jlimit(0, 4, audioProcessor.getCurrentEngineColorIndex());
+    if (visual.backgroundSet >= 0 && visual.backgroundSet < 5)
+        fallbackColorIndex = visual.backgroundSet;
+
+    customLookAndFeel.setColorTheme(fallbackColorIndex);
+    loadBackgroundImage(fallbackColorIndex);
+
+    juce::Colour valueTextColor = visual.valueTextColour;
+    const float alphaScale = static_cast<float>(juce::jlimit(0, 100, layoutTuning.valueTextAlphaPct)) * 0.01f;
+    valueTextColor = valueTextColor.withMultipliedAlpha(alphaScale);
+
+    rateValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    depthValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    offsetValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    widthValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    colorValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    mixValueLabel.setColour(juce::Label::textColourId, valueTextColor);
+    rateValueLabel.setEditorTextColor(valueTextColor);
+    depthValueLabel.setEditorTextColor(valueTextColor);
+    offsetValueLabel.setEditorTextColor(valueTextColor);
+    widthValueLabel.setEditorTextColor(valueTextColor);
+    colorValueLabel.setEditorTextColor(valueTextColor);
+    mixValueLabel.setEditorTextColor(valueTextColor);
+
+    topBarDrawer.setAccentColour(visual.accentColour);
+    if (topHeaderBar_)
+        topHeaderBar_->setAccentColour(visual.accentColour);
+
+    PluginEditorSetup::applyLayout(*this, layoutTuning);
+}
+
 void ChoroborosPluginEditor::loadBackgroundImage(int colorIndex)
 {
     const auto pack = getOrDecodeBackgroundAssetPack(colorIndex);
     backgroundImage = pack.off;
     backgroundImageLit = pack.lit;
     invalidateHQLitOverlayCache();
+}
+
+void ChoroborosPluginEditor::applyCurrentEngineVisual()
+{
+    auto* mgr = audioProcessor.customEngineManager.get();
+    if (mgr == nullptr)
+    {
+        const int colorIndex = audioProcessor.getCurrentEngineColorIndex();
+        engineColorBox.setSelectedId(colorIndex + 1, juce::dontSendNotification);
+        updateValueLabelColors(colorIndex);
+        customLookAndFeel.setColorTheme(colorIndex);
+        loadBackgroundImage(colorIndex);
+        return;
+    }
+
+    const auto& engines = mgr->getEngines();
+    const choroboros::CustomEngine* activeEngine = nullptr;
+    int comboId = 1;
+
+    if (audioProcessor.hasActiveCustomEngine())
+    {
+        const auto activeId = audioProcessor.getActiveCustomEngineId();
+        for (int i = 0; i < static_cast<int>(engines.size()); ++i)
+        {
+            if (engines[static_cast<size_t>(i)].id == activeId)
+            {
+                activeEngine = &engines[static_cast<size_t>(i)];
+                comboId = i + 1;
+                break;
+            }
+        }
+    }
+
+    if (activeEngine == nullptr)
+    {
+        const int colorIndex = audioProcessor.getCurrentEngineColorIndex();
+        activeEngine = mgr->getFactoryEngine(colorIndex);
+        comboId = colorIndex + 1;
+    }
+
+    if (activeEngine == nullptr)
+        return;
+
+    engineColorBox.setSelectedId(comboId, juce::dontSendNotification);
+    applyEngineVisual(activeEngine->visual);
+    rateSlider.repaint();
+    depthSlider.repaint();
+    offsetSlider.repaint();
+    widthSlider.repaint();
+    colorSlider.repaint();
+    mixSlider.repaint();
+}
+
+bool ChoroborosPluginEditor::isInterestedInFileDrag(const juce::StringArray& files)
+{
+    for (const auto& file : files)
+        if (file.endsWithIgnoreCase(".kzn"))
+            return true;
+    return false;
+}
+
+void ChoroborosPluginEditor::filesDropped(const juce::StringArray& files, int, int)
+{
+    juce::ignoreUnused(files);
+
+    juce::File droppedFile;
+    for (const auto& path : files)
+    {
+        if (path.endsWithIgnoreCase(".kzn"))
+        {
+            droppedFile = juce::File(path);
+            break;
+        }
+    }
+
+    if (!droppedFile.existsAsFile())
+        return;
+
+    const auto result = choroboros::importKzn(audioProcessor, droppedFile);
+    if (result.success)
+    {
+        if (result.type == "engine")
+        {
+            rebuildEngineSelectorItems();
+            applyCurrentEngineVisual();
+        }
+
+        juce::String message = "Imported " + result.type + ": " + result.presetName;
+        if (result.warningMessage.isNotEmpty())
+            message << "\n\nWarning:\n" << result.warningMessage;
+
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                               "KZN Import Successful",
+                                               message);
+        return;
+    }
+
+    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                                           "KZN Import Failed",
+                                           result.errorMessage);
 }
 
 int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const
@@ -1561,7 +1696,7 @@ void ChoroborosPluginEditor::updateValueLabel(LabelWithContainer& label, float v
     }
     else if (paramId == ChoroborosAudioProcessor::OFFSET_ID)
     {
-        text = juce::String(static_cast<int>(mappedValue)) + " deg";
+        text = juce::String(static_cast<int>(mappedValue)) + "°";
     }
     else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
     {
@@ -1676,6 +1811,8 @@ float ChoroborosPluginEditor::parseOffsetValue(const juce::String& trimmed)
     juce::String clean = trimmed;
     if (clean.endsWithIgnoreCase("deg"))
         clean = clean.substring(0, clean.length() - 3).trim();
+    else if (clean.endsWith("°"))
+        clean = clean.dropLastCharacters(1).trim();
     const float value = clean.getFloatValue();
     if (std::isfinite(value))
         return value;

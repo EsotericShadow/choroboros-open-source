@@ -829,6 +829,8 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     // Create preset manager early — it only scans the user presets directory
     // and doesn't call back into the processor during construction.
     presetManager = std::make_unique<PresetManager> (*this);
+    customEngineManager = std::make_unique<choroboros::CustomEngineManager>();
+    customEngineManager->loadAll();
 
     // Install crash handlers — on crash, the handler deletes the clean-shutdown
     // marker (using async-signal-safe unlink()) so next launch detects the crash.
@@ -1463,7 +1465,19 @@ void ChoroborosAudioProcessor::syncEngineInternalsToActiveDsp(int colorIndex, bo
 {
     const int clamped = juce::jlimit(0, 4, colorIndex);
     if (clamped == activeInternalsEngine && hqEnabled == activeInternalsHQ)
+    {
+        if (!activeCustomEngineId.isNull() && customEngineManager)
+        {
+            if (auto* engine = customEngineManager->getEngineById(activeCustomEngineId))
+            {
+                auto& srcTuning = hqEnabled ? *engine->hqTuning : *engine->nqTuning;
+                copyRuntimeTuningValues(srcTuning, chorusDSP->getRuntimeTuning());
+                return;
+            }
+        }
+
         copyRuntimeTuningValues(engineInternals[clamped][hqEnabled ? 1 : 0], chorusDSP->getRuntimeTuning());
+    }
 }
 
 void ChoroborosAudioProcessor::initializeEngineInternalProfiles()
@@ -1482,12 +1496,32 @@ void ChoroborosAudioProcessor::initializeEngineInternalProfiles()
 
 void ChoroborosAudioProcessor::persistActiveEngineInternalsFromDsp()
 {
+    if (!activeCustomEngineId.isNull() && customEngineManager)
+    {
+        if (auto* engine = customEngineManager->getEngineById(activeCustomEngineId))
+        {
+            auto& dstTuning = activeInternalsHQ ? *engine->hqTuning : *engine->nqTuning;
+            copyRuntimeTuningValues(chorusDSP->getRuntimeTuning(), dstTuning);
+            return;
+        }
+    }
+
     const int clampedColor = juce::jlimit(0, 4, activeInternalsEngine);
     copyRuntimeTuningValues(chorusDSP->getRuntimeTuning(), engineInternals[clampedColor][activeInternalsHQ ? 1 : 0]);
 }
 
 void ChoroborosAudioProcessor::restoreEngineInternalsToDsp(int colorIndex, bool hqEnabled)
 {
+    if (!activeCustomEngineId.isNull() && customEngineManager)
+    {
+        if (auto* engine = customEngineManager->getEngineById(activeCustomEngineId))
+        {
+            auto& srcTuning = hqEnabled ? *engine->hqTuning : *engine->nqTuning;
+            copyRuntimeTuningValues(srcTuning, chorusDSP->getRuntimeTuning());
+            return;
+        }
+    }
+
     copyRuntimeTuningValues(engineInternals[juce::jlimit(0, 4, colorIndex)][hqEnabled ? 1 : 0], chorusDSP->getRuntimeTuning());
 }
 
@@ -1533,6 +1567,14 @@ PresetState ChoroborosAudioProcessor::capturePresetState() const
     if (const auto* hqParam = parameters.getRawParameterValue(HQ_ID))
         state.hqEnabled = (hqParam->load() >= 0.5f);
 
+    // Capture engine color selection
+    if (const auto* engineColorParam = parameters.getRawParameterValue(ENGINE_COLOR_ID))
+        state.engineColorIndex = juce::jlimit(0, 4, static_cast<int>(engineColorParam->load()));
+
+    // Capture custom engine identity
+    if (!activeCustomEngineId.isNull())
+        state.customEngineId = activeCustomEngineId.toString().toStdString();
+
     // Capture modular core state
     state.modularCoresEnabled = modularCoresEnabled;
     state.coreAssignments = coreAssignments;
@@ -1568,6 +1610,9 @@ bool ChoroborosAudioProcessor::applyPresetState(const PresetState& state, ApplyC
     setRawParam(COLOR_ID, state.color);
     setRawParam(MIX_ID, state.mix);
 
+    // Set engine color
+    setRawParam(ENGINE_COLOR_ID, static_cast<float>(state.engineColorIndex));
+
     // Set HQ
     if (auto* param = parameters.getParameter(HQ_ID))
         param->setValueNotifyingHost(state.hqEnabled ? 1.0f : 0.0f);
@@ -1578,6 +1623,30 @@ bool ChoroborosAudioProcessor::applyPresetState(const PresetState& state, ApplyC
 
     // PLAN 2: Publish config once (all parameters updated atomically, lock-free)
     publishDspConfig();
+    lastEngineIndex = state.engineColorIndex;
+
+    // Apply custom engine identity (must come AFTER publishDspConfig so base state is applied first)
+    if (!state.customEngineId.empty())
+    {
+        const juce::Uuid customId(juce::String(state.customEngineId));
+        if (!customId.isNull() && customEngineManager
+            && customEngineManager->getEngineById(customId) != nullptr)
+        {
+            activateCustomEngine(customId);
+        }
+        else
+        {
+            // Missing engine fallback: engine not found on this machine.
+            // Clear custom engine mode, fall back to factory engineColorIndex.
+            if (hasActiveCustomEngine())
+                deactivateCustomEngine();
+        }
+    }
+    else if (hasActiveCustomEngine())
+    {
+        // Preset is a factory preset - deactivate any active custom engine.
+        deactivateCustomEngine();
+    }
 
     // Update preset manager state based on context
     if (presetManager != nullptr)
@@ -1610,11 +1679,14 @@ void ChoroborosAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     const double stateCapStartMs = juce::Time::getMillisecondCounterHiRes();
 
-    // Capture canonical preset state
-    const auto presetState = capturePresetState();
+    auto state = parameters.copyState();
+    state.setProperty("modularCoresEnabled", modularCoresEnabled, nullptr);
+    state.setProperty("coreAssignmentsJson", encodeCoreAssignmentsForStateProperty(coreAssignments), nullptr);
+    if (!activeCustomEngineId.isNull())
+        state.setProperty("customEngineId", activeCustomEngineId.toString(), nullptr);
 
-    // Serialize to binary (JSON-based format)
-    destData = presetState.serializeToBinary();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    copyXmlToBinary(*xml, destData);
 
     logLoadTraceEvent("processor_get_state_information_ms",
                       juce::Time::getMillisecondCounterHiRes() - stateCapStartMs,
@@ -1626,15 +1698,65 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
     const double stateLoadStartMs = juce::Time::getMillisecondCounterHiRes();
     bool stateApplied = false;
 
-    // Deserialize preset state (with legacy XML migration)
-    if (const auto presetState = PresetState::deserializeFromBinary(data, sizeInBytes))
+    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+    if (xmlState != nullptr && xmlState->hasTagName(parameters.state.getType()))
     {
-        // Apply preset state through the canonical path
+        stateLoadInProgress = true;
+        parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
+        if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
+            lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
+
+        bool restoredModular = false;
+        if (parameters.state.hasProperty("modularCoresEnabled"))
+        {
+            const auto value = parameters.state.getProperty("modularCoresEnabled");
+            if (value.isBool())
+                restoredModular = static_cast<bool>(value);
+            else if (value.isInt() || value.isInt64() || value.isDouble())
+                restoredModular = static_cast<double>(value) >= 0.5;
+            else
+                restoredModular = value.toString().equalsIgnoreCase("true") || value.toString() == "1";
+        }
+        setModularCoresEnabled(restoredModular);
+
+        choroboros::CoreAssignmentTable restoredAssignments;
+        restoredAssignments.resetToLegacy();
+        bool loadedAssignments = false;
+        if (parameters.state.hasProperty("coreAssignmentsJson"))
+        {
+            loadedAssignments = decodeCoreAssignmentsFromStateProperty(
+                parameters.state.getProperty("coreAssignmentsJson").toString(),
+                restoredAssignments);
+        }
+        if (parameters.state.hasProperty("coreAssignments"))
+        {
+            loadedAssignments = parseCoreAssignmentsFromVar(
+                parameters.state.getProperty("coreAssignments"),
+                restoredAssignments) || loadedAssignments;
+        }
+        if (!loadedAssignments)
+            restoredAssignments.resetToLegacy();
+        setCoreAssignments(restoredAssignments);
+
+        activeCustomEngineId = juce::Uuid();
+        if (parameters.state.hasProperty("customEngineId"))
+        {
+            const juce::Uuid restoredId(parameters.state.getProperty("customEngineId").toString());
+            if (!restoredId.isNull() && customEngineManager
+                && customEngineManager->getEngineById(restoredId) != nullptr)
+            {
+                activateCustomEngine(restoredId);
+            }
+        }
+
+        stateLoadInProgress = false;
+        stateApplied = true;
+    }
+    else if (const auto presetState = PresetState::deserializeFromBinary(data, sizeInBytes))
+    {
         stateLoadInProgress = true;
         if (applyPresetState(presetState.value(), ApplyContext::HostRestore))
-        {
             stateApplied = true;
-        }
         stateLoadInProgress = false;
     }
 
@@ -1705,6 +1827,9 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
 
         const int newEngine = juce::jlimit (0, 4, static_cast<int> (newValue));
 
+        if (!activeCustomEngineId.isNull())
+            deactivateCustomEngine();
+
         saveCurrentParamsToEngineProfile (lastEngineIndex);
         lastEngineIndex = newEngine;
         applyEngineParamProfile (newEngine);
@@ -1718,6 +1843,9 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
     {
         liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
         liveTelemetry.hqToggleCount.fetch_add (1, std::memory_order_relaxed);
+
+        if (!activeCustomEngineId.isNull())
+            syncCustomEngineTuningToActiveDsp();
 
         // PLAN 2: Publish config instead of direct DSP mutation
         publishDspConfig();
@@ -1786,6 +1914,73 @@ void ChoroborosAudioProcessor::resetToFactoryDefaults()
     // PLAN 2: Publish config with all factory defaults (lock-free, atomic)
     publishDspConfig();
     resetLiveTelemetryPeakHold();
+}
+
+void ChoroborosAudioProcessor::activateCustomEngine(const juce::Uuid& id)
+{
+    if (!customEngineManager)
+        return;
+
+    auto* engine = customEngineManager->getEngineById(id);
+    if (engine == nullptr)
+        return;
+
+    persistActiveEngineInternalsFromDsp();
+    activeCustomEngineId = id;
+
+    auto assignments = getCoreAssignments();
+    const int currentColor = getCurrentEngineColorIndex();
+    assignments.set(currentColor, false, engine->nqCore);
+    assignments.set(currentColor, true, engine->hqCore);
+    setCoreAssignments(assignments);
+
+    if (!modularCoresEnabled)
+        setModularCoresEnabled(true);
+
+    const bool hqEnabled = isHqEnabled();
+    auto& srcTuning = hqEnabled ? *engine->hqTuning : *engine->nqTuning;
+    copyRuntimeTuningValues(srcTuning, chorusDSP->getRuntimeTuning());
+}
+
+void ChoroborosAudioProcessor::syncCustomEngineTuningToActiveDsp()
+{
+    if (activeCustomEngineId.isNull() || !customEngineManager || chorusDSP == nullptr)
+        return;
+
+    auto* engine = customEngineManager->getEngineById(activeCustomEngineId);
+    if (engine == nullptr)
+        return;
+
+    const bool hqEnabled = isHqEnabled();
+    auto& srcTuning = hqEnabled ? *engine->hqTuning : *engine->nqTuning;
+    copyRuntimeTuningValues(srcTuning, chorusDSP->getRuntimeTuning());
+}
+
+void ChoroborosAudioProcessor::deactivateCustomEngine()
+{
+    if (activeCustomEngineId.isNull())
+        return;
+
+    if (customEngineManager)
+    {
+        auto* engine = customEngineManager->getEngineById(activeCustomEngineId);
+        if (engine != nullptr)
+        {
+            const bool hqEnabled = isHqEnabled();
+            auto& dstTuning = hqEnabled ? *engine->hqTuning : *engine->nqTuning;
+            copyRuntimeTuningValues(chorusDSP->getRuntimeTuning(), dstTuning);
+            customEngineManager->saveEngine(activeCustomEngineId);
+        }
+    }
+
+    activeCustomEngineId = juce::Uuid();
+    coreAssignments.resetToLegacy();
+    setCoreAssignments(coreAssignments);
+
+    const int currentColor = getCurrentEngineColorIndex();
+    const bool hqEnabled = isHqEnabled();
+    copyRuntimeTuningValues(engineInternals[juce::jlimit(0, 4, currentColor)][hqEnabled ? 1 : 0],
+                            chorusDSP->getRuntimeTuning());
 }
 
 bool ChoroborosAudioProcessor::getAnalyzerSnapshot(AnalyzerSnapshot& outSnapshot) const

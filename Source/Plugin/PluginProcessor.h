@@ -33,6 +33,7 @@
 #include "ApplyContext.h"
 #include "DspConfig.h"
 #include "DspConfigManager.h"
+#include "../Engine/CustomEngineManager.h"
 
 //==============================================================================
 /**
@@ -146,6 +147,7 @@ public:
     const std::array<EngineParamProfile, 5>& getEngineParamProfiles() const { return engineParamProfiles; }
     void loadEngineParamProfilesFromVar(const juce::var& profilesVar);
     void syncEngineInternalsToActiveDsp(int colorIndex, bool hqEnabled = false);
+    void syncCustomEngineTuningToActiveDsp();
     float mapParameterValue(const juce::String& paramId, float rawValue) const;
     float unmapParameterValue(const juce::String& paramId, float mappedValue) const;
 
@@ -240,6 +242,12 @@ public:
 
     // Preset manager (public for editor header bar access)
     std::unique_ptr<PresetManager> presetManager;
+    std::unique_ptr<choroboros::CustomEngineManager> customEngineManager;
+
+    void activateCustomEngine(const juce::Uuid& id);
+    void deactivateCustomEngine();
+    bool hasActiveCustomEngine() const { return !activeCustomEngineId.isNull(); }
+    juce::Uuid getActiveCustomEngineId() const { return activeCustomEngineId; }
     
     // Parameter IDs (public for editor access)
     static constexpr const char* RATE_ID = "rate";
@@ -305,6 +313,7 @@ private:
     
     int currentProgram = 0; // Current preset index
     std::uint64_t instanceId = 0;
+    juce::Uuid activeCustomEngineId;
     std::array<EngineParamProfile, 5> engineParamProfiles;
     int lastEngineIndex = 0;
     std::atomic<bool> presetLoadInProgress { false };

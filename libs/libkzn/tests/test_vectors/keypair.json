@@ -1,0 +1,6 @@
+{
+  "note": "TEST ONLY — NOT production. Do not use for real signing.",
+  "key_id": 1,
+  "private_key_hex": "1b6ca1d8cf888c1d2a6ef7e51797b01efffb5d1fbda6a7f4365be51e9bcad6b1",
+  "public_key_hex": "327f37657868e9e65b125b070903461464d0e556cd1928bbbed4ac509429db5f"
+}

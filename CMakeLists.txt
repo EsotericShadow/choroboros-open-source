@@ -35,6 +35,9 @@ else()
     FetchContent_MakeAvailable(JUCE)
 endif()
 
+set(LIBKZN_BUILD_TESTS OFF CACHE BOOL "Disable libkzn tests" FORCE)
+add_subdirectory(libs/libkzn)
+
 juce_add_plugin(Choroboros
     COMPANY_NAME "Kaizen DSP"
     COMPANY_COPYRIGHT "Copyright (C) 2026 Kaizen Strategic AI Inc. All rights reserved."
@@ -82,6 +85,11 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/SessionLog.h
     Source/Plugin/CrashReporter.cpp
     Source/Plugin/CrashReporter.h
+    Source/Engine/CustomEngineManager.cpp
+    Source/Engine/CustomEngineManager.h
+    Source/KZN/ChoroborosKznSchema.h
+    Source/KZN/ChoroborosKznImporter.h
+    Source/KZN/ChoroborosKznImporter.cpp
 
     # DSP engine
     Source/DSP/ChorusDSP.cpp
@@ -216,6 +224,7 @@ target_link_libraries(Choroboros
         juce::juce_audio_plugin_client
         juce::juce_dsp
         ChoroborosBinaryData
+        libkzn
 )
 
 # Regression test harness + build gate

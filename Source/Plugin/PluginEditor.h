@@ -38,7 +38,8 @@
 /**
 */
 class ChoroborosPluginEditor  : public juce::AudioProcessorEditor,
-                                private juce::AudioProcessorValueTreeState::Listener
+                                private juce::AudioProcessorValueTreeState::Listener,
+                                public juce::FileDragAndDropTarget
 {
 public:
     ChoroborosPluginEditor (ChoroborosAudioProcessor&);
@@ -53,6 +54,8 @@ public:
     void applyTuningToUI();
     void refreshValueLabels();
     void resetLayoutToFactoryDefaults();
+    bool isInterestedInFileDrag(const juce::StringArray& files) override;
+    void filesDropped(const juce::StringArray& files, int x, int y) override;
     float getUiScale() const { return kUiScale; }
     int getHeaderBarHeight() const { return topHeaderBar_ ? topHeaderBar_->getBarHeight() : 0; }
     const LayoutTuning& getLayoutTuning() const { return layoutTuning; }
@@ -145,8 +148,11 @@ private:
     
     // Constructor helper methods
     void setupEngineColorSelector();
+    void rebuildEngineSelectorItems();
     void setupSliderAttachments();
     void setupSliderValueChangeListeners();
+    void applyEngineVisual(const choroboros::CustomEngineVisual& visual);
+    void applyCurrentEngineVisual();
     void startDeferredThemePrewarm(int activeColorIndex);
     void stopDeferredThemePrewarm();
     void scheduleDeferredDevPanelPrewarm();
@@ -173,6 +179,7 @@ private:
     double editorCtorStartMs = 0.0;
     bool firstPaintTimingLogged = false;
     bool themePrewarmStarted = false;
+    bool engineSwitchInProgress = false;
     
     // Make members accessible to setup helper
     friend class PluginEditorSetup;
