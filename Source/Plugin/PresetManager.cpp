@@ -134,6 +134,7 @@ void PresetManager::loadPreset (int index)
     loadInProgress_ = true;
 
     currentIndex_ = juce::jlimit (0, total - 1, index);
+    DBG("loadPreset: index=" + juce::String(index) + " total=" + juce::String(total) + " currentIndex_=" + juce::String(currentIndex_) + " name=" + getCurrentPresetName());
 
     if (currentIndex_ < getNumFactoryPresets())
     {
@@ -169,9 +170,16 @@ void PresetManager::nextPreset()
 
     // If no preset is active (index == -1), start from the first preset.
     if (currentIndex_ < 0)
+    {
+        DBG("nextPreset: no preset active, starting from 0, total=" + juce::String(total));
         loadPreset (0);
+    }
     else
-        loadPreset ((currentIndex_ + 1) % total);
+    {
+        const int newIndex = (currentIndex_ + 1) % total;
+        DBG("nextPreset: currentIndex_=" + juce::String(currentIndex_) + " total=" + juce::String(total) + " newIndex=" + juce::String(newIndex));
+        loadPreset (newIndex);
+    }
 }
 
 void PresetManager::previousPreset()
@@ -182,15 +190,32 @@ void PresetManager::previousPreset()
 
     // If no preset is active (index == -1), start from the last preset.
     if (currentIndex_ < 0)
+    {
+        DBG("previousPreset: no preset active, starting from " + juce::String(total - 1) + ", total=" + juce::String(total));
         loadPreset (total - 1);
+    }
     else
-        loadPreset ((currentIndex_ - 1 + total) % total);
+    {
+        const int newIndex = (currentIndex_ - 1 + total) % total;
+        DBG("previousPreset: currentIndex_=" + juce::String(currentIndex_) + " total=" + juce::String(total) + " newIndex=" + juce::String(newIndex));
+        loadPreset (newIndex);
+    }
 }
 
 void PresetManager::invalidatePreset()
 {
     if (currentIndex_ < 0)
         return;   // Already invalidated — nothing to do.
+
+    // Guard: don't invalidate while loading a preset.
+    // Parameter changes that occur as side-effects of the load should not
+    // reset the currentIndex_ to -1. Only user-initiated state changes
+    // (not caused by the preset load itself) should invalidate.
+    if (loadInProgress_)
+    {
+        DBG("invalidatePreset called during load, ignoring");
+        return;
+    }
 
     currentIndex_ = -1;
     listeners_.call (&Listener::presetChanged, juce::String());
