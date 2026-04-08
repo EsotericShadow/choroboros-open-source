@@ -1123,6 +1123,7 @@ void ChoroborosPluginEditor::applyTuningToUI()
     offsetSlider.setSkewFactor(tuning.offset.uiSkew.load());
     widthSlider.setSkewFactor(tuning.width.uiSkew.load());
     colorSlider.setSkewFactor(tuning.color.uiSkew.load());
+    colorSlider.setValue(colorSlider.getValue(), juce::dontSendNotification);
     mixSlider.setSkewFactor(tuning.mix.uiSkew.load());
 }
 
@@ -1185,6 +1186,7 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
         }
 
         applyEngineVisual(engine.visual);
+        applyTuningToUI();
         rateSlider.repaint();
         depthSlider.repaint();
         offsetSlider.repaint();
@@ -1800,7 +1802,7 @@ float ChoroborosPluginEditor::parseDepthValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 1.0f) ? (value / 100.0f) : value;
+        return (value >= 1.0f && value <= 100.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
 
@@ -1822,7 +1824,7 @@ float ChoroborosPluginEditor::parseWidthValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 2.0f) ? (value / 100.0f) : value;
+        return (value > 2.0f) ? juce::jlimit(0.0f, 2.0f, value / 100.0f) : value;
     return -1.0f;
 }
 
@@ -1831,7 +1833,7 @@ float ChoroborosPluginEditor::parseColorValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 1.0f) ? (value / 100.0f) : value;
+        return (value >= 1.0f && value <= 100.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
 
@@ -1840,6 +1842,6 @@ float ChoroborosPluginEditor::parseMixValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 1.0f) ? (value / 100.0f) : value;
+        return (value >= 1.0f && value <= 100.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
