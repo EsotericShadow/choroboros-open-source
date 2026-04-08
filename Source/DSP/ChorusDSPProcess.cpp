@@ -222,6 +222,26 @@ void ChorusDSPProcess::processOutputPeakCatch(ChorusDSP& chorusDSP,
     }
 }
 
+void ChorusDSPProcess::processOutputTrim(ChorusDSP& chorusDSP,
+                                         juce::dsp::AudioBlock<float>& block)
+{
+    const int numChannels = static_cast<int>(block.getNumChannels());
+    const int numSamples = static_cast<int>(block.getNumSamples());
+    if (numChannels <= 0 || numSamples <= 0)
+        return;
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto* data = block.getChannelPointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float trimGain = chorusDSP.smoothedOutputTrimGain.getNextValue();
+            data[i] *= trimGain;
+        }
+        chorusDSP.smoothedOutputTrimGain.skip(numSamples - 1);
+    }
+}
+
 void ChorusDSPProcess::processChorusParameters(ChorusDSP& chorusDSP, int blockNumSamples, float& currentDepth, float& currentRate, float& currentCentreDelayMs)
 {
     // Smooth the raw 0-1 depth first so engine switches do not inject a step
@@ -531,4 +551,5 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     processPostChorusSaturation(chorusDSP, block);
     chorusDSP.dryWet.mixWetSamples(block);
     processOutputPeakCatch(chorusDSP, block);
+    processOutputTrim(chorusDSP, block);
 }

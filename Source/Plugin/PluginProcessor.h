@@ -258,6 +258,7 @@ public:
     static constexpr const char* ENGINE_COLOR_ID = "engineColor"; // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     static constexpr const char* HQ_ID = "hq"; // Quality toggle
     static constexpr const char* MIX_ID = "mix"; // Dry/wet mix (0.0 = dry, 1.0 = wet)
+    static constexpr const char* OUTPUT_TRIM_ID = "outputTrim"; // Output trim (-12dB to +12dB)
 
     static constexpr float RATE_MIN = 0.01f;
     static constexpr float RATE_MAX = 10.0f;
@@ -271,6 +272,8 @@ public:
     static constexpr float COLOR_MAX = 1.0f;
     static constexpr float MIX_MIN = 0.0f;
     static constexpr float MIX_MAX = 1.0f;
+    static constexpr float OUTPUT_TRIM_MIN = -12.0f;
+    static constexpr float OUTPUT_TRIM_MAX = 12.0f;
 
 private:
     //==============================================================================

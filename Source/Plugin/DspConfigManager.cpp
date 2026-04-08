@@ -122,6 +122,7 @@ void DspConfigManager::applyConfigToDsp(const DspConfig& config, ChorusDSP& dsp)
     dsp.setWidth(config.width);
     dsp.setColor(config.color);
     dsp.setMix(config.mix);
+    dsp.setOutputTrim(config.outputTrim);
 
     // Quality and engine selection
     dsp.setQualityEnabled(config.hqEnabled);

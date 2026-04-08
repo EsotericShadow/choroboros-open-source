@@ -47,6 +47,7 @@ struct DspConfig
     float width = 1.0f;             // 0.0–2.0
     float color = 0.5f;             // 0.0–1.0, tone/saturation
     float mix = 0.5f;               // 0.0–1.0, dry/wet blend
+    float outputTrim = 0.0f;        // -12.0–12.0 dB
 
     // Quality toggle
     bool hqEnabled = false;

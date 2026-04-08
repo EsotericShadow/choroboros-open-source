@@ -26,15 +26,19 @@ void ChorusDSPPrepare::prepareLFOs(ChorusDSP& chorusDSP, const juce::dsp::Proces
     chorusDSP.lfo.initialise(oscFunction);
     chorusDSP.lfo.prepare(spec);
     chorusDSP.lfo.setFrequency(1.0f);
-    
+
     auto cosFunction = [] (float x) { return std::cos(x); };
     chorusDSP.lfoCos.initialise(cosFunction);
     chorusDSP.lfoCos.prepare(spec);
     chorusDSP.lfoCos.setFrequency(1.0f);
-    
+
     constexpr float oscVolumeMultiplier = 0.5f;
     chorusDSP.oscVolume.reset(spec.sampleRate, 0.0);
     chorusDSP.oscVolume.setCurrentAndTargetValue(0.25f * oscVolumeMultiplier);
+
+    // Output trim gain (0dB default = gain of 1.0)
+    chorusDSP.smoothedOutputTrimGain.reset(spec.sampleRate, 0.01);  // 10ms smoothing
+    chorusDSP.smoothedOutputTrimGain.setCurrentAndTargetValue(1.0f);
 }
 
 void ChorusDSPPrepare::prepareFilters(ChorusDSP& chorusDSP, const juce::dsp::ProcessSpec& spec)
@@ -77,7 +81,7 @@ void ChorusDSPPrepare::prepareBuffers(ChorusDSP& chorusDSP, const juce::dsp::Pro
     chorusDSP.delaySamplesBuffer.setSize(1, chorusDSP.maxBlockSize);
     chorusDSP.preEmphOriginalBuffer.setSize(spec.numChannels, chorusDSP.maxBlockSize);
     
-    chorusDSP.dryWet.setMixingRule(juce::dsp::DryWetMixingRule::linear);
+    chorusDSP.dryWet.setMixingRule(juce::dsp::DryWetMixingRule::balanced);
     chorusDSP.dryWet.prepare(spec);
     chorusDSP.dryWet.setWetMixProportion(0.5f);
 

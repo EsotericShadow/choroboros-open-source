@@ -911,7 +911,7 @@ void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float 
     const float fs = static_cast<float>(spec.sampleRate);
     const float cutoffMaxHz = juce::jmax(20.0f, tuning.greenBloomCutoffMaxHz);
     const float cutoffMinHz = juce::jlimit(20.0f, cutoffMaxHz, tuning.greenBloomCutoffMinHz);
-    const float cutoffHz = juce::jmap(bloom, 0.0f, 1.0f, cutoffMaxHz, cutoffMinHz);
+    const float cutoffHz = juce::jmap(bloom, 0.0f, 1.0f, cutoffMinHz, cutoffMaxHz);
     const float onePole = std::exp(-2.0f * juce::MathConstants<float>::pi * cutoffHz / fs);
     const float wetBlend = juce::jlimit(0.0f, 1.0f, tuning.greenBloomWetBlend) * bloom;
     const float bloomGain = 1.0f + juce::jmax(0.0f, tuning.greenBloomGain) * bloom;
@@ -1151,6 +1151,13 @@ void ChorusDSP::setMix(float mix_)
 {
     mix = juce::jlimit(0.0f, 1.0f, mix_);
     smoothedMix.setTargetValue(mix);
+}
+
+void ChorusDSP::setOutputTrim(float trimDb)
+{
+    trimDb = juce::jlimit(-12.0f, 12.0f, trimDb);
+    const float trimGain = std::pow(10.0f, trimDb / 20.0f);
+    smoothedOutputTrimGain.setTargetValue(trimGain);
 }
 
 void ChorusDSP::switchCore(int colorIndex, bool hq)

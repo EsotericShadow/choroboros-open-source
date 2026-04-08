@@ -29,6 +29,7 @@ public:
     static void processWetCharacter(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     static void processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     static void processOutputPeakCatch(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
+    static void processOutputTrim(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     static void processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block);
     
 private:

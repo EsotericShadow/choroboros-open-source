@@ -881,6 +881,7 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
     parameters.addParameterListener(COLOR_ID, this);
     parameters.addParameterListener(HQ_ID, this);
     parameters.addParameterListener(MIX_ID, this);
+    parameters.addParameterListener(OUTPUT_TRIM_ID, this);
     lastEngineIndex = getCurrentEngineColorIndex();
     analyzerWorker = std::make_unique<AnalyzerWorker>(*this);
 
@@ -907,6 +908,7 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     parameters.removeParameterListener(COLOR_ID, this);
     parameters.removeParameterListener(HQ_ID, this);
     parameters.removeParameterListener(MIX_ID, this);
+    parameters.removeParameterListener(OUTPUT_TRIM_ID, this);
 
     if (sessionLog)
         sessionLog->prepareForShutdown();
@@ -1859,7 +1861,8 @@ void ChoroborosAudioProcessor::parameterChanged(const juce::String& parameterID,
         || parameterID == OFFSET_ID
         || parameterID == WIDTH_ID
         || parameterID == COLOR_ID
-        || parameterID == MIX_ID)
+        || parameterID == MIX_ID
+        || parameterID == OUTPUT_TRIM_ID)
     {
         liveTelemetry.parameterWriteCount.fetch_add (1, std::memory_order_relaxed);
         saveCurrentParamsToEngineProfile (getCurrentEngineColorIndex());
@@ -1905,6 +1908,7 @@ void ChoroborosAudioProcessor::resetToFactoryDefaults()
     setToDefault(WIDTH_ID);
     setToDefault(COLOR_ID);
     setToDefault(MIX_ID);
+    setToDefault(OUTPUT_TRIM_ID);
 
     if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
         lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
@@ -2415,7 +2419,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChoroborosAudioProcessor::cr
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
         0.5f  // Default: 50% wet
     ));
-    
+
+    // Output Trim: -12dB to +12dB
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        OUTPUT_TRIM_ID, "Output Trim",
+        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.1f),
+        0.0f  // Default: 0dB (unity)
+    ));
+
     return { params.begin(), params.end() };
 }
 
@@ -2439,6 +2450,8 @@ DspConfig ChoroborosAudioProcessor::buildCurrentDspConfig() const
         config.color = mapParameterValue(COLOR_ID, colorParam->load());
     if (auto* mixParam = parameters.getRawParameterValue(MIX_ID))
         config.mix = mapParameterValue(MIX_ID, mixParam->load());
+    if (auto* trimParam = parameters.getRawParameterValue(OUTPUT_TRIM_ID))
+        config.outputTrim = trimParam->load();
 
     // Quality and engine selection
     if (auto* hqParam = parameters.getRawParameterValue(HQ_ID))

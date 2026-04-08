@@ -172,6 +172,7 @@ public:
     void setEngineColor(int colorIndex); // 0=Green, 1=Blue, 2=Red, 3=Purple, 4=Black
     void setQualityEnabled(bool enabled); // false=Normal, true=HQ
     void setMix(float mix); // 0.0 to 1.0 (dry/wet mix)
+    void setOutputTrim(float trimDb); // -12.0 to 12.0 dB
     void setModularCoreModeEnabled(bool enabled);
     bool isModularCoreModeEnabled() const { return modularCoreModeEnabled; }
     void setCoreAssignments(const choroboros::CoreAssignmentTable& assignments);
@@ -425,18 +426,19 @@ private:
     // This prevents crackling when knob is turned fast
     float smoothedDepthValue = 0.5f;  // Raw depth value
     float depthSmoothingCoeff = 0.0f;  // One-pole filter coefficient
-    
+
     // Rate limiter for depth - prevents rapid changes that overwhelm the smoother
     // Maximum change rate: 2.0 per second (full range in 0.5 seconds)
     float depthRateLimit = 2.0f;  // Maximum change per second
     float depthRateLimitPerSample = 0.0f;  // Calculated per-sample limit
     float currentDepthTarget = 0.5f;  // Current raw rate-limited target
-    
+
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedCentreDelay;  // Centre delay smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedColor;  // Color smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedWidth;  // Width smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOffset;  // Offset smoothing
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedMix;  // Mix smoothing
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOutputTrimGain;  // Output trim gain smoothing
     
     // Target parameters
     float rateHz = 0.5f;  // Rate - Default: 0.5 Hz
