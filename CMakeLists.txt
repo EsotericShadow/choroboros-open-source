@@ -10,6 +10,26 @@ set(CHOROBOROS_VERSION_STRING "Beta v2.04.1")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ---------- Sanitizer support (development only) ----------
+# Applied per-target via choroboros_apply_sanitizers() so JUCE juceaide/helpers stay clean.
+option(CHOROBOROS_ENABLE_ASAN "Enable AddressSanitizer + LeakSanitizer (Debug-oriented builds)" OFF)
+option(CHOROBOROS_ENABLE_TSAN "Enable ThreadSanitizer (mutually exclusive with ASAN)" OFF)
+
+if(CHOROBOROS_ENABLE_ASAN AND CHOROBOROS_ENABLE_TSAN)
+    message(FATAL_ERROR "CHOROBOROS_ENABLE_ASAN and CHOROBOROS_ENABLE_TSAN cannot both be ON.")
+endif()
+
+if(CHOROBOROS_ENABLE_ASAN)
+    message(STATUS "AddressSanitizer ENABLED (shared code, plugin format targets, regression tests)")
+endif()
+
+if(CHOROBOROS_ENABLE_TSAN)
+    message(STATUS "ThreadSanitizer ENABLED (shared code, plugin format targets, regression tests)")
+    if(MSVC)
+        message(WARNING "ThreadSanitizer is not supported with MSVC; use Clang on Windows for TSAN.")
+    endif()
+endif()
+
 # Generate compile_commands.json for IDE language servers
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -33,6 +53,40 @@ else()
         GIT_TAG        29396c22c93392d6738e021b83196283d6e4d850
     )
     FetchContent_MakeAvailable(JUCE)
+endif()
+
+# ---------- Melatonin Inspector (development UI debugging) ----------
+option(CHOROBOROS_ENABLE_INSPECTOR "Enable Melatonin Inspector for UI debugging" OFF)
+
+if(CHOROBOROS_ENABLE_INSPECTOR)
+    message(STATUS "Melatonin Inspector ENABLED")
+    include(FetchContent)
+    FetchContent_Declare(
+        melatonin_inspector
+        GIT_REPOSITORY https://github.com/sudara/melatonin_inspector.git
+        GIT_TAG main
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(melatonin_inspector)
+endif()
+
+# ---------- Melatonin Perfetto (performance tracing) ----------
+option(CHOROBOROS_ENABLE_PERFETTO "Enable Perfetto performance tracing (CMake 3.24+)" OFF)
+
+if(CHOROBOROS_ENABLE_PERFETTO)
+    if(CMAKE_VERSION VERSION_LESS "3.24")
+        message(FATAL_ERROR "CHOROBOROS_ENABLE_PERFETTO requires CMake 3.24+ (melatonin_perfetto).")
+    endif()
+    message(STATUS "Melatonin Perfetto ENABLED")
+    set(PERFETTO ON CACHE BOOL "Enable Perfetto in melatonin_perfetto module" FORCE)
+    include(FetchContent)
+    FetchContent_Declare(
+        melatonin_perfetto
+        GIT_REPOSITORY https://github.com/sudara/melatonin_perfetto.git
+        GIT_TAG main
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(melatonin_perfetto)
 endif()
 
 set(LIBKZN_BUILD_TESTS OFF CACHE BOOL "Disable libkzn tests" FORCE)
@@ -227,6 +281,43 @@ target_link_libraries(Choroboros
         libkzn
 )
 
+if(CHOROBOROS_ENABLE_INSPECTOR)
+    target_link_libraries(Choroboros PRIVATE melatonin_inspector)
+    target_compile_definitions(Choroboros PRIVATE CHOROBOROS_INSPECTOR_ENABLED=1)
+endif()
+
+if(CHOROBOROS_ENABLE_PERFETTO)
+    target_link_libraries(Choroboros PRIVATE melatonin_perfetto)
+    target_compile_definitions(Choroboros PRIVATE CHOROBOROS_PERFETTO_ENABLED=1)
+endif()
+
+function(choroboros_apply_sanitizers target_name)
+    if(NOT TARGET ${target_name})
+        return()
+    endif()
+    if(CHOROBOROS_ENABLE_ASAN)
+        if(MSVC)
+            target_compile_options(${target_name} PRIVATE /fsanitize=address)
+        else()
+            target_compile_options(${target_name} PRIVATE -fsanitize=address -fno-omit-frame-pointer -g)
+            target_link_options(${target_name} PRIVATE -fsanitize=address)
+        endif()
+    endif()
+    if(CHOROBOROS_ENABLE_TSAN AND NOT MSVC)
+        target_compile_options(${target_name} PRIVATE -fsanitize=thread -fno-omit-frame-pointer -g)
+        target_link_options(${target_name} PRIVATE -fsanitize=thread)
+    endif()
+endfunction()
+
+choroboros_apply_sanitizers(Choroboros)
+# JUCE format targets perform the final link; they must carry sanitizer link flags
+# or instrumented SharedCode leaves undefined ___asan_* symbols.
+foreach(_choroboros_fmt Choroboros_Standalone Choroboros_VST3 Choroboros_AU Choroboros_AAX)
+    if(TARGET ${_choroboros_fmt})
+        choroboros_apply_sanitizers(${_choroboros_fmt})
+    endif()
+endforeach()
+
 # Regression test harness + build gate
 # Run: cmake --build build --target ChoroborosRegressionTests && ./build/ChoroborosRegressionTests
 add_executable(ChoroborosRegressionTests Tests/ChoroborosRegressionTests.cpp)
@@ -238,6 +329,8 @@ target_link_libraries(ChoroborosRegressionTests PRIVATE
     juce::juce_dsp
     ChoroborosBinaryData
 )
+
+choroboros_apply_sanitizers(ChoroborosRegressionTests)
 
 # JUCE's initialization chain (audio plugin client + AAX) exceeds Windows'
 # default 1 MB stack. Raise to 8 MB to prevent STATUS_STACK_OVERFLOW (0xC00000FD)

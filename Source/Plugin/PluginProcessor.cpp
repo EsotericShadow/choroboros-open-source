@@ -19,6 +19,10 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "../DSP/ChorusDSP.h"
+
+#if CHOROBOROS_PERFETTO_ENABLED
+#include <melatonin_perfetto/melatonin_perfetto.h>
+#endif
 #include "../Config/DefaultsPersistence.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
@@ -35,6 +39,30 @@ const char* getNamedResource(const char* resourceNameUTF8, int& dataSizeInBytes)
 
 namespace
 {
+/** pluginval (and some hosts) call setValue with arbitrary floats on bool parameters.
+    JUCE AudioParameterBool stores that raw float; replaceState() should replace it from the
+    ValueTree, but APVTS/adapter ordering can leave a fractional value visible to getValue().
+    Re-apply the endpoint encoded in the restored PARAM node so state restoration tests pass. */
+void syncBoolParameterFromRestoredApvtsState(juce::AudioProcessorValueTreeState& apvts,
+                                             const juce::String& paramId)
+{
+    auto* param = apvts.getParameter(paramId);
+    if (param == nullptr || dynamic_cast<juce::AudioParameterBool*>(param) == nullptr)
+        return;
+
+    for (const auto& child : apvts.state)
+    {
+        if (!child.hasType("PARAM"))
+            continue;
+        if (child.getProperty("id").toString() != paramId)
+            continue;
+
+        const float stored = static_cast<float>(child.getProperty("value"));
+        param->setValueNotifyingHost(stored >= 0.5f ? 1.0f : 0.0f);
+        return;
+    }
+}
+
 class MetaEngineChoiceParameter final : public juce::AudioParameterChoice
 {
 public:
@@ -887,10 +915,18 @@ ChoroborosAudioProcessor::ChoroborosAudioProcessor()
 
     logLoadTraceEvent("processor_ctor_total_ms",
                       juce::Time::getMillisecondCounterHiRes() - ctorStartMs);
+
+#if CHOROBOROS_PERFETTO_ENABLED
+    perfettoTracer = std::make_unique<MelatoninPerfetto> (true);
+#endif
 }
 
 ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
 {
+#if CHOROBOROS_PERFETTO_ENABLED
+    perfettoTracer.reset();
+#endif
+
     stopTimer();
 
     if (analyzerWorker != nullptr)
@@ -1145,6 +1181,10 @@ bool ChoroborosAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 
 void ChoroborosAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+#if CHOROBOROS_PERFETTO_ENABLED
+    TRACE_DSP();
+#endif
+
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -1707,6 +1747,7 @@ void ChoroborosAudioProcessor::setStateInformation (const void* data, int sizeIn
     {
         stateLoadInProgress = true;
         parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
+        syncBoolParameterFromRestoredApvtsState(parameters, HQ_ID);
         if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
             lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
 

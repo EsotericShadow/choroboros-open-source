@@ -21,6 +21,10 @@
 #include "../Cores/ChorusCore.h"
 #include <cmath>
 
+#if CHOROBOROS_PERFETTO_ENABLED
+#include <melatonin_perfetto/melatonin_perfetto.h>
+#endif
+
 void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
     if (block.getNumSamples() == 0 || block.getNumChannels() == 0)
@@ -365,6 +369,10 @@ void ChorusDSPProcess::processChorusDelay(ChorusDSP& chorusDSP, juce::dsp::Audio
 
 void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
 {
+#if CHOROBOROS_PERFETTO_ENABLED
+    TRACE_DSP();
+#endif
+
     const int numChannels = static_cast<int>(block.getNumChannels());
     const int blockNumSamples = static_cast<int>(block.getNumSamples());
     

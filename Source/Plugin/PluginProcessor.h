@@ -35,6 +35,10 @@
 #include "DspConfigManager.h"
 #include "../Engine/CustomEngineManager.h"
 
+#if CHOROBOROS_PERFETTO_ENABLED
+class MelatoninPerfetto;
+#endif
+
 //==============================================================================
 /**
 */
@@ -349,6 +353,10 @@ private:
     std::atomic<int> activeAnalyzerSnapshotIndex { 0 };
     std::atomic<std::uint64_t> analyzerSequenceCounter { 0 };
     std::unique_ptr<AnalyzerWorker> analyzerWorker;
+
+#if CHOROBOROS_PERFETTO_ENABLED
+    std::unique_ptr<MelatoninPerfetto> perfettoTracer;
+#endif
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChoroborosAudioProcessor)
 };
