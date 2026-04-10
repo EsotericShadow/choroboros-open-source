@@ -84,7 +84,7 @@ verify_release_versions() {
         return 1
     fi
 
-    dist_ver=$(grep -Eo 'version="[0-9][0-9.]*"' "${INSTALLER_DIR}/distribution.xml" | head -1 | grep -Eo '[0-9][0-9.]*' || true)
+    dist_ver=$(grep '<pkg-ref' "${INSTALLER_DIR}/distribution.xml" | grep -Eo 'version="[0-9][0-9.]*"' | head -1 | grep -Eo '[0-9][0-9.]*' || true)
     if [[ -n "$dist_ver" && "$dist_ver" != "$CHOROBOROS_VERSION" ]]; then
         echo "ERROR: distribution.xml pkg-ref version (${dist_ver}) != CHOROBOROS_VERSION (${CHOROBOROS_VERSION})."
         echo "Update the three version=\"...\" attributes in installer/distribution.xml."
