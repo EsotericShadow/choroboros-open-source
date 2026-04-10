@@ -1,5 +1,8 @@
 #!/bin/bash
 # Build macOS Universal Binary (arm64 + x86_64)
+#
+# For signed .pkg + notarization, use the full pipeline:
+#   ./scripts/release_macos_signed_installer.sh
 
 set -e
 

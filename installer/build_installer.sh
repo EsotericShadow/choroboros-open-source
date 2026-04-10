@@ -10,6 +10,8 @@
 # Usage:
 #   ./installer/build_installer.sh
 #
+# Full pipeline (typical): ./scripts/release_macos_signed_installer.sh
+#
 # Prerequisites:
 #   - Plugin bundles already signed (run sign_bundles.sh first)
 #   - Xcode Command Line Tools installed

@@ -12,6 +12,8 @@
 # Usage:
 #   ./installer/sign_and_notarize.sh
 #
+# Full pipeline: ./scripts/release_macos_signed_installer.sh
+#
 # Prerequisites:
 #   - "Developer ID Installer: Kaizen Strategic AI Inc. (9XLRQU887D)"
 #     certificate installed in your keychain

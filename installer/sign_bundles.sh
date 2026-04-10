@@ -9,6 +9,8 @@
 # Usage:
 #   ./installer/sign_bundles.sh
 #
+# Full pipeline: ./scripts/release_macos_signed_installer.sh
+#
 # Prerequisites:
 #   - "Developer ID Application: Kaizen Strategic AI Inc. (9XLRQU887D)"
 #     certificate installed in your keychain
