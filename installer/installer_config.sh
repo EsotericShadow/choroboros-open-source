@@ -12,9 +12,24 @@
 #
 # One command for the full macOS pipeline (from repo root):
 #   ./scripts/release_macos_signed_installer.sh
+#
+# Put the heavy CMake tree on an external SSD (internal disk almost full):
+#   export CHOROBOROS_CMAKE_BUILD_DIR="/Volumes/T7/ChoroborosCMakeBuilds/universal"
+#   ./scripts/release_macos_signed_installer.sh
+# Or: ./scripts/build_on_external_ssd.sh
 # =============================================================================
 # shellcheck shell=bash
 export CHOROBOROS_BUNDLE_BASENAME="Choroboros Beta"
 export CHOROBOROS_VERSION="2.0.41"
 export CHOROBOROS_COMPANY_ID="com.kaizenstrategicai"
-export CHOROBOROS_BUILD_DIR="Universal-Build/Choroboros_artefacts/Release"
+
+# Directory passed to cmake -B (objects, FetchContent, Choroboros_artefacts/...).
+# Export before sourcing this file to override. Relative paths are from repo root.
+: "${CHOROBOROS_CMAKE_BUILD_DIR:=Universal-Build}"
+export CHOROBOROS_CMAKE_BUILD_DIR
+
+if [[ "${CHOROBOROS_CMAKE_BUILD_DIR}" = /* ]]; then
+    export CHOROBOROS_BUILD_DIR="${CHOROBOROS_CMAKE_BUILD_DIR}/Choroboros_artefacts/Release"
+else
+    export CHOROBOROS_BUILD_DIR="${CHOROBOROS_CMAKE_BUILD_DIR}/Choroboros_artefacts/Release"
+fi

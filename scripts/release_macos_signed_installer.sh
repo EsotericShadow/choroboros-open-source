@@ -7,13 +7,19 @@
 #   ./scripts/release_macos_signed_installer.sh
 #
 # Flags:
-#   --no-universal-build   Skip ./scripts/build_macos_universal.sh (reuse Universal-Build/)
+#   --cmake-build-dir PATH cmake -B directory (default: Universal-Build). Use a T7 path when
+#                          internal disk is full, e.g. /Volumes/T7/ChoroborosCMakeBuilds/universal
+#   --no-universal-build   Skip ./scripts/build_macos_universal.sh (reuse existing artefacts)
 #   --to-signed-pkg        Stop after unsigned product .pkg + signed .pkg (no Apple notarize/staple)
 #   --notarize-only        Only run installer/sign_and_notarize.sh (components or unsigned pkg must exist)
 #   -h, --help             Show this help
 #
+# Same as env: export CHOROBOROS_CMAKE_BUILD_DIR="/Volumes/T7/.../universal" before running.
+#
 # Before each release, bump versions in one place and sync the rest — see
 # installer/installer_config.sh (checklist at top of that file).
+#
+# Free disk (dry run): ./scripts/clean_choroboros_build_artifacts.sh
 # =============================================================================
 
 set -euo pipefail
@@ -22,8 +28,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 INSTALLER_DIR="${REPO_ROOT}/installer"
-# shellcheck source=installer/installer_config.sh
-source "${INSTALLER_DIR}/installer_config.sh"
 
 RUN_UNIVERSAL=true
 RUN_SIGN_BUNDLES=true
@@ -31,7 +35,7 @@ RUN_BUILD_INSTALLER=true
 RUN_NOTARIZE=true
 
 usage() {
-    sed -n '1,25p' "$0" | tail -n +2
+    sed -n '1,35p' "$0" | tail -n +2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -40,17 +44,28 @@ while [[ $# -gt 0 ]]; do
             usage
             exit 0
             ;;
+        --cmake-build-dir)
+            if [[ -z "${2:-}" ]]; then
+                echo "ERROR: --cmake-build-dir requires a path"
+                exit 1
+            fi
+            export CHOROBOROS_CMAKE_BUILD_DIR="$2"
+            shift 2
+            ;;
         --no-universal-build)
             RUN_UNIVERSAL=false
+            shift
             ;;
         --to-signed-pkg)
             RUN_NOTARIZE=false
+            shift
             ;;
         --notarize-only)
             RUN_UNIVERSAL=false
             RUN_SIGN_BUNDLES=false
             RUN_BUILD_INSTALLER=false
             RUN_NOTARIZE=true
+            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -58,8 +73,10 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
     esac
-    shift
 done
+
+# shellcheck source=installer/installer_config.sh
+source "${INSTALLER_DIR}/installer_config.sh"
 
 if [[ ! -f "${REPO_ROOT}/CMakeLists.txt" ]]; then
     echo "ERROR: CMakeLists.txt not found. Expected repo root at ${REPO_ROOT}"
@@ -103,6 +120,9 @@ echo ""
 
 verify_release_versions
 
+echo ""
+echo "Bundle artefacts: ${CHOROBOROS_BUILD_DIR}"
+echo "CMake tree:       ${CHOROBOROS_CMAKE_BUILD_DIR}"
 echo ""
 
 if $RUN_UNIVERSAL; then

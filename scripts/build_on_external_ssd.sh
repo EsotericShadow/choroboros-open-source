@@ -1,29 +1,28 @@
 #!/bin/bash
-# Configure/build Choroboros CMake trees on an external drive (e.g. Samsung T7).
-# Keeps object files and FetchContent caches off the internal SSD.
+# Run the universal Release build with the CMake tree on an external drive (e.g. T7).
+# This is a thin wrapper around build_macos_universal.sh — same artefacts layout as the
+# signed-installer pipeline (CHOROBOROS_BUILD_DIR derived from CHOROBOROS_CMAKE_BUILD_DIR).
 #
 # Usage:
-#   ./scripts/build_on_external_ssd.sh [BUILD_ROOT]
+#   ./scripts/build_on_external_ssd.sh                    # auto: first writable T7-like volume
+#   ./scripts/build_on_external_ssd.sh /Volumes/T7/ChoroborosCMakeBuilds/universal
 #
-# If BUILD_ROOT is omitted, uses $CHOROBOROS_CMAKE_BUILD_ROOT, else the first
-# writable match among common macOS mount names:
-#   /Volumes/T7, /Volumes/Samsung_T7, /Volumes/T7 Shield, /Volumes/PortableSSD
+# Full release (sign + pkg + notarize) on the T7:
+#   CHOROBOROS_CMAKE_BUILD_DIR="/Volumes/T7/ChoroborosCMakeBuilds/universal" \
+#     ./scripts/release_macos_signed_installer.sh
 #
-# Example:
-#   ./scripts/build_on_external_ssd.sh "/Volumes/T7/ChoroborosBuilds"
+# Or after this script:
+#   CHOROBOROS_CMAKE_BUILD_DIR="/Volumes/T7/ChoroborosCMakeBuilds/universal" \
+#     ./scripts/release_macos_signed_installer.sh --no-universal-build
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-resolve_build_root() {
-    if [[ -n "${1:-}" ]]; then
-        echo "$1"
-        return
-    fi
-    if [[ -n "${CHOROBOROS_CMAKE_BUILD_ROOT:-}" ]]; then
-        echo "$CHOROBOROS_CMAKE_BUILD_ROOT"
+resolve_parent_root() {
+    if [[ -n "${CHOROBOROS_EXTERNAL_BUILD_PARENT:-}" ]]; then
+        echo "${CHOROBOROS_EXTERNAL_BUILD_PARENT}"
         return
     fi
     local cand
@@ -36,31 +35,24 @@ resolve_build_root() {
     echo ""
 }
 
-ROOT="$(resolve_build_root "${1:-}")"
-if [[ -z "$ROOT" ]]; then
-    echo "No external build root found. Pass a path, e.g.:" >&2
-    echo "  $0 /Volumes/T7/ChoroborosCMakeBuilds" >&2
-    echo "or set CHOROBOROS_CMAKE_BUILD_ROOT." >&2
-    exit 1
+if [[ -n "${1:-}" ]]; then
+    export CHOROBOROS_CMAKE_BUILD_DIR="$1"
+else
+    if [[ -n "${CHOROBOROS_CMAKE_BUILD_DIR:-}" ]]; then
+        : # user already exported full cmake -B path
+    else
+        PARENT="$(resolve_parent_root)"
+        if [[ -z "$PARENT" ]]; then
+            echo "No external volume found. Pass the cmake -B path, e.g.:" >&2
+            echo "  $0 /Volumes/T7/ChoroborosCMakeBuilds/universal" >&2
+            echo "Or set CHOROBOROS_CMAKE_BUILD_DIR or CHOROBOROS_EXTERNAL_BUILD_PARENT." >&2
+            exit 1
+        fi
+        mkdir -p "$PARENT"
+        export CHOROBOROS_CMAKE_BUILD_DIR="${PARENT}/universal"
+    fi
 fi
 
-mkdir -p "$ROOT"
-echo "Using CMake build root: $ROOT"
-
-run_build() {
-    local name="$1"
-    shift
-    local bdir="$ROOT/$name"
-    echo "========== $name =========="
-    cmake -S "$REPO_ROOT" -B "$bdir" -G Ninja "$@"
-    cmake --build "$bdir" --parallel
-}
-
-# Default shipping configuration
-run_build release -DCMAKE_BUILD_TYPE=Release
-
-echo "Done. Other presets (run manually with same pattern):"
-echo "  ASAN:    -DCMAKE_BUILD_TYPE=Debug -DCHOROBOROS_ENABLE_ASAN=ON"
-echo "  TSAN:    -DCMAKE_BUILD_TYPE=Debug -DCHOROBOROS_ENABLE_TSAN=ON"
-echo "  Inspector: -DCMAKE_BUILD_TYPE=Debug -DCHOROBOROS_ENABLE_INSPECTOR=ON"
-echo "  Perfetto:  -DCMAKE_BUILD_TYPE=Release -DCHOROBOROS_ENABLE_PERFETTO=ON  (CMake 3.24+)"
+mkdir -p "$(dirname "${CHOROBOROS_CMAKE_BUILD_DIR}")"
+echo "CHOROBOROS_CMAKE_BUILD_DIR=${CHOROBOROS_CMAKE_BUILD_DIR}"
+exec "${REPO_ROOT}/scripts/build_macos_universal.sh"
