@@ -7,6 +7,14 @@ build/
 build-*/
 Release/
 Universal-Build/
+dist/
+
+# Installer working trees (never commit staged plugins or component .pkgs)
+installer/staging/
+installer/components/
+installer/vst3-payload/
+installer/au-payload/
+installer/standalone-payload/
 AU/
 VST3/
 .cache/

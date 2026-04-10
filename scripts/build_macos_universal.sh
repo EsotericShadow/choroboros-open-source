@@ -22,9 +22,11 @@ cmake --build Universal-Build --config Release --parallel
 
 # Verify architectures
 echo "🔍 Verifying architectures..."
-VST3_BINARY="Universal-Build/Choroboros_artefacts/Release/VST3/Choroboros.vst3/Contents/MacOS/Choroboros"
-AU_BINARY="Universal-Build/Choroboros_artefacts/Release/AU/Choroboros.component/Contents/MacOS/Choroboros"
-STANDALONE_BINARY="Universal-Build/Choroboros_artefacts/Release/Standalone/Choroboros.app/Contents/MacOS/Choroboros"
+# Must match PRODUCT_NAME in CMakeLists.txt (juce_add_plugin)
+BUNDLE_BASENAME="Choroboros Beta"
+VST3_BINARY="Universal-Build/Choroboros_artefacts/Release/VST3/${BUNDLE_BASENAME}.vst3/Contents/MacOS/${BUNDLE_BASENAME}"
+AU_BINARY="Universal-Build/Choroboros_artefacts/Release/AU/${BUNDLE_BASENAME}.component/Contents/MacOS/${BUNDLE_BASENAME}"
+STANDALONE_BINARY="Universal-Build/Choroboros_artefacts/Release/Standalone/${BUNDLE_BASENAME}.app/Contents/MacOS/${BUNDLE_BASENAME}"
 
 if [ -f "$VST3_BINARY" ]; then
     echo "✅ VST3 architectures:"

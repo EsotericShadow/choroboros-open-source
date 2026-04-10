@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Choroboros</title>
+    <organization>com.kaizenstrategicai</organization>
+
+    <!-- Install to the boot volume only, system-wide (requires admin password) -->
+    <domains enable_localSystem="true"/>
+    <options customize="allow" require-scripts="false" rootVolumeOnly="true"/>
+
+    <!-- Minimum macOS version: 10.13 High Sierra (matches JUCE 8 requirement) -->
+    <allowed-os-versions>
+        <os-version min="10.13"/>
+    </allowed-os-versions>
+
+    <!-- Installer UI pages -->
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <license file="license.html" mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <!-- Component choices shown to the user -->
+    <choices-outline>
+        <line choice="vst3"/>
+        <line choice="au"/>
+        <line choice="standalone"/>
+    </choices-outline>
+
+    <!-- VST3: checked by default, user can uncheck -->
+    <choice id="vst3"
+            title="VST3 Plugin"
+            description="Installs Choroboros as a VST3 plugin for Ableton Live, Cubase, Studio One, REAPER, FL Studio, Bitwig, and other VST3 hosts. Installed to /Library/Audio/Plug-Ins/VST3/"
+            selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.vst3"/>
+    </choice>
+
+    <!-- AU: checked by default, user can uncheck -->
+    <choice id="au"
+            title="Audio Unit Plugin"
+            description="Installs Choroboros as an Audio Unit plugin for Logic Pro, GarageBand, and other AU hosts. Installed to /Library/Audio/Plug-Ins/Components/"
+            selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.au"/>
+    </choice>
+
+    <!-- Standalone: checked by default, user can uncheck -->
+    <choice id="standalone"
+            title="Standalone Application"
+            description="Installs the Choroboros standalone application to /Applications/. Use this to run Choroboros without a DAW."
+            selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.standalone"/>
+    </choice>
+
+    <!-- Package references (filenames match what build_installer.sh produces) -->
+    <pkg-ref id="com.kaizenstrategicai.choroboros.vst3"
+             version="2.0.41"
+             onConclusion="none">Choroboros-VST3.pkg</pkg-ref>
+
+    <pkg-ref id="com.kaizenstrategicai.choroboros.au"
+             version="2.0.41"
+             onConclusion="none">Choroboros-AU.pkg</pkg-ref>
+
+    <pkg-ref id="com.kaizenstrategicai.choroboros.standalone"
+             version="2.0.41"
+             onConclusion="none">Choroboros-Standalone.pkg</pkg-ref>
+</installer-gui-script>

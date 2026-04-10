@@ -1,0 +1,18 @@
+#!/bin/bash
+# Choroboros post-install script
+# Clears the Audio Unit cache so Logic Pro and GarageBand
+# immediately discover the newly installed plugin without
+# requiring a manual rescan.
+
+# Clear the system-level AU cache
+rm -f /Library/Caches/AudioUnitCache/com.apple.audiounits.cache 2>/dev/null
+
+# Clear the user-level AU cache for the installing user
+# Note: $HOME and $USER are set to the user running the installer,
+# even though the installer runs with root privileges.
+if [ -n "$HOME" ]; then
+    rm -f "$HOME/Library/Caches/AudioUnitCache/com.apple.audiounits.cache" 2>/dev/null
+    rm -rf "$HOME/Library/Caches/com.apple.audio.InfoHelper/" 2>/dev/null
+fi
+
+exit 0
