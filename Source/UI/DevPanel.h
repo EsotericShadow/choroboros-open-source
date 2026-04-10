@@ -179,6 +179,9 @@ public:
     DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& processorRef);
     void resized() override;
 
+    /** Lazy tabs: call before accessing Validation (etc.) from tests or tooling. */
+    void ensureTabBuiltForTesting(int mainTab) { ensureTabBuilt(mainTab); }
+
 private:
     ChoroborosPluginEditor& editor;
     ChoroborosAudioProcessor& processor;

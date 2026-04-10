@@ -422,6 +422,9 @@ static void testConsoleCommandLatencyUnderAudioLoad()
     DevPanel devPanel(editor, proc);
     devPanel.setBounds(0, 0, 1280, 760);
     devPanel.resized();
+    // Validation tab (index 5) is lazy-built; console lives there, not on default Overview.
+    devPanel.ensureTabBuiltForTesting(5);
+    devPanel.resized();
 
     auto* console = findConsoleComponentRecursive(devPanel);
     REGRESS_ASSERT(console != nullptr, "DevPanel console component not found");
