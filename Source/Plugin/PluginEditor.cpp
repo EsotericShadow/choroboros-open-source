@@ -29,11 +29,16 @@
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/DevPanel.h"
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <future>
 #include <vector>
 #if JUCE_WINDOWS
  #include <windows.h>
+#endif
+
+#if CHOROBOROS_PERFETTO_ENABLED
+#include <melatonin_perfetto/melatonin_perfetto.h>
 #endif
 
 namespace
@@ -839,6 +844,10 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     applyLayout();
     setResizable(false, false);
 
+#if CHOROBOROS_INSPECTOR_ENABLED
+    setWantsKeyboardFocus(true);
+#endif
+
     audioProcessor.logLoadTraceEvent("editor_ctor_total_ms",
                                      juce::Time::getMillisecondCounterHiRes() - editorCtorStartMs);
 
@@ -959,6 +968,10 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     // 4. Stop background theme thread.
     stopDeferredThemePrewarm();
 
+#if CHOROBOROS_INSPECTOR_ENABLED
+    inspector.reset();
+#endif
+
     // 5. Explicitly destroy child windows BEFORE component teardown.
     //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
     //    can trigger cascading HWND messages that deadlock or crash (Cubase).
@@ -973,6 +986,20 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     // 6. Detach look-and-feel last.
     setLookAndFeel(nullptr);
 }
+
+#if CHOROBOROS_INSPECTOR_ENABLED
+bool ChoroborosPluginEditor::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress ('i', juce::ModifierKeys::commandModifier, 0))
+    {
+        if (inspector == nullptr)
+            inspector = std::make_unique<melatonin::Inspector> (*this, false);
+        inspector->setVisible (! inspector->isVisible());
+        return true;
+    }
+    return Component::keyPressed (key);
+}
+#endif
 
 void ChoroborosPluginEditor::parentHierarchyChanged()
 {
@@ -1007,10 +1034,28 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
 //==============================================================================
 void ChoroborosPluginEditor::paint (juce::Graphics& g)
 {
+#if CHOROBOROS_PERFETTO_ENABLED
+    TRACE_COMPONENT();
+#endif
+
     if (!activeThemeInstalled && activeThemeDecodeFuture.valid())
     {
+        // Non-blocking check: is the async theme decode finished?
+        if (activeThemeDecodeFuture.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        {
+            // Not ready yet. Draw black fallback and check again next frame.
+            g.fillAll(juce::Colours::black);
+            // Schedule repaint so we poll again on the next message loop iteration.
+            juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]()
+            {
+                if (safeThis != nullptr)
+                    safeThis->repaint();
+            });
+            return;
+        }
+
         const double waitStartMs = juce::Time::getMillisecondCounterHiRes();
-        auto themePack = activeThemeDecodeFuture.get();
+        auto themePack = activeThemeDecodeFuture.get();  // guaranteed immediate, future is ready
         customLookAndFeel.installThemeAssetPack(activeThemeDecodeColorIndex, std::move(themePack));
         activeThemeInstalled = true;
 

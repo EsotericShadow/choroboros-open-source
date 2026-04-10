@@ -304,9 +304,16 @@ void FeedbackDialog::closeDialog()
         return;
     }
 
+    // Defer destruction so the call stack unwinds before `this` is deleted.
+    // SafePointer guards against the component being destroyed by other means
+    // before the async callback fires.
+    juce::Component::SafePointer<FeedbackDialog> safeThis(this);
     if (auto* parent = getParentComponent())
-        parent->removeChildComponent (this);
-    delete this;
+        parent->removeChildComponent(this);
+    juce::MessageManager::callAsync([safeThis]()
+    {
+        delete safeThis.getComponent();
+    });
 }
 
 //==============================================================================

@@ -30,6 +30,11 @@
 #include "../UI/TopHeaderBar.h"
 #include "../UI/RateSyncOverlay.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+
+#if CHOROBOROS_INSPECTOR_ENABLED
+#include <melatonin_inspector/melatonin_inspector.h>
+#endif
+
 #include <atomic>
 #include <future>
 #include <mutex>
@@ -72,6 +77,10 @@ public:
     juce::Font makeValueLabelFont(float heightPx, bool bold = true) const;
     juce::Font makeUiTextFont(float heightPx, bool bold = true) const;
     void setTooltipsEnabled(bool enabled);
+
+#if CHOROBOROS_INSPECTOR_ENABLED
+    bool keyPressed (const juce::KeyPress& key) override;
+#endif
 
 private:
     class HQLitOverlay;
@@ -182,6 +191,10 @@ private:
 
     std::thread themePrewarmThread;
     std::shared_ptr<std::atomic<bool>> themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
+
+#if CHOROBOROS_INSPECTOR_ENABLED
+    std::unique_ptr<melatonin::Inspector> inspector;
+#endif
 
     // Prewarm results queue: worker pushes decoded packs, message-thread paint installs them.
     struct PrewarmedTheme
