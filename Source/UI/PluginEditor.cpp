@@ -1111,7 +1111,11 @@ float ChoroborosPluginEditor::parseWidthValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 2.0f) ? juce::jlimit(0.0f, 2.0f, value / 100.0f) : value;
+    {
+        // Display shows 0–200%, so always interpret typed values as percentages.
+        // Typing "100" → 1.0, "50" → 0.5, "200" → 2.0, "1" → 0.01.
+        return juce::jlimit(0.0f, 2.0f, value / 100.0f);
+    }
     return -1.0f;
 }
 
