@@ -138,12 +138,12 @@ public:
         std::atomic<float> tapeCentreScale { 2.0f };
         std::atomic<float> tapeToneMaxHz { 16000.0f };
         std::atomic<float> tapeToneMinHz { 12000.0f };
-        std::atomic<float> tapeToneSmoothingCoeff { 0.08f };
+        std::atomic<float> tapeToneSmoothingCoeff { 0.25f };  // τ in ms (was raw α = 0.08)
         std::atomic<float> tapeDriveScale { 0.35f };
         std::atomic<float> tapeLfoRatioScale { 0.05f };
         std::atomic<float> tapeLfoModSmoothingCoeff { 0.008f };
         std::atomic<float> tapeRatioSmoothingCoeff { 0.004f };
-        std::atomic<float> tapePhaseDamping { 0.99999f };
+        std::atomic<float> tapePhaseDampingPerSec { 0.6188f };  // per-second retention (was per-sample 0.99999)
         std::atomic<float> tapeWowFreqBase { 0.33f };
         std::atomic<float> tapeWowFreqSpread { 0.03f };
         std::atomic<float> tapeFlutterFreqBase { 5.8f };
@@ -322,12 +322,12 @@ private:
         float tapeCentreScale = 2.0f;
         float tapeToneMaxHz = 16000.0f;
         float tapeToneMinHz = 12000.0f;
-        float tapeToneSmoothingCoeff = 0.08f;
+        float tapeToneSmoothingCoeff = 0.25f;  // τ in ms (was raw α = 0.08)
         float tapeDriveScale = 0.35f;
         float tapeLfoRatioScale = 0.05f;
         float tapeLfoModSmoothingCoeff = 0.008f;
         float tapeRatioSmoothingCoeff = 0.004f;
-        float tapePhaseDamping = 0.99999f;
+        float tapePhaseDampingPerSec = 0.6188f;  // per-second retention (was per-sample 0.99999)
         float tapeWowFreqBase = 0.33f;
         float tapeWowFreqSpread = 0.03f;
         float tapeFlutterFreqBase = 5.8f;

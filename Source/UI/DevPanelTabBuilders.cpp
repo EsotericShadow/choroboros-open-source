@@ -1927,13 +1927,13 @@ void DevPanel::buildInternalsTab(DevPanelBuildContext& ctx)
             tapeDelayAndTone.add(addInternal(engineIndex, hqEnabled, "Tape Centre Scale", engineTuning.tapeCentreScale, 0.0, 4.0, 0.01, 1.0));
             tapeDelayAndTone.add(addInternal(engineIndex, hqEnabled, "Tape Tone Max (Hz)", engineTuning.tapeToneMaxHz, 1000.0, 20000.0, 1.0, 1.0));
             tapeDelayAndTone.add(addInternal(engineIndex, hqEnabled, "Tape Tone Min (Hz)", engineTuning.tapeToneMinHz, 1000.0, 20000.0, 1.0, 1.0));
-            tapeDelayAndTone.add(addInternal(engineIndex, hqEnabled, "Tape Tone Smooth", engineTuning.tapeToneSmoothingCoeff, 0.0, 1.0, 0.0001, 1.0));
+            tapeDelayAndTone.add(addInternal(engineIndex, hqEnabled, "Tape Tone τ (ms)", engineTuning.tapeToneSmoothingCoeff, 0.01, 10.0, 0.01, 1.0));
 
             juce::Array<juce::PropertyComponent*> tapeMotionAndModulation;
             tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape LFO Ratio", engineTuning.tapeLfoRatioScale, 0.0, 0.2, 0.0001, 1.0));
             tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape LFO Smooth", engineTuning.tapeLfoModSmoothingCoeff, 0.0, 0.05, 0.0001, 1.0));
             tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape Ratio Smooth", engineTuning.tapeRatioSmoothingCoeff, 0.0, 0.05, 0.0001, 1.0));
-            tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape Phase Damp", engineTuning.tapePhaseDamping, 0.9, 1.0, 0.00001, 1.0));
+            tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape Phase Damp/s", engineTuning.tapePhaseDampingPerSec, 0.01, 1.0, 0.001, 1.0));
             tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape Wow Freq Base", engineTuning.tapeWowFreqBase, 0.0, 2.0, 0.001, 1.0));
             tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape Wow Freq Spread", engineTuning.tapeWowFreqSpread, 0.0, 0.5, 0.001, 1.0));
             tapeMotionAndModulation.add(addInternal(engineIndex, hqEnabled, "Tape Flutter Freq Base", engineTuning.tapeFlutterFreqBase, 0.0, 12.0, 0.001, 1.0));

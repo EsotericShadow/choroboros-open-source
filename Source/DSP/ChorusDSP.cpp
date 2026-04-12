@@ -215,12 +215,12 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningSnapshot.tapeCentreScale = runtimeTuning.tapeCentreScale.load();
     runtimeTuningSnapshot.tapeToneMaxHz = juce::jmax(20.0f, runtimeTuning.tapeToneMaxHz.load());
     runtimeTuningSnapshot.tapeToneMinHz = juce::jmax(20.0f, runtimeTuning.tapeToneMinHz.load());
-    runtimeTuningSnapshot.tapeToneSmoothingCoeff = clamp01(runtimeTuning.tapeToneSmoothingCoeff.load());
+    runtimeTuningSnapshot.tapeToneSmoothingCoeff = juce::jmax(0.01f, runtimeTuning.tapeToneSmoothingCoeff.load());  // τ in ms
     runtimeTuningSnapshot.tapeDriveScale = juce::jmax(0.0f, runtimeTuning.tapeDriveScale.load());
     runtimeTuningSnapshot.tapeLfoRatioScale = runtimeTuning.tapeLfoRatioScale.load();
     runtimeTuningSnapshot.tapeLfoModSmoothingCoeff = clamp01(runtimeTuning.tapeLfoModSmoothingCoeff.load());
     runtimeTuningSnapshot.tapeRatioSmoothingCoeff = clamp01(runtimeTuning.tapeRatioSmoothingCoeff.load());
-    runtimeTuningSnapshot.tapePhaseDamping = clamp01(runtimeTuning.tapePhaseDamping.load());
+    runtimeTuningSnapshot.tapePhaseDampingPerSec = clamp01(runtimeTuning.tapePhaseDampingPerSec.load());
     runtimeTuningSnapshot.tapeWowFreqBase = juce::jmax(0.0f, runtimeTuning.tapeWowFreqBase.load());
     runtimeTuningSnapshot.tapeWowFreqSpread = runtimeTuning.tapeWowFreqSpread.load();
     runtimeTuningSnapshot.tapeFlutterFreqBase = juce::jmax(0.0f, runtimeTuning.tapeFlutterFreqBase.load());
@@ -351,7 +351,7 @@ void ChorusDSP::applyRuntimeTuning()
     lastAppliedTuningSnapshot.tapeToneSmoothingCoeff = runtimeTuningSnapshot.tapeToneSmoothingCoeff;
     lastAppliedTuningSnapshot.tapeLfoModSmoothingCoeff = runtimeTuningSnapshot.tapeLfoModSmoothingCoeff;
     lastAppliedTuningSnapshot.tapeRatioSmoothingCoeff = runtimeTuningSnapshot.tapeRatioSmoothingCoeff;
-    lastAppliedTuningSnapshot.tapePhaseDamping = runtimeTuningSnapshot.tapePhaseDamping;
+    lastAppliedTuningSnapshot.tapePhaseDampingPerSec = runtimeTuningSnapshot.tapePhaseDampingPerSec;
     lastAppliedTuningSnapshot.centreDelayBaseMs = runtimeTuningSnapshot.centreDelayBaseMs;
     lastAppliedTuningSnapshot.centreDelayScale = runtimeTuningSnapshot.centreDelayScale;
     lastAppliedTuningSnapshot.preEmphasisLevelSmoothing = runtimeTuningSnapshot.preEmphasisLevelSmoothing;
@@ -475,12 +475,12 @@ TuningSnapshot ChorusDSP::precomputeTuningSnapshot()
     snapshot.tapeCentreScale = runtimeTuning.tapeCentreScale.load();
     snapshot.tapeToneMaxHz = juce::jmax(20.0f, runtimeTuning.tapeToneMaxHz.load());
     snapshot.tapeToneMinHz = juce::jmax(20.0f, runtimeTuning.tapeToneMinHz.load());
-    snapshot.tapeToneSmoothingCoeff = clamp01(runtimeTuning.tapeToneSmoothingCoeff.load());
+    snapshot.tapeToneSmoothingCoeff = juce::jmax(0.01f, runtimeTuning.tapeToneSmoothingCoeff.load());  // τ in ms
     snapshot.tapeDriveScale = juce::jmax(0.0f, runtimeTuning.tapeDriveScale.load());
     snapshot.tapeLfoRatioScale = runtimeTuning.tapeLfoRatioScale.load();
     snapshot.tapeLfoModSmoothingCoeff = clamp01(runtimeTuning.tapeLfoModSmoothingCoeff.load());
     snapshot.tapeRatioSmoothingCoeff = clamp01(runtimeTuning.tapeRatioSmoothingCoeff.load());
-    snapshot.tapePhaseDamping = clamp01(runtimeTuning.tapePhaseDamping.load());
+    snapshot.tapePhaseDampingPerSec = clamp01(runtimeTuning.tapePhaseDampingPerSec.load());
     snapshot.tapeWowFreqBase = juce::jmax(0.0f, runtimeTuning.tapeWowFreqBase.load());
     snapshot.tapeWowFreqSpread = runtimeTuning.tapeWowFreqSpread.load();
     snapshot.tapeFlutterFreqBase = juce::jmax(0.0f, runtimeTuning.tapeFlutterFreqBase.load());
@@ -636,7 +636,7 @@ void ChorusDSP::applyTuningOnAudioThread(const TuningSnapshot& snapshot)
     runtimeTuningSnapshot.tapeLfoRatioScale = snapshot.tapeLfoRatioScale;
     runtimeTuningSnapshot.tapeLfoModSmoothingCoeff = snapshot.tapeLfoModSmoothingCoeff;
     runtimeTuningSnapshot.tapeRatioSmoothingCoeff = snapshot.tapeRatioSmoothingCoeff;
-    runtimeTuningSnapshot.tapePhaseDamping = snapshot.tapePhaseDamping;
+    runtimeTuningSnapshot.tapePhaseDampingPerSec = snapshot.tapePhaseDampingPerSec;
     runtimeTuningSnapshot.tapeWowFreqBase = snapshot.tapeWowFreqBase;
     runtimeTuningSnapshot.tapeWowFreqSpread = snapshot.tapeWowFreqSpread;
     runtimeTuningSnapshot.tapeFlutterFreqBase = snapshot.tapeFlutterFreqBase;

@@ -247,7 +247,7 @@ void forEachRuntimeTuningValue(const ChorusDSP::RuntimeTuning& tuning, Fn&& fn)
     fn("tape_lfo_ratio_scale", tuning.tapeLfoRatioScale.load());
     fn("tape_lfo_mod_smoothing_coeff", tuning.tapeLfoModSmoothingCoeff.load());
     fn("tape_ratio_smoothing_coeff", tuning.tapeRatioSmoothingCoeff.load());
-    fn("tape_phase_damping", tuning.tapePhaseDamping.load());
+    fn("tape_phase_damping", tuning.tapePhaseDampingPerSec.load());
     fn("tape_wow_freq_base", tuning.tapeWowFreqBase.load());
     fn("tape_wow_freq_spread", tuning.tapeWowFreqSpread.load());
     fn("tape_flutter_freq_base", tuning.tapeFlutterFreqBase.load());

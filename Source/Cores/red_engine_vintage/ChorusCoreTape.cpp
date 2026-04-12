@@ -171,7 +171,12 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     if (toneMin > toneMax)
         std::swap(toneMin, toneMax);
     const float targetToneCutoff = toneMax - (toneMax - toneMin) * color;
-    smoothedToneCutoff += tuning.tapeToneSmoothingCoeff * (targetToneCutoff - smoothedToneCutoff);
+    // Sample-rate-invariant tone cutoff smoothing: snapshot stores τ in ms,
+    // converted here to a per-sample α.  Matches lfoModSmoothAlpha / ratioSmoothAlpha
+    // pattern 10 lines above.  (Was hardcoded α = 0.08 — only correct at 48 k.)
+    const float toneSmoothTauMs = std::max(0.01f, tuning.tapeToneSmoothingCoeff);
+    const float toneSmoothAlpha = 1.0f - std::exp(-1.0f / (toneSmoothTauMs * 0.001f * sampleRate));
+    smoothedToneCutoff += toneSmoothAlpha * (targetToneCutoff - smoothedToneCutoff);
     const float toneAmount = juce::jlimit(0.0f, 1.0f, color);
 
     constexpr float cutoffRecomputeThresholdHz = 5.0f;
@@ -179,6 +184,14 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     auto* lfoLeft = dsp.lfoBuffer.getReadPointer(0);
     // If stereo, use cosBuffer for right channel (quadrature LFO)
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
+
+    // Sample-rate-invariant phase damping: snapshot stores per-second retention,
+    // pre-compute the per-sample coefficient once per block (not in the inner loop).
+    // damping_per_sample = pow(damping_per_second, 1.0 / sampleRate)
+    // At 48 k with per-second = 0.6188: per-sample = 0.99999 (original behavior).
+    // (Was hardcoded per-sample = 0.99999 — only correct at 48 k.)
+    const float phaseDampPerSample = std::pow(tuning.tapePhaseDampingPerSec,
+                                              1.0f / sampleRate);
 
     // Drive increases with Color knob
     const float drive = 1.0f + tuning.tapeDriveScale * color;
@@ -246,9 +259,9 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             // Leaky Integrator / Spring
             // This pulls the read head back to the center delay time.
             // If too strong, it kills the LFO drift. If too weak, it drifts too far.
-            // 0.99998 lets it drift ~50x more than 0.999.
             // Tuned for ~1-2 Hz LFOs to allow sufficient excursion.
-            resampler.phaseOffset *= tuning.tapePhaseDamping;
+            // Per-sample coefficient pre-computed above from per-second retention.
+            resampler.phaseOffset *= phaseDampPerSample;
 
             // 4. Calculate Read Pulse
             float effectiveDelay = currentFixedDelay + resampler.phaseOffset;

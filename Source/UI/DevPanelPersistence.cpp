@@ -141,7 +141,7 @@ juce::String DevPanel::buildJson() const
         json << "    \"tapeLfoRatioScale\": " << formatFloat(internals.tapeLfoRatioScale.load()) << ",\n";
         json << "    \"tapeLfoModSmoothingCoeff\": " << formatFloat(internals.tapeLfoModSmoothingCoeff.load()) << ",\n";
         json << "    \"tapeRatioSmoothingCoeff\": " << formatFloat(internals.tapeRatioSmoothingCoeff.load()) << ",\n";
-        json << "    \"tapePhaseDamping\": " << formatFloat(internals.tapePhaseDamping.load()) << ",\n";
+        json << "    \"tapePhaseDampingPerSec\": " << formatFloat(internals.tapePhaseDampingPerSec.load()) << ",\n";
         json << "    \"tapeWowFreqBase\": " << formatFloat(internals.tapeWowFreqBase.load()) << ",\n";
         json << "    \"tapeWowFreqSpread\": " << formatFloat(internals.tapeWowFreqSpread.load()) << ",\n";
         json << "    \"tapeFlutterFreqBase\": " << formatFloat(internals.tapeFlutterFreqBase.load()) << ",\n";

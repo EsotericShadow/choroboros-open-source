@@ -292,7 +292,7 @@ void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeT
     internals.tapeLfoRatioScale.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeLfoRatioScale", internals.tapeLfoRatioScale.load())));
     internals.tapeLfoModSmoothingCoeff.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeLfoModSmoothingCoeff", internals.tapeLfoModSmoothingCoeff.load())));
     internals.tapeRatioSmoothingCoeff.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeRatioSmoothingCoeff", internals.tapeRatioSmoothingCoeff.load())));
-    internals.tapePhaseDamping.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapePhaseDamping", internals.tapePhaseDamping.load())));
+    internals.tapePhaseDampingPerSec.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapePhaseDampingPerSec", internals.tapePhaseDampingPerSec.load())));
     internals.tapeWowFreqBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeWowFreqBase", internals.tapeWowFreqBase.load())));
     internals.tapeWowFreqSpread.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeWowFreqSpread", internals.tapeWowFreqSpread.load())));
     internals.tapeFlutterFreqBase.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeFlutterFreqBase", internals.tapeFlutterFreqBase.load())));
@@ -352,12 +352,12 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.tapeCentreScale.store(2.0f);
     r.tapeToneMaxHz.store(16000.0f);
     r.tapeToneMinHz.store(12000.0f);
-    r.tapeToneSmoothingCoeff.store(0.08f);
+    r.tapeToneSmoothingCoeff.store(0.25f);  // τ in ms (was raw α = 0.08)
     r.tapeDriveScale.store(0.35f);
     r.tapeLfoRatioScale.store(0.05f);
     r.tapeLfoModSmoothingCoeff.store(0.0015f);
     r.tapeRatioSmoothingCoeff.store(0.004f);
-    r.tapePhaseDamping.store(1.0f);
+    r.tapePhaseDampingPerSec.store(1.0f);
     r.tapeWowFreqBase.store(0.33f);
     r.tapeWowFreqSpread.store(0.03f);
     r.tapeFlutterFreqBase.store(5.8f);
@@ -417,12 +417,12 @@ void setRedHQDefaults(ChorusDSP::RuntimeTuning& r)
     r.tapeCentreScale.store(2.6f);
     r.tapeToneMaxHz.store(20000.0f);
     r.tapeToneMinHz.store(14000.0f);
-    r.tapeToneSmoothingCoeff.store(0.06f);
+    r.tapeToneSmoothingCoeff.store(0.337f);  // τ in ms (was raw α = 0.06)
     r.tapeDriveScale.store(0.22f);
     r.tapeLfoRatioScale.store(0.045f);
     r.tapeLfoModSmoothingCoeff.store(0.0015f);
     r.tapeRatioSmoothingCoeff.store(0.004f);
-    r.tapePhaseDamping.store(1.0f);
+    r.tapePhaseDampingPerSec.store(1.0f);
     r.tapeWowFreqBase.store(0.33f);
     r.tapeWowFreqSpread.store(0.03f);
     r.tapeFlutterFreqBase.store(5.8f);
@@ -568,7 +568,7 @@ void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::Run
     dst.tapeLfoRatioScale.store(src.tapeLfoRatioScale.load());
     dst.tapeLfoModSmoothingCoeff.store(src.tapeLfoModSmoothingCoeff.load());
     dst.tapeRatioSmoothingCoeff.store(src.tapeRatioSmoothingCoeff.load());
-    dst.tapePhaseDamping.store(src.tapePhaseDamping.load());
+    dst.tapePhaseDampingPerSec.store(src.tapePhaseDampingPerSec.load());
     dst.tapeWowFreqBase.store(src.tapeWowFreqBase.load());
     dst.tapeWowFreqSpread.store(src.tapeWowFreqSpread.load());
     dst.tapeFlutterFreqBase.store(src.tapeFlutterFreqBase.load());

@@ -325,7 +325,7 @@ void CustomEngineManager::tuningToJson(juce::DynamicObject& obj, const ChorusDSP
     KZN_TUNING_FIELD(obj, t, tapeLfoRatioScale);
     KZN_TUNING_FIELD(obj, t, tapeLfoModSmoothingCoeff);
     KZN_TUNING_FIELD(obj, t, tapeRatioSmoothingCoeff);
-    KZN_TUNING_FIELD(obj, t, tapePhaseDamping);
+    KZN_TUNING_FIELD(obj, t, tapePhaseDampingPerSec);
     KZN_TUNING_FIELD(obj, t, tapeWowFreqBase);
     KZN_TUNING_FIELD(obj, t, tapeWowFreqSpread);
     KZN_TUNING_FIELD(obj, t, tapeFlutterFreqBase);
@@ -434,7 +434,7 @@ void CustomEngineManager::tuningFromJson(const juce::var& src, ChorusDSP::Runtim
     KZN_TUNING_READ(src, t, tapeLfoRatioScale);
     KZN_TUNING_READ(src, t, tapeLfoModSmoothingCoeff);
     KZN_TUNING_READ(src, t, tapeRatioSmoothingCoeff);
-    KZN_TUNING_READ(src, t, tapePhaseDamping);
+    KZN_TUNING_READ(src, t, tapePhaseDampingPerSec);
     KZN_TUNING_READ(src, t, tapeWowFreqBase);
     KZN_TUNING_READ(src, t, tapeWowFreqSpread);
     KZN_TUNING_READ(src, t, tapeFlutterFreqBase);

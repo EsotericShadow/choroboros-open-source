@@ -199,7 +199,7 @@ void readTuningFromVar(const juce::var& src, ChorusDSP::RuntimeTuning& t)
     KZN_READ_TUNING(tapeToneMinHz); KZN_READ_TUNING(tapeToneSmoothingCoeff);
     KZN_READ_TUNING(tapeDriveScale); KZN_READ_TUNING(tapeLfoRatioScale);
     KZN_READ_TUNING(tapeLfoModSmoothingCoeff); KZN_READ_TUNING(tapeRatioSmoothingCoeff);
-    KZN_READ_TUNING(tapePhaseDamping); KZN_READ_TUNING(tapeWowFreqBase);
+    KZN_READ_TUNING(tapePhaseDampingPerSec); KZN_READ_TUNING(tapeWowFreqBase);
     KZN_READ_TUNING(tapeWowFreqSpread); KZN_READ_TUNING(tapeFlutterFreqBase);
     KZN_READ_TUNING(tapeFlutterFreqSpread); KZN_READ_TUNING(tapeWowDepthBase);
     KZN_READ_TUNING(tapeWowDepthSpread); KZN_READ_TUNING(tapeFlutterDepthBase);
