@@ -53,7 +53,7 @@ struct TuningSnapshot
     float preEmphasisFreqHz = 3000.0f;
     float preEmphasisQ = 0.707f;
     float preEmphasisGain = 1.2f;
-    float preEmphasisLevelSmoothing = 0.95f;
+    float preEmphasisLevelSmoothing = 0.208f;  // τ in seconds (was raw α = 0.95)
     float preEmphasisQuietThreshold = 0.125f;
     float preEmphasisMaxAmount = 0.5f;
     float compressorAttackMs = 50.0f;

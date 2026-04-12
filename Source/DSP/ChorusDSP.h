@@ -55,7 +55,7 @@ public:
         std::atomic<float> preEmphasisFreqHz { 3000.0f };
         std::atomic<float> preEmphasisQ { 0.707f };
         std::atomic<float> preEmphasisGain { 1.2f };
-        std::atomic<float> preEmphasisLevelSmoothing { 0.95f };
+        std::atomic<float> preEmphasisLevelSmoothing { 0.208f };  // τ in seconds (was raw α = 0.95)
         std::atomic<float> preEmphasisQuietThreshold { 0.125f };
         std::atomic<float> preEmphasisMaxAmount { 0.5f };
         std::atomic<float> compressorAttackMs { 50.0f };
@@ -245,7 +245,7 @@ private:
         float preEmphasisFreqHz = 3000.0f;
         float preEmphasisQ = 0.707f;
         float preEmphasisGain = 1.2f;
-        float preEmphasisLevelSmoothing = 0.95f;
+        float preEmphasisLevelSmoothing = 0.208f;  // τ in seconds (was raw α = 0.95)
         float preEmphasisQuietThreshold = 0.125f;
         float preEmphasisMaxAmount = 0.5f;
         float compressorAttackMs = 50.0f;

@@ -55,7 +55,14 @@ void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::Audio
     rmsLevel /= block.getNumChannels();
     
     const auto& tuning = chorusDSP.runtimeTuningSnapshot;
-    const float levelSmoothing = juce::jlimit(0.0f, 1.0f, tuning.preEmphasisLevelSmoothing);
+
+    // Sample-rate-invariant level smoothing: snapshot stores τ in seconds,
+    // converted here to a per-block α coefficient.
+    // (Was hardcoded α = 0.95 — only correct at 48 k / 512-sample blocks.)
+    const float blockDurationSec = static_cast<float>(blockSize)
+                                 / static_cast<float>(chorusDSP.spec.sampleRate);
+    const float levelTauSec = std::max(0.001f, tuning.preEmphasisLevelSmoothing);
+    const float levelSmoothing = std::exp(-blockDurationSec / levelTauSec);
     chorusDSP.inputLevel = levelSmoothing * chorusDSP.inputLevel + (1.0f - levelSmoothing) * rmsLevel;
     
     const float quietThreshold = tuning.preEmphasisQuietThreshold;

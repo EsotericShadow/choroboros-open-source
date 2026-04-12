@@ -138,7 +138,7 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningSnapshot.preEmphasisFreqHz = juce::jmax(20.0f, runtimeTuning.preEmphasisFreqHz.load());
     runtimeTuningSnapshot.preEmphasisQ = juce::jmax(0.1f, runtimeTuning.preEmphasisQ.load());
     runtimeTuningSnapshot.preEmphasisGain = juce::jmax(0.01f, runtimeTuning.preEmphasisGain.load());
-    runtimeTuningSnapshot.preEmphasisLevelSmoothing = clamp01(runtimeTuning.preEmphasisLevelSmoothing.load());
+    runtimeTuningSnapshot.preEmphasisLevelSmoothing = juce::jmax(0.001f, runtimeTuning.preEmphasisLevelSmoothing.load());  // τ in seconds
     runtimeTuningSnapshot.preEmphasisQuietThreshold = juce::jmax(0.0f, runtimeTuning.preEmphasisQuietThreshold.load());
     runtimeTuningSnapshot.preEmphasisMaxAmount = juce::jmax(0.0f, runtimeTuning.preEmphasisMaxAmount.load());
     runtimeTuningSnapshot.compressorAttackMs = juce::jmax(0.1f, runtimeTuning.compressorAttackMs.load());
@@ -398,7 +398,7 @@ TuningSnapshot ChorusDSP::precomputeTuningSnapshot()
     snapshot.preEmphasisFreqHz = juce::jmax(20.0f, runtimeTuning.preEmphasisFreqHz.load());
     snapshot.preEmphasisQ = juce::jmax(0.1f, runtimeTuning.preEmphasisQ.load());
     snapshot.preEmphasisGain = juce::jmax(0.01f, runtimeTuning.preEmphasisGain.load());
-    snapshot.preEmphasisLevelSmoothing = clamp01(runtimeTuning.preEmphasisLevelSmoothing.load());
+    snapshot.preEmphasisLevelSmoothing = juce::jmax(0.001f, runtimeTuning.preEmphasisLevelSmoothing.load());  // τ in seconds
     snapshot.preEmphasisQuietThreshold = juce::jmax(0.0f, runtimeTuning.preEmphasisQuietThreshold.load());
     snapshot.preEmphasisMaxAmount = juce::jmax(0.0f, runtimeTuning.preEmphasisMaxAmount.load());
     snapshot.compressorAttackMs = juce::jmax(0.1f, runtimeTuning.compressorAttackMs.load());

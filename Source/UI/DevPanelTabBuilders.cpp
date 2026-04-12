@@ -1788,7 +1788,7 @@ void DevPanel::buildInternalsTab(DevPanelBuildContext& ctx)
             dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Freq (Hz)", engineTuning.preEmphasisFreqHz, 200.0, 12000.0, 1.0, 1.0));
             dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Q", engineTuning.preEmphasisQ, 0.1, 4.0, 0.001, 1.0));
             dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Gain", engineTuning.preEmphasisGain, 0.1, 4.0, 0.001, 1.0));
-            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Level Smooth", engineTuning.preEmphasisLevelSmoothing, 0.0, 1.0, 0.001, 1.0));
+            dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Level \u03c4 (s)", engineTuning.preEmphasisLevelSmoothing, 0.001, 2.0, 0.001, 1.0));
             dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Quiet Thresh", engineTuning.preEmphasisQuietThreshold, 0.0, 1.0, 0.001, 1.0));
             dspFiltering.add(addInternal(engineIndex, hqEnabled, "PreEmph Max Amount", engineTuning.preEmphasisMaxAmount, 0.0, 1.0, 0.001, 1.0));
         }

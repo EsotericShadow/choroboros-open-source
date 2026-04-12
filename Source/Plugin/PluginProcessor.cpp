@@ -324,7 +324,7 @@ void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
     r.preEmphasisFreqHz.store(1502.0f);
     r.preEmphasisQ.store(1.706f);
     r.preEmphasisGain.store(1.343f);
-    r.preEmphasisLevelSmoothing.store(0.866f);
+    r.preEmphasisLevelSmoothing.store(0.074f);  // τ in seconds (was raw α = 0.866)
     r.preEmphasisQuietThreshold.store(0.535f);
     r.preEmphasisMaxAmount.store(0.961f);
     r.compressorAttackMs.store(19.4f);
@@ -389,7 +389,7 @@ void setRedHQDefaults(ChorusDSP::RuntimeTuning& r)
     r.preEmphasisFreqHz.store(3200.0f);
     r.preEmphasisQ.store(0.8f);
     r.preEmphasisGain.store(1.15f);
-    r.preEmphasisLevelSmoothing.store(0.9f);
+    r.preEmphasisLevelSmoothing.store(0.101f);  // τ in seconds (was raw α = 0.9)
     r.preEmphasisQuietThreshold.store(0.2f);
     r.preEmphasisMaxAmount.store(0.35f);
     r.compressorAttackMs.store(18.0f);
