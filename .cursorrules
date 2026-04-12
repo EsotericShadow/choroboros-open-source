@@ -1,4 +1,4 @@
-# Choroboros — Cursor Rules for v2.04-dev
+# Choroboros — Cursor Rules for v2.05
 # JUCE 8.0.12 audio plugin (VST3/AU/AAX/Standalone)
 # Copyright (C) 2026 Kaizen Strategic AI Inc. (DBA: Kaizen DSP)
 
@@ -7,7 +7,7 @@ selectable "color" engines (Green, Blue, Red, Purple, Black) each with
 distinct DSP interpolation cores. Built on JUCE 8.0.12. Targets macOS
 (AU/VST3/Standalone), Windows (VST3/Standalone), and AAX.
 
-Active branch: `v2.04-dev`
+Active branch: `v2.05-dev`
 
 ---
 
@@ -181,11 +181,13 @@ if (isBulkChange) { ... return; }
 - If mail launch fails or user closes dialog, the report file survives
 
 ### 7. UI scale factor
-`kUiScale = 0.91f`. All pixel values in PluginEditor go through
-`uiScaleInt()`. Never hardcode raw pixel numbers.
+`kBaseUiScale = 0.91f`. The effective scale is `kBaseUiScale * dpiScale`
+(returned by `getUiScale()`). All pixel values in PluginEditor go through
+`uiScaleInt()`. Never hardcode raw pixel numbers. The host-reported DPI
+factor is stored in `dpiScale` and set via the `setScaleFactor()` override.
 
 ### 8. Git discipline
-- No force-push to `v2.04-dev`
+- No force-push to `v2.05-dev`
 - New commits only — never amend shared history
 - No `--no-verify` to skip hooks
 

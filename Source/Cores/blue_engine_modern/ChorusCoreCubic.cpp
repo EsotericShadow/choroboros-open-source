@@ -76,45 +76,7 @@ float ChorusCoreCubic::getMaxDelaySamples() const
     return static_cast<float>(maxDelaySamples) - getGuardSamples();
 }
 
-float ChorusCoreCubic::readCubic(int channel, float delaySamples) const
-{
-    const auto& buf = delayBuffers[static_cast<size_t>(channel)];
-    const int writePos = writePositions[static_cast<size_t>(channel)];
-    
-    // Calculate read position (behind write head)
-    float readPos = static_cast<float>(writePos) - delaySamples;
-    
-    // Wrap to positive range
-    while (readPos < 0.0f)
-        readPos += static_cast<float>(bufferSize);
-    
-    // Get integer and fractional parts
-    int i1 = static_cast<int>(readPos);
-    float u = readPos - static_cast<float>(i1); // Fractional part in [0,1)
-    
-    // Get indices for 4-point cubic (p_{-1}, p_0, p_{+1}, p_{+2})
-    int im1 = (i1 - 1) & bufferMask;
-    int i0  = (i1 + 0) & bufferMask;
-    int ip1 = (i1 + 1) & bufferMask;
-    int ip2 = (i1 + 2) & bufferMask;
-    
-    // Get samples
-    float pm1 = buf[static_cast<size_t>(im1)];
-    float p0  = buf[static_cast<size_t>(i0)];
-    float p1  = buf[static_cast<size_t>(ip1)];
-    float p2  = buf[static_cast<size_t>(ip2)];
-    
-    // Catmull-Rom cubic weights
-    float u2 = u * u;
-    float u3 = u2 * u;
-    
-    float w_m1 = 0.5f * (-u3 + 2.0f * u2 - u);
-    float w_0  = 0.5f * ( 3.0f * u3 - 5.0f * u2 + 2.0f);
-    float w_1  = 0.5f * (-3.0f * u3 + 4.0f * u2 + u);
-    float w_2  = 0.5f * ( u3 - u2);
-    
-    return w_m1 * pm1 + w_0 * p0 + w_1 * p1 + w_2 * p2;
-}
+// readCubic() is now inlined in the header, delegating to shared readCubicInterp()
 
 void ChorusCoreCubic::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& block, float currentCentreDelayMs)
 {

@@ -326,6 +326,7 @@ private:
     std::atomic<bool> presetLoadInProgress { false };
     std::atomic<bool> stateLoadInProgress { false };
     std::atomic<bool> engineProfileApplyInProgress { false };
+    std::atomic<bool> isShuttingDown { false };
     LiveTelemetry liveTelemetry;
     std::atomic<juce::int64> lastAnomalyLogTimeMs { 0 };  // throttle DSP anomaly logging
 

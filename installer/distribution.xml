@@ -50,14 +50,14 @@
 
     <!-- Package references (filenames match what build_installer.sh produces) -->
     <pkg-ref id="com.kaizenstrategicai.choroboros.vst3"
-             version="2.0.41"
+             version="2.0.50"
              onConclusion="none">Choroboros-VST3.pkg</pkg-ref>
 
     <pkg-ref id="com.kaizenstrategicai.choroboros.au"
-             version="2.0.41"
+             version="2.0.50"
              onConclusion="none">Choroboros-AU.pkg</pkg-ref>
 
     <pkg-ref id="com.kaizenstrategicai.choroboros.standalone"
-             version="2.0.41"
+             version="2.0.50"
              onConclusion="none">Choroboros-Standalone.pkg</pkg-ref>
 </installer-gui-script>

@@ -17,7 +17,7 @@
 # Prerequisites:
 #   - "Developer ID Installer: Kaizen Strategic AI Inc. (9XLRQU887D)"
 #     certificate installed in your keychain
-#   - notarytool credentials stored (profile name: "notarytool-profile")
+#   - notarytool credentials stored (default profile: notarytool-profile; override with CHOROBOROS_NOTARY_PROFILE)
 #   - Unsigned .pkg already built by build_installer.sh
 # =============================================================================
 
@@ -29,13 +29,14 @@ source "${SCRIPT_DIR}/installer_config.sh"
 
 # ---- Configuration ----------------------------------------------------------
 
-# Your Developer ID Installer certificate identity.
-# Check with: security find-identity -v
-INSTALLER_IDENTITY="Developer ID Installer: Kaizen Strategic AI Inc. (9XLRQU887D)"
+# Override on the shell if needed:
+#   CHOROBOROS_INSTALLER_SIGN_IDENTITY='Developer ID Installer: …'
+#   CHOROBOROS_NOTARY_PROFILE=my-profile
+INSTALLER_IDENTITY="${CHOROBOROS_INSTALLER_SIGN_IDENTITY:-Developer ID Installer: Kaizen Strategic AI Inc. (9XLRQU887D)}"
 
 # The notarytool keychain profile you created with:
 #   xcrun notarytool store-credentials "notarytool-profile" ...
-NOTARY_PROFILE="notarytool-profile"
+NOTARY_PROFILE="${CHOROBOROS_NOTARY_PROFILE:-notarytool-profile}"
 
 VERSION="${CHOROBOROS_VERSION}"
 DIST_DIR="dist"
@@ -72,10 +73,10 @@ if [ "$HAVE_COMPONENTS" = false ] && [ ! -f "$UNSIGNED_PKG" ]; then
 fi
 
 # Check that the Installer identity exists in the keychain
-if ! security find-identity -v | grep -q "Developer ID Installer: Kaizen Strategic AI Inc."; then
+if ! security find-identity -v | grep -Fq "${INSTALLER_IDENTITY}"; then
     echo "ERROR: Developer ID Installer certificate not found in keychain."
     echo ""
-    echo "Expected: $INSTALLER_IDENTITY"
+    echo "Expected a line matching: ${INSTALLER_IDENTITY}"
     echo ""
     echo "Run this to check what's installed:"
     echo "  security find-identity -v"

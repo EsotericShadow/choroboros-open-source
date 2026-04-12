@@ -29,7 +29,7 @@
 // crossings cleanly. When the integer part of the delay changes, the active
 // allpass (with settled DFII-T state) becomes the "fading out" instance while
 // a fresh allpass (with coefficients for the new integer delay) fades in.
-// A short sin²/cos² crossfade (~48 samples) masks the coefficient discontinuity
+// A sin²/cos² crossfade (~6ms, sample-rate-invariant) masks the coefficient discontinuity
 // that would otherwise produce scratchy artifacts.
 //
 // Reference: J.-P. Thiran, "Recursive digital filters with maximally
@@ -76,9 +76,8 @@ private:
         AllpassInstance apB;   // Secondary allpass (used during crossfade)
 
         // Crossfade state: when integer delay changes, we fade from apA to apB
-        // over XFADE_LENGTH samples using sin²/cos² envelope
-        static constexpr int XFADE_LENGTH = 48;
-        int xfadeCounter = 0;      // Counts down from XFADE_LENGTH to 0; 0 = no crossfade active
+        // over xfadeLength samples using sin²/cos² envelope
+        int xfadeCounter = 0;      // Counts down from xfadeLength to 0; 0 = no crossfade active
         bool aIsActive = true;     // Which instance is the "new" one after crossfade
 
         // Smoothed delay for stability
@@ -122,6 +121,16 @@ private:
 
     // One-pole output lowpass coefficient: y[n] = (1-a)*x[n] + a*y[n-1]
     float outputLpAlpha = 0.0f;
+
+    // Sample-rate-invariant delay smoothing coefficient.
+    // Derived from a 14ms time constant in prepare() so behaviour is identical
+    // at 44.1 k, 48 k, 96 k, 192 k.  (Was hardcoded 0.9985 — only correct at 48 k.)
+    float delaySmoothingCoeff_ = 0.9985f;
+
+    // Sample-rate-invariant crossfade length (samples).
+    // Derived from a 6.0 ms target duration in prepare().
+    // (Was static constexpr 48 — only 1 ms at 48 k, leaked 1.5% THD transients.)
+    int xfadeLength_ = 288;
 
     // Per-channel one-pole centre delay smoothing
     std::array<float, 2> smoothedCentreDelay {{ 0.0f, 0.0f }};

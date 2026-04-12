@@ -1,6 +1,6 @@
 # Known Issues
 
-Issues known for Choroboros v2.04-dev. Please report additional issues via the Feedback button.
+Issues known for Choroboros v2.05 Beta. Please report additional issues via the Feedback button.
 
 ## Current Test Scope
 
@@ -15,6 +15,20 @@ Issues known for Choroboros v2.04-dev. Please report additional issues via the F
 Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are **not supported**. The plugin may fail AU validation or crash on load on these systems. This is a limitation of the JUCE 8 framework, which requires macOS 10.13 as a minimum deployment target.
 
 ## Audio / DSP
+
+### Fixed in v2.05
+
+- **3 dB volume dip at 50% wet mix:** Linear dry/wet mixing caused a volume dip when wet signal has phase offset from stereo modulation (which chorus always does). Fixed with equal-power sin/cos crossfade (industry standard). Added per-engine output trim parameter for gain compensation.
+- **Zippering artifacts across all 5 engines:** Per-sample interpolation smoothing and coefficient fixes across Green (Lagrange), Blue (Cubic/Thiran), Red (Tape), and Black (Ensemble) cores. Reported by multiple testers as "DSP anomalies" and "scratchy" sound.
+- **Three additional freeze-on-close vectors:** Beyond the D3D11 fix in v2.04.1, three more teardown issues resolved: DevPanelWindow HWND cascade under DLL loader lock, themePrewarmThread outliving DLL unload, and FeedbackCollector blocking disk I/O in destructor.
+- **Preset browser cycling bug:** Preset index reset during load due to parameter callbacks. Fixed with loadInProgress guard.
+- **Text entry "1" = 100%:** Typing "1" into any knob value field was misinterpreted as 100%. Parsers for Depth, Color, Mix, and Width now correctly treat values 1-100 as percentages. Offset parser accepts both "deg" and degree symbol suffixes.
+- **Color slider "sounds reversed" after engine switch:** Slider value now re-syncs after skew factor change on engine switch.
+- **Timer race condition on shutdown:** Defensive atomic guard so timerCallback() cannot execute after plugin destruction begins.
+- **Logic Pro hidden editor leak:** Editor now stops background threads when Logic hides the editor without destroying it.
+- **Dialog destruction crashes:** About/Feedback/Help dialogs replaced delete-this with SafePointer + callAsync for safe destruction.
+- **Non-ASCII character rendering:** Em dashes, curly quotes, arrows, and math symbols rendered as garbled text in JUCE fonts. Replaced with ASCII equivalents.
+- **DPI / HiDPI scaling:** Plugin now responds to host-reported DPI scale factor via setScaleFactor() override. Renders correctly on Retina, 4K, and scaled displays in hosts that support VST3 DPI notification (Reaper, Cubase, Studio One, Bitwig, etc.).
 
 ### Fixed in v2.04-dev
 
@@ -53,11 +67,13 @@ HQ toggle now switches in ~43 ms (18 ms warmup + 25 ms crossfade) and supports s
 - **Ardour 8.10 (Windows):** One report of VST3 crash on load. Appears to be an Ardour VST3 hosting issue — other plugins also crash for this user.
 - **Sample rates:** Supports up to 192 kHz. Report any issues at extreme sample rates.
 
-## macOS Gatekeeper (Unsigned Beta)
+## macOS Gatekeeper (signed installer vs zip beta)
 
-Choroboros is not yet code-signed or notarized (pending Apple Developer enrollment). macOS will show a security warning when you first open the plugin or installer.
+**Preferred:** Install from the **signed, notarized** `.pkg` when we ship it (see GitHub Releases). After notarization, Gatekeeper should allow a normal double-click install without workarounds.
 
-**To install despite Gatekeeper warnings:**
+**If you only have an unsigned zip** (older betas or local builds): macOS may block the plugin or show security warnings.
+
+**To install an unsigned zip despite Gatekeeper:**
 
 1. **Recommended — use the install script:** Open Terminal, navigate to the unzipped folder, and run:
    ```
@@ -71,12 +87,11 @@ Choroboros is not yet code-signed or notarized (pending Apple Developer enrollme
    xattr -cr ~/Library/Audio/Plug-Ins/Components/Choroboros.component
    xattr -cr /Applications/Choroboros.app
    ```
+   (Paths may differ if the product name includes “Beta”.)
 
-3. **"Open Anyway" in System Settings:** Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the Choroboros warning. This button only appears **after** you've attempted to open the blocked file.
+3. **"Open Anyway" in System Settings:** Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the Choroboros warning. This option is **unreliable on recent macOS** for unsigned code; prefer the `.pkg` or `xattr` steps above.
 
-4. **If "Open Anyway" doesn't appear:** Some macOS versions (especially Ventura+) hide this option. Use the Terminal xattr method above instead.
-
-Code signing and notarization will be added in a future release.
+Maintainers: full macOS pipeline is `./scripts/release_macos_signed_installer.sh` (universal build → sign bundles → `.pkg` → notarize → staple). See `installer/installer_config.sh` for version alignment and optional env overrides.
 
 ## Reporting Issues
 

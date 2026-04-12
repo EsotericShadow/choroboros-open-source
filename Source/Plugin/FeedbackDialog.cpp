@@ -224,7 +224,7 @@ void FeedbackDialog::sendToDeveloper()
 #ifdef CHOROBOROS_VERSION_STRING
     subject << " - v" << juce::String (CHOROBOROS_VERSION_STRING);
 #else
-    subject << " - v2.04-dev";
+    subject << " - v2.05";
 #endif
 
     juce::String mailto = "mailto:info@kaizenstrategic.ai"

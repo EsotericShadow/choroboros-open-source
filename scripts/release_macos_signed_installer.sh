@@ -78,6 +78,12 @@ done
 # shellcheck source=installer/installer_config.sh
 source "${INSTALLER_DIR}/installer_config.sh"
 
+# Linker / tool temp on the system volume can ENOSPC when the CMake tree lives on /Volumes/...
+if [[ "${CHOROBOROS_CMAKE_BUILD_DIR}" == /Volumes/* ]]; then
+    export TMPDIR="${TMPDIR:-$(dirname "${CHOROBOROS_CMAKE_BUILD_DIR}")/tmp}"
+    mkdir -p "${TMPDIR}"
+fi
+
 if [[ ! -f "${REPO_ROOT}/CMakeLists.txt" ]]; then
     echo "ERROR: CMakeLists.txt not found. Expected repo root at ${REPO_ROOT}"
     exit 1

@@ -32,7 +32,7 @@ namespace
 {
 int uiScaleInt(int value)
 {
-    return juce::roundToInt(static_cast<float>(value) * ChoroborosPluginEditor::kUiScale);
+    return juce::roundToInt(static_cast<float>(value) * ChoroborosPluginEditor::kBaseUiScale);
 }
 
 int getIntOrDefault(const juce::var& objectVar, const juce::Identifier& key, int fallback)
@@ -1089,15 +1089,17 @@ float ChoroborosPluginEditor::parseDepthValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 1.0f) ? (value / 100.0f) : value;
+        return (value >= 1.0f && value <= 100.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
 
 float ChoroborosPluginEditor::parseOffsetValue(const juce::String& trimmed)
 {
-    juce::String clean = trimmed.removeCharacters("°").trim();
+    juce::String clean = trimmed;
     if (clean.endsWithIgnoreCase("deg"))
         clean = clean.substring(0, clean.length() - 3).trim();
+    else if (clean.endsWith("°"))
+        clean = clean.dropLastCharacters(1).trim();
     const float value = clean.getFloatValue();
     if (std::isfinite(value))
         return value;
@@ -1109,7 +1111,7 @@ float ChoroborosPluginEditor::parseWidthValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 2.0f) ? (value / 100.0f) : value;
+        return (value > 2.0f) ? juce::jlimit(0.0f, 2.0f, value / 100.0f) : value;
     return -1.0f;
 }
 
@@ -1118,7 +1120,7 @@ float ChoroborosPluginEditor::parseColorValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 1.0f) ? (value / 100.0f) : value;
+        return (value >= 1.0f && value <= 100.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }
 
@@ -1127,6 +1129,6 @@ float ChoroborosPluginEditor::parseMixValue(const juce::String& trimmed)
     juce::String clean = trimmed.removeCharacters("%").trim();
     const float value = clean.getFloatValue();
     if (value >= 0.0f && std::isfinite(value))
-        return (value > 1.0f) ? (value / 100.0f) : value;
+        return (value >= 1.0f && value <= 100.0f) ? (value / 100.0f) : value;
     return -1.0f;
 }

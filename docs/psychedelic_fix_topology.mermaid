@@ -1,0 +1,49 @@
+%%{ init: { 'theme': 'dark', 'flowchart': { 'nodeSpacing': 25, 'rankSpacing': 35, 'curve': 'basis' } } }%%
+flowchart LR
+    IN(["0 dBFS<br/>mono/stereo"])
+
+    IN --> HPF["HPF"] --> PRESAT["Pre-Sat"]
+
+    PRESAT --> SPLIT{ }
+
+    SPLIT -->|"saved as dry"| HOLD["Dry Hold<br/>0 dBFS"]
+    SPLIT -->|"in-place → wet"| PREEQ["Pre-Emph"]
+
+    PREEQ --> CORE
+
+    subgraph CORE["Chorus Core — stereo from here"]
+        direction TB
+        C1["PhaseWarped NQ<br/>depth 0.52 · offset 52°<br/><i>multi-voice + interp</i>"]
+    end
+
+    LFO(["LFO<br/>0.12 Hz"]) -.->|"mod"| C1
+
+    CORE --> WCHAR["Wet Char<br/>color 0.13"]
+    WCHAR --> POSTSAT["Post-Sat<br/><i>Purple NQ tanh</i>"]
+
+    POSTSAT -->|"× 0.884<br/>(−1.1 dB)"| MIX
+    HOLD -->|"× 0.467<br/>(−6.6 dB)"| MIX
+
+    MIX(["DW Mix<br/>balanced · sin/cos"])
+
+    MIX --> PC["Peak Catch<br/>−2 dB · 2∶1 · 4 dB knee<br/><i>shapes dynamics</i>"]
+    PC --> TRIM["Trim<br/>0 dB default"]
+    TRIM --> LPF2["LPF"]
+
+    LPF2 --> WIDTH["M/S Width<br/>side × 2.0<br/>comp 0.632×"]
+
+    WIDTH --> LIMIT["Safety Limiter<br/>−0.5 dB · 20∶1 · 2 dB knee<br/>0.1 ms atk · 50 ms rel<br/><i>brick-wall ceiling</i>"]
+
+    LIMIT --> OUT(["DAW output<br/>≤ −0.2 dBFS"])
+
+    style SPLIT fill:none,stroke:none
+    style MIX fill:#2a2a4a,stroke:#7a7afa,stroke-width:2px,color:#fff
+    style PC fill:#2a2a2a,stroke:#666,stroke-width:1px,color:#aaa
+    style WIDTH fill:#3a3a1a,stroke:#999944,stroke-width:1px,color:#ccc
+    style LIMIT fill:#1a4a1a,stroke:#44dd44,stroke-width:3px,color:#fff
+    style OUT fill:#1a4a1a,stroke:#44dd44,stroke-width:2px,color:#fff
+    style HOLD fill:#1a3a1a,stroke:#4a9a4a,stroke-width:1px,color:#ccc
+    style LFO fill:#2a1a3a,stroke:#8a5aba,stroke-width:1px,color:#ccc
+    style IN fill:#1a3a2a,stroke:#4aba6a,color:#fff
+    style CORE fill:#1a2a3a,stroke:#4a7aaa,color:#fff
+    style C1 fill:#1a2a3a,stroke:#4a7aaa,color:#fff

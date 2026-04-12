@@ -46,9 +46,16 @@ echo "Choroboros open-source artifact cleanup"
 echo "Repo: ${REPO_ROOT}"
 echo ""
 
+zip_list=()
+sha_list=()
 shopt -s nullglob
-zip_list=( "${REPO_ROOT}/Release"/Choroboros-*-macOS-Universal.zip )
-sha_list=( "${REPO_ROOT}/Release"/Choroboros-*-macOS-Universal.zip.sha256 )
+for f in "${REPO_ROOT}/Release"/Choroboros-*-macOS-Universal.zip; do
+    zip_list+=("$f")
+done
+for f in "${REPO_ROOT}/Release"/Choroboros-*-macOS-Universal.zip.sha256; do
+    sha_list+=("$f")
+done
+shopt -u nullglob
 
 for p in "${paths[@]}"; do
     if [[ -e "$p" ]]; then
@@ -56,16 +63,19 @@ for p in "${paths[@]}"; do
         echo "  $sz  $p"
     fi
 done
-for p in "${zip_list[@]}"; do
-    [[ -f "$p" ]] || continue
-    sz=$(du -sh "$p" 2>/dev/null | cut -f1)
-    echo "  $sz  $p"
-done
-for p in "${sha_list[@]}"; do
-    [[ -f "$p" ]] || continue
-    echo "  (small)  $p"
-done
-shopt -u nullglob
+if ((${#zip_list[@]} > 0)); then
+    for p in "${zip_list[@]}"; do
+        [[ -f "$p" ]] || continue
+        sz=$(du -sh "$p" 2>/dev/null | cut -f1)
+        echo "  $sz  $p"
+    done
+fi
+if ((${#sha_list[@]} > 0)); then
+    for p in "${sha_list[@]}"; do
+        [[ -f "$p" ]] || continue
+        echo "  (small)  $p"
+    done
+fi
 
 echo ""
 if [[ "${1:-}" != "--yes" ]]; then
@@ -83,9 +93,8 @@ for p in "${paths[@]}"; do
         rm -rf "$p"
     fi
 done
-shopt -s nullglob
-rm -f "${zip_list[@]}" "${sha_list[@]}" 2>/dev/null || true
-shopt -u nullglob
+((${#zip_list[@]})) && rm -f "${zip_list[@]}"
+((${#sha_list[@]})) && rm -f "${sha_list[@]}"
 
 echo ""
 echo "Done. df -h . for free space on this volume."

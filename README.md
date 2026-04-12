@@ -62,7 +62,7 @@ Intended for educators, sound designers, and power users who want to see under t
 
 ## Installation
 
-**Downloads (v2.04-beta):**
+**Downloads (v2.05-beta):**
 
 Beta builds are distributed via GitHub Actions artifacts. Go to the [Actions tab](https://github.com/EsotericShadow/choroboros-open-source/actions), open the latest passing Build run, and download the artifact for your platform. Each artifact contains a `.zip` and a `.zip.sha256` checksum file.
 
@@ -129,7 +129,7 @@ After installation, rescan plugins in your DAW.
 
 ## Technical Details
 
-- **Version:** 2.04
+- **Version:** 2.05
 - **Company:** Kaizen DSP
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
@@ -182,6 +182,6 @@ For issues, questions, or licensing inquiries:
 ## Installation Troubleshooting
 
 - **Plugins not appearing in DAW:** Make sure you've copied the plugin to the correct location and rescanned plugins in your DAW. Some DAWs require a full restart.
-- **macOS Gatekeeper (beta builds):** The beta is not yet code-signed. If macOS blocks the plugin, use the install script (`bash install.sh`) which handles quarantine removal automatically. Or manually run `xattr -cr` on each plugin file — see [KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for detailed steps.
+- **macOS Gatekeeper:** Prefer a **signed, notarized** `.pkg` from releases when available. For unsigned zips or local builds, use `bash install.sh` or `xattr -cr` as in [KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - **AU validation failure:** Ensure your Mac is running macOS 10.13 or later. If validation fails, try `killall -9 AudioComponentRegistrar` then rescan in Logic.
 - **Permission Issues:** For system-wide installation (`/Library/` on macOS, `C:\Program Files\` on Windows), you may need administrator privileges. User-specific installation (`~/Library/` on macOS) is recommended.

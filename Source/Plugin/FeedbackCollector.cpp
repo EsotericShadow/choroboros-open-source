@@ -143,7 +143,7 @@ juce::String FeedbackCollector::getUsageSummary() const
 #ifdef CHOROBOROS_VERSION_STRING
     s << "Version: " << juce::String (CHOROBOROS_VERSION_STRING) << "\n";
 #else
-    s << "Version: 2.04-dev\n";
+    s << "Version: 2.05\n";
 #endif
     s << "Date: " << juce::Time::getCurrentTime().toString (true, true) << "\n";
 

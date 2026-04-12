@@ -17,7 +17,7 @@
 #   - Xcode Command Line Tools installed
 #
 # Output:
-#   dist/ChoroborosBeta-2.0.41-Installer.pkg (unsigned)
+#   dist/ChoroborosBeta-2.0.50-Installer.pkg (unsigned)
 #
 # After this, sign and notarize with:
 #   ./installer/sign_and_notarize.sh
@@ -78,14 +78,14 @@ for BUNDLE in "${BUILD_DIR}/VST3/${BUNDLE_BASENAME}.vst3" "${BUILD_DIR}/AU/${BUN
         if echo "$SIGNING_ID" | grep -q "Authority=Developer ID Application: Kaizen"; then
             echo "  OK: $(basename "$BUNDLE") signed with Developer ID"
         else
-            echo "  WARNING: $(basename "$BUNDLE") may not be signed with Developer ID."
+            echo "  ERROR: $(basename "$BUNDLE") must be signed with Developer ID Application (Kaizen) for a shippable .pkg."
             echo "  Found: $SIGNING_ID"
-            echo "  Run ./installer/sign_bundles.sh to sign properly."
-            read -p "  Continue anyway? (y/n) " -n 1 -r
-            echo ""
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "  Run: ./installer/sign_bundles.sh"
+            echo "  For local experiments only: CHOROBOROS_ALLOW_NON_DEV_ID_SIGNING=1 ./installer/build_installer.sh"
+            if [[ "${CHOROBOROS_ALLOW_NON_DEV_ID_SIGNING:-}" != "1" ]]; then
                 exit 1
             fi
+            echo "  Continuing (CHOROBOROS_ALLOW_NON_DEV_ID_SIGNING=1)."
         fi
     fi
 done

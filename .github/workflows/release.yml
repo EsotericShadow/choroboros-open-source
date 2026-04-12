@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (e.g. v2.04.1)'
+        description: 'Tag to build (e.g. v2.05)'
         required: true
 
 env:

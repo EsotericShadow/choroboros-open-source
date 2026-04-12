@@ -42,7 +42,7 @@ AboutDialog::AboutDialog()
     versionLabel.setText(juce::String("v") + juce::String(CHOROBOROS_VERSION_STRING),
                          juce::dontSendNotification);
 #else
-    versionLabel.setText("v2.04", juce::dontSendNotification);
+    versionLabel.setText("v2.05", juce::dontSendNotification);
 #endif
     versionLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::description, false));
     versionLabel.setJustificationType(juce::Justification::centred);

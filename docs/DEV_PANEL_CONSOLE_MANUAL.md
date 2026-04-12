@@ -1,6 +1,6 @@
 # Choroboros Dev Panel: Interactive Console Manual
 
-*Version: 2.04*
+*Version: 2.05*
 *Audience: Shell Enthusiasts, Headless Automated Testers, and Preset Designers.*
 
 Welcome to the command-line documentation for the **Choroboros Dev Panel**. If the standard interface of Choroboros is a simple 6-knob pedal, and the Dev Panel UI is an aircraft cockpit, then the **Interactive Console** is raw access to the flight computer's C++ shell memory.

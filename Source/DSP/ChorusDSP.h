@@ -22,6 +22,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "CoreAssignments.h"
 #include "TuningConfigManager.h"
+#include <algorithm>
 #include <atomic>
 #include <array>
 #include <memory>
@@ -175,6 +176,9 @@ public:
     void setOutputTrim(float trimDb); // -12.0 to 12.0 dB
     void setModularCoreModeEnabled(bool enabled);
     bool isModularCoreModeEnabled() const { return modularCoreModeEnabled; }
+
+    /** Latency introduced by the safety limiter's lookahead buffer (samples). */
+    int getSafetyLimiterLatencySamples() const { return safetyLimiterL.getLatencySamples(); }
     void setCoreAssignments(const choroboros::CoreAssignmentTable& assignments);
     const choroboros::CoreAssignmentTable& getCoreAssignments() const { return coreAssignments; }
     bool setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId);
@@ -518,4 +522,208 @@ private:
     juce::dsp::IIR::Coefficients<float>::Ptr preallocatedHpfCoeffs;
     juce::dsp::IIR::Coefficients<float>::Ptr preallocatedLpfCoeffs;
     juce::dsp::IIR::Coefficients<float>::Ptr preallocatedPreEmphasisCoeffs;
+
+    // ══════════════════════════════════════════════════════════════════
+    // Final-stage safety limiter — lookahead true-peak design
+    //
+    // Placed AFTER processWidth() as the last DSP stage before output.
+    // Width M/S processing can amplify the side channel, creating peaks
+    // that bypass the in-chain peak catcher.  This limiter catches them.
+    //
+    // Architecture:
+    //   - 5 ms lookahead via circular delay buffer (no JUCE DelayLine)
+    //   - 4× cubic Hermite true-peak detection (ITU-R BS.1770)
+    //   - Soft-knee gain reduction: −1.0 dBTP, 20:1, 2 dB knee
+    //   - Smooth gain ramp over the lookahead window (alias-free)
+    //   - Exponential release: 50 ms (no pumping on chorus)
+    //   - Latency: 5 ms, reported via getLatencySamples()
+    //
+    // Standards: EBU R128, ITU-R BS.1770-5, AES77-2023
+    //
+    // CRITICAL: All buffers pre-allocated in prepare(). Zero heap
+    // allocation in the process path per D1 (real-time safety).
+    // ══════════════════════════════════════════════════════════════════
+    struct SafetyLimiterChannel
+    {
+        static constexpr float thresholdDb  = -1.0f;
+        static constexpr float ratio        = 20.0f;
+        static constexpr float kneeDb       = 2.0f;
+        static constexpr float lookaheadMs  = 5.0f;
+        static constexpr float releaseMs    = 50.0f;
+
+        static constexpr float kneeHalf     = kneeDb * 0.5f;
+        static constexpr float threshLow    = thresholdDb - kneeHalf;   // −2.0 dBTP
+        static constexpr float threshHigh   = thresholdDb + kneeHalf;   //  0.0 dBTP
+
+        std::vector<float> delayBuf;
+        int delaySamples   = 1;     // Never 0 — prevents % 0 UB if process() called before prepare()
+        int writePos       = 0;
+
+        float currentGainDb = 0.0f;
+        float targetGainDb  = 0.0f;
+        float rampPerSample = 0.0f;
+        float releaseCoeff  = 0.0f;
+        int   holdCounter   = 0;    // Hold gain after attack for delaySamples before releasing
+
+        // Last 3 samples of prior block — lets detectTruePeak see Hermite knots across callbacks
+        std::array<float, 3> scanTail {{ 0.0f, 0.0f, 0.0f }};
+        std::vector<float>   scanScratch; // 3 + maxBlock, filled in prepare (no RT alloc)
+
+        void prepare (double sampleRate, int maxBlockSamples)
+        {
+            delaySamples = static_cast<int>(std::ceil (lookaheadMs * 0.001 * sampleRate));
+            delayBuf.assign (static_cast<size_t>(delaySamples), 0.0f);
+            writePos = 0;
+            currentGainDb = 0.0f;
+            targetGainDb  = 0.0f;
+            rampPerSample = 0.0f;
+            holdCounter   = 0;
+            scanTail.fill (0.0f);
+            const int mb = juce::jmax (1, maxBlockSamples);
+            scanScratch.assign (static_cast<size_t>(3 + mb), 0.0f);
+            releaseCoeff  = std::exp (-1.0f / static_cast<float>(releaseMs * 0.001 * sampleRate));
+        }
+
+        void reset()
+        {
+            std::fill (delayBuf.begin(), delayBuf.end(), 0.0f);
+            writePos = 0;
+            currentGainDb = 0.0f;
+            targetGainDb  = 0.0f;
+            rampPerSample = 0.0f;
+            holdCounter   = 0;
+            scanTail.fill (0.0f);
+        }
+
+        int getLatencySamples() const { return delaySamples; }
+
+        // Cubic Hermite interpolation for inter-sample peak detection
+        static float cubicHermite (float y0, float y1, float y2, float y3, float t)
+        {
+            float m0 = 0.5f * (y2 - y0);
+            float m1 = 0.5f * (y3 - y1);
+            float t2 = t * t;
+            float t3 = t2 * t;
+            return (2.0f * y1 - 2.0f * y2 + m0 + m1) * t3
+                 + (-3.0f * y1 + 3.0f * y2 - 2.0f * m0 - m1) * t2
+                 + m0 * t
+                 + y1;
+        }
+
+        // 4× oversampled true-peak detection (ITU-R BS.1770)
+        static float detectTruePeak (const float* data, int numSamples)
+        {
+            float peak = 0.0f;
+            for (int i = 0; i < numSamples; ++i)
+                peak = std::max (peak, std::abs (data[i]));
+
+            if (numSamples < 4) return peak;  // Need 4 points for cubic interp
+
+            for (int i = 1; i < numSamples - 2; ++i)
+            {
+                float y0 = data[i - 1], y1 = data[i], y2 = data[i + 1], y3 = data[i + 2];
+                for (int f = 1; f <= 3; ++f)
+                {
+                    float t = static_cast<float>(f) * 0.25f;
+                    peak = std::max (peak, std::abs (cubicHermite (y0, y1, y2, y3, t)));
+                }
+            }
+            return peak;
+        }
+
+        // Soft-knee gain reduction (dB, positive = attenuation)
+        static float computeGainReductionDb (float peakDb)
+        {
+            if (peakDb <= threshLow) return 0.0f;
+            if (peakDb >= threshHigh)
+                return (peakDb - thresholdDb) * (1.0f - 1.0f / ratio);
+            float x = peakDb - threshLow;
+            return (1.0f - 1.0f / ratio) * x * x / (2.0f * kneeDb);
+        }
+
+        // Block-level: scan for true peak and set gain ramp target.
+        // Call ONCE per block BEFORE the per-sample loop.
+        //
+        // Hold stage: after an attack, hold gain for at least delaySamples
+        // before releasing. This ensures the delayed version of the hot
+        // signal passes through with full gain reduction applied, even
+        // when the hot transient sits near a block boundary.
+        void scanBlock (const float* data, int numSamples)
+        {
+            if (numSamples < 1 || scanScratch.size() < static_cast<size_t>(3 + numSamples))
+                return;
+
+            std::copy (scanTail.begin(), scanTail.end(), scanScratch.begin());
+            std::copy (data, data + numSamples, scanScratch.begin() + 3);
+
+            const int padded = 3 + numSamples;
+            float truePeak = detectTruePeak (scanScratch.data(), padded);
+
+            scanTail[0] = scanScratch[static_cast<size_t>(padded - 3)];
+            scanTail[1] = scanScratch[static_cast<size_t>(padded - 2)];
+            scanTail[2] = scanScratch[static_cast<size_t>(padded - 1)];
+
+            if (truePeak < 1.0e-10f)
+            {
+                // Silent block — allow hold to expire naturally
+                rampPerSample = 0.0f;
+                return;
+            }
+
+            float peakDb = 20.0f * std::log10 (truePeak);
+            float neededGrDb = -computeGainReductionDb (peakDb);
+
+            if (neededGrDb < targetGainDb)
+            {
+                // Attack: deeper reduction needed → ramp and reset hold
+                targetGainDb = neededGrDb;
+                rampPerSample = (targetGainDb - currentGainDb)
+                              / static_cast<float>(std::max (1, delaySamples));
+                holdCounter = delaySamples;  // Hold for one lookahead period after attack
+            }
+            else
+            {
+                // No deeper reduction needed — let hold timer expire
+                rampPerSample = 0.0f;
+            }
+        }
+
+        // Per-sample: delay + gain application (attack → hold → release)
+        // REQUIRES: prepare() called first. delaySamples >= 1 enforced by init.
+        float process (float sample)
+        {
+            if (delayBuf.empty()) return sample;  // Safety: not yet prepared
+            delayBuf[static_cast<size_t>(writePos)] = sample;
+            writePos = (writePos + 1) % delaySamples;
+            float delayed = delayBuf[static_cast<size_t>(writePos)];
+
+            if (targetGainDb < currentGainDb)
+            {
+                // Attack: ramp toward deeper reduction
+                currentGainDb += rampPerSample;
+                if (currentGainDb < targetGainDb)
+                    currentGainDb = targetGainDb;
+            }
+            else if (holdCounter > 0)
+            {
+                // Hold: maintain current gain reduction until delayed
+                // hot samples have passed through the output
+                --holdCounter;
+            }
+            else
+            {
+                // Release: exponential decay back toward 0 dB
+                currentGainDb = releaseCoeff * currentGainDb;
+                if (currentGainDb > -0.001f)
+                    currentGainDb = 0.0f;
+            }
+
+            if (currentGainDb < -0.001f)
+                return delayed * std::pow (10.0f, currentGainDb / 20.0f);
+            return delayed;
+        }
+    };
+
+    SafetyLimiterChannel safetyLimiterL;
+    SafetyLimiterChannel safetyLimiterR;
 };

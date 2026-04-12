@@ -743,6 +743,10 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     preallocatedLpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 20000.0f, 0.707f);
     preallocatedPreEmphasisCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter(spec.sampleRate, 3000.0f, 0.707f, 1.2f);
 
+    // Safety limiter lookahead buffers (pre-allocated, no allocation in process)
+    safetyLimiterL.prepare (spec.sampleRate, static_cast<int> (spec.maximumBlockSize));
+    safetyLimiterR.prepare (spec.sampleRate, static_cast<int> (spec.maximumBlockSize));
+
     reset();
 }
 
@@ -778,6 +782,8 @@ void ChorusDSP::reset()
     compressor.reset();
     for (auto& comp : wetCompressors)
         comp.envelope = 0.0f;
+    safetyLimiterL.reset();
+    safetyLimiterR.reset();
     
     inputLevel = 0.0f;
     coreSwitchCrossfadeActive = false;
@@ -1088,8 +1094,27 @@ void ChorusDSP::process(const juce::dsp::AudioBlock<float>& block)
     lpf.process(context);
     if (nonConstBlock.getNumChannels() >= 2)
         processWidth(nonConstBlock);
-    // Legacy full-output compression is bypassed. A transparent post-sum peak
-    // catcher runs inside processChorus after dry/wet mixing instead.
+
+    // Safety limiter: lookahead true-peak limiting AFTER width processing.
+    // Width M/S can amplify side channel → new peaks the peak catcher missed.
+    // Scan both channels for true peaks, then apply delayed+ramped gain.
+    {
+        const int numSamples = static_cast<int>(nonConstBlock.getNumSamples());
+        auto* left  = nonConstBlock.getChannelPointer (0);
+        auto* right = (nonConstBlock.getNumChannels() >= 2)
+                    ? nonConstBlock.getChannelPointer (1) : nullptr;
+
+        safetyLimiterL.scanBlock (left, numSamples);
+        if (right != nullptr)
+            safetyLimiterR.scanBlock (right, numSamples);
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            left[i] = safetyLimiterL.process (left[i]);
+            if (right != nullptr)
+                right[i] = safetyLimiterR.process (right[i]);
+        }
+    }
 }
 
 void ChorusDSP::setRate(float rateHz_)

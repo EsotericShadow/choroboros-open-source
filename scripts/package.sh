@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="2.04-beta"
+VERSION="2.05-beta"
 PLUGIN_NAME="Choroboros"
 RELEASE_DIR="Release/${PLUGIN_NAME}-v${VERSION}"
 ARCHIVE_NAME="${PLUGIN_NAME}-v${VERSION}-macOS.zip"

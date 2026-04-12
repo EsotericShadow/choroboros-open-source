@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Choroboros VERSION 2.0.41)
+project(Choroboros VERSION 2.0.50)
 
 # Version string for feedback/reports.
 # Keep this as a normal variable so the checked-in source of truth wins over any
 # stale value left behind in an existing CMake cache.
-set(CHOROBOROS_VERSION_STRING "Beta v2.04.1")
+set(CHOROBOROS_VERSION_STRING "Beta v2.05")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,24 +33,26 @@ endif()
 # Generate compile_commands.json for IDE language servers
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Look for JUCE in the repo first, then as a sibling directory (common layout
-# when multiple repos live under a shared parent like CHOROS_MASTER/).
+# Look for JUCE in the repo first, then as a sibling directory, then inside
+# the commercial repo (common layout when both repos live under CHOROS_MASTER/).
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/CMakeLists.txt")
     set(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/JUCE")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE/CMakeLists.txt")
     get_filename_component(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE" ABSOLUTE)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../choroboros-commercial/JUCE/CMakeLists.txt")
+    get_filename_component(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../choroboros-commercial/JUCE" ABSOLUTE)
 endif()
 
 if(DEFINED _JUCE_DIR)
     message(STATUS "Using local JUCE directory: ${_JUCE_DIR}")
     add_subdirectory("${_JUCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/JUCE")
 else()
-    message(STATUS "Local JUCE not found. Fetching JUCE 6.0.8...")
+    message(STATUS "Local JUCE not found. Fetching JUCE 8.0.12...")
     include(FetchContent)
     FetchContent_Declare(
         JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-        GIT_TAG        29396c22c93392d6738e021b83196283d6e4d850
+        GIT_TAG        29396c22c93392d6738e021b83196283d6e4d850  # 8.0.12
     )
     FetchContent_MakeAvailable(JUCE)
 endif()
@@ -104,7 +106,7 @@ juce_add_plugin(Choroboros
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
     PRODUCT_NAME "Choroboros Beta"
     DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms (Beta)"
-    VERSION 2.0.41
+    VERSION 2.0.50
 )
 
 target_sources(Choroboros PRIVATE
@@ -332,11 +334,73 @@ target_link_libraries(ChoroborosRegressionTests PRIVATE
 
 choroboros_apply_sanitizers(ChoroborosRegressionTests)
 
+# ---------- DSP Chain Topology Tester ----------
+# Isolated simulation environment that processes audio through the real DSP chain
+# with measurement taps at every stage. Use to diagnose gain staging, verify the
+# safety limiter proposal, and stress-test presets for clipping.
+#
+# Build & run:
+#   cmake --build build --target ChoroborosDspChainTest
+#   ./build/ChoroborosDspChainTest                          # Psychedelic preset
+#   ./build/ChoroborosDspChainTest --limiter                # with safety limiter
+#   ./build/ChoroborosDspChainTest --all                    # all presets comparison
+#   ./build/ChoroborosDspChainTest --preset MaxEverything   # stress test
+add_executable(ChoroborosDspChainTest Tests/DspChainTest.cpp)
+target_include_directories(ChoroborosDspChainTest PRIVATE Source)
+target_link_libraries(ChoroborosDspChainTest PRIVATE
+    Choroboros
+    juce::juce_audio_utils
+    juce::juce_audio_plugin_client
+    juce::juce_dsp
+    ChoroborosBinaryData
+)
+choroboros_apply_sanitizers(ChoroborosDspChainTest)
+
+# ---------- Per-Core DSP Benchmark ----------
+# Isolated test harness that exercises each of the 10 chorus cores independently,
+# measuring: peak/true-peak, NaN/Inf, noise floor, stereo balance, CPU time,
+# and optionally sweeps all param combos for worst-case headroom.
+#
+# Build & run:
+#   cmake --build build --target ChoroborosCoreTest
+#   ./build/ChoroborosCoreTest --all                     # all 10 cores
+#   ./build/ChoroborosCoreTest --all --sweep             # + 81-combo param sweep each
+#   ./build/ChoroborosCoreTest --core Blue_HQ --verbose  # single core, detailed
+add_executable(ChoroborosCoreTest Tests/CoreBenchmark.cpp)
+target_include_directories(ChoroborosCoreTest PRIVATE Source)
+target_link_libraries(ChoroborosCoreTest PRIVATE
+    Choroboros
+    juce::juce_audio_utils
+    juce::juce_audio_plugin_client
+    juce::juce_dsp
+    ChoroborosBinaryData
+)
+choroboros_apply_sanitizers(ChoroborosCoreTest)
+
+# Isolated knob physics lab (3×3 green knobs, compare drag curves)
+#   cmake --build build --target ChoroborosKnobPhysicsLab && ./build/ChoroborosKnobPhysicsLab
+add_executable(ChoroborosKnobPhysicsLab
+    Tests/KnobPhysicsLabMain.cpp
+    Source/UI/KnobPhysicsLabSlider.cpp
+)
+target_include_directories(ChoroborosKnobPhysicsLab PRIVATE Source)
+target_link_libraries(ChoroborosKnobPhysicsLab PRIVATE
+    Choroboros
+    juce::juce_audio_utils
+    juce::juce_audio_plugin_client
+    juce::juce_dsp
+    ChoroborosBinaryData
+)
+choroboros_apply_sanitizers(ChoroborosKnobPhysicsLab)
+
 # JUCE's initialization chain (audio plugin client + AAX) exceeds Windows'
 # default 1 MB stack. Raise to 8 MB to prevent STATUS_STACK_OVERFLOW (0xC00000FD)
 # on Windows runners and machines.
 if(MSVC)
     target_link_options(ChoroborosRegressionTests PRIVATE "/STACK:8388608")
+    target_link_options(ChoroborosDspChainTest PRIVATE "/STACK:8388608")
+    target_link_options(ChoroborosCoreTest PRIVATE "/STACK:8388608")
+    target_link_options(ChoroborosKnobPhysicsLab PRIVATE "/STACK:8388608")
 endif()
 
 # Build gate: regression harness

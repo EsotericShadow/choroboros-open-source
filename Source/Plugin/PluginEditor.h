@@ -58,19 +58,21 @@ class ChoroborosPluginEditor  : public juce::AudioProcessorEditor,
 public:
     ChoroborosPluginEditor (ChoroborosAudioProcessor&);
     ~ChoroborosPluginEditor() override;
-    static constexpr float kUiScale = 0.91f;
+    static constexpr float kBaseUiScale = 0.91f;
 
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
     void parentHierarchyChanged() override;
+    void visibilityChanged() override;
+    void setScaleFactor (float newScale) override;
     void applyLayout();
     void applyTuningToUI();
     void refreshValueLabels();
     void resetLayoutToFactoryDefaults();
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
-    float getUiScale() const { return kUiScale; }
+    float getUiScale() const { return kBaseUiScale * dpiScale; }
     int getHeaderBarHeight() const { return topHeaderBar_ ? topHeaderBar_->getBarHeight() : 0; }
     const LayoutTuning& getLayoutTuning() const { return layoutTuning; }
     LayoutTuning& getLayoutTuning() { return layoutTuning; }
@@ -188,6 +190,8 @@ private:
     float parseWidthValue(const juce::String& trimmed);
     float parseColorValue(const juce::String& trimmed);
     float parseMixValue(const juce::String& trimmed);
+
+    float dpiScale = 1.0f;  // Host-reported DPI scale factor (1.0 = 100%, 2.0 = Retina/200%)
 
     std::thread themePrewarmThread;
     std::shared_ptr<std::atomic<bool>> themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);

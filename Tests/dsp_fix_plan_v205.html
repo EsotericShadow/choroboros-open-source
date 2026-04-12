@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Choroboros v2.05 — DSP Fix Plan</title>
+<style>
+  :root {
+    --bg: #0d1117; --fg: #c9d1d9; --muted: #8b949e;
+    --card: #161b22; --border: #30363d;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149; --blue: #58a6ff; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2rem; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin-bottom: 0.3rem; color: #fff; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+  .sub { color: var(--muted); margin-bottom: 2rem; }
+  .phase { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; position: relative; }
+  .phase-num { position: absolute; top: -12px; left: 16px; background: var(--bg); padding: 0 8px; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; }
+  .p0 .phase-num { color: var(--green); }
+  .p1 .phase-num { color: var(--red); }
+  .p2 .phase-num { color: var(--purple); }
+  .p3 .phase-num { color: var(--yellow); }
+  .p4 .phase-num { color: var(--muted); }
+  .p5 .phase-num { color: var(--blue); }
+  .p6 .phase-num { color: var(--blue); }
+  code { background: #1c2128; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+  pre { background: #1c2128; padding: 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; margin: 0.5rem 0; }
+  .file-list { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0; }
+  .file-list code { color: var(--blue); background: none; padding: 0; }
+  .predict { background: #1c2128; border-left: 3px solid var(--green); padding: 0.6rem 1rem; margin: 0.8rem 0; border-radius: 0 6px 6px 0; }
+  .predict-label { color: var(--green); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.03em; }
+  .risk { background: #1c2128; border-left: 3px solid var(--yellow); padding: 0.6rem 1rem; margin: 0.8rem 0; border-radius: 0 6px 6px 0; }
+  .risk-label { color: var(--yellow); font-weight: 700; font-size: 0.85rem; }
+  .gate { background: #1c2128; border-left: 3px solid var(--blue); padding: 0.6rem 1rem; margin: 0.8rem 0; border-radius: 0 6px 6px 0; }
+  .gate-label { color: var(--blue); font-weight: 700; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { padding: 8px 12px; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--card); color: var(--blue); font-size: 0.9rem; }
+  .dep-arrow { color: var(--muted); font-size: 1.2rem; text-align: center; margin: 0.5rem 0; }
+  .mermaid { background: #fff; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; margin-right: 4px; }
+  .tag-safety { background: #f8514922; color: var(--red); border: 1px solid #f8514944; }
+  .tag-quality { background: #bc8cff22; color: var(--purple); border: 1px solid #bc8cff44; }
+  .tag-maint { background: #8b949e22; color: var(--muted); border: 1px solid #8b949e44; }
+  .tag-perf { background: #d2992222; color: var(--yellow); border: 1px solid #d2992244; }
+  .tag-bench { background: #58a6ff22; color: var(--blue); border: 1px solid #58a6ff44; }
+  .done { opacity: 0.6; }
+  .done::after { content: " ✓ DONE"; color: var(--green); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<h1>Choroboros v2.05 — DSP Fix &amp; Optimization Plan</h1>
+<p class="sub">6 phases, dependency-ordered. Each phase has a build gate — don't proceed until the gate passes.</p>
+
+<!-- ═══════════════════════════════ DEPENDENCY GRAPH ═══════════════════════════════ -->
+<h2>Dependency Graph</h2>
+<div class="phase" style="padding:0.5rem 1rem;">
+<div class="mermaid">
+flowchart LR
+    P0["Phase 0<br/>Limiter Hold ✓"] --> P1["Phase 1<br/>NaN Guards"]
+    P1 --> P2["Phase 2<br/>Thiran Fix"]
+    P1 --> P3["Phase 3<br/>Cross-Channel"]
+    P3 --> P5["Phase 5<br/>Stereo Balance"]
+    P2 --> P5
+    P1 --> P4["Phase 4<br/>Dedup readCubic"]
+    P5 --> P6["Phase 6<br/>Spectral Tests"]
+
+    style P0 fill:#3fb950,color:#000
+    style P1 fill:#f85149,color:#fff
+    style P2 fill:#bc8cff,color:#000
+    style P3 fill:#d29922,color:#000
+    style P4 fill:#8b949e,color:#000
+    style P5 fill:#58a6ff,color:#000
+    style P6 fill:#58a6ff,color:#000
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 0 ═══════════════════════════════ -->
+<h2>Phase 0 — Safety Limiter Hold Stage <span class="done"></span></h2>
+<div class="phase p0">
+<span class="phase-num">Phase 0 — Complete</span>
+<p><span class="tag tag-safety">SAFETY</span> Already implemented in this session. Adds attack → hold → release envelope to <code>SafetyLimiterChannel</code>.</p>
+
+<h3>What changed</h3>
+<p>Added <code>holdCounter</code> member to <code>SafetyLimiterChannel</code> in <code>Source/DSP/ChorusDSP.h</code>. After each attack, gain reduction is held for <code>delaySamples</code> (5 ms) before releasing. This closes the block-boundary timing gap where the release started before delayed hot samples passed through.</p>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME</p>
+<p><strong>Green_NQ sweep:</strong> -0.4 dBTP → ≤ -0.8 dBTP (comfortably below -0.5 pass threshold)</p>
+<p><strong>All other cores:</strong> Unchanged or slightly improved (hold makes limiter more conservative, never less)</p>
+<p><strong>Latency:</strong> Unchanged (221 samples @ 44.1 kHz / 240 @ 48 kHz)</p>
+<p><strong>CPU:</strong> Negligible (+1 int decrement and branch per sample)</p>
+<p><strong>Audio character:</strong> Slightly slower release on transients (5 ms hold before 50 ms release). On sustained chorus, inaudible. On percussive transients through max-depth Green NQ, the limiter recovery will be ~5 ms longer — barely perceptible and correct behavior.</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 0</p>
+<p>Cursor prompt ready: <code>Tests/cursor_limiter_hold_retest_prompt.md</code></p>
+<p>Pass criteria: <code>./build/ChoroborosCoreTest --all --sweep</code> → exit 0, all 10 cores SAFE</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 1 ═══════════════════════════════ -->
+<h2>Phase 1 — NaN Guard Hardening (C6)</h2>
+<div class="phase p1">
+<span class="phase-num">Phase 1 — UB Elimination</span>
+<p><span class="tag tag-safety">SAFETY</span> Eliminates the only undefined behavior in the plugin. Zero behavior change for valid inputs — these guards only fire if upstream NaN propagation occurs (e.g., during a core crossfade glitch or numeric edge case).</p>
+
+<h3>The fix</h3>
+<p>Every manual-buffer core has a <code>static_cast&lt;int&gt;(readPos)</code> that is UB if <code>readPos</code> is NaN. Add a one-line sanitization before the cast. The pattern:</p>
+<pre>// BEFORE (UB if NaN):
+int i0 = static_cast&lt;int&gt;(readPos);
+
+// AFTER (defined behavior always):
+if (!(readPos >= 0.0f)) readPos = 0.0f;  // Catches NaN (NaN fails all comparisons)
+int i0 = static_cast&lt;int&gt;(readPos);</pre>
+<p>Using <code>!(readPos >= 0.0f)</code> instead of <code>std::isnan()</code> because it works correctly even with <code>-ffast-math</code> (which is S1 — <code>std::isnan</code> gets optimized away under <code>-ffinite-math-only</code>). A NaN fails the <code>>=</code> comparison, so the negation catches it.</p>
+
+<h3>Files to modify (7 total)</h3>
+<div class="file-list">
+<p><code>Source/Cores/green_engine_classic/ChorusCoreLagrange5th.cpp</code> — <code>readLagrange5th()</code> line 90</p>
+<p><code>Source/Cores/blue_engine_modern/ChorusCoreCubic.cpp</code> — <code>readCubic()</code> line 92</p>
+<p><code>Source/Cores/blue_engine_modern/ChorusCoreThiran.cpp</code> — <code>processDelay()</code> line 208 (<code>std::floor</code> path)</p>
+<p><code>Source/Cores/red_engine_vintage/ChorusCoreTape.cpp</code> — <code>resampleHermite()</code> line 97</p>
+<p><code>Source/Cores/purple_engine_experimental/ChorusCorePhaseWarped.cpp</code> — <code>readCubic()</code> line 120</p>
+<p><code>Source/Cores/purple_engine_experimental/ChorusCoreOrbit.cpp</code> — <code>readCubic()</code> line 137</p>
+<p><code>Source/Cores/red_engine_vintage/ChorusCoreBBD.cpp</code> — <code>processBBDChannel()</code> lines 125–126 (clockPhase cast)</p>
+</div>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME</p>
+<p><strong>Benchmark:</strong> Identical results — NaN never reaches these paths in normal operation</p>
+<p><strong>Audio:</strong> Zero audible change</p>
+<p><strong>CPU:</strong> +1 branch per sample per core (~0.5 ns on M-series, completely negligible)</p>
+<p><strong>Safety:</strong> If a NaN ever does propagate (e.g., from a future bug in the LFO or smoothing chain), the plugin will read from buffer position 0 instead of invoking undefined behavior. The output will be wrong but defined — no crash, no memory corruption, no security vulnerability.</p>
+</div>
+
+<div class="risk">
+<p class="risk-label">RISK</p>
+<p>Extremely low. The guard is a single branch that never fires in normal operation. The only way to introduce a regression is if the <code>readPos = 0.0f</code> fallback produces a click when a NaN appears — but a NaN reaching this point already means audio is broken upstream, so producing buffer[0] instead of UB is strictly better.</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 1</p>
+<p>1. <code>cmake --build build --target ChoroborosCoreTest</code> — compiles clean</p>
+<p>2. <code>./build/ChoroborosCoreTest --all --sweep</code> — all 10 SAFE, identical dBTP numbers to Phase 0</p>
+<p>3. <code>cmake --build build --target Choroboros_VST3</code> — compiles clean</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 2 ═══════════════════════════════ -->
+<h2>Phase 2 — Thiran Ping-Pong Fix (S-NEW-B)</h2>
+<div class="phase p2">
+<span class="phase-num">Phase 2 — Quality Fix</span>
+<p><span class="tag tag-quality">QUALITY</span> This is the audible fix. The Thiran allpass's ping-pong aliasing comes from zeroing the allpass state on every integer-delay boundary crossing.</p>
+
+<h3>Root cause</h3>
+<p>At <code>ChorusCoreThiran.cpp</code> line 227: <code>newActive.state.fill(0.0f)</code> zeros the incoming allpass state whenever the integer delay changes. This creates a discontinuity that the 48-sample sin²/cos² crossfade must absorb. At fast LFO rates (high depth + high rate), boundaries cross frequently, and the 48-sample crossfade can't fully mask repeated zero-state transients. The result: scratchy, aliasing-like artifacts that sweep with the LFO.</p>
+
+<h3>The fix — two options (investigate both)</h3>
+
+<h3>Option A: Copy state from fading allpass (preferred)</h3>
+<p>Instead of zeroing the new allpass state, copy the fading allpass's state as a starting point. The new coefficients are different (for the new integer delay), but the state values represent recent signal history that's a much better approximation than zero.</p>
+<pre>// BEFORE:
+newActive.state.fill(0.0f);
+computeCoefficients(thiranD, newActive.a);
+
+// AFTER:
+newActive.state = fadingAp.state;  // Warm start from fading state
+computeCoefficients(thiranD, newActive.a);</pre>
+<p>Where <code>fadingAp</code> is the allpass instance that was just active (before the swap). Need to capture this reference before <code>thiranCh.aIsActive</code> flips.</p>
+
+<h3>Option B: Extend crossfade length</h3>
+<p>If state copying introduces instability (unlikely but possible with mismatched coefficients), increase <code>XFADE_LENGTH</code> from 48 to 128 or 256 samples. Longer crossfade = more masking at the cost of slightly softer transient response.</p>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME — Option A</p>
+<p><strong>Audio:</strong> Significant reduction in ping-pong aliasing artifacts. The allpass starts from a warm state that approximates recent signal, so the crossfade blends two similar signals instead of blending signal-with-zero. At slow LFO rates: improvement is subtle. At fast rates with high depth: dramatic improvement.</p>
+<p><strong>Benchmark:</strong> True peak numbers may change slightly (±0.1 dB) due to different transient shape during crossfades. Noise floor unchanged.</p>
+<p><strong>CPU:</strong> +5 float copies per boundary crossing (copying the 5-element state array). Boundary crossings happen at most once per sample. Negligible.</p>
+<p><strong>Stability risk:</strong> Low. The Thiran allpass is inherently stable (all poles inside unit circle) regardless of initial state. Mismatched coefficients with warm state may produce a brief (~5 sample) transient, but the crossfade masks it. Worst case is it sounds like a very short click that the 48-sample crossfade absorbs. If testing reveals instability, fall back to Option B.</p>
+</div>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME — Option B (fallback)</p>
+<p><strong>Audio:</strong> Moderate improvement. Longer crossfade masks the zero-state transient better, but doesn't eliminate the root cause. At very fast modulation, artifacts are reduced but not gone.</p>
+<p><strong>CPU:</strong> More samples in dual-allpass mode per crossing. At XFADE_LENGTH=128: ~2× the crossfade CPU cost. Still small relative to the per-sample coefficient recompute.</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 2</p>
+<p>1. Build + 10-core sweep: all SAFE</p>
+<p>2. <strong>Listening test (critical):</strong> Load Choroboros in DAW → Blue HQ → Rate 3-4 Hz → Depth 80-100% → Color 50-80%. A/B the artifact with a recording from before the fix. The ping-pong sweep should be gone or dramatically reduced.</p>
+<p>3. Blue HQ noise floor should not increase by more than 3 dB relative to pre-fix</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 3 ═══════════════════════════════ -->
+<h2>Phase 3 — Cross-Channel Smoothing Fixes</h2>
+<div class="phase p3">
+<span class="phase-num">Phase 3 — Stereo Precision</span>
+<p><span class="tag tag-quality">QUALITY</span> <span class="tag tag-perf">STEREO</span> Two cores share smoothing state across L/R channels, causing channel 1 to start with pre-smoothed values from channel 0's processing pass.</p>
+
+<h3>Fix A: Tape <code>smoothedDepth</code></h3>
+<p><code>ChorusCoreTape.cpp</code> — <code>smoothedDepth</code> is a single float member updated per-sample inside the channel loop. Channel 1 inherits channel 0's converged depth.</p>
+<pre>// BEFORE (single member):
+float smoothedDepth = 0.0f;
+// In processDelay, inside per-sample loop:
+smoothedDepth = depthSmoothCoeff * smoothedDepth + ...
+
+// AFTER (per-channel):
+std::vector&lt;float&gt; smoothedDepth;  // sized in prepare()
+// In processDelay:
+smoothedDepth[ch] = depthSmoothCoeff * smoothedDepth[ch] + ...</pre>
+
+<h3>Fix B: LinearEnsemble <code>smoothedColour</code></h3>
+<p><code>ChorusCoreLinearEnsemble.cpp</code> — Same pattern. <code>smoothedColour</code> is a single float updated per-sample, shared across channels. This is likely contributing to Black_HQ's -1.47 dB stereo imbalance in the benchmark.</p>
+<pre>// BEFORE:
+float smoothedColour = 0.0f;
+
+// AFTER:
+std::array&lt;float, 2&gt; smoothedColour {{ 0.0f, 0.0f }};
+// Per-sample: smoothedColour[ch] += alpha * (target - smoothedColour[ch]);</pre>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME</p>
+<p><strong>Tape stereo balance:</strong> Should tighten from current value toward 0 dB during depth changes. Steady-state balance unaffected (both channels converge to same target).</p>
+<p><strong>Black_HQ stereo balance:</strong> The -1.47 dB imbalance should reduce significantly. The colour controls tap2Mix and secondTapDepthScale, so a shared smoother means channel 1 gets different tap weights during colour transitions. Making this per-channel should bring balance much closer to 0 dB.</p>
+<p><strong>Audio character:</strong> Subtle. During knob movements, L and R will now track identically instead of R lagging. For static knob positions: zero change.</p>
+<p><strong>CPU:</strong> +1 float per channel (trivial).</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 3</p>
+<p>1. Build + 10-core sweep: all SAFE</p>
+<p>2. Black_HQ stereo balance should be within ±0.5 dB (was -1.47 dB)</p>
+<p>3. Tape stereo balance should remain stable</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 4 ═══════════════════════════════ -->
+<h2>Phase 4 — Deduplicate readCubic</h2>
+<div class="phase p4">
+<span class="phase-num">Phase 4 — Maintenance</span>
+<p><span class="tag tag-maint">MAINTENANCE</span> Three identical <code>readCubic()</code> implementations exist in Blue NQ, Purple NQ, and Purple HQ. Extract to a shared utility so the NaN guard (Phase 1) and any future interpolation changes only need to be applied once.</p>
+
+<h3>Approach</h3>
+<p>Create a <code>Source/Cores/CoreInterpolation.h</code> with a <code>static inline</code> Catmull-Rom function. All three cores call it instead of their private copies. The Lagrange5th and Hermite interpolations are unique, so they stay in their respective cores.</p>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME</p>
+<p><strong>Audio:</strong> Bit-identical output (same algorithm, same float math)</p>
+<p><strong>CPU:</strong> Identical (inline expansion)</p>
+<p><strong>Maintenance:</strong> Future interpolation fixes apply to 1 file instead of 3</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 4</p>
+<p>1. Build + 10-core sweep: identical numbers to post-Phase-3</p>
+<p>2. Diff check: Blue NQ, Purple NQ, Purple HQ output should be bit-identical before/after</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 5 ═══════════════════════════════ -->
+<h2>Phase 5 — Stereo Balance Investigation</h2>
+<div class="phase p5">
+<span class="phase-num">Phase 5 — Investigation</span>
+<p><span class="tag tag-quality">QUALITY</span> <span class="tag tag-bench">BENCH</span> After Phases 2-3 fix known stereo issues, re-measure and investigate any remaining imbalances.</p>
+
+<h3>Expected situation after Phase 3</h3>
+<table>
+<tr><th>Core</th><th>Pre-fix balance</th><th>Predicted post-fix</th><th>Action if still off</th></tr>
+<tr><td>Purple_HQ (Orbit)</td><td>+1.67 dB</td><td>Still +1.67 dB (cross-channel fix doesn't apply here)</td><td>Investigate: dual-tap mix ratio may not be energy-preserving. <code>mix1 × wet1 + mix2 × wet2</code> where mix1+mix2=1 — if wet1 and wet2 have different RMS (because tap 2 has different depth scaling), the blend isn't energy-neutral for L vs R. May need per-channel mix compensation or the stereo theta offset is intentionally widening.</td></tr>
+<tr><td>Black_HQ (Ensemble)</td><td>-1.47 dB</td><td>~0 dB (cross-channel smoothedColour fix)</td><td>If still off: investigate tap mix weighting with stereo LFO spread.</td></tr>
+</table>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME</p>
+<p><strong>Purple_HQ:</strong> The +1.67 dB is likely by design — the stereo theta offset creates intentional L/R decorrelation that reads as different RMS in a short (2 s) test. Over longer windows, it should average closer to 0 dB. Decision point: accept as characteristic or add energy compensation.</p>
+<p><strong>Black_HQ:</strong> Should be resolved by Phase 3. If not, the LFO spread mechanism (<code>jmap(col, primaryLfo, oppositeLfo)</code>) creates intentional L-R modulation difference — which is the point of an ensemble effect.</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 5</p>
+<p>1. Run benchmark with extended test duration (10 s instead of 2 s) to average out LFO-driven variation</p>
+<p>2. All cores within ±1 dB stereo balance over 10 s window → PASS</p>
+<p>3. If Purple_HQ still > 1 dB, make a judgment call: intentional character vs. compensate</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ PHASE 6 ═══════════════════════════════ -->
+<h2>Phase 6 — Spectral Benchmark Enhancement</h2>
+<div class="phase p6">
+<span class="phase-num">Phase 6 — Tooling</span>
+<p><span class="tag tag-bench">BENCH</span> Add spectral analysis to the benchmark so future regressions in aliasing, modulation artifacts, and cross-talk are caught automatically.</p>
+
+<h3>New test vectors</h3>
+<table>
+<tr><th>Test</th><th>What it catches</th><th>Method</th><th>Pass criteria</th></tr>
+<tr><td>Alias Energy Ratio</td><td>Interpolation aliasing, clock feedthrough (BBD)</td><td>Input: 5 kHz + 7 kHz two-tone. FFT output. Measure energy at IM products (2 kHz, 12 kHz, etc.) vs fundamentals.</td><td>IM products &lt; -40 dB below fundamentals</td></tr>
+<tr><td>L-R Correlation</td><td>Ping-pong artifacts, stereo phase flips</td><td>Per-block <code>correlation(L, R)</code>. Flag sudden decorrelation spikes.</td><td>No block with correlation &lt; -0.5 (anti-phase)</td></tr>
+<tr><td>Spectral Difference vs Reference</td><td>Unexpected coloration per core</td><td>Run same signal through Black_NQ (cleanest) and target core. FFT both. Report energy difference &gt; 6 dB in any band.</td><td>Report only — each core has intentional coloration</td></tr>
+</table>
+
+<div class="predict">
+<p class="predict-label">PREDICTED OUTCOME</p>
+<p>After Phase 2 (Thiran fix), the L-R correlation test should show Thiran's boundary crossings are much smoother. The alias energy ratio will establish baselines for each core — BBD and Tape will have higher IM products by design (that's their character), while Green/Blue/Black should be very clean.</p>
+</div>
+
+<div class="gate">
+<p class="gate-label">BUILD GATE 6</p>
+<p>1. New benchmark tests compile and run on all 10 cores</p>
+<p>2. All cores pass their respective thresholds</p>
+<p>3. Results documented as new baseline for regression testing</p>
+</div>
+</div>
+
+<!-- ═══════════════════════════════ SUMMARY ═══════════════════════════════ -->
+<h2>Execution Summary</h2>
+
+<table>
+<tr><th>Phase</th><th>Type</th><th>Files</th><th>Effort</th><th>Risk</th><th>Audible?</th></tr>
+<tr><td>0 — Limiter Hold ✓</td><td>Safety</td><td>1</td><td>Done</td><td>None</td><td>Barely (5 ms slower release)</td></tr>
+<tr><td>1 — NaN Guards</td><td>Safety</td><td>7</td><td>~30 min</td><td>None</td><td>No</td></tr>
+<tr><td>2 — Thiran Fix</td><td>Quality</td><td>1</td><td>~1 hr + listening</td><td>Low</td><td><strong>Yes — the big one</strong></td></tr>
+<tr><td>3 — Cross-Channel</td><td>Quality</td><td>2 (+headers)</td><td>~30 min</td><td>None</td><td>Subtle (during knob moves)</td></tr>
+<tr><td>4 — Dedup readCubic</td><td>Maintenance</td><td>4 (3 cores + new header)</td><td>~20 min</td><td>None</td><td>No</td></tr>
+<tr><td>5 — Stereo Balance</td><td>Investigation</td><td>0-2</td><td>~1 hr</td><td>None</td><td>Maybe</td></tr>
+<tr><td>6 — Spectral Tests</td><td>Tooling</td><td>1</td><td>~2 hr</td><td>None</td><td>No (test only)</td></tr>
+</table>
+
+<h3>Recommended execution order for today</h3>
+<p>Phase 0 is done. Hand Cursor the Phase 0 retest prompt. While Cursor rebuilds, I can implement Phase 1 (NaN guards) in parallel — it's independent code in different files. Once both pass their gates, move to Phase 2 (Thiran) which is the one you'll actually hear improve. Phases 3-6 can happen tomorrow or whenever.</p>
+
+<p style="margin-top:2rem;color:var(--muted);font-size:0.85rem;">Choroboros v2.05 DSP Fix Plan — Generated 2026-04-11</p>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+</body>
+</html>

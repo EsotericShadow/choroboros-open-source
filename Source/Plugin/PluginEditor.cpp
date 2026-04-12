@@ -73,7 +73,7 @@ SharedBackgroundCache& getSharedBackgroundCache()
 
 int uiScaleInt(int value)
 {
-    return juce::roundToInt(static_cast<float>(value) * ChoroborosPluginEditor::kUiScale);
+    return juce::roundToInt(static_cast<float>(value) * ChoroborosPluginEditor::kBaseUiScale);
 }
 
 int getIntOrDefault(const juce::var& objectVar, const juce::Identifier& key, int fallback)
@@ -712,7 +712,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Create branded top header bar with preset browser
     if (audioProcessor.presetManager)
     {
-        topHeaderBar_ = std::make_unique<TopHeaderBar> (*audioProcessor.presetManager, kUiScale);
+        topHeaderBar_ = std::make_unique<TopHeaderBar> (*audioProcessor.presetManager, kBaseUiScale);
         addAndMakeVisible (*topHeaderBar_);
     }
 
@@ -783,7 +783,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
 
         topBarDrawer.setupIcons (devIcon, aboutIcon, helpIcon, feedbackIcon);
-        topBarDrawer.setupLayout (kUiScale);
+        topBarDrawer.setupLayout (kBaseUiScale);
 
         // Set initial drawer accent colour to match the current engine
         if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
@@ -1133,6 +1133,32 @@ void ChoroborosPluginEditor::resized()
     // Position header bar across the full width at the very top
     if (topHeaderBar_)
         topHeaderBar_->setBounds (0, 0, getWidth(), topHeaderBar_->getBarHeight());
+}
+
+void ChoroborosPluginEditor::visibilityChanged()
+{
+    // Logic Pro (AU) sometimes hides the editor window without destroying it.
+    // The editor object stays alive, background threads keep running, and
+    // renderOpenGL (if used) keeps firing.  When we become invisible, stop
+    // the expensive background theme prewarm thread.  When we become visible
+    // again, restart it so the next engine switch is snappy.
+    if (!isVisible())
+    {
+        stopDeferredThemePrewarm();
+    }
+}
+
+void ChoroborosPluginEditor::setScaleFactor(float newScale)
+{
+    // JUCE 8.0.12's VST3 wrapper applies the DPI scaling transform
+    // automatically via AffineTransform on the Graphics context.
+    // We just need to store the scale so getUiScale() returns the
+    // combined base × DPI value for any layout helpers that use it,
+    // then let the base class do the actual transform work.
+    dpiScale = newScale;
+    juce::AudioProcessorEditor::setScaleFactor(newScale);
+    invalidateHQLitOverlayCache();
+    repaint();
 }
 
 void ChoroborosPluginEditor::repaintHQLitOverlay()

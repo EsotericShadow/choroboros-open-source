@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../ChorusCore.h"
+#include "../InterpolationUtils.h"
 #include <vector>
 
 // Orbit Chorus core (2D LFO with rotating axis)
@@ -63,8 +64,16 @@ private:
     std::vector<juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>> delaySmoothers2;
     float lastDelaySmoothingMs = -1.0f;
     
-    // Cubic interpolation read (same as Blue Normal)
-    float readCubic(int channel, float delaySamples) const;
+    // Cubic interpolation read — delegates to shared readCubicInterp()
+    float readCubic(int channel, float delaySamples) const
+    {
+        const auto& buf = delayBuffers[static_cast<size_t>(channel)];
+        const int writePos = writePositions[static_cast<size_t>(channel)];
+        float readPos = static_cast<float>(writePos) - delaySamples;
+        while (readPos < 0.0f)
+            readPos += static_cast<float>(bufferSize);
+        return readCubicInterp(buf.data(), bufferMask, readPos);
+    }
     
     // Compute orbit modulation
     // Returns modulation signal u in range [-1, 1] for given phase, theta, and eccentricity

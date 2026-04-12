@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="2.04-beta"
+VERSION="2.05-beta"
 PLUGIN_NAME="Choroboros"
 DMG_NAME="${PLUGIN_NAME}-v${VERSION}-macOS"
 TEMP_DIR="dmg_temp"

@@ -17,10 +17,17 @@
 #   export CHOROBOROS_CMAKE_BUILD_DIR="/Volumes/T7/ChoroborosCMakeBuilds/universal"
 #   ./scripts/release_macos_signed_installer.sh
 # Or: ./scripts/build_on_external_ssd.sh
+#
+# Optional signing overrides (same shell session):
+#   CHOROBOROS_APP_SIGN_IDENTITY       — full "Developer ID Application: … (TEAM)" string
+#   CHOROBOROS_INSTALLER_SIGN_IDENTITY — full "Developer ID Installer: … (TEAM)" string
+#   CHOROBOROS_NOTARY_PROFILE          — notarytool keychain profile (default: notarytool-profile)
+# Store notary credentials once:
+#   xcrun notarytool store-credentials "notarytool-profile" --apple-id "…" --team-id "…" --password "app-specific-password"
 # =============================================================================
 # shellcheck shell=bash
 export CHOROBOROS_BUNDLE_BASENAME="Choroboros Beta"
-export CHOROBOROS_VERSION="2.0.41"
+export CHOROBOROS_VERSION="2.0.50"
 export CHOROBOROS_COMPANY_ID="com.kaizenstrategicai"
 
 # Directory passed to cmake -B (objects, FetchContent, Choroboros_artefacts/...).

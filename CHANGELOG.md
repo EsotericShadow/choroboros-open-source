@@ -2,6 +2,53 @@
 
 All notable changes to Choroboros are documented here.
 
+## [2.05] - 2026-04-10
+
+35 commits, 158 files changed. Major architectural modernization focused on stability, audio thread safety, and extensibility.
+
+### Added
+- **KZN custom engine import system:** Full .kzn binary format library (libkzn) with Ed25519 signature verification. ChoroborosKznImporter supports drag-and-drop import. CustomEngineManager provides factory + custom engine model with free-tier gating (single custom slot, white visual identity, commercial cores rejected in free build). PluginEditor wired for drag-and-drop; PluginProcessor handles custom engine activation.
+- **PresetState with engine identity:** Added `engineColorIndex` (0–4 factory) and `customEngineId` (UUID string) fields to PresetState. JSON serialize/deserialize, legacy APVTS XML migration, and missing-engine fallback (invalid customEngineId clears to factory).
+- **Canonical preset state layer (Phase 1):** PresetState routes host state, user presets, and factory presets through a canonical layer. ApplyContext descriptor for preset application context. DspConfig publish/consume double-buffered DSP configuration at block boundaries. DspConfigManager for DSP parameter routing. PresetManager integration. Tier 1+2 regression verified.
+- **Lock-free runtime tuning (Phase 2):** TuningConfigManager replaces dspLock on the audio path with double-buffered publish/consume. Precomputed snapshot-based application eliminates blocking on the audio thread.
+- **Headless console service (Phase 3):** ConsoleEngine for headless-safe command parsing (no JUCE UI thread assumptions). Tiered regression harness (Tier 1, Tier 1+2 smoke tests).
+- **Consent service (Phase 5):** ConsentService with explicit consent matrix for feedback/analytics. FeedbackDialog integration. prepareForShutdown() pattern matching SessionLog.
+- **DPI / HiDPI scaling support:** `setScaleFactor()` override stores host-reported DPI scale factor. JUCE 8.0.12's VST3 wrapper applies the scaling transform automatically. `getUiScale()` returns `kBaseUiScale * dpiScale` so all layout helpers account for both the 0.91x base scale and the host's DPI factor. HQ lit overlay cache invalidated on scale change.
+- **Modulation tab redesign:** Replaced L/R sparklines with dual waveform oscilloscope overlay and Lissajous XY stereo phase plot. New scope subtitles, legends, and hints. Updated readout names: "Measured Swing", "Effective Phase Spread", "Stereo Coherence". DevPanel widened from 900 to 1100px.
+- **Accessibility: tooltip toggle:** Enable/disable tooltips in DevPanel Accessibility panel. setTooltipsEnabled() exposed in PluginEditor for main UI control.
+- **Validation matrix:** VST3 strictness L3/L5/L7/L10, L5 x 3 random seeds. AU L5 + L10, auval aufx ChBr KzDp. Edge block 1/8192 and 96k/192k sample rates. All runs exit 0.
+- **Optional sanitizers and profiling:** CMake CHOROBOROS_ENABLE_ASAN/TSAN with per-target flags. Optional Melatonin Inspector (Cmd+I) and Perfetto tracing. TRACE_DSP hooks in processBlock (guarded, default off).
+- **macOS release orchestration:** New release_macos_signed_installer.sh — single entry point for universal build, bundle sign, pkg build, notarize. Version sync check (CMake project() vs installer_config vs distribution.xml). Flags: --no-universal-build, --to-signed-pkg, --notarize-only.
+- **External SSD (T7) build support:** CHOROBOROS_CMAKE_BUILD_DIR for external disk cmake -B paths. build_on_external_ssd wrapper. clean_choroboros_build_artifacts.sh with dry run vs --yes. Keeps juceaide/objects off internal SSD.
+- **CI: macOS Universal job:** Build workflow now includes macOS Universal (VST3, AU, Standalone) matching Release coverage. Runs on v2.05-dev branch.
+
+### Changed
+- **Equal-power crossfade and output trim:** Switched DryWetMixer from linear to balanced sin/cos mixing (eliminates 3 dB volume dip at 50% wet). Added smoothed output trim parameter (+/-12 dB) for per-engine gain compensation.
+- **Engine core interpolation and smoothing:** Green (Lagrange 3rd/5th) improved smoothing coefficients. Blue (Cubic and Thiran) coefficient interpolation fixes. Red (Tape) crossfade and drive refinements. Black (Linear Ensemble) delay smoothing improvements. Eliminates zippering artifacts across all 5 engines.
+- **`kUiScale` renamed to `kBaseUiScale`:** Clarifies base scale factor (0.91f) vs runtime DPI scale. All references updated across both editor files and .cursorrules.
+- **UI string polish:** Replaced "deg" abbreviations with degree symbol. Replaced non-ASCII text (em dashes, curly quotes, arrows, math symbols) with ASCII equivalents for JUCE font rendering.
+- **Dev Panel tutorials rewritten:** Orientation-first walkthrough replacing concept-first approach. 13-topic index (orientation, core, primers, deep-dive tasks).
+- **Dialog destruction safety:** delete-this replaced with SafePointer + MessageManager::callAsync in About/Feedback/Help dialogs. Non-blocking theme decode via polling in paint().
+- **Debug I/O removal (Phase 4):** Removed debug file logging and trace disk writes. Clean shutdown paths.
+- **CMakeLists JUCE resolution:** Added search path for ../choroboros-commercial/JUCE/ so clean builds find local JUCE 8.0.12 without a network fetch. Fixed stale comment that said "JUCE 6.0.8" when the actual fetched tag was 8.0.12.
+- **Installer improvements:** installer_config.sh sourced by all sign/build/notarize scripts. Fixed wrong bundle paths that broke signing, pkgbuild, and notarization. Stage payloads with ditto, strip xattrs, chmod postinstall before pkgbuild. Detect invalid notarization and fetch log.
+- **Build artifact retention:** 30 days down to 3 days (build) / 1 day (release).
+- **Binary size 400 MB to <120 MB:** All engine spritesheets reprocessed and optimized (not just Black).
+- **Version bump:** Project version 2.0.41 to 2.0.50, version string "Beta v2.04.1" to "Beta v2.05".
+
+### Fixed
+- **Three freeze-on-close vectors (beyond D3D11):** (1) DevPanelWindow: hide + removeFromDesktop before reset to prevent Win32 HWND message cascade under DLL loader lock. (2) themePrewarmThread: replaced callAsync with mutex queue + join pattern to prevent detached threads outliving DLL unload. (3) FeedbackCollector: prepareForShutdown() moves blocking disk I/O out of destructor chain.
+- **Equal-power crossfade 3 dB dip:** 50% wet mix produced a volume dip because linear mixing doesn't account for phase offset from stereo modulation. Fixed with balanced sin/cos amplitude curves (industry standard).
+- **Engine core zippering across all 5 engines:** Per-sample interpolation smoothing and coefficient fixes across Green, Blue, Red, and Black cores. Reported as "DSP anomalies" and "scratchy" by multiple testers.
+- **Preset browser cycling bug:** Preset index reset to -1 by parameter callbacks during preset load. loadInProgress_ guard prevents false invalidations in invalidatePreset().
+- **Text entry '1' = 100% bug:** Boundary check `value > 1.0f` didn't catch exactly 1.0. Fixed to `value >= 1.0f && value <= 100.0f` in Depth, Color, Mix, and Width parsers. Width parser also clamps via juce::jlimit. Offset parser improved to accept both "deg" and degree symbol suffixes.
+- **Color slider "sounds reversed" after engine switch:** Re-sync slider value after skew factor change + applyTuningToUI() on engine switch.
+- **Timer race condition on shutdown:** stopTimer() doesn't block on a currently-executing timerCallback(). Added std::atomic<bool> isShuttingDown with release/acquire ordering. Flag set before stopTimer() in destructor and releaseResources(); cleared in prepareToPlay().
+- **Logic Pro editor resource leak:** Logic Pro (AU) hides editor without destroying it, leaving background threads running. visibilityChanged() override stops theme prewarm thread when editor becomes invisible.
+- **Non-ASCII rendering in JUCE fonts:** em dashes, curly quotes, arrows, and math symbols rendered as garbled text. Replaced with ASCII equivalents.
+
+---
+
 ## [2.04-dev] - 2026-03-16
 
 ### Added

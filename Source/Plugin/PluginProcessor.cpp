@@ -927,6 +927,12 @@ ChoroborosAudioProcessor::~ChoroborosAudioProcessor()
     perfettoTracer.reset();
 #endif
 
+    // Signal shutdown BEFORE stopping timer — timerCallback() checks this
+    // flag to bail out early, preventing access to resources we're about
+    // to destroy.  Uses release ordering so the flag is visible to any
+    // concurrent callback on the message thread.
+    isShuttingDown.store(true, std::memory_order_release);
+
     stopTimer();
 
     if (analyzerWorker != nullptr)
@@ -1093,6 +1099,9 @@ void ChoroborosAudioProcessor::changeProgramName (int index, const juce::String&
 //==============================================================================
 void ChoroborosAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    // Clear shutdown flag — host may call prepareToPlay again after releaseResources.
+    isShuttingDown.store(false, std::memory_order_release);
+
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     // Some hosts can deliver larger blocks than the initial samplesPerBlock.
@@ -1102,6 +1111,10 @@ void ChoroborosAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
     
     chorusDSP->prepare(spec);
+
+    // Report safety limiter lookahead latency to the host for PDC.
+    setLatencySamples (chorusDSP->getSafetyLimiterLatencySamples());
+
     constexpr int diagnosticBufferCeiling = 8192;
     const int diagnosticBufferSize = juce::jmax<int>(samplesPerBlock, diagnosticBufferCeiling);
     dryTapBuffer.setSize(2, diagnosticBufferSize, false, true, true);
@@ -1136,6 +1149,7 @@ void ChoroborosAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
 
 void ChoroborosAudioProcessor::releaseResources()
 {
+    isShuttingDown.store(true, std::memory_order_release);
     stopTimer();
     if (analyzerWorker != nullptr)
     {
@@ -1148,6 +1162,12 @@ void ChoroborosAudioProcessor::releaseResources()
 
 void ChoroborosAudioProcessor::timerCallback()
 {
+    // Guard: stopTimer() doesn't wait for a currently-executing callback to
+    // finish.  If the destructor is running concurrently, chorusDSP may be
+    // reset out from under us.  The flag is set *before* stopTimer() in dtor.
+    if (isShuttingDown.load(std::memory_order_acquire))
+        return;
+
     // Precompute tuning snapshot on message thread (allocation OK here)
     // then publish lock-free to double-buffer for audio thread to consume.
     // No locks required.

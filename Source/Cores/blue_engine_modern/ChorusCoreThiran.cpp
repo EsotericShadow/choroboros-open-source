@@ -107,6 +107,22 @@ void ChorusCoreThiran::prepare(const juce::dsp::ProcessSpec& processSpec, Chorus
         outputLpAlpha = std::exp(-w);
     }
 
+    // Sample-rate-invariant delay smoothing: 14ms time constant
+    // (was hardcoded 0.9985 which is only ~14ms at 48k; halves at 96k)
+    {
+        constexpr float delaySmoothingTauMs = 14.0f;
+        delaySmoothingCoeff_ = std::exp(-1.0f / (delaySmoothingTauMs * 0.001f
+                                                  * static_cast<float>(spec.sampleRate)));
+    }
+
+    // Sample-rate-invariant crossfade length: 6.0ms
+    // Originally 1ms (48 samples @ 48k), which leaked boundary-crossing
+    // transients at ~1.5% THD.  At 6ms the sin²/cos² envelope masks the
+    // state-copy transient fully (THD drops to ~0.14%).  The longer window
+    // also means fewer crossings per second (guard prevents overlapping
+    // crossfades), which further reduces artifacts.
+    xfadeLength_ = std::max(4, static_cast<int>(0.006f * static_cast<float>(spec.sampleRate)));
+
     // ~3ms centre delay smoothing
     centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
     smoothedCentreDelay.fill(0.0f);
@@ -152,7 +168,7 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
 
     // Precompute crossfade table constants
-    constexpr float xfadeInvLen = 1.0f / static_cast<float>(ThiranChannel::XFADE_LENGTH);
+    const float xfadeInvLen = 1.0f / static_cast<float>(xfadeLength_);
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -199,10 +215,9 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
             float targetDelay = smoothedCentreDelay[chIdx] + depthSamples * channelLfo[i];
             targetDelay = juce::jlimit(guardSamples, maxDelay, targetDelay);
 
-            // Smooth delay for stability (~14ms τ @ 48k)
-            constexpr float delaySmoothingCoeff = 0.9985f;
-            thiranCh.smoothedDelay = delaySmoothingCoeff * thiranCh.smoothedDelay
-                                   + (1.0f - delaySmoothingCoeff) * targetDelay;
+            // Smooth delay for stability (14ms τ, sample-rate-invariant)
+            thiranCh.smoothedDelay = delaySmoothingCoeff_ * thiranCh.smoothedDelay
+                                   + (1.0f - delaySmoothingCoeff_) * targetDelay;
 
             const float totalDelay = thiranCh.smoothedDelay;
             const int intDelay = static_cast<int>(std::floor(totalDelay));
@@ -213,7 +228,17 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
             auto& activeAp = thiranCh.aIsActive ? thiranCh.apA : thiranCh.apB;
             auto& fadingAp = thiranCh.aIsActive ? thiranCh.apB : thiranCh.apA;
 
-            // Check if integer delay boundary crossed — initiate crossfade
+            // Between integer boundaries: do NOT call computeCoefficients() per sample.
+            // Välimäki & Laakso ("Elimination of Transients in Time-Varying Allpass
+            // Fractional Delay Filters"): updating DFII-T Thiran coefficients every
+            // sample while state was built under the previous set causes mismatch
+            // transients — broadband fuzz/distortion at 5th order. Coefficients only
+            // change at init and at crossings below; fractional drift is slow enough
+            // that a fixed set is fine until the next integer step.
+            //
+            // Do NOT assign lastIntDelay here either: during xfadeCounter > 0, intDelay
+            // can step again; advancing lastIntDelay without a new crossfade desyncs
+            // curActive.intDelay from the tap the filter state was built for.
             if (intDelay != thiranCh.lastIntDelay && thiranCh.xfadeCounter <= 0)
             {
                 // The currently active allpass becomes the fading-out one.
@@ -222,20 +247,19 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
 
                 // After the swap, "activeAp" and "fadingAp" have swapped roles
                 auto& newActive = thiranCh.aIsActive ? thiranCh.apA : thiranCh.apB;
+                auto& oldActive = thiranCh.aIsActive ? thiranCh.apB : thiranCh.apA;
 
-                // Reset the new active allpass state so it starts clean
-                newActive.state.fill(0.0f);
+                // Copy state from the fading (old-active) allpass instead of zeroing.
+                // Zeroing creates a transient discontinuity every integer-delay boundary
+                // crossing that a short crossfade cannot fully mask — heard as
+                // "ping-pong aliasing" on slow sweeps. The old allpass has settled DFII-T
+                // state representing recent signal history, so copying it gives the new
+                // allpass a warm start that preserves continuity.
+                newActive.state = oldActive.state;
                 computeCoefficients(thiranD, newActive.a);
                 newActive.intDelay = intDelay;
 
-                thiranCh.xfadeCounter = ThiranChannel::XFADE_LENGTH;
-                thiranCh.lastIntDelay = intDelay;
-            }
-            else
-            {
-                // Update active allpass coefficients for fractional changes (no boundary crossing)
-                computeCoefficients(thiranD, activeAp.a);
-                activeAp.intDelay = intDelay;
+                thiranCh.xfadeCounter = xfadeLength_;
                 thiranCh.lastIntDelay = intDelay;
             }
 
@@ -263,7 +287,7 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
                 const float fadingOut = processAllpass(curFading, fadingDelayed);
 
                 // sin²/cos² crossfade — energy-preserving
-                const float progress = static_cast<float>(ThiranChannel::XFADE_LENGTH - thiranCh.xfadeCounter)
+                const float progress = static_cast<float>(xfadeLength_ - thiranCh.xfadeCounter)
                                      * xfadeInvLen;
                 const float fadeInGain = std::sin(progress * juce::MathConstants<float>::halfPi);
                 const float fadeOutGain = std::cos(progress * juce::MathConstants<float>::halfPi);

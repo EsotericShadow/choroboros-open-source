@@ -41,9 +41,9 @@ private:
     juce::dsp::ProcessSpec spec;
     int maxDelaySamples = 0;
 
-    // Per-sample smoothing for colour and centre delay to eliminate block-boundary zippering
-    float smoothedColour = 0.0f;
-    bool colourInitialized = false;
+    // Per-channel smoothing for colour and centre delay to eliminate block-boundary zippering + L/R crosstalk
+    std::array<float, 2> smoothedColour {{ 0.0f, 0.0f }};
+    std::array<bool, 2> colourInitialized {{ false, false }};
     float colourSmoothAlpha = 0.0f;
 
     std::array<float, 2> smoothedCentreDelay {{ 0.0f, 0.0f }};

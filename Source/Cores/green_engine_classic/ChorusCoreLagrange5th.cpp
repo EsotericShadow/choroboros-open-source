@@ -86,6 +86,10 @@ float ChorusCoreLagrange5th::readLagrange5th(int channel, float delaySamples) co
     while (readPos < 0.0f)
         readPos += static_cast<float>(bufferSize);
     
+    // NaN guard: static_cast<int>(NaN) is undefined behaviour in C++.
+    if (!(readPos >= 0.0f))
+        readPos = 0.0f;
+
     // Get integer and fractional parts
     int i0 = static_cast<int>(readPos);
     float u = readPos - static_cast<float>(i0); // Fractional part

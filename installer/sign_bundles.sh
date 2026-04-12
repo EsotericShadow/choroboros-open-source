@@ -26,9 +26,10 @@ source "${SCRIPT_DIR}/installer_config.sh"
 
 # ---- Configuration ----------------------------------------------------------
 
-# Your Developer ID Application certificate identity.
-# This must match exactly what shows in: security find-identity -v -p codesigning
-APP_IDENTITY="Developer ID Application: Kaizen Strategic AI Inc. (9XLRQU887D)"
+# Developer ID Application identity (override for another machine or cert name):
+#   export CHOROBOROS_APP_SIGN_IDENTITY='Developer ID Application: …'
+# This must match a line from: security find-identity -v -p codesigning
+APP_IDENTITY="${CHOROBOROS_APP_SIGN_IDENTITY:-Developer ID Application: Kaizen Strategic AI Inc. (9XLRQU887D)}"
 
 # Path to entitlements file (relative to repo root)
 ENTITLEMENTS="installer/entitlements.plist"
@@ -65,10 +66,10 @@ if [ ! -f "$ENTITLEMENTS" ]; then
 fi
 
 # Check that the signing identity exists in the keychain
-if ! security find-identity -v -p codesigning | grep -q "Developer ID Application: Kaizen Strategic AI Inc."; then
+if ! security find-identity -v -p codesigning | grep -Fq "${APP_IDENTITY}"; then
     echo "ERROR: Developer ID Application certificate not found in keychain."
     echo ""
-    echo "Expected: $APP_IDENTITY"
+    echo "Expected a line matching: ${APP_IDENTITY}"
     echo ""
     echo "Run this to check what's installed:"
     echo "  security find-identity -v -p codesigning"

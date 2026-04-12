@@ -42,8 +42,8 @@ void ChorusCoreLinearEnsemble::prepare(const juce::dsp::ProcessSpec& processSpec
     // ~5ms colour smoothing, ~3ms centre delay smoothing
     colourSmoothAlpha = 1.0f - std::exp(-1.0f / (0.005f * static_cast<float>(spec.sampleRate)));
     centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
-    smoothedColour = 0.0f;
-    colourInitialized = false;
+    smoothedColour.fill(0.0f);
+    colourInitialized.fill(false);
     smoothedCentreDelay.fill(0.0f);
     centreDelayInitialized.fill(false);
 }
@@ -52,8 +52,8 @@ void ChorusCoreLinearEnsemble::reset()
 {
     delayLineA.reset();
     delayLineB.reset();
-    smoothedColour = 0.0f;
-    colourInitialized = false;
+    smoothedColour.fill(0.0f);
+    colourInitialized.fill(false);
     smoothedCentreDelay.fill(0.0f);
     centreDelayInitialized.fill(false);
 }
@@ -81,18 +81,18 @@ void ChorusCoreLinearEnsemble::processDelay(ChorusDSP& dsp, juce::dsp::AudioBloc
     const auto& tuning = dsp.runtimeTuningSnapshot;
     const float targetColour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
 
-    if (!colourInitialized)
-    {
-        smoothedColour = targetColour;
-        colourInitialized = true;
-    }
-
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* channelSamples = block.getChannelPointer(ch);
         const float* primaryLfo = (ch == 0) ? lfoLeft : lfoRight;
         const float* oppositeLfo = (ch == 0) ? lfoRight : lfoLeft;
         const auto chIdx = static_cast<size_t>(ch);
+
+        if (!colourInitialized[chIdx])
+        {
+            smoothedColour[chIdx] = targetColour;
+            colourInitialized[chIdx] = true;
+        }
 
         if (!centreDelayInitialized[chIdx])
         {
@@ -102,11 +102,11 @@ void ChorusCoreLinearEnsemble::processDelay(ChorusDSP& dsp, juce::dsp::AudioBloc
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            // Per-sample colour and centre delay smoothing
-            smoothedColour += colourSmoothAlpha * (targetColour - smoothedColour);
+            // Per-sample colour and centre delay smoothing (now per-channel to prevent L/R crosstalk)
+            smoothedColour[chIdx] += colourSmoothAlpha * (targetColour - smoothedColour[chIdx]);
             smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
 
-            const float col = smoothedColour;
+            const float col = smoothedColour[chIdx];
             const float centre = smoothedCentreDelay[chIdx];
 
             const float tap2Mix = juce::jlimit(0.0f, 1.0f,

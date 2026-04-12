@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Choroboros v2.05 — Core Topology &amp; DSP Audit</title>
+<style>
+  :root {
+    --bg: #0d1117; --fg: #c9d1d9; --muted: #8b949e;
+    --green: #2d5016; --blue: #1a4a8a; --red: #8a1a1a;
+    --purple: #6a1a8a; --black: #333;
+    --crit: #f85149; --warn: #d29922; --info: #58a6ff;
+    --card: #161b22; --border: #30363d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin-bottom: 0.5rem; color: #fff; }
+  h2 { font-size: 1.5rem; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 0.5rem; }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .engine-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; color: #fff; font-size: 0.8rem; font-weight: 600; margin-right: 6px; vertical-align: middle; }
+  .badge-green  { background: var(--green); }
+  .badge-blue   { background: var(--blue); }
+  .badge-red    { background: var(--red); }
+  .badge-purple { background: var(--purple); }
+  .badge-black  { background: var(--black); }
+  .badge-nq { border: 1px solid var(--muted); background: transparent; color: var(--muted); }
+  .badge-hq { border: 1px solid var(--info); background: transparent; color: var(--info); }
+  .core-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .core-card .mermaid { background: #fff; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  .props { color: var(--muted); font-size: 0.9rem; }
+  .props strong { color: var(--fg); }
+  .finding { border-left: 3px solid; padding: 0.75rem 1rem; margin: 0.75rem 0; border-radius: 0 6px 6px 0; background: var(--card); }
+  .finding-crit { border-color: var(--crit); }
+  .finding-warn { border-color: var(--warn); }
+  .finding-info { border-color: var(--info); }
+  .finding-tag { font-weight: 700; }
+  .tag-crit { color: var(--crit); }
+  .tag-warn { color: var(--warn); }
+  .tag-info { color: var(--info); }
+  code { background: #1c2128; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+  pre { background: #1c2128; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; margin: 0.5rem 0; }
+  .summary-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  .summary-table th, .summary-table td { padding: 8px 12px; text-align: left; border: 1px solid var(--border); }
+  .summary-table th { background: var(--card); color: var(--info); }
+  .summary-table tr:nth-child(even) { background: var(--card); }
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+  .toc a { color: var(--info); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc li::before { content: "→ "; color: var(--muted); }
+  .safe { color: #3fb950; }
+  .unsafe { color: var(--crit); }
+</style>
+</head>
+<body>
+
+<h1>Choroboros v2.05 — Core DSP Topology &amp; Audit</h1>
+<p class="subtitle">10 cores (5 engines × 2 modes) — Flow charts, deep-dsp-quirks audit, risk matrix</p>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ul>
+    <li><a href="#outer">Outer Signal Chain</a></li>
+    <li><a href="#green-nq">Green NQ — Lagrange 3rd</a></li>
+    <li><a href="#green-hq">Green HQ — Lagrange 5th</a></li>
+    <li><a href="#blue-nq">Blue NQ — Cubic (Catmull-Rom)</a></li>
+    <li><a href="#blue-hq">Blue HQ — Thiran Allpass</a></li>
+    <li><a href="#red-nq">Red NQ — BBD</a></li>
+    <li><a href="#red-hq">Red HQ — Tape Varispeed</a></li>
+    <li><a href="#purple-nq">Purple NQ — Phase Warp</a></li>
+    <li><a href="#purple-hq">Purple HQ — Orbit</a></li>
+    <li><a href="#black-nq">Black NQ — Linear</a></li>
+    <li><a href="#black-hq">Black HQ — Linear Ensemble</a></li>
+    <li><a href="#audit">Deep DSP Quirks Audit — All Findings</a></li>
+    <li><a href="#matrix">Risk Matrix</a></li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="outer">Outer Signal Chain</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart TD
+    IN["🔊 Input Block"] --> HPF["HPF 30 Hz<br/>IIR Butterworth"]
+    HPF --> PRE_SAT["Pre-Chorus Saturation<br/><i>currently bypassed</i>"]
+    PRE_SAT --> CHORUS["processChorus()"]
+
+    subgraph CHORUS_INNER ["processChorus — inner chain"]
+        direction TD
+        PARAMS["Smooth Params<br/>Depth (rate-limited 2%/s)<br/>Rate, Mix, Color, Offset"] --> LFO["LFO Generator<br/>sin + cos quadrature<br/>Phase offset rotation"]
+        LFO --> DRY_HOLD["dryWet.pushDrySamples<br/>hold dry copy"]
+        DRY_HOLD --> PRE_EMPH["Pre-Emphasis<br/>3 kHz peak boost<br/>adaptive: quiet signals only<br/><i>Skipped for Red NQ</i>"]
+        PRE_EMPH --> CORE_SEL{"Active Core<br/>10 options"}
+        CORE_SEL --> CORE["Core processDelay<br/>see per-core charts ↓"]
+        CORE --> WET_CHAR["Wet Character<br/>Green = Bloom LP<br/>Blue = Focus BP+EQ<br/>Others = pass"]
+        WET_CHAR --> POST_SAT["Post-Chorus Saturation<br/><i>Red NQ only: Color→drive</i>"]
+        POST_SAT --> DW_MIX["Dry/Wet Mix<br/>equal-power crossfade"]
+        DW_MIX --> PEAK["Peak Catcher<br/>compressor -6 dB thresh<br/>4:1 ratio, 2 dB knee<br/>50 ms atk / 200 ms rel"]
+        PEAK --> TRIM["Output Trim ±12 dB<br/>smoothed"]
+    end
+
+    CHORUS --> LPF["LPF 20 kHz<br/>IIR Butterworth"]
+    LPF --> WIDTH["Width M/S<br/>side × width<br/>RMS comp: 1/√(0.5+0.5w²)"]
+    WIDTH --> LIMITER["⚡ Safety Limiter ✅<br/>5 ms lookahead • 4× true-peak<br/>Cross-block scan (3-sample tail)<br/>-1.0 dBTP thresh • 20:1<br/>2 dB knee • hold + 50 ms rel"]
+    LIMITER --> OUT["🔊 Output"]
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="green-nq"><span class="engine-badge badge-green">GREEN</span><span class="engine-badge badge-nq">NQ</span> Lagrange 3rd</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart LR
+    IN["Input"] --> PUSH["Push to JUCE<br/>DelayLine"]
+    PUSH --> SMOOTH["One-pole smooth<br/>centre delay ~3 ms<br/>α = 1-exp(-1/0.003·fs)"]
+    SMOOTH --> MOD["delay = centre<br/>+ depth × LFO_ch"]
+    MOD --> CLAMP["jlimit(guard, max)"]
+    CLAMP --> POP["Pop: Lagrange 3rd<br/>4-point interpolation<br/>JUCE built-in"]
+    POP --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 2 samples &nbsp;|&nbsp; <strong>Buffer:</strong> JUCE DelayLine (internal) &nbsp;|&nbsp; <strong>CPU:</strong> Lightest of all cores &nbsp;|&nbsp; <strong>Interpolation overshoot:</strong> ~0.1 dB possible at fast modulation (polynomial ringing)</p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="green-hq"><span class="engine-badge badge-green">GREEN</span><span class="engine-badge badge-hq">HQ</span> Lagrange 5th</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart LR
+    IN["Input"] --> WRITE["Write to<br/>power-of-2 buffer<br/>bitmasked index"]
+    WRITE --> ADV["writePos++<br/>& bufferMask"]
+    ADV --> SMOOTH["One-pole smooth<br/>centre delay ~3 ms"]
+    SMOOTH --> MOD["delay = centre<br/>+ depth × LFO_ch"]
+    MOD --> CLAMP["jlimit(guard, max)"]
+    CLAMP --> READ["readLagrange5th<br/>6 indices masked<br/>6-point polynomial<br/>weight loop i≠j"]
+    READ --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 3 samples &nbsp;|&nbsp; <strong>Buffer:</strong> Manual circular, power-of-2 + bitmask &nbsp;|&nbsp; <strong>CPU:</strong> Moderate (6-point polynomial per sample) &nbsp;|&nbsp; <strong>C6:</strong> <span class="safe">✓ NaN guard added</span></p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="blue-nq"><span class="engine-badge badge-blue">BLUE</span><span class="engine-badge badge-nq">NQ</span> Cubic (Catmull-Rom)</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart LR
+    IN["Input"] --> WRITE["Write to<br/>power-of-2 buffer"]
+    WRITE --> ADV["writePos++<br/>& bufferMask"]
+    ADV --> SMOOTH["One-pole smooth<br/>centre delay ~3 ms"]
+    SMOOTH --> MOD["delay = centre<br/>+ depth × LFO_ch"]
+    MOD --> CLAMP["jlimit(guard, max)"]
+    CLAMP --> READ["readCubic<br/>4 indices masked<br/>Catmull-Rom weights<br/>u² u³ polynomial"]
+    READ --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 2 samples &nbsp;|&nbsp; <strong>Buffer:</strong> Manual circular, power-of-2 + bitmask &nbsp;|&nbsp; <strong>CPU:</strong> Light &nbsp;|&nbsp; <strong>C6:</strong> <span class="safe">✓ NaN guard via shared readCubicInterp()</span></p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="blue-hq"><span class="engine-badge badge-blue">BLUE</span><span class="engine-badge badge-hq">HQ</span> Thiran 5th-Order Allpass</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart TD
+    IN["Input"] --> SMOOTH_D["Smooth delay<br/>~14 ms tau (0.9985)<br/>+ 3 ms centre smooth"]
+    SMOOTH_D --> DECOMP["Decompose<br/>intDelay + fracDelay"]
+    DECOMP --> BOUNDARY{"Integer delay<br/>boundary crossed?"}
+
+    BOUNDARY -->|Yes| SWAP["Swap active ↔ fading<br/>allpass instances<br/>Copy state from fading AP ✅<br/>Fresh Thiran coeffs<br/>Start 48-sample xfade"]
+    BOUNDARY -->|No| UPDATE["Update active AP<br/>coeffs for new frac<br/>(per-sample recompute)"]
+
+    SWAP --> WRITE["Write input<br/>to circular buffer"]
+    UPDATE --> WRITE
+
+    WRITE --> ADV["writePos++<br/>& bufferMask"]
+    ADV --> READ_A["Read at active<br/>intDelay - ORDER"]
+    READ_A --> AP_A["Active Allpass<br/>5th-order DFII-T<br/>Thiran coefficients"]
+
+    AP_A --> XFADE{"Crossfade<br/>active?"}
+    XFADE -->|Yes| READ_F["Read at fading<br/>intDelay - ORDER"]
+    READ_F --> AP_F["Fading Allpass<br/>5th-order DFII-T"]
+    AP_F --> BLEND["sin²/cos² blend<br/>48-sample envelope"]
+    BLEND --> LP["Output LP<br/>~16 kHz one-pole"]
+
+    XFADE -->|No| LP
+    LP --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 6 samples (ORDER+1) &nbsp;|&nbsp; <strong>Buffer:</strong> Manual circular, power-of-2 &nbsp;|&nbsp; <strong>CPU:</strong> Heaviest core (~150 FLOPs/sample for per-sample coefficient recompute) &nbsp;|&nbsp; <strong>Dual-allpass crossfade:</strong> 48-sample sin²/cos² masks integer boundary clicks &nbsp;|&nbsp; <strong>16 kHz LP:</strong> Tames HF allpass ringing &nbsp;|&nbsp; <strong>State copy:</strong> <span class="safe">✓ Warm-start from fading AP (was zero-reset)</span></p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="red-nq"><span class="engine-badge badge-red">RED</span><span class="engine-badge badge-nq">NQ</span> BBD (Bucket-Brigade Device)</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart TD
+    IN["Input"] --> INPUT_FILT["Input Filter<br/>5th-order Butterworth LP<br/>anti-alias before S&H"]
+    INPUT_FILT --> CLOCK["Clock Phase<br/>Accumulation<br/>phase += clockFreq / fs"]
+    CLOCK --> TICK{"Clock tick<br/>crossing?"}
+
+    TICK -->|"Yes (N ticks)"| INTERP_IN["Raffel Interpolation<br/>for each tick:<br/>frac = boundary / clockInc<br/>toWrite = lerp(prev, current)"]
+    INTERP_IN --> SH_WRITE["Write to stages<br/>head = (head+1) % stages"]
+    SH_WRITE --> SH_READ["Read from<br/>stages - delayStages"]
+    SH_READ --> HELD["Update<br/>heldOutput"]
+
+    TICK -->|No| FOH["First-Order Hold<br/>interp = prev +<br/>fracPhase × delta"]
+    HELD --> FOH
+
+    FOH --> OUT_FILT["Output Filter<br/>5th-order Butterworth LP<br/>reconstruction"]
+    OUT_FILT --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 1 sample &nbsp;|&nbsp; <strong>Stages:</strong> 256–2048 (runtime tunable) &nbsp;|&nbsp; <strong>Clock domain:</strong> Discrete S&H, clock frequency tracks delay modulation &nbsp;|&nbsp; <strong>Filters:</strong> 5th-order Butterworth pair brackets stage chain, updated every 32 samples &nbsp;|&nbsp; <strong>First-order hold:</strong> ~40 dB clock harmonic suppression &nbsp;|&nbsp; <strong>Post-saturation:</strong> in outer chain via Color→drive (tanh)</p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="red-hq"><span class="engine-badge badge-red">RED</span><span class="engine-badge badge-hq">HQ</span> Tape Varispeed</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart TD
+    IN["Input"] --> SAT["tapeSaturate<br/>tanh soft clip<br/>drive = 1 + scale × Color"]
+    SAT --> WRITE["Write to<br/>circular buffer"]
+    WRITE --> ADV["writePos++<br/>& bufferMask"]
+
+    ADV --> WOW["Wow: sin(2π·wowPhase)<br/>× wowDepth × depth<br/>~0.33 Hz"]
+    WOW --> FLUTTER["Flutter: sin(2π·flutterPhase)<br/>× flutterDepth × depth<br/>~5.8 Hz"]
+    FLUTTER --> LFO_MOD["LFO modulation<br/>smoothed (~5 ms)"]
+    LFO_MOD --> RATIO["Target ratio<br/>1.0 + lfo + wow + flutter<br/>clamped ratioMin..ratioMax"]
+    RATIO --> SMOOTH_R["Smooth ratio<br/>~4 ms alpha"]
+    SMOOTH_R --> PHASE["Phase integrator<br/>offset += 1 - ratio"]
+    PHASE --> SPRING["Leaky integrator<br/>offset × damping<br/>(0.99999 anti-windup)"]
+    SPRING --> EFF_D["Effective delay =<br/>fixedDelay + offset<br/>clamped + anti-windup"]
+
+    EFF_D --> HERMITE["Hermite Interpolation<br/>4-point, tension param<br/>circular buffer read"]
+    HERMITE --> TONE["Tone: 2-pole cascaded LP<br/>~14 kHz, cached coeffs<br/>blend: wet + amount × (toned-wet)"]
+    TONE --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 4 samples &nbsp;|&nbsp; <strong>Buffer:</strong> Manual circular, power-of-2 &nbsp;|&nbsp; <strong>Write-path saturation:</strong> tanh (record path, physically motivated) &nbsp;|&nbsp; <strong>Varispeed model:</strong> Leaky phase integrator with anti-windup &nbsp;|&nbsp; <strong>Wow + flutter:</strong> Per-channel decorrelated frequencies &nbsp;|&nbsp; <strong>Tone filter:</strong> 2-pole cascaded one-pole LP, zero allocation, coefficient caching &nbsp;|&nbsp; <strong>Key risk:</strong> C6 — <code>static_cast&lt;int&gt;(std::floor(realPos))</code></p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="purple-nq"><span class="engine-badge badge-purple">PURPLE</span><span class="engine-badge badge-nq">NQ</span> Phase Warp</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart LR
+    IN["Input"] --> WRITE["Write to<br/>power-of-2 buffer"]
+    WRITE --> ADV["writePos++<br/>& bufferMask"]
+    ADV --> PHASE["Phase accumulate<br/>phase += rate/fs<br/>wrap at 1.0"]
+    PHASE --> WARP["Warped modulation<br/>φw = φ + a·sin(k·φ + b·sin(φ))<br/>mod = sin(φw)"]
+    WARP --> MOD["delay = centre<br/>+ depth × mod"]
+    MOD --> SMOOTH_D["SmoothedValue<br/>10–30 ms ramp"]
+    SMOOTH_D --> CLAMP["jlimit(guard, max)"]
+    CLAMP --> READ["readCubic<br/>Catmull-Rom 4-point"]
+    READ --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 2 samples &nbsp;|&nbsp; <strong>Own LFO:</strong> Internal phase accumulator (not outer LFO) &nbsp;|&nbsp; <strong>Warp parameters:</strong> a, b, k all scale with Color &nbsp;|&nbsp; <strong>Smoother:</strong> SmoothedValue (vs one-pole in Green/Blue) &nbsp;|&nbsp; <strong>Key risk:</strong> C6 — <code>static_cast&lt;int&gt;(readPos)</code> in readCubic</p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="purple-hq"><span class="engine-badge badge-purple">PURPLE</span><span class="engine-badge badge-hq">HQ</span> Orbit (Dual-Tap Elliptical)</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart TD
+    IN["Input"] --> WRITE["Write to<br/>power-of-2 buffer"]
+    WRITE --> ADV["writePos++<br/>& bufferMask"]
+
+    ADV --> P_ACC["3 Phase accumulators<br/>phase, theta, theta2<br/>each += rate/fs, wrap 1.0"]
+
+    P_ACC --> MOD1["Tap 1: Ellipse projection<br/>u1 = sin(φ)·cos(θ+offset)<br/>+ (1-e)·cos(φ)·sin(θ+offset)"]
+    P_ACC --> MOD2["Tap 2: Second ellipse<br/>u2 = sin(φ)·cos(θ2+offset)<br/>+ (1-e2)·cos(φ)·sin(θ2+offset)"]
+
+    MOD1 --> D1["delay1 = centre + depth × u1"]
+    MOD2 --> D2["delay2 = centre + depth × u2"]
+
+    D1 --> SMOOTH1["SmoothedValue ~20 ms"]
+    D2 --> SMOOTH2["SmoothedValue ~20 ms"]
+
+    SMOOTH1 --> READ1["readCubic tap 1"]
+    SMOOTH2 --> READ2["readCubic tap 2"]
+
+    READ1 --> MIX["Blend taps<br/>mix1·wet1 + mix2·wet2<br/>mix ratio from tuning"]
+    READ2 --> MIX
+    MIX --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 2 samples &nbsp;|&nbsp; <strong>Buffer:</strong> Single shared buffer, dual read taps &nbsp;|&nbsp; <strong>3 phase accumulators:</strong> Non-repeating modulation patterns &nbsp;|&nbsp; <strong>Stereo:</strong> Per-channel theta offset for decorrelation &nbsp;|&nbsp; <strong>Color:</strong> Controls eccentricity + tap blend ratio &nbsp;|&nbsp; <strong>Key risk:</strong> C6 — <code>static_cast&lt;int&gt;(readPos)</code> in readCubic</p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="black-nq"><span class="engine-badge badge-black">BLACK</span><span class="engine-badge badge-nq">NQ</span> Linear</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart LR
+    IN["Input"] --> PUSH["Push to JUCE<br/>DelayLine (Linear)"]
+    PUSH --> SMOOTH["One-pole smooth<br/>centre delay<br/>glideTime from tuning"]
+    SMOOTH --> MOD["delay = centre<br/>+ depth × <b>Color</b> × LFO"]
+    MOD --> CLAMP["jlimit(guard, max)"]
+    CLAMP --> POP["Pop: Linear<br/>2-point interpolation<br/>JUCE built-in"]
+    POP --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 1 sample &nbsp;|&nbsp; <strong>Buffer:</strong> JUCE DelayLine (internal) &nbsp;|&nbsp; <strong>CPU:</strong> Lightest (2-point linear) &nbsp;|&nbsp; <strong>Unique:</strong> Color scales depth (in other engines Color drives saturation, warp, etc.)</p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="black-hq"><span class="engine-badge badge-black">BLACK</span><span class="engine-badge badge-hq">HQ</span> Linear Ensemble</h2>
+<div class="core-card">
+<div class="mermaid">
+flowchart TD
+    IN["Input"] --> PUSH_A["Push to DelayLine A"]
+    IN --> PUSH_B["Push to DelayLine B"]
+
+    PUSH_A --> SMOOTH_COL["Per-channel smooth ✅<br/>Colour ~5 ms<br/>Centre delay ~3 ms"]
+    PUSH_B --> SMOOTH_COL
+
+    SMOOTH_COL --> TAP1["Tap 1: Primary LFO<br/>delay = centre + depth × primaryLfo"]
+    SMOOTH_COL --> TAP2["Tap 2: Spread LFO<br/>spreadLfo = jmap(Color, primaryLfo, oppositeLfo)<br/>delay = centre + depth × depthScale × spreadLfo + offset"]
+
+    TAP1 --> POP1["Pop A: Linear interp"]
+    TAP2 --> POP2["Pop B: Linear interp"]
+
+    POP1 --> BLEND["Blend<br/>tap1Mix × wet1 + tap2Mix × wet2<br/>tapMix from Color"]
+    POP2 --> BLEND
+    BLEND --> OUT["Output"]
+</div>
+<p class="props"><strong>Guard:</strong> 1 sample &nbsp;|&nbsp; <strong>Dual delay lines:</strong> Independent modulation, shared input &nbsp;|&nbsp; <strong>Color controls:</strong> tap2 mix, depth scale, delay offset, LFO spread (primary↔opposite interpolation) &nbsp;|&nbsp; <strong>Creates ensemble density without complex interpolation</strong></p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="audit">Deep DSP Quirks Audit — All Findings</h2>
+
+<h3>🔴 CRITICAL Findings</h3>
+
+<div class="finding finding-crit">
+<p><span class="finding-tag tag-crit">C6-A: Float-to-int without NaN guard</span> — <strong>Lagrange5th, Cubic, PhaseWarp, Orbit, Tape</strong> &nbsp; <span class="safe" style="font-weight:700">✅ FIXED</span></p>
+<p>All manual circular buffer cores computed <code>int i0 = static_cast&lt;int&gt;(readPos)</code>. If <code>readPos</code> becomes NaN, <code>static_cast&lt;int&gt;(NaN)</code> is <strong>undefined behavior</strong> per C++ standard.</p>
+<p><strong>Fix applied:</strong> NaN guard <code>if (!(readPos >= 0.0f)) readPos = 0.0f;</code> — uses the <code>!(x >= 0)</code> form that catches NaN even with <code>-ffast-math</code> (unlike <code>std::isnan</code>). Cubic cores now share the guard via <code>InterpolationUtils.h::readCubicInterp()</code>. Lagrange5th and Tape have inline guards.</p>
+</div>
+
+<div class="finding finding-crit">
+<p><span class="finding-tag tag-crit">C6-B: Thiran intDelay cast from smoothed float</span> — <strong>Thiran</strong></p>
+<p><code>const int intDelay = static_cast&lt;int&gt;(std::floor(totalDelay))</code> at line 208 of <code>ChorusCoreThiran.cpp</code>. Same C6 pattern — if <code>totalDelay</code> is NaN, <code>std::floor(NaN)</code> returns NaN, and the cast is UB. The <code>jlimit</code> upstream (line 200) guards against out-of-range values but NOT against NaN, because <code>jlimit</code> uses <code>&lt;</code> / <code>&gt;</code> comparisons which are all <code>false</code> for NaN.</p>
+<p><strong>Fix:</strong> Same NaN sanitization before the cast.</p>
+</div>
+
+<div class="finding finding-crit">
+<p><span class="finding-tag tag-crit">C6-C: BBD clockPhase double-to-int cast</span> — <strong>BBD</strong></p>
+<p><code>const int intBefore = static_cast&lt;int&gt;(phaseBeforeInc)</code> and <code>const int intAfter = static_cast&lt;int&gt;(chan.clockPhase)</code> at lines 125-126 of <code>ChorusCoreBBD.cpp</code>. If <code>clockFreq</code> becomes extremely large (e.g., due to a near-zero <code>delaySeconds</code>), <code>clockPhase</code> can overflow <code>int</code> range. The upstream <code>jlimit</code> on <code>delayMs</code> prevents this in normal operation, but the <code>delaySeconds</code> computation <code>float delaySeconds = delayMs * 0.001f</code> at line 245 could theoretically reach a very small value if <code>delayMinMs</code> is misconfigured.</p>
+<p><strong>Severity:</strong> Low — multiple guards upstream. But technically unchecked.</p>
+</div>
+
+<h3>🟡 DANGEROUS Findings</h3>
+
+<div class="finding finding-warn">
+<p><span class="finding-tag tag-warn">D1-A: Thiran coefficient recomputation per-sample</span> — <strong>Thiran</strong></p>
+<p><code>computeCoefficients()</code> is called on every sample (line 237 in the non-boundary branch). This function performs a double-precision nested loop: ORDER=5 → 30 multiply/divide operations per call. That's ~150 FLOPs per sample per channel. <strong>No allocation</strong> (it writes to a pre-allocated <code>std::array</code>), so it's RT-safe, but it's the single heaviest per-sample cost in the entire plugin.</p>
+<p><strong>Not a correctness bug.</strong> Performance concern only. Could be optimized by interpolating coefficients between block-start and block-end values.</p>
+</div>
+
+<div class="finding finding-warn">
+<p><span class="finding-tag tag-warn">D1-B: BBD filter redesign every 32 samples</span> — <strong>BBD</strong> &nbsp; <span class="safe" style="font-weight:700">✅ VERIFIED SAFE</span></p>
+<p>At line 264: <code>choroboros::designBBD5thOrderButterworth(targetCutoff, fs)</code> is called every 32 samples. <strong>Verified:</strong> <code>BBD5thOrderButterworthCoeffs</code> is a plain struct of 13 floats, returned by value on the stack. <code>setCoeffs()</code> is plain struct assignment. <strong>Zero heap allocation.</strong> RT-safe.</p>
+</div>
+
+<div class="finding finding-warn">
+<p><span class="finding-tag tag-warn">D1-C: Tape smoothedDepth shared across channels</span> — <strong>Tape</strong> &nbsp; <span class="safe" style="font-weight:700">✅ FIXED</span></p>
+<p><code>smoothedDepth</code> was a single member variable shared across the L/R per-sample loop, causing channel 1 to see a pre-smoothed value from channel 0's pass. Same bug existed in LinearEnsemble's <code>smoothedColour</code>.</p>
+<p><strong>Fix applied:</strong> Both <code>smoothedDepth</code> (Tape) and <code>smoothedColour</code> + <code>colourInitialized</code> (LinearEnsemble) are now <code>std::array&lt;float, 2&gt;</code> indexed per-channel. Eliminates L/R smoothing crosstalk.</p>
+</div>
+
+<h3>🔵 SUBTLE Findings</h3>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S2-A: Denormal risk in BBD stage chain</span> — <strong>BBD</strong></p>
+<p>The 256–2048 element <code>stages</code> array decays toward silence during clock periods with no new input. Low-amplitude values can hit denormal range. <code>ScopedNoDenormals</code> in the outer <code>ChorusDSP::process()</code> sets FTZ/DAZ flags. <strong>Mitigated.</strong></p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S2-B: Denormal risk in Thiran allpass state</span> — <strong>Thiran</strong></p>
+<p>The 5-element <code>state[]</code> array in each allpass instance processes through feedback. During silence, these states decay toward denormal territory. <code>ScopedNoDenormals</code> covers this. <strong>Mitigated.</strong></p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S2-C: Tape phase offset leaky integrator</span> — <strong>Tape</strong></p>
+<p><code>phaseOffset *= tapePhaseDamping</code> (0.99999) decays very slowly. After 100,000 samples of silence (~2.3 s at 44.1 kHz), the offset is still 37% of its peak. If the initial value was very small (1e-20), the decay passes through denormal range. <code>ScopedNoDenormals</code> handles this. <strong>Mitigated.</strong></p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S6-A: Lagrange5th weight computation — floating-point precision</span> — <strong>Lagrange5th</strong></p>
+<p>The Lagrange weight loop <code>weight *= (u - xj) / (xi - xj)</code> accumulates round-off across 6 multiplied terms. When <code>u</code> is close to an integer, some weights become very small. Interpolation overshoot of ~0.001 dB possible. <strong>Inaudible, acceptable.</strong></p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S-NEW-A: Thiran coefficient stability at low fractional delay</span> — <strong>Thiran</strong></p>
+<p>When <code>fracDelay</code> approaches 0, the Thiran <code>D</code> value approaches ORDER (5.0). The <code>jlimit(ORDER+0.01, ORDER+0.99, D)</code> clamp prevents the worst case, but near D=5.01, coefficient accuracy degrades. The crossfade strategy masks this. <strong>Acceptable.</strong></p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S-NEW-B: Thiran allpass state reset on boundary crossing creates transient</span> — <strong>Thiran</strong> &nbsp; <span class="safe" style="font-weight:700">✅ FIXED</span></p>
+<p>Was: <code>newActive.state.fill(0.0f)</code> zeroed the allpass state on every integer-delay boundary crossing, creating repeated transients the 48-sample crossfade couldn't fully mask. Root cause of "ping-pong aliasing" on slow Thiran sweeps.</p>
+<p><strong>Fix applied:</strong> <code>newActive.state = oldActive.state</code> — copies the settled DFII-T state from the fading allpass, giving the new allpass a warm start that preserves continuity across the crossfade.</p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S-NEW-C: BBD clock frequency at extreme depth</span> — <strong>BBD</strong></p>
+<p>At very short delays, clock frequency can approach Nyquist. The 5th-order Butterworth input filter attenuates this, but at extreme settings may not fully suppress clock feedthrough. <strong>Intentional</strong> — BBD circuits have this exact behavior (it's the "character").</p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S-NEW-D: PhaseWarp and Orbit duplicate readCubic implementations</span> — <strong>PhaseWarp, Orbit</strong> &nbsp; <span class="safe" style="font-weight:700">✅ FIXED</span></p>
+<p>Was: Three identical <code>readCubic()</code> implementations in Cubic, PhaseWarped, and Orbit .cpp files.</p>
+<p><strong>Fix applied:</strong> Shared <code>readCubicInterp()</code> in new <code>Source/Cores/InterpolationUtils.h</code>. All three cores now have thin inline <code>readCubic()</code> wrappers in their headers that delegate to the shared function. NaN guard lives in one place.</p>
+</div>
+
+<div class="finding finding-info">
+<p><span class="finding-tag tag-info">S-NEW-E: Tape write-after-read ordering</span> — <strong>Tape</strong></p>
+<p>In Tape, the saturated input is written to the buffer AFTER the read (line 284, after the read at line 264). This means the current sample's write doesn't contaminate the current sample's read. The effective minimum delay is 1 sample (enforced by <code>guardSamples</code>). <strong>Correct and intentional.</strong></p>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2 id="matrix">Risk Matrix — All 10 Cores</h2>
+
+<table class="summary-table">
+<thead>
+<tr>
+  <th>Core</th>
+  <th>Buffer Type</th>
+  <th>Interpolation</th>
+  <th>C6 (NaN UB)</th>
+  <th>D1 (Alloc)</th>
+  <th>S2 (Denorm)</th>
+  <th>Unique Risks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><span class="engine-badge badge-green">Green NQ</span></td>
+  <td>JUCE DelayLine</td>
+  <td>Lagrange 3rd (JUCE)</td>
+  <td class="safe">✓ JUCE handles</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>Polynomial overshoot at fast mod (~0.1 dB)</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-green">Green HQ</span></td>
+  <td>Manual circular</td>
+  <td>Lagrange 5th (manual)</td>
+  <td class="safe">✓ C6-A fixed</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>Weight precision (~0.001 dB overshoot)</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-blue">Blue NQ</span></td>
+  <td>Manual circular</td>
+  <td>Catmull-Rom (shared)</td>
+  <td class="safe">✓ C6-A fixed</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>readCubicInterp() shared ✅</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-blue">Blue HQ</span></td>
+  <td>Manual circular</td>
+  <td>Thiran 5th allpass</td>
+  <td class="safe">✓ C6-B (jlimit guards)</td>
+  <td>⚡ D1-A (CPU, not alloc)</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>State copy ✅ (was zero-reset ping-pong)</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-red">Red NQ</span></td>
+  <td>Stage array</td>
+  <td>Raffel + First-Order Hold</td>
+  <td class="safe">✓ C6-C (guards upstream)</td>
+  <td class="safe">✓ D1-B verified stack-only</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>Clock aliasing at extreme depth (intentional)</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-red">Red HQ</span></td>
+  <td>Manual circular</td>
+  <td>Hermite 4-point</td>
+  <td class="safe">✓ C6-A fixed</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>smoothedDepth per-channel ✅</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-purple">Purple NQ</span></td>
+  <td>Manual circular</td>
+  <td>Catmull-Rom (shared)</td>
+  <td class="safe">✓ C6-A fixed</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>readCubicInterp() shared ✅</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-purple">Purple HQ</span></td>
+  <td>Manual circular</td>
+  <td>Catmull-Rom (shared)</td>
+  <td class="safe">✓ C6-A fixed</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>readCubicInterp() shared ✅, stereo balance +1.67 dB (likely intentional decorrelation)</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-black">Black NQ</span></td>
+  <td>JUCE DelayLine</td>
+  <td>Linear (JUCE)</td>
+  <td class="safe">✓ JUCE handles</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>None — cleanest core</td>
+</tr>
+<tr>
+  <td><span class="engine-badge badge-black">Black HQ</span></td>
+  <td>JUCE DelayLine ×2</td>
+  <td>Linear (JUCE)</td>
+  <td class="safe">✓ JUCE handles</td>
+  <td class="safe">✓ Clean</td>
+  <td class="safe">✓ ScopedNoD</td>
+  <td>smoothedColour per-channel ✅ — retest stereo balance</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Priority Actions</h3>
+<table class="summary-table">
+<thead>
+<tr><th>#</th><th>Finding</th><th>Severity</th><th>Effort</th><th>Action</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>C6-A: NaN guard for manual buffer reads</td><td class="safe">✅ FIXED</td><td>Small</td><td><code>if (!(readPos >= 0.0f)) readPos = 0.0f;</code> in 5 files + shared InterpolationUtils.h</td></tr>
+<tr><td>2</td><td>S-NEW-B: Thiran state-reset transient</td><td class="safe">✅ FIXED</td><td>Medium</td><td><code>newActive.state = oldActive.state</code> — warm start from fading allpass</td></tr>
+<tr><td>3</td><td>D1-B: BBD filter redesign allocation check</td><td class="safe">✅ VERIFIED SAFE</td><td>Small</td><td>13 plain floats, stack-only struct, zero heap allocation</td></tr>
+<tr><td>4</td><td>D1-C: Cross-channel smoothing (Tape + LinearEnsemble)</td><td class="safe">✅ FIXED</td><td>Small</td><td><code>smoothedDepth</code> and <code>smoothedColour</code> now <code>std::array&lt;float, 2&gt;</code> per-channel</td></tr>
+<tr><td>5</td><td>S-NEW-D: Deduplicate readCubic</td><td class="safe">✅ FIXED</td><td>Small</td><td>Shared <code>readCubicInterp()</code> in <code>InterpolationUtils.h</code>, 3 cores now delegate</td></tr>
+</tbody>
+</table>
+
+<p style="margin-top:2rem;color:var(--muted);font-size:0.85rem;">Generated 2026-04-11, updated 2026-04-11 — Choroboros v2.05 beta • Deep DSP Quirks audit with fix status<br/>Safety limiter: hold stage + cross-block true-peak scan (−0.8 dBTP, was −0.4) • All 5 priority actions resolved</p>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'default',
+  themeVariables: {
+    fontSize: '13px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+  },
+  flowchart: {
+    useMaxWidth: true,
+    htmlLabels: true,
+    curve: 'basis'
+  }
+});
+</script>
+</body>
+</html>

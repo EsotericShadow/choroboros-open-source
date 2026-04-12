@@ -544,7 +544,6 @@ void TopHeaderBar::resized()
 //==============================================================================
 void TopHeaderBar::presetChanged (const juce::String& name)
 {
-    DBG("presetChanged: name=" + name);
     refreshPresetMenu();
 }
 
@@ -558,8 +557,6 @@ void TopHeaderBar::refreshPresetMenu()
     const auto names = presetManager_.getPresetNames();
     const int currentIdx = presetManager_.getCurrentIndex();
 
-    DBG("refreshPresetMenu: numItems=" + juce::String(names.size()) + " currentIdx=" + juce::String(currentIdx) + " selectedIdBefore=" + juce::String(presetMenu_.getSelectedId()));
-
     updatingPresetMenu_ = true;
     presetMenu_.clear (juce::dontSendNotification);
 
@@ -570,17 +567,13 @@ void TopHeaderBar::refreshPresetMenu()
     {
         // A valid preset is active — select it.
         const int selectedId = juce::jlimit (1, names.size(), currentIdx + 1);
-        DBG("  setting selectedId=" + juce::String(selectedId) + " (clamped from " + juce::String(currentIdx + 1) + ")");
         presetMenu_.setSelectedId (selectedId, juce::dontSendNotification);
     }
     else
     {
         // No preset active — deselect so the placeholder text shows.
-        DBG("  no preset active or no items, deselecting");
         presetMenu_.setSelectedId (0, juce::dontSendNotification);
     }
-
-    DBG("  selectedIdAfter=" + juce::String(presetMenu_.getSelectedId()));
 
     updatingPresetMenu_ = false;
 

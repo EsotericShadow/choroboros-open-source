@@ -4,7 +4,7 @@
 
 *Kaizen Strategic AI Inc. (DBA: Kaizen DSP)*  
 *British Columbia, Canada*  
-*Version 2.04 | 2026*
+*Version 2.05 | 2026*
 
 ---
 

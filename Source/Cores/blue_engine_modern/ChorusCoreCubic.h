@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../ChorusCore.h"
+#include "../InterpolationUtils.h"
 #include <vector>
 
 // Cubic (Catmull-Rom) interpolation chorus core
@@ -49,6 +50,14 @@ private:
     std::array<bool, 2> centreDelayInitialized {{ false, false }};
     float centreDelaySmoothAlpha = 0.0f;
 
-    // Cubic interpolation read
-    float readCubic(int channel, float delaySamples) const;
+    // Cubic interpolation read — delegates to shared readCubicInterp()
+    float readCubic(int channel, float delaySamples) const
+    {
+        const auto& buf = delayBuffers[static_cast<size_t>(channel)];
+        const int writePos = writePositions[static_cast<size_t>(channel)];
+        float readPos = static_cast<float>(writePos) - delaySamples;
+        while (readPos < 0.0f)
+            readPos += static_cast<float>(bufferSize);
+        return readCubicInterp(buf.data(), bufferMask, readPos);
+    }
 };
