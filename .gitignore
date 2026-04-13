@@ -1,3 +1,8 @@
+# Secrets (PACE / iLok — installer/sign_aax_pace.sh)
+.env
+.env.local
+.env.*.local
+
 # macOS
 .DS_Store
 

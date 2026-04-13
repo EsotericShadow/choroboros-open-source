@@ -1,12 +1,16 @@
 #!/bin/bash
-# Choroboros Installation Script
-# This script automatically installs Choroboros plugins to the correct locations
+# Choroboros Beta Installation Script
+# This script automatically installs Choroboros Beta plugin formats to the correct locations
 
 set -e
 
+PRODUCT_NAME="Choroboros Beta"
+LEGACY_PRODUCT_NAME="Choroboros"
+PUBLIC_VERSION="v2.05"
+
 echo "=========================================="
-echo "  Choroboros Plugin Installer"
-echo "  Version 2.05-beta"
+echo "  ${PRODUCT_NAME} Installer"
+echo "  Version ${PUBLIC_VERSION}"
 echo "=========================================="
 echo ""
 
@@ -30,7 +34,7 @@ MACOS_VERSION=$(sw_vers -productVersion 2>/dev/null || echo "0.0")
 MACOS_MAJOR=$(echo "$MACOS_VERSION" | cut -d. -f1)
 MACOS_MINOR=$(echo "$MACOS_VERSION" | cut -d. -f2)
 if [[ "$MACOS_MAJOR" -lt 11 ]] && [[ "$MACOS_MAJOR" -eq 10 ]] && [[ "$MACOS_MINOR" -lt 13 ]]; then
-    echo -e "${RED}Error: Choroboros requires macOS 10.13 (High Sierra) or later.${NC}"
+    echo -e "${RED}Error: ${PRODUCT_NAME} requires macOS 10.13 (High Sierra) or later.${NC}"
     echo "Detected: macOS $MACOS_VERSION"
     echo "The JUCE 8 framework does not support earlier macOS versions."
     exit 1
@@ -43,14 +47,20 @@ echo ""
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Check for plugin files
-VST3_SOURCE="$SCRIPT_DIR/VST3/Choroboros.vst3"
-AU_SOURCE="$SCRIPT_DIR/AU/Choroboros.component"
-STANDALONE_SOURCE="$SCRIPT_DIR/Standalone/Choroboros.app"
+VST3_SOURCE="$SCRIPT_DIR/VST3/${PRODUCT_NAME}.vst3"
+AU_SOURCE="$SCRIPT_DIR/AU/${PRODUCT_NAME}.component"
+STANDALONE_SOURCE="$SCRIPT_DIR/Standalone/${PRODUCT_NAME}.app"
 
 # Installation directories
 VST3_USER="$HOME/Library/Audio/Plug-Ins/VST3"
 AU_USER="$HOME/Library/Audio/Plug-Ins/Components"
 STANDALONE_USER="/Applications"
+VST3_TARGET="$VST3_USER/${PRODUCT_NAME}.vst3"
+AU_TARGET="$AU_USER/${PRODUCT_NAME}.component"
+STANDALONE_TARGET="$STANDALONE_USER/${PRODUCT_NAME}.app"
+LEGACY_VST3_TARGET="$VST3_USER/${LEGACY_PRODUCT_NAME}.vst3"
+LEGACY_AU_TARGET="$AU_USER/${LEGACY_PRODUCT_NAME}.component"
+LEGACY_STANDALONE_TARGET="$STANDALONE_USER/${LEGACY_PRODUCT_NAME}.app"
 
 # Check if files exist
 if [ ! -d "$VST3_SOURCE" ] && [ ! -d "$AU_SOURCE" ] && [ ! -d "$STANDALONE_SOURCE" ]; then
@@ -58,13 +68,13 @@ if [ ! -d "$VST3_SOURCE" ] && [ ! -d "$AU_SOURCE" ] && [ ! -d "$STANDALONE_SOURC
     echo "Make sure you've unzipped the package and run this script from the extracted folder."
     echo ""
     echo "Expected locations:"
-    echo "  - VST3/Choroboros.vst3"
-    echo "  - AU/Choroboros.component"
-    echo "  - Standalone/Choroboros.app"
+    echo "  - VST3/${PRODUCT_NAME}.vst3"
+    echo "  - AU/${PRODUCT_NAME}.component"
+    echo "  - Standalone/${PRODUCT_NAME}.app"
     exit 1
 fi
 
-echo "This will install Choroboros plugins to your system."
+echo "This will install ${PRODUCT_NAME} plugin formats to your system."
 echo ""
 echo "Installation locations:"
 if [ -d "$VST3_SOURCE" ]; then
@@ -116,9 +126,12 @@ mkdir -p "$AU_USER"
 # Install VST3
 if [ -d "$VST3_SOURCE" ]; then
     echo -n "  Installing VST3 plugin... "
-    if [ -d "$VST3_USER/Choroboros.vst3" ]; then
-        rm -rf "$VST3_USER/Choroboros.vst3"
-        echo -ne "${YELLOW}(replacing old version) ${NC}"
+    if [ -d "$VST3_TARGET" ]; then
+        rm -rf "$VST3_TARGET"
+        echo -ne "${YELLOW}(replacing current beta) ${NC}"
+    elif [ -d "$LEGACY_VST3_TARGET" ]; then
+        rm -rf "$LEGACY_VST3_TARGET"
+        echo -ne "${YELLOW}(removing legacy bundle) ${NC}"
     fi
     cp -R "$VST3_SOURCE" "$VST3_USER/"
     echo -e "${GREEN}✓${NC}"
@@ -127,9 +140,12 @@ fi
 # Install AU
 if [ -d "$AU_SOURCE" ]; then
     echo -n "  Installing AU plugin... "
-    if [ -d "$AU_USER/Choroboros.component" ]; then
-        rm -rf "$AU_USER/Choroboros.component"
-        echo -ne "${YELLOW}(replacing old version) ${NC}"
+    if [ -d "$AU_TARGET" ]; then
+        rm -rf "$AU_TARGET"
+        echo -ne "${YELLOW}(replacing current beta) ${NC}"
+    elif [ -d "$LEGACY_AU_TARGET" ]; then
+        rm -rf "$LEGACY_AU_TARGET"
+        echo -ne "${YELLOW}(removing legacy bundle) ${NC}"
     fi
     cp -R "$AU_SOURCE" "$AU_USER/"
     echo -e "${GREEN}✓${NC}"
@@ -138,9 +154,12 @@ fi
 # Install Standalone
 if [ -d "$STANDALONE_SOURCE" ]; then
     echo -n "  Installing Standalone app... "
-    if [ -d "$STANDALONE_USER/Choroboros.app" ]; then
-        rm -rf "$STANDALONE_USER/Choroboros.app"
-        echo -ne "${YELLOW}(replacing old version) ${NC}"
+    if [ -d "$STANDALONE_TARGET" ]; then
+        rm -rf "$STANDALONE_TARGET"
+        echo -ne "${YELLOW}(replacing current beta) ${NC}"
+    elif [ -d "$LEGACY_STANDALONE_TARGET" ]; then
+        rm -rf "$LEGACY_STANDALONE_TARGET"
+        echo -ne "${YELLOW}(removing legacy bundle) ${NC}"
     fi
     cp -R "$STANDALONE_SOURCE" "$STANDALONE_USER/"
     echo -e "${GREEN}✓${NC}"
@@ -150,7 +169,7 @@ echo ""
 # Step 3: Verify quarantine is cleared on installed files
 echo -e "${CYAN}Step 3: Verifying quarantine status on installed files...${NC}"
 NEEDS_ATTENTION=false
-for INSTALLED in "$VST3_USER/Choroboros.vst3" "$AU_USER/Choroboros.component" "$STANDALONE_USER/Choroboros.app"; do
+for INSTALLED in "$VST3_TARGET" "$AU_TARGET" "$STANDALONE_TARGET"; do
     if [ -d "$INSTALLED" ]; then
         # Check if quarantine attribute is still present
         if xattr -l "$INSTALLED" 2>/dev/null | grep -q "com.apple.quarantine"; then
@@ -173,9 +192,9 @@ if $NEEDS_ATTENTION; then
     echo ""
     echo -e "${YELLOW}Some files still have quarantine attributes.${NC}"
     echo "Try running this script with sudo, or manually run:"
-    echo "  sudo xattr -cr ~/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-    echo "  sudo xattr -cr ~/Library/Audio/Plug-Ins/Components/Choroboros.component"
-    echo "  sudo xattr -cr /Applications/Choroboros.app"
+    echo "  sudo xattr -cr ~/Library/Audio/Plug-Ins/VST3/${PRODUCT_NAME}.vst3"
+    echo "  sudo xattr -cr ~/Library/Audio/Plug-Ins/Components/${PRODUCT_NAME}.component"
+    echo "  sudo xattr -cr /Applications/${PRODUCT_NAME}.app"
 fi
 
 echo ""
@@ -186,7 +205,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Open your DAW (Logic Pro, Ableton, Reaper, etc.)"
 echo "  2. Rescan plugins in your DAW preferences"
-echo "  3. Look for 'Choroboros' in your plugin list"
+echo "  3. Look for '${PRODUCT_NAME}' in your plugin list"
 echo ""
 echo -e "${CYAN}Troubleshooting:${NC}"
 echo ""
@@ -196,8 +215,8 @@ echo ""
 echo "  macOS still blocks the plugin?"
 echo "    → System Settings > Privacy & Security > scroll down > 'Open Anyway'"
 echo "    → If that button isn't visible, run in Terminal:"
-echo "      xattr -cr ~/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-echo "      xattr -cr ~/Library/Audio/Plug-Ins/Components/Choroboros.component"
+echo "      xattr -cr ~/Library/Audio/Plug-Ins/VST3/${PRODUCT_NAME}.vst3"
+echo "      xattr -cr ~/Library/Audio/Plug-Ins/Components/${PRODUCT_NAME}.component"
 echo ""
 echo "  AU validation fails in Logic Pro?"
 echo "    → Requires macOS 10.13+. Older Macs (Pre-2012) may not be supported."

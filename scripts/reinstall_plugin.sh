@@ -1,15 +1,23 @@
 #!/bin/bash
 
-# Reinstall Choroboros Plugin Script
+# Reinstall Choroboros Beta Plugin Script
 # Removes old installations and installs the new version
 
 set -e
 
-VERSION="2.05-beta"
-PLUGIN_NAME="Choroboros"
-RELEASE_DIR="Release/${PLUGIN_NAME}-v${VERSION}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_ROOT}"
 
-echo "🔄 Reinstalling Choroboros v${VERSION}..."
+# shellcheck source=../installer/installer_config.sh
+source "${REPO_ROOT}/installer/installer_config.sh"
+
+VERSION="${CHOROBOROS_PUBLIC_VERSION}"
+PRODUCT_NAME="${CHOROBOROS_BUNDLE_BASENAME}"
+PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
+RELEASE_DIR="Release/${PRODUCT_SLUG}-${VERSION}"
+
+echo "🔄 Reinstalling ${PRODUCT_NAME} ${VERSION}..."
 echo ""
 
 # Check if release package exists
@@ -23,14 +31,14 @@ fi
 echo "🗑️  Removing old plugin installations..."
 
 # User locations
-USER_VST3="$HOME/Library/Audio/Plug-Ins/VST3/${PLUGIN_NAME}.vst3"
-USER_AU="$HOME/Library/Audio/Plug-Ins/Components/${PLUGIN_NAME}.component"
-USER_STANDALONE="$HOME/Applications/${PLUGIN_NAME}.app"
+USER_VST3="$HOME/Library/Audio/Plug-Ins/VST3/${PRODUCT_NAME}.vst3"
+USER_AU="$HOME/Library/Audio/Plug-Ins/Components/${PRODUCT_NAME}.component"
+USER_STANDALONE="$HOME/Applications/${PRODUCT_NAME}.app"
 
 # System locations
-SYSTEM_VST3="/Library/Audio/Plug-Ins/VST3/${PLUGIN_NAME}.vst3"
-SYSTEM_AU="/Library/Audio/Plug-Ins/Components/${PLUGIN_NAME}.component"
-SYSTEM_STANDALONE="/Applications/${PLUGIN_NAME}.app"
+SYSTEM_VST3="/Library/Audio/Plug-Ins/VST3/${PRODUCT_NAME}.vst3"
+SYSTEM_AU="/Library/Audio/Plug-Ins/Components/${PRODUCT_NAME}.component"
+SYSTEM_STANDALONE="/Applications/${PRODUCT_NAME}.app"
 
 removed_any=false
 
@@ -88,31 +96,31 @@ mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
 mkdir -p "$HOME/Applications"
 
 # Install VST3
-if [ -d "$RELEASE_DIR/VST3/${PLUGIN_NAME}.vst3" ]; then
-    cp -R "$RELEASE_DIR/VST3/${PLUGIN_NAME}.vst3" "$HOME/Library/Audio/Plug-Ins/VST3/"
+if [ -d "$RELEASE_DIR/VST3/${PRODUCT_NAME}.vst3" ]; then
+    cp -R "$RELEASE_DIR/VST3/${PRODUCT_NAME}.vst3" "$HOME/Library/Audio/Plug-Ins/VST3/"
     # Remove quarantine attribute to prevent macOS security warnings
-    xattr -d com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/VST3/${PLUGIN_NAME}.vst3" 2>/dev/null || true
-    echo "  ✅ Installed VST3 to: ~/Library/Audio/Plug-Ins/VST3/${PLUGIN_NAME}.vst3"
+    xattr -d com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/VST3/${PRODUCT_NAME}.vst3" 2>/dev/null || true
+    echo "  ✅ Installed VST3 to: ~/Library/Audio/Plug-Ins/VST3/${PRODUCT_NAME}.vst3"
 else
     echo "  ⚠️  VST3 not found in release package"
 fi
 
 # Install AU
-if [ -d "$RELEASE_DIR/AU/${PLUGIN_NAME}.component" ]; then
-    cp -R "$RELEASE_DIR/AU/${PLUGIN_NAME}.component" "$HOME/Library/Audio/Plug-Ins/Components/"
+if [ -d "$RELEASE_DIR/AU/${PRODUCT_NAME}.component" ]; then
+    cp -R "$RELEASE_DIR/AU/${PRODUCT_NAME}.component" "$HOME/Library/Audio/Plug-Ins/Components/"
     # Remove quarantine attribute to prevent macOS security warnings
-    xattr -d com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/Components/${PLUGIN_NAME}.component" 2>/dev/null || true
-    echo "  ✅ Installed AU to: ~/Library/Audio/Plug-Ins/Components/${PLUGIN_NAME}.component"
+    xattr -d com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/Components/${PRODUCT_NAME}.component" 2>/dev/null || true
+    echo "  ✅ Installed AU to: ~/Library/Audio/Plug-Ins/Components/${PRODUCT_NAME}.component"
 else
     echo "  ⚠️  AU not found in release package"
 fi
 
 # Install Standalone
-if [ -d "$RELEASE_DIR/Standalone/${PLUGIN_NAME}.app" ]; then
-    cp -R "$RELEASE_DIR/Standalone/${PLUGIN_NAME}.app" "$HOME/Applications/"
+if [ -d "$RELEASE_DIR/Standalone/${PRODUCT_NAME}.app" ]; then
+    cp -R "$RELEASE_DIR/Standalone/${PRODUCT_NAME}.app" "$HOME/Applications/"
     # Remove quarantine attribute to prevent macOS security warnings
-    xattr -d com.apple.quarantine "$HOME/Applications/${PLUGIN_NAME}.app" 2>/dev/null || true
-    echo "  ✅ Installed Standalone to: ~/Applications/${PLUGIN_NAME}.app"
+    xattr -d com.apple.quarantine "$HOME/Applications/${PRODUCT_NAME}.app" 2>/dev/null || true
+    echo "  ✅ Installed Standalone to: ~/Applications/${PRODUCT_NAME}.app"
 else
     echo "  ⚠️  Standalone not found in release package"
 fi

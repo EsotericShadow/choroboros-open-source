@@ -20,6 +20,11 @@
 # installer/installer_config.sh (checklist at top of that file).
 #
 # Free disk (dry run): ./scripts/clean_choroboros_build_artifacts.sh
+#
+# AAX + PACE: With a Release AAX bundle, the pipeline runs ./installer/sign_aax_pace.sh
+# before building the .pkg (requires .env with ILOK_* and WCGUID in repo or parent).
+# Skip PACE: CHOROBOROS_SKIP_AAX_SIGN=1 (AAX must already be signed, or omit AAX build).
+# Omit AAX from .pkg only: CHOROBOROS_SKIP_AAX_PACKAGE=1 (e.g. CI without PACE).
 # =============================================================================
 
 set -euo pipefail
@@ -107,14 +112,15 @@ verify_release_versions() {
         return 1
     fi
 
-    dist_ver=$(grep '<pkg-ref' "${INSTALLER_DIR}/distribution.xml" | grep -Eo 'version="[0-9][0-9.]*"' | head -1 | grep -Eo '[0-9][0-9.]*' || true)
-    if [[ -n "$dist_ver" && "$dist_ver" != "$CHOROBOROS_VERSION" ]]; then
-        echo "ERROR: distribution.xml pkg-ref version (${dist_ver}) != CHOROBOROS_VERSION (${CHOROBOROS_VERSION})."
-        echo "Update the three version=\"...\" attributes in installer/distribution.xml."
+    local ver_count
+    ver_count=$(grep -cF "version=\"${CHOROBOROS_VERSION}\"" "${INSTALLER_DIR}/distribution.xml" || true)
+    if [[ "$ver_count" -ne 4 ]]; then
+        echo "ERROR: distribution.xml must contain exactly four pkg-ref version=\"${CHOROBOROS_VERSION}\" lines."
+        echo "Found ${ver_count}. Update installer/distribution.xml to match CHOROBOROS_VERSION."
         return 1
     fi
 
-    echo "OK: Release metadata versions agree (${CHOROBOROS_VERSION})."
+    echo "OK: Internal release metadata versions agree (${CHOROBOROS_VERSION}); public beta label ${CHOROBOROS_PUBLIC_VERSION}."
     return 0
 }
 
@@ -132,42 +138,55 @@ echo "CMake tree:       ${CHOROBOROS_CMAKE_BUILD_DIR}"
 echo ""
 
 if $RUN_UNIVERSAL; then
-    echo ">>> [1/4] Universal Release build"
+    echo ">>> [1/5] Universal Release build"
     "${REPO_ROOT}/scripts/build_macos_universal.sh"
     echo ""
 else
-    echo ">>> [1/4] SKIP universal build (--no-universal-build)"
+    echo ">>> [1/5] SKIP universal build (--no-universal-build)"
     echo ""
 fi
 
 if $RUN_SIGN_BUNDLES; then
-    echo ">>> [2/4] Sign plugin bundles (Developer ID Application)"
+    echo ">>> [2/5] Sign plugin bundles (Developer ID Application)"
     "${INSTALLER_DIR}/sign_bundles.sh"
     echo ""
 else
-    echo ">>> [2/4] SKIP sign bundles"
+    echo ">>> [2/5] SKIP sign bundles"
+    echo ""
+fi
+
+AAX_BUNDLE="${CHOROBOROS_BUILD_DIR}/AAX/${CHOROBOROS_BUNDLE_BASENAME}.aaxplugin"
+if [[ -e "$AAX_BUNDLE" ]] && [[ "${CHOROBOROS_SKIP_AAX_SIGN:-}" != "1" ]]; then
+    echo ">>> [3/5] PACE sign AAX (Apple + wraptool)"
+    "${INSTALLER_DIR}/sign_aax_pace.sh"
+    echo ""
+elif [[ -e "$AAX_BUNDLE" ]] && [[ "${CHOROBOROS_SKIP_AAX_SIGN:-}" == "1" ]]; then
+    echo ">>> [3/5] SKIP PACE AAX sign (CHOROBOROS_SKIP_AAX_SIGN=1 — bundle must already be signed for .pkg)"
+    echo ""
+else
+    echo ">>> [3/5] No AAX bundle at ${AAX_BUNDLE} (installer will omit AAX component)"
     echo ""
 fi
 
 if $RUN_BUILD_INSTALLER; then
-    echo ">>> [3/4] Build component .pkgs + product installer"
+    echo ">>> [4/5] Build component .pkgs + product installer"
     "${INSTALLER_DIR}/build_installer.sh"
     echo ""
 else
-    echo ">>> [3/4] SKIP installer build"
+    echo ">>> [4/5] SKIP installer build"
     echo ""
 fi
 
 if $RUN_NOTARIZE; then
-    echo ">>> [4/4] Sign product .pkg, notarize, staple"
+    echo ">>> [5/5] Sign product .pkg, notarize, staple"
     "${INSTALLER_DIR}/sign_and_notarize.sh"
     echo ""
 else
-    echo ">>> [4/4] SKIP notarize (--to-signed-pkg)"
+    echo ">>> [5/5] SKIP notarize (--to-signed-pkg)"
     echo ""
     echo "When ready for Apple:"
     echo "  ./scripts/release_macos_signed_installer.sh --notarize-only"
-    echo "(Keep installer/components/ until then, or re-run steps 2–3.)"
+    echo "(Keep installer/components/ until then, or re-run sign steps + build_installer.)"
     echo ""
 fi
 
@@ -176,5 +195,5 @@ echo "  Pipeline step(s) finished"
 echo "============================================"
 echo ""
 echo "Signed installer (after full run):"
-echo "  dist/ChoroborosBeta-${CHOROBOROS_VERSION}-Installer-Signed.pkg"
+echo "  dist/${CHOROBOROS_PRODUCT_SLUG}-${CHOROBOROS_PUBLIC_VERSION}-Installer-Signed.pkg"
 echo ""

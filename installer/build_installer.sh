@@ -14,10 +14,12 @@
 #
 # Prerequisites:
 #   - Plugin bundles already signed (run sign_bundles.sh first)
+#   - AAX: run sign_aax_pace.sh before this so .aaxplugin is Developer ID + PACE signed
+#   - Omit AAX from the product: export CHOROBOROS_SKIP_AAX_PACKAGE=1 (CI / no PACE)
 #   - Xcode Command Line Tools installed
 #
 # Output:
-#   dist/ChoroborosBeta-2.0.50-Installer.pkg (unsigned)
+#   dist/Choroboros-Beta-v2.05-Installer.pkg (unsigned)
 #
 # After this, sign and notarize with:
 #   ./installer/sign_and_notarize.sh
@@ -33,8 +35,10 @@ source "${SCRIPT_DIR}/installer_config.sh"
 
 COMPANY_ID="${CHOROBOROS_COMPANY_ID}"
 VERSION="${CHOROBOROS_VERSION}"
+PUBLIC_VERSION="${CHOROBOROS_PUBLIC_VERSION}"
 BUILD_DIR="${CHOROBOROS_BUILD_DIR}"
 BUNDLE_BASENAME="${CHOROBOROS_BUNDLE_BASENAME}"
+PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
 
 # Working directories
 INSTALLER_DIR="installer"
@@ -55,7 +59,7 @@ if [ ! -f "CMakeLists.txt" ]; then
     exit 1
 fi
 
-# Check that at least VST3 or AU exists (the two formats we ship for now)
+# Check that at least VST3 or AU exists
 if [ ! -e "${BUILD_DIR}/VST3/${BUNDLE_BASENAME}.vst3" ] && [ ! -e "${BUILD_DIR}/AU/${BUNDLE_BASENAME}.component" ]; then
     echo "ERROR: No signed build artifacts found."
     echo "Run these first:"
@@ -89,6 +93,32 @@ for BUNDLE in "${BUILD_DIR}/VST3/${BUNDLE_BASENAME}.vst3" "${BUILD_DIR}/AU/${BUN
         fi
     fi
 done
+
+AAX_BUNDLE="${BUILD_DIR}/AAX/${BUNDLE_BASENAME}.aaxplugin"
+WRAPTOOL_BIN="${WRAPTOOL_PATH:-/Applications/PACEAntiPiracy/Eden/Fusion/Current/bin/wraptool}"
+HAS_AAX=0
+if [[ "${CHOROBOROS_SKIP_AAX_PACKAGE:-}" == "1" ]]; then
+    echo "  AAX: skipped (CHOROBOROS_SKIP_AAX_PACKAGE=1)"
+elif [ -e "$AAX_BUNDLE" ]; then
+    echo "Checking AAX bundle (must be Developer ID + PACE signed)..."
+    if ! codesign --verify --deep --strict "$AAX_BUNDLE" 2>/dev/null; then
+        echo "ERROR: AAX codesign verify failed: $AAX_BUNDLE"
+        echo "Run ./installer/sign_aax_pace.sh or set CHOROBOROS_SKIP_AAX_PACKAGE=1 to omit AAX from this .pkg."
+        exit 1
+    fi
+    if [[ ! -x "$WRAPTOOL_BIN" ]]; then
+        echo "ERROR: wraptool not found at $WRAPTOOL_BIN (PACE Eden). Install Eden or set WRAPTOOL_PATH."
+        exit 1
+    fi
+    if ! "$WRAPTOOL_BIN" verify --in "$AAX_BUNDLE" >/dev/null 2>&1; then
+        echo "ERROR: wraptool verify failed for AAX. Run ./installer/sign_aax_pace.sh"
+        exit 1
+    fi
+    echo "  OK: AAX signed (codesign + PACE verify)"
+    HAS_AAX=1
+else
+    echo "  AAX: no bundle at ${AAX_BUNDLE} (omitted from installer)"
+fi
 echo ""
 
 # ---- Clean previous staging --------------------------------------------------
@@ -134,6 +164,16 @@ if [ -e "${BUILD_DIR}/Standalone/${BUNDLE_BASENAME}.app" ]; then
     echo "  Staged: Standalone"
 fi
 
+# AAX -> /Library/Application Support/Avid/Audio/Plug-Ins/ (Pro Tools system scan path)
+if [[ "$HAS_AAX" -eq 1 ]]; then
+    AAX_PAYLOAD="${STAGING_DIR}/aax/Library/Application Support/Avid/Audio/Plug-Ins"
+    mkdir -p "${AAX_PAYLOAD}"
+    rm -rf "${AAX_PAYLOAD}/${BUNDLE_BASENAME}.aaxplugin"
+    ditto "$AAX_BUNDLE" "${AAX_PAYLOAD}/${BUNDLE_BASENAME}.aaxplugin"
+    xattr -cr "${AAX_PAYLOAD}/${BUNDLE_BASENAME}.aaxplugin" 2>/dev/null || true
+    echo "  Staged: AAX (Pro Tools)"
+fi
+
 echo ""
 
 # ---- Build component packages ------------------------------------------------
@@ -143,6 +183,9 @@ echo "Building component packages..."
 # pkgbuild runs installer scripts; they must be executable.
 if [ -d "${INSTALLER_DIR}/scripts" ]; then
     chmod 755 "${INSTALLER_DIR}/scripts/postinstall" 2>/dev/null || true
+fi
+if [ -d "${INSTALLER_DIR}/scripts-aax" ]; then
+    chmod 755 "${INSTALLER_DIR}/scripts-aax/postinstall" 2>/dev/null || true
 fi
 
 # VST3 component
@@ -179,16 +222,35 @@ if [ -d "${STAGING_DIR}/standalone" ]; then
     echo "  Built: Choroboros-Standalone.pkg"
 fi
 
+# AAX component (Pro Tools cache helper postinstall)
+if [ -d "${STAGING_DIR}/aax" ]; then
+    pkgbuild \
+        --root "${STAGING_DIR}/aax" \
+        --identifier "${COMPANY_ID}.choroboros.aax" \
+        --version "${VERSION}" \
+        --install-location / \
+        --scripts "${INSTALLER_DIR}/scripts-aax" \
+        "${COMPONENTS_DIR}/Choroboros-AAX.pkg"
+    echo "  Built: Choroboros-AAX.pkg (with AAX cache postinstall)"
+fi
+
 echo ""
 
 # ---- Build product archive ---------------------------------------------------
 
 echo "Building product archive..."
 
-INSTALLER_PKG="${DIST_DIR}/ChoroborosBeta-${VERSION}-Installer.pkg"
+INSTALLER_PKG="${DIST_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-Installer.pkg"
+DIST_XML="${STAGING_DIR}/distribution.build.xml"
+if [[ "$HAS_AAX" -eq 1 ]]; then
+    cp "${INSTALLER_DIR}/distribution.xml" "$DIST_XML"
+else
+    python3 "${INSTALLER_DIR}/strip_distribution_remove_aax.py" \
+        "${INSTALLER_DIR}/distribution.xml" "$DIST_XML"
+fi
 
 productbuild \
-    --distribution "${INSTALLER_DIR}/distribution.xml" \
+    --distribution "$DIST_XML" \
     --resources "${INSTALLER_DIR}/resources" \
     --package-path "${COMPONENTS_DIR}" \
     "${INSTALLER_PKG}"

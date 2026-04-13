@@ -20,7 +20,15 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# shellcheck source=../installer/installer_config.sh
+source "${REPO_ROOT}/installer/installer_config.sh"
+
 : "${CHOROBOROS_CMAKE_BUILD_DIR:=Universal-Build}"
+
+PRODUCT_NAME="${CHOROBOROS_BUNDLE_BASENAME}"
+PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
+PUBLIC_VERSION="${CHOROBOROS_PUBLIC_VERSION}"
+ARCHIVE_BASENAME="${PRODUCT_SLUG}-${PUBLIC_VERSION}-macOS-Universal.zip"
 
 # Absolute path to CMake binary dir (for cd / rm)
 if [[ "${CHOROBOROS_CMAKE_BUILD_DIR}" = /* ]]; then
@@ -48,8 +56,8 @@ echo ""
 if [[ "${CHOROBOROS_SKIP_UNIVERSAL_CLEAN:-0}" != "1" ]]; then
     echo "🧹 Cleaning this CMake build tree and local zip output..."
     rm -rf "${CMAKE_BIN_DIR}"
-    rm -f "${RELEASE_DIR}"/Choroboros-v2.05-beta-macOS-Universal.zip \
-        "${RELEASE_DIR}"/Choroboros-v2.05-beta-macOS-Universal.zip.sha256
+    rm -f "${RELEASE_DIR}/${ARCHIVE_BASENAME}" \
+        "${RELEASE_DIR}/${ARCHIVE_BASENAME}.sha256"
 else
     echo "🧹 SKIP clean (CHOROBOROS_SKIP_UNIVERSAL_CLEAN=1)"
 fi
@@ -64,7 +72,7 @@ echo "🔨 Building universal binary..."
 cmake --build "${CMAKE_BIN_DIR}" --config Release --parallel
 
 echo "🔍 Verifying architectures..."
-BUNDLE_BASENAME="Choroboros Beta"
+BUNDLE_BASENAME="${PRODUCT_NAME}"
 VST3_BINARY="${ARTEFACT_RELEASE}/VST3/${BUNDLE_BASENAME}.vst3/Contents/MacOS/${BUNDLE_BASENAME}"
 AU_BINARY="${ARTEFACT_RELEASE}/AU/${BUNDLE_BASENAME}.component/Contents/MacOS/${BUNDLE_BASENAME}"
 STANDALONE_BINARY="${ARTEFACT_RELEASE}/Standalone/${BUNDLE_BASENAME}.app/Contents/MacOS/${BUNDLE_BASENAME}"
@@ -92,27 +100,28 @@ mkdir -p "${RELEASE_DIR}"
 
 (
     cd "${ARTEFACT_RELEASE}"
-    zip -r -o "${RELEASE_DIR}/Choroboros-v2.05-beta-macOS-Universal.zip" VST3 AU Standalone
+    zip -r -o "${RELEASE_DIR}/${ARCHIVE_BASENAME}" VST3 AU Standalone
 )
 
 cd "${RELEASE_DIR}"
-unzip -q -o Choroboros-v2.05-beta-macOS-Universal.zip || true
+unzip -q -o "${ARCHIVE_BASENAME}" || true
 cp "${REPO_ROOT}/README.md" "${REPO_ROOT}/DISTRIBUTION.md" "${REPO_ROOT}/INSTALL.txt" \
     "${REPO_ROOT}/LICENSE" "${REPO_ROOT}/COPYING" "${REPO_ROOT}/SOURCE_LINK.txt" . 2>/dev/null || true
-cp "${REPO_ROOT}/install.sh" "${REPO_ROOT}/Install Choroboros.command" . 2>/dev/null || true
-chmod +x install.sh "Install Choroboros.command" 2>/dev/null || true
-zip -r -o Choroboros-v2.05-beta-macOS-Universal.zip \
+cp "${REPO_ROOT}/install.sh" . 2>/dev/null || true
+cp "${REPO_ROOT}/install.sh" "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
+chmod +x install.sh "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
+zip -r -o "${ARCHIVE_BASENAME}" \
     README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt \
-    install.sh "Install Choroboros.command" 2>/dev/null || true
-rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt install.sh "Install Choroboros.command"
+    install.sh "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
+rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt install.sh "Install ${PRODUCT_NAME}.command"
 rm -rf VST3 AU Standalone
 cd "${REPO_ROOT}"
 
 echo "🔐 Generating SHA256 checksum..."
-shasum -a 256 "${RELEASE_DIR}/Choroboros-v2.05-beta-macOS-Universal.zip" > "${RELEASE_DIR}/Choroboros-v2.05-beta-macOS-Universal.zip.sha256"
+shasum -a 256 "${RELEASE_DIR}/${ARCHIVE_BASENAME}" > "${RELEASE_DIR}/${ARCHIVE_BASENAME}.sha256"
 
 echo ""
 echo "✅ macOS Universal build complete!"
-echo "📦 Package: ${RELEASE_DIR}/Choroboros-v2.05-beta-macOS-Universal.zip"
-echo "📊 Size: $(du -h "${RELEASE_DIR}/Choroboros-v2.05-beta-macOS-Universal.zip" | cut -f1)"
+echo "📦 Package: ${RELEASE_DIR}/${ARCHIVE_BASENAME}"
+echo "📊 Size: $(du -h "${RELEASE_DIR}/${ARCHIVE_BASENAME}" | cut -f1)"
 echo "📂 Artefacts: ${ARTEFACT_RELEASE}"

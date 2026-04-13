@@ -39,11 +39,13 @@ INSTALLER_IDENTITY="${CHOROBOROS_INSTALLER_SIGN_IDENTITY:-Developer ID Installer
 NOTARY_PROFILE="${CHOROBOROS_NOTARY_PROFILE:-notarytool-profile}"
 
 VERSION="${CHOROBOROS_VERSION}"
+PUBLIC_VERSION="${CHOROBOROS_PUBLIC_VERSION}"
+PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
 DIST_DIR="dist"
 INSTALLER_DIR="installer"
 COMPONENTS_DIR="${INSTALLER_DIR}/components"
-UNSIGNED_PKG="${DIST_DIR}/ChoroborosBeta-${VERSION}-Installer.pkg"
-SIGNED_PKG="${DIST_DIR}/ChoroborosBeta-${VERSION}-Installer-Signed.pkg"
+UNSIGNED_PKG="${DIST_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-Installer.pkg"
+SIGNED_PKG="${DIST_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-Installer-Signed.pkg"
 
 # ---- Preflight checks -------------------------------------------------------
 

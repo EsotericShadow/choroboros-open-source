@@ -1,16 +1,24 @@
 #!/bin/bash
 
-# Choroboros Plugin Packaging Script
+# Choroboros Beta Plugin Packaging Script
 # This script creates a distribution-ready package
 
 set -e
 
-VERSION="2.05-beta"
-PLUGIN_NAME="Choroboros"
-RELEASE_DIR="Release/${PLUGIN_NAME}-v${VERSION}"
-ARCHIVE_NAME="${PLUGIN_NAME}-v${VERSION}-macOS.zip"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_ROOT}"
 
-echo "🎵 Packaging Choroboros v${VERSION}..."
+# shellcheck source=../installer/installer_config.sh
+source "${REPO_ROOT}/installer/installer_config.sh"
+
+VERSION="${CHOROBOROS_PUBLIC_VERSION}"
+PRODUCT_NAME="${CHOROBOROS_BUNDLE_BASENAME}"
+PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
+RELEASE_DIR="Release/${PRODUCT_SLUG}-${VERSION}"
+ARCHIVE_NAME="${PRODUCT_SLUG}-${VERSION}-macOS.zip"
+
+echo "🎵 Packaging ${PRODUCT_NAME} ${VERSION}..."
 
 # Clean previous release
 if [ -d "Release" ]; then
@@ -71,13 +79,13 @@ if [ -f "DISTRIBUTION.md" ]; then
 fi
 
 # Create installation instructions
-cat > "${RELEASE_DIR}/INSTALL.txt" << 'EOF'
-Choroboros Installation Instructions
+cat > "${RELEASE_DIR}/INSTALL.txt" <<EOF
+${PRODUCT_NAME} Installation Instructions
 ====================================
 
 VST3 Plugin:
 ------------
-1. Copy Choroboros.vst3 to one of these locations:
+1. Copy ${PRODUCT_NAME}.vst3 to one of these locations:
    - /Library/Audio/Plug-Ins/VST3/ (system-wide, requires admin)
    - ~/Library/Audio/Plug-Ins/VST3/ (user-specific, recommended)
 
@@ -85,7 +93,7 @@ VST3 Plugin:
 
 AU Plugin:
 ----------
-1. Copy Choroboros.component to one of these locations:
+1. Copy ${PRODUCT_NAME}.component to one of these locations:
    - /Library/Audio/Plug-Ins/Components/ (system-wide, requires admin)
    - ~/Library/Audio/Plug-Ins/Components/ (user-specific, recommended)
 
@@ -93,7 +101,7 @@ AU Plugin:
 
 Standalone Application:
 -----------------------
-1. Copy Choroboros.app to /Applications/ or any location you prefer
+1. Copy ${PRODUCT_NAME}.app to /Applications/ or any location you prefer
 2. Double-click to launch
 
 Troubleshooting:
@@ -108,7 +116,7 @@ echo "  ✅ Installation instructions created"
 # Create archive
 echo "Creating archive..."
 cd Release
-zip -r "${ARCHIVE_NAME}" "${PLUGIN_NAME}-v${VERSION}" > /dev/null
+zip -r "${ARCHIVE_NAME}" "${PRODUCT_SLUG}-${VERSION}" > /dev/null
 cd ..
 
 ARCHIVE_SIZE=$(du -h "Release/${ARCHIVE_NAME}" | cut -f1)

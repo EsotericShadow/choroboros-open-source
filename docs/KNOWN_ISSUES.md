@@ -1,6 +1,6 @@
 # Known Issues
 
-Issues known for Choroboros v2.05 Beta. Please report additional issues via the Feedback button.
+Issues known for Choroboros Beta v2.05. Please report additional issues via the Feedback button.
 
 ## Current Test Scope
 
@@ -18,6 +18,9 @@ Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are **no
 
 ### Fixed in v2.05
 
+- **Sample-rate invariance (all engines):** Five DSP constants were hardcoded as raw pole values tuned at 48 kHz. At other sample rates (44.1k, 96k, 192k) they silently degraded — smoothing speeds changed, crossfade durations shrank, and the Tape varispeed spring tightened. All five are now computed from physical time constants at the consumption site, making behavior identical at any supported sample rate.
+- **Thiran broadband fuzz/distortion (Blue HQ):** Per-sample coefficient updates caused DFII-T state-coefficient mismatch transients. Extended crossfade from 1ms to 6ms with state-copy architecture on boundary crossings, reducing THD from 1.47% to 0.14%.
+- **Width text input parsing:** Typing "1" into the Width field set it to 100%. Parser now correctly divides by 100 to match the displayed percentage format.
 - **3 dB volume dip at 50% wet mix:** Linear dry/wet mixing caused a volume dip when wet signal has phase offset from stereo modulation (which chorus always does). Fixed with equal-power sin/cos crossfade (industry standard). Added per-engine output trim parameter for gain compensation.
 - **Zippering artifacts across all 5 engines:** Per-sample interpolation smoothing and coefficient fixes across Green (Lagrange), Blue (Cubic/Thiran), Red (Tape), and Black (Ensemble) cores. Reported by multiple testers as "DSP anomalies" and "scratchy" sound.
 - **Three additional freeze-on-close vectors:** Beyond the D3D11 fix in v2.04.1, three more teardown issues resolved: DevPanelWindow HWND cascade under DLL loader lock, themePrewarmThread outliving DLL unload, and FeedbackCollector blocking disk I/O in destructor.
@@ -65,7 +68,7 @@ HQ toggle now switches in ~43 ms (18 ms warmup + 25 ms crossfade) and supports s
 - **DAWs tested:** Reaper (macOS + Windows), Logic Pro (macOS), Ableton Live (Windows), FL Studio (Windows), Samplitude (Windows). Additional DAW reports welcome.
 - **Studio One / Fender Studio Pro:** Bugs reported in these hosts but not yet investigated — access to these environments is required before issues can be addressed. Fix ETA unknown. If you're running either host, in-plugin feedback or email is especially valuable.
 - **Ardour 8.10 (Windows):** One report of VST3 crash on load. Appears to be an Ardour VST3 hosting issue — other plugins also crash for this user.
-- **Sample rates:** Supports up to 192 kHz. Report any issues at extreme sample rates.
+- **Sample rates:** Supports up to 192 kHz. As of v2.05, all DSP is sample-rate invariant — smoothing, crossfades, and modulation behave identically at 44.1k, 48k, 96k, and 192k. Report any issues at non-standard sample rates.
 
 ## macOS Gatekeeper (signed installer vs zip beta)
 
@@ -83,13 +86,12 @@ HQ toggle now switches in ~43 ms (18 ms warmup + 25 ms crossfade) and supports s
 
 2. **Manual quarantine removal:** If you installed manually and your DAW won't load the plugin, run:
    ```
-   xattr -cr ~/Library/Audio/Plug-Ins/VST3/Choroboros.vst3
-   xattr -cr ~/Library/Audio/Plug-Ins/Components/Choroboros.component
-   xattr -cr /Applications/Choroboros.app
+   xattr -cr ~/Library/Audio/Plug-Ins/VST3/Choroboros\ Beta.vst3
+   xattr -cr ~/Library/Audio/Plug-Ins/Components/Choroboros\ Beta.component
+   xattr -cr /Applications/Choroboros\ Beta.app
    ```
-   (Paths may differ if the product name includes “Beta”.)
 
-3. **"Open Anyway" in System Settings:** Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the Choroboros warning. This option is **unreliable on recent macOS** for unsigned code; prefer the `.pkg` or `xattr` steps above.
+3. **"Open Anyway" in System Settings:** Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the Choroboros Beta warning. This option is **unreliable on recent macOS** for unsigned code; prefer the `.pkg` or `xattr` steps above.
 
 Maintainers: full macOS pipeline is `./scripts/release_macos_signed_installer.sh` (universal build → sign bundles → `.pkg` → notarize → staple). See `installer/installer_config.sh` for version alignment and optional env overrides.
 

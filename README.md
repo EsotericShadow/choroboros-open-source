@@ -62,55 +62,55 @@ Intended for educators, sound designers, and power users who want to see under t
 
 ## Installation
 
-**Downloads (v2.05-beta):**
+**Downloads (Choroboros Beta v2.05):**
 
 Beta builds are distributed via GitHub Actions artifacts. Go to the [Actions tab](https://github.com/EsotericShadow/choroboros-open-source/actions), open the latest passing Build run, and download the artifact for your platform. Each artifact contains a `.zip` and a `.zip.sha256` checksum file.
 
 | Platform | Artifact name |
 |----------|--------------|
-| macOS Universal (Intel + Apple Silicon) | `Choroboros-macos-universal` |
-| Linux x64 | `Choroboros-linux-x64` |
-| Windows x64 | `Choroboros-windows-x64` |
-| Windows x86 (legacy) | `Choroboros-windows-x86` |
+| macOS Universal (Intel + Apple Silicon) | `Choroboros-Beta-macOS-Universal` |
+| Linux x64 | `Choroboros-Beta-linux-x64` |
+| Windows x64 | `Choroboros-Beta-windows-x64` |
+| Windows x86 (legacy) | `Choroboros-Beta-windows-x86` |
 
 ### macOS — install script (recommended)
 The macOS zip includes `install.sh` which handles copying and Gatekeeper quarantine removal automatically:
 ```bash
-cd ~/Downloads/Choroboros-macOS-Universal
+cd ~/Downloads/<unzipped-Choroboros-Beta-package>
 bash install.sh
 ```
 
 ### macOS — manual VST3
-Copy `Choroboros.vst3` to:
+Copy `Choroboros Beta.vst3` to:
 - `~/Library/Audio/Plug-Ins/VST3/` (user-specific, recommended)
 - `/Library/Audio/Plug-Ins/VST3/` (system-wide)
 
 ### macOS — manual AU
-Copy `Choroboros.component` to:
+Copy `Choroboros Beta.component` to:
 - `~/Library/Audio/Plug-Ins/Components/` (user-specific, recommended)
 - `/Library/Audio/Plug-Ins/Components/` (system-wide)
 
 ### macOS — Standalone
-Copy `Choroboros.app` to `/Applications/` or anywhere you prefer.
+Copy `Choroboros Beta.app` to `/Applications/` or anywhere you prefer.
 
 ### Windows — VST3
-Extract the zip. Copy `Choroboros.vst3` to:
+Extract the zip. Copy `Choroboros Beta.vst3` to:
 - `C:\Program Files\Common Files\VST3\` (system-wide)
 - `%LOCALAPPDATA%\Programs\Common\VST3\` (user-specific)
 
 ### Windows — Standalone
-Extract the zip. Run `Choroboros.exe` directly or place it anywhere you prefer.
+Extract the zip. Run `Choroboros Beta.exe` directly or place it anywhere you prefer.
 
 ### Linux — VST3
-Extract the zip. Copy `Choroboros.vst3` to:
+Extract the zip. Copy `Choroboros Beta.vst3` to:
 - `~/.vst3/` (user-specific, recommended)
 - `/usr/lib/vst3/` (system-wide, requires sudo)
 
 ### Linux — Standalone
-Extract the zip. Make `Choroboros` executable and run it:
+Extract the zip. Make `Choroboros Beta` executable and run it:
 ```bash
-chmod +x Choroboros
-./Choroboros
+chmod +x "Choroboros Beta"
+./"Choroboros Beta"
 ```
 
 After installation, rescan plugins in your DAW.
@@ -129,11 +129,11 @@ After installation, rescan plugins in your DAW.
 
 ## Technical Details
 
-- **Version:** 2.05
+- **Version:** v2.05
 - **Company:** Kaizen DSP
 - **Location:** British Columbia, Canada
 - **Framework:** JUCE 8.0.12
-- **Sample Rate:** Up to 192 kHz
+- **Sample Rate:** Up to 192 kHz (all DSP is sample-rate invariant as of v2.05)
 - **Formats:** VST3, AU, Standalone (macOS); VST3, Standalone (Windows)
 - **macOS:** Universal binary (arm64 + x86_64)
 - **Windows:** x64 primary, x86-compat

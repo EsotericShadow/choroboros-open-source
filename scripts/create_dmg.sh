@@ -1,17 +1,25 @@
 #!/bin/bash
 
-# Choroboros DMG Creator Script
+# Choroboros Beta DMG Creator Script
 # Creates a professional DMG installer for distribution
 
 set -e
 
-VERSION="2.05-beta"
-PLUGIN_NAME="Choroboros"
-DMG_NAME="${PLUGIN_NAME}-v${VERSION}-macOS"
-TEMP_DIR="dmg_temp"
-DMG_DIR="${TEMP_DIR}/${PLUGIN_NAME}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_ROOT}"
 
-echo "📦 Creating DMG installer for ${PLUGIN_NAME} v${VERSION}..."
+# shellcheck source=../installer/installer_config.sh
+source "${REPO_ROOT}/installer/installer_config.sh"
+
+VERSION="${CHOROBOROS_PUBLIC_VERSION}"
+PRODUCT_NAME="${CHOROBOROS_BUNDLE_BASENAME}"
+PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
+DMG_NAME="${PRODUCT_SLUG}-${VERSION}-macOS"
+TEMP_DIR="dmg_temp"
+DMG_DIR="${TEMP_DIR}/${PRODUCT_SLUG}"
+
+echo "📦 Creating DMG installer for ${PRODUCT_NAME} ${VERSION}..."
 
 # Clean up previous attempts
 if [ -d "${TEMP_DIR}" ]; then
@@ -33,13 +41,13 @@ cp -R Build/Choroboros_artefacts/AU "${DMG_DIR}/"
 cp -R Build/Choroboros_artefacts/Standalone "${DMG_DIR}/"
 
 # Create installation instructions
-cat > "${DMG_DIR}/INSTALL.txt" << 'EOF'
-Choroboros Installation Instructions
+cat > "${DMG_DIR}/INSTALL.txt" <<EOF
+${PRODUCT_NAME} Installation Instructions
 ====================================
 
 VST3 Plugin:
 ------------
-1. Drag Choroboros.vst3 to:
+1. Drag ${PRODUCT_NAME}.vst3 to:
    - /Library/Audio/Plug-Ins/VST3/ (system-wide, requires password)
    - ~/Library/Audio/Plug-Ins/VST3/ (user-specific, recommended)
 
@@ -47,7 +55,7 @@ VST3 Plugin:
 
 AU Plugin:
 ----------
-1. Drag Choroboros.component to:
+1. Drag ${PRODUCT_NAME}.component to:
    - /Library/Audio/Plug-Ins/Components/ (system-wide, requires password)
    - ~/Library/Audio/Plug-Ins/Components/ (user-specific, recommended)
 
@@ -55,7 +63,7 @@ AU Plugin:
 
 Standalone Application:
 -----------------------
-1. Drag Choroboros.app to /Applications/ or any location you prefer
+1. Drag ${PRODUCT_NAME}.app to /Applications/ or any location you prefer
 2. Double-click to launch
 
 Quick Install (Recommended):
@@ -72,7 +80,7 @@ Troubleshooting:
 - On macOS, you may need to allow the plugins in System Preferences > Security & Privacy
 - After installation, rescan plugins in your DAW's preferences
 
-Version: 2.04-beta
+Version: ${VERSION}
 EOF
 
 # Copy README if it exists
@@ -92,7 +100,7 @@ ln -s ~/Library/Audio/Plug-Ins/Components "${DMG_DIR}/Library/Components (User)"
 
 # Create DMG
 echo "Creating DMG..."
-hdiutil create -volname "${PLUGIN_NAME}" \
+hdiutil create -volname "${PRODUCT_NAME}" \
     -srcfolder "${DMG_DIR}" \
     -ov -format UDZO \
     "${DMG_NAME}.dmg"
@@ -108,9 +116,9 @@ echo "📦 DMG: ${DMG_NAME}.dmg"
 echo "📊 Size: ${DMG_SIZE}"
 echo ""
 echo "The DMG contains:"
-echo "  - Choroboros.vst3 (VST3 plugin)"
-echo "  - Choroboros.component (AU plugin)"
-echo "  - Choroboros.app (Standalone application)"
+echo "  - Choroboros Beta.vst3 (VST3 plugin)"
+echo "  - Choroboros Beta.component (AU plugin)"
+echo "  - Choroboros Beta.app (Standalone application)"
 echo "  - INSTALL.txt (Installation instructions)"
 echo "  - Shortcuts to installation folders"
 echo ""

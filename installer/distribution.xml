@@ -22,6 +22,7 @@
         <line choice="vst3"/>
         <line choice="au"/>
         <line choice="standalone"/>
+        <line choice="aax"/>
     </choices-outline>
 
     <!-- VST3: checked by default, user can uncheck -->
@@ -48,6 +49,14 @@
         <pkg-ref id="com.kaizenstrategicai.choroboros.standalone"/>
     </choice>
 
+    <!-- AAX: Pro Tools / Avid (system Library path; PACE-signed build required) -->
+    <choice id="aax"
+            title="AAX Plugin (Pro Tools)"
+            description="Installs the AAX plugin for Avid Pro Tools to /Library/Application Support/Avid/Audio/Plug-Ins/"
+            selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.aax"/>
+    </choice>
+
     <!-- Package references (filenames match what build_installer.sh produces) -->
     <pkg-ref id="com.kaizenstrategicai.choroboros.vst3"
              version="2.0.50"
@@ -60,4 +69,8 @@
     <pkg-ref id="com.kaizenstrategicai.choroboros.standalone"
              version="2.0.50"
              onConclusion="none">Choroboros-Standalone.pkg</pkg-ref>
+
+    <pkg-ref id="com.kaizenstrategicai.choroboros.aax"
+             version="2.0.50"
+             onConclusion="none">Choroboros-AAX.pkg</pkg-ref>
 </installer-gui-script>

@@ -1,7 +1,7 @@
 param(
     [ValidateSet("Release", "Debug")]
     [string]$Config = "Release",
-    [string]$VersionLabel = "v2.05-beta",
+    [string]$VersionLabel = "v2.05",
     [string]$RepoRoot = "",
     [switch]$SkipX64,
     [switch]$SkipX86
@@ -9,6 +9,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$ProductName = "Choroboros Beta"
+$ProductSlug = "Choroboros-Beta"
 
 function Resolve-ExistingPath {
     param([Parameter(Mandatory = $true)][string]$PathValue)
@@ -31,8 +33,8 @@ function New-WindowsPackage {
     )
 
     $artefactsDir = Join-Path $BuildDir ("Choroboros_artefacts\" + $ConfigName)
-    $srcVst3 = Join-Path $artefactsDir "VST3\Choroboros.vst3"
-    $srcStandalone = Join-Path $artefactsDir "Standalone\Choroboros.exe"
+    $srcVst3 = Join-Path $artefactsDir ("VST3\" + $ProductName + ".vst3")
+    $srcStandalone = Join-Path $artefactsDir ("Standalone\" + $ProductName + ".exe")
 
     if (-not (Test-Path $srcVst3)) {
         throw "Missing VST3 bundle for ${ArchLabel}: $srcVst3"
@@ -41,7 +43,7 @@ function New-WindowsPackage {
         throw "Missing Standalone executable for ${ArchLabel}: $srcStandalone"
     }
 
-    $packageName = "Choroboros-$PackageVersion-Windows-$ArchLabel"
+    $packageName = "$ProductSlug-$PackageVersion-Windows-$ArchLabel"
     $stageRoot = Join-Path $ReleaseDir $packageName
     $zipPath = Join-Path $ReleaseDir ($packageName + ".zip")
     $hashPath = $zipPath + ".sha256"
@@ -54,8 +56,8 @@ function New-WindowsPackage {
     New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "VST3") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "Standalone") | Out-Null
 
-    Copy-Item $srcVst3 (Join-Path $stageRoot "VST3\Choroboros.vst3") -Recurse -Force
-    Copy-Item $srcStandalone (Join-Path $stageRoot "Standalone\Choroboros.exe") -Force
+    Copy-Item $srcVst3 (Join-Path $stageRoot ("VST3\" + $ProductName + ".vst3")) -Recurse -Force
+    Copy-Item $srcStandalone (Join-Path $stageRoot ("Standalone\" + $ProductName + ".exe")) -Force
 
     foreach ($doc in $SharedDocs) {
         $leafName = [System.IO.Path]::GetFileName($doc)
@@ -63,7 +65,7 @@ function New-WindowsPackage {
     }
 
     $buildInfo = @"
-Plugin: Choroboros
+Plugin: $ProductName
 Package: $packageName
 Arch: $ArchLabel
 Config: $ConfigName

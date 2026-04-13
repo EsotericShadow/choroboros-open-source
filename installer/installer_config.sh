@@ -7,8 +7,11 @@
 # 1. CMakeLists.txt
 #    - project(Choroboros VERSION x.y.z)
 #    - juce_add_plugin( ... VERSION x.y.z ... PRODUCT_NAME "..." )
-# 2. This file: CHOROBOROS_VERSION and CHOROBOROS_BUNDLE_BASENAME
-# 3. installer/distribution.xml — all pkg-ref version="x.y.z" attributes (three places)
+# 2. This file:
+#    - CHOROBOROS_VERSION (internal bundle/pkg version)
+#    - CHOROBOROS_PUBLIC_VERSION (tester-facing release label)
+#    - CHOROBOROS_BUNDLE_BASENAME / CHOROBOROS_PRODUCT_SLUG
+# 3. installer/distribution.xml — all pkg-ref version="x.y.z" attributes (four places: VST3, AU, Standalone, AAX)
 #
 # One command for the full macOS pipeline (from repo root):
 #   ./scripts/release_macos_signed_installer.sh
@@ -27,6 +30,8 @@
 # =============================================================================
 # shellcheck shell=bash
 export CHOROBOROS_BUNDLE_BASENAME="Choroboros Beta"
+export CHOROBOROS_PRODUCT_SLUG="Choroboros-Beta"
+export CHOROBOROS_PUBLIC_VERSION="v2.05"
 export CHOROBOROS_VERSION="2.0.50"
 export CHOROBOROS_COMPANY_ID="com.kaizenstrategicai"
 

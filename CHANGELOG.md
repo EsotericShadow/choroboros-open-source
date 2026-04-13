@@ -2,7 +2,27 @@
 
 All notable changes to Choroboros are documented here.
 
-## [2.05] - 2026-04-10
+## [2.05] - 2026-04-11
+
+Sample-rate invariance structural fix — all 5 hardcoded DSP constants now derived from physical time constants.
+
+### Fixed
+- **Sample-rate invariance (all engines):** Five DSP constants were hardcoded as raw pole values or sample counts tuned at 48 kHz. At other sample rates (44.1k, 96k, 192k) they silently degraded — smoothing speeds halved/doubled, crossfade durations shrank, and the Tape varispeed spring tightened. All five are now computed from physical time constants (seconds/ms) in prepare() or at the consumption site, making behavior identical at any sample rate.
+  - **Thiran delay smoothing** (Blue HQ): 14ms time constant, was hardcoded α=0.9985 (halved at 96k).
+  - **Thiran crossfade length** (Blue HQ): 6ms sin²/cos² crossfade, was hardcoded 48 samples (shrank to 0.25ms at 192k, leaking 1.5% THD transients).
+  - **Pre-emphasis level follower** (all engines): 208ms time constant, was hardcoded per-block α=0.95 (4× slower at 96k).
+  - **Tape tone cutoff smoother** (Red HQ): 0.25ms time constant, was hardcoded α=0.08 (2× faster at 96k).
+  - **Tape phase damping** (Red HQ): Per-second retention 0.6188, was hardcoded per-sample 0.99999 (spring 4× stronger at 192k). Field renamed `tapePhaseDampingPerSec` for clean semantic break.
+- **Thiran broadband fuzz/distortion** (Blue HQ): Removed per-sample coefficient updates that caused DFII-T state–coefficient mismatch transients (Välimäki & Laakso). Extended crossfade from 1ms to 6ms, reducing THD from 1.47% to 0.14%. State-copy architecture on boundary crossings.
+- **Width text input parsing:** Typing "1" set width to 100% and "2" to 200%. parseWidthValue() now always divides by 100 to match the display format. Both PluginEditor.cpp copies fixed.
+
+### Changed
+- **DevPanel slider labels:** Pre-emphasis level smoother shows "PreEmph Level τ (s)" with range 0.001–2.0s. Tape tone smoother shows "Tape Tone τ (ms)" with range 0.01–10.0ms. Tape phase damping shows "Tape Phase Damp/s" with range 0.01–1.0.
+- **Factory defaults updated:** All three JSON factory files and PluginProcessor per-engine defaults converted from raw coefficients to physical time constants.
+- **Shared interpolation utility:** New `InterpolationUtils.h` with `readCubicInterp()` deduplicating cubic interpolation across Blue, Purple, and Black cores.
+- **Tape core robustness:** Per-channel smoothedDepth with NaN guard in Red HQ. Per-channel colour smoothing in Black HQ.
+
+### Earlier v2.05 release work (2026-04-10)
 
 35 commits, 158 files changed. Major architectural modernization focused on stability, audio thread safety, and extensibility.
 

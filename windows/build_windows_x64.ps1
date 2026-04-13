@@ -43,4 +43,4 @@ if (-not $SkipTests) {
 Write-Host ""
 Write-Host "Build complete." -ForegroundColor Green
 Write-Host "Expected VST3 path:"
-Write-Host "  $buildDir\Choroboros_artefacts\Release\VST3\Choroboros.vst3"
+Write-Host "  $buildDir\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3"

@@ -3,8 +3,8 @@
 # Removes ALL old Choroboros installations (both "Choroboros" and "Choroboros Beta")
 # then installs the correct v2.05 "Choroboros Beta" builds from the open-source build.
 #
-# Covers: Reaper, Ableton, Pro Tools, Cubase, FL Studio, Waveform 13, GarageBand, Logic
-# (All of these read from the standard macOS plugin paths below.)
+# Covers: Reaper, Ableton, Pro Tools, Cubase, FL Studio, Waveform 13, GarageBand, Logic.
+# Pro Tools AAX: use the system Avid folder (/Library/.../Plug-Ins), not ~/Library — PT scans the system path.
 
 set -e
 
@@ -164,7 +164,6 @@ echo ""
 # Create directories
 mkdir -p "$USER_VST3"
 mkdir -p "$USER_AU"
-mkdir -p "$USER_AAX"
 
 # VST3
 echo -n "  VST3 → $USER_VST3/ ... "
@@ -178,10 +177,11 @@ cp -R "$AU_SRC" "$USER_AU/"
 xattr -cr "$USER_AU/Choroboros Beta.component" 2>/dev/null || true
 echo -e "${GREEN}done${NC}"
 
-# AAX (user location for dev/testing — Pro Tools checks both)
-echo -n "  AAX  → $USER_AAX/ ... "
-cp -R "$AAX_SRC" "$USER_AAX/"
-xattr -cr "$USER_AAX/Choroboros Beta.aaxplugin" 2>/dev/null || true
+# AAX → system Avid folder (required for Pro Tools to see the plug-in)
+echo -n "  AAX  → $SYS_AAX/ ... "
+sudo rm -rf "$SYS_AAX/Choroboros Beta.aaxplugin"
+sudo ditto "$AAX_SRC" "$SYS_AAX/Choroboros Beta.aaxplugin"
+sudo xattr -cr "$SYS_AAX/Choroboros Beta.aaxplugin" 2>/dev/null || true
 echo -e "${GREEN}done${NC}"
 
 # Standalone (install to ~/Applications if /Applications needs sudo)
@@ -225,7 +225,7 @@ verify() {
 
 verify "$USER_VST3/Choroboros Beta.vst3" "VST3"
 verify "$USER_AU/Choroboros Beta.component" "AU"
-verify "$USER_AAX/Choroboros Beta.aaxplugin" "AAX"
+verify "$SYS_AAX/Choroboros Beta.aaxplugin" "AAX (Pro Tools)"
 if [ -d "/Applications/Choroboros Beta.app" ]; then
     verify "/Applications/Choroboros Beta.app" "Standalone"
 else
@@ -241,7 +241,7 @@ echo "DAW-specific notes:"
 echo ""
 echo "  Reaper:      Preferences > Plug-ins > VST > Re-scan"
 echo "  Ableton:     Preferences > Plug-Ins > Rescan"
-echo "  Pro Tools:   Restart PT (auto-rescans AAX folder)"
+echo "  Pro Tools:   Restart PT (rescans /Library/.../Avid/Audio/Plug-Ins)"
 echo "  Cubase:      Studio > VST Plug-in Manager > Rescan All"
 echo "  FL Studio:   Options > Manage Plugins > Start Scan"
 echo "  Waveform 13: Settings > Plugins > Re-scan"

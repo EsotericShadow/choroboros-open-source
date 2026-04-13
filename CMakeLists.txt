@@ -6,6 +6,7 @@ project(Choroboros VERSION 2.0.50)
 # Keep this as a normal variable so the checked-in source of truth wins over any
 # stale value left behind in an existing CMake cache.
 set(CHOROBOROS_VERSION_STRING "Beta v2.05")
+set(CHOROBOROS_PRODUCT_NAME "Choroboros Beta")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -104,7 +105,7 @@ juce_add_plugin(Choroboros
     VST3_CATEGORIES Fx Modulation
     AU_MAIN_TYPE kAudioUnitType_Effect
     AAX_CATEGORY AAX_ePlugInCategory_Modulation
-    PRODUCT_NAME "Choroboros Beta"
+    PRODUCT_NAME "${CHOROBOROS_PRODUCT_NAME}"
     DESCRIPTION "A chorus that eats its own tail - Five colors, ten algorithms (Beta)"
     VERSION 2.0.50
 )
@@ -412,15 +413,11 @@ if(APPLE)
     add_custom_command(TARGET Choroboros_VST3 POST_BUILD
         COMMAND /usr/bin/codesign --force --sign - --deep "$<TARGET_BUNDLE_DIR:Choroboros_VST3>"
         COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
-        COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.vst3 to user VST3 folder..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:Choroboros_VST3>" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/Choroboros.vst3"
-        COMMENT "Copy Choroboros.vst3 to ~/Library/Audio/Plug-Ins/VST3 for Reaper")
-    # After AAX build, copy to Avid Plug-Ins (Pro Tools Developer loads from user path if present)
-    add_custom_command(TARGET Choroboros_AAX POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins"
-        COMMAND ${CMAKE_COMMAND} -E echo "Installing Choroboros.aaxplugin to Avid Plug-Ins..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:Choroboros_AAX>" "$ENV{HOME}/Library/Application Support/Avid/Audio/Plug-Ins/Choroboros.aaxplugin"
-        COMMENT "Copy Choroboros.aaxplugin to ~/Library/Application Support/Avid/Audio/Plug-Ins for Pro Tools Developer")
+        COMMAND ${CMAKE_COMMAND} -E echo "Installing ${CHOROBOROS_PRODUCT_NAME}.vst3 to user VST3 folder..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/${CHOROBOROS_PRODUCT_NAME}.vst3"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:Choroboros_VST3>" "$ENV{HOME}/Library/Audio/Plug-Ins/VST3/${CHOROBOROS_PRODUCT_NAME}.vst3"
+        COMMENT "Copy ${CHOROBOROS_PRODUCT_NAME}.vst3 to ~/Library/Audio/Plug-Ins/VST3 for local host testing")
+    # Do not auto-copy AAX after build. Pro Tools scans the system Avid folder,
+    # which requires an explicit install step and should stay aligned with the
+    # signed installer / install_aax_pro_tools_system.sh workflow.
 endif()

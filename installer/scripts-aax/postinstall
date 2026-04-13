@@ -1,0 +1,12 @@
+#!/bin/bash
+# Clear narrow Pro Tools AAX plug-in cache entries for Choroboros so upgrades rescan cleanly.
+set -e
+CACHE="/Users/Shared/Pro Tools/AAXPlugInCache"
+if [[ -d "$CACHE" ]]; then
+  shopt -s nullglob
+  for f in "$CACHE"/Choroboros*.plugincache "$CACHE"/Choroboros*.plugincache.txt; do
+    rm -f "$f" 2>/dev/null || true
+  done
+  shopt -u nullglob
+fi
+exit 0
