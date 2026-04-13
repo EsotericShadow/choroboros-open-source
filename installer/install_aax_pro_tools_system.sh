@@ -14,6 +14,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+CLI_CHOROBOROS_AAX_PATH="${CHOROBOROS_AAX_PATH:-}"
+
 PARENT_ENV="$(cd "$REPO_ROOT/.." && pwd)/.env"
 ENV_FILE=""
 if [[ -f "${REPO_ROOT}/.env" ]]; then
@@ -26,6 +28,10 @@ if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
   set +a
+fi
+
+if [[ -n "$CLI_CHOROBOROS_AAX_PATH" ]]; then
+  export CHOROBOROS_AAX_PATH="$CLI_CHOROBOROS_AAX_PATH"
 fi
 
 if [[ -n "${CHOROBOROS_AAX_PATH:-}" ]]; then
