@@ -41,7 +41,6 @@ if [[ -z "$ENV_FILE" || ! -f "$ENV_FILE" ]]; then
   echo "ERROR: No .env found. Create one in either:"
   echo "  ${REPO_ROOT}/.env"
   echo "  ${PARENT_ENV}"
-  echo "  cp .env.example .env   # from choroboros-open-source/"
   exit 1
 fi
 echo "Using env file: $ENV_FILE"

@@ -58,6 +58,20 @@ Documentation/*.url
 # Beta tester feedback (names, emails, verbatim responses)
 feedback/
 
+# Internal-only docs / research / runbooks (keep local, never publish)
+/docs/developer/
+/docs/BETA_FEEDBACK_TRACKER.md
+/docs/DSP_SAMPLE_RATE_INVARIANCE.md
+/docs/DOCUMENTATION_AUDIT_*.md
+/docs/ENGINE_CONTENT_CORRECTED.md
+/docs/SAMPLE_RATE_INVARIANCE_PLAN.md
+/docs/TECHNICAL_SPECS_CORRECTIONS.md
+/windows/AGENT_CONTEXT.md
+/windows/CHECKLIST.md
+/windows/HOST_PLUGIN_PATHS.md
+/windows/README.md
+/windows/RELEASE_CHECKLIST_HARD.md
+
 # Local workspace noise (duplicate root-level source copies)
 /AnimatedToggleButton.cpp
 /AnimatedToggleButton.h
