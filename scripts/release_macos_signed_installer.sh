@@ -156,8 +156,16 @@ else
 fi
 
 AAX_BUNDLE="${CHOROBOROS_BUILD_DIR}/AAX/${CHOROBOROS_BUNDLE_BASENAME}.aaxplugin"
+# Always sign the AAX next to this CMake tree. A .env CHOROBOROS_AAX_PATH (e.g. old T7
+# path) would otherwise sign the wrong bundle while build_installer verifies BUILD_DIR.
+ABS_RELEASE_DIR="${CHOROBOROS_BUILD_DIR}"
+if [[ "${ABS_RELEASE_DIR}" != /* ]]; then
+    ABS_RELEASE_DIR="${REPO_ROOT}/${CHOROBOROS_BUILD_DIR}"
+fi
+export CHOROBOROS_AAX_PATH="${ABS_RELEASE_DIR}/AAX/${CHOROBOROS_BUNDLE_BASENAME}.aaxplugin"
+
 if [[ -e "$AAX_BUNDLE" ]] && [[ "${CHOROBOROS_SKIP_AAX_SIGN:-}" != "1" ]]; then
-    echo ">>> [3/5] PACE sign AAX (Apple + wraptool)"
+    echo ">>> [3/5] PACE sign AAX (Apple + wraptool) — ${CHOROBOROS_AAX_PATH}"
     "${INSTALLER_DIR}/sign_aax_pace.sh"
     echo ""
 elif [[ -e "$AAX_BUNDLE" ]] && [[ "${CHOROBOROS_SKIP_AAX_SIGN:-}" == "1" ]]; then
