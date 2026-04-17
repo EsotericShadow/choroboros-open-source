@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
-    <title>Choroboros</title>
+    <title>Choroboros Beta</title>
     <organization>com.kaizenstrategicai</organization>
 
     <!-- Install to the boot volume only, system-wide (requires admin password) -->
@@ -30,6 +30,7 @@
             title="VST3 Plugin"
             description="Installs Choroboros as a VST3 plugin for Ableton Live, Cubase, Studio One, REAPER, FL Studio, Bitwig, and other VST3 hosts. Installed to /Library/Audio/Plug-Ins/VST3/"
             selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.resources"/>
         <pkg-ref id="com.kaizenstrategicai.choroboros.vst3"/>
     </choice>
 
@@ -38,6 +39,7 @@
             title="Audio Unit Plugin"
             description="Installs Choroboros as an Audio Unit plugin for Logic Pro, GarageBand, and other AU hosts. Installed to /Library/Audio/Plug-Ins/Components/"
             selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.resources"/>
         <pkg-ref id="com.kaizenstrategicai.choroboros.au"/>
     </choice>
 
@@ -46,6 +48,7 @@
             title="Standalone Application"
             description="Installs the Choroboros standalone application to /Applications/. Use this to run Choroboros without a DAW."
             selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.resources"/>
         <pkg-ref id="com.kaizenstrategicai.choroboros.standalone"/>
     </choice>
 
@@ -54,10 +57,15 @@
             title="AAX Plugin (Pro Tools)"
             description="Installs the AAX plugin for Avid Pro Tools to /Library/Application Support/Avid/Audio/Plug-Ins/"
             selected="true">
+        <pkg-ref id="com.kaizenstrategicai.choroboros.resources"/>
         <pkg-ref id="com.kaizenstrategicai.choroboros.aax"/>
     </choice>
 
     <!-- Package references (filenames match what build_installer.sh produces) -->
+    <pkg-ref id="com.kaizenstrategicai.choroboros.resources"
+             version="2.0.50"
+             onConclusion="none">Choroboros-Resources.pkg</pkg-ref>
+
     <pkg-ref id="com.kaizenstrategicai.choroboros.vst3"
              version="2.0.50"
              onConclusion="none">Choroboros-VST3.pkg</pkg-ref>

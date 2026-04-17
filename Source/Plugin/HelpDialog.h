@@ -29,8 +29,6 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    static void show();
-
 private:
     juce::Label titleLabel;
     juce::Label introLabel;

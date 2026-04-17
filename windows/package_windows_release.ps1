@@ -125,9 +125,9 @@ if ([string]::IsNullOrWhiteSpace($gitSha)) { $gitSha = "unknown" }
 $builtUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $sharedDocs = @(
     (Join-Path $RepoRoot "README.md"),
-    (Join-Path $RepoRoot "EULA.md"),
     (Join-Path $RepoRoot "COPYING"),
     (Join-Path $RepoRoot "LICENSE"),
+    (Join-Path $RepoRoot "EULA.md"),
     (Join-Path $RepoRoot "windows\README.md"),
     (Join-Path $RepoRoot "windows\HOST_PLUGIN_PATHS.md"),
     (Join-Path $RepoRoot "windows\windows_factory_defaults.json")

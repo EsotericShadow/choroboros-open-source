@@ -17,7 +17,7 @@
  */
 
 #include "AnimatedToggleButton.h"
-#include "BinaryData.h"
+#include "../Assets/AssetRepository.h"
 
 AnimatedToggleButton::AnimatedToggleButton()
 {
@@ -30,9 +30,11 @@ AnimatedToggleButton::AnimatedToggleButton()
     setMouseDragSensitivity(500);
     setScrollWheelEnabled(false);
     setWantsKeyboardFocus(false);
-    juce::SoftwareImageType softwareType;
-    spritesheetImage = softwareType.convert(juce::ImageCache::getFromMemory(BinaryData::switch_a_spritesheet_png,
-                                                                            BinaryData::switch_a_spritesheet_pngSize));
+    setOpaque(false);
+    setRepaintsOnMouseActivity(false);
+    spritesheetImage = choroboros::assets::AssetRepository::instance()
+        .loadImage(choroboros::assets::ids::switchSpriteSheet, true)
+        .image;
     onValueChange = [this]
     {
         const bool isOn = getValue() >= 0.5;
@@ -45,11 +47,16 @@ AnimatedToggleButton::~AnimatedToggleButton()
     stopTimer();
 }
 
-void AnimatedToggleButton::resized()
+void AnimatedToggleButton::invalidateScaledFrameCache()
 {
     cachedFrameWidth = 0;
     cachedFrameHeight = 0;
     scaledFrames.fill({});
+}
+
+void AnimatedToggleButton::resized()
+{
+    invalidateScaledFrameCache();
 }
 
 float AnimatedToggleButton::getAnimationProgress() const
@@ -72,23 +79,61 @@ void AnimatedToggleButton::paint(juce::Graphics& g)
     if (!sheet.isValid())
         return;
 
-    const int frameIndex = juce::jlimit(0, kNumFrames - 1, juce::roundToInt(animatedFrame));
-    const auto& cachedFrame = scaledFrames[static_cast<size_t>(frameIndex)];
-    if (cachedFrame.isValid())
+    const float clampedFrame = juce::jlimit(0.0f, static_cast<float>(kNumFrames - 1), animatedFrame);
+    const int baseIndex = juce::jlimit(0, kNumFrames - 1, static_cast<int>(std::floor(clampedFrame)));
+    const int nextIndex = juce::jlimit(0, kNumFrames - 1, baseIndex + 1);
+    const float nextAlpha = (baseIndex == nextIndex) ? 0.0f
+                                                     : juce::jlimit(0.0f, 1.0f, clampedFrame - static_cast<float>(baseIndex));
+
+    const auto drawCachedFrame = [&](int frameIndex, float alpha)
     {
+        if (alpha <= 0.001f)
+            return false;
+
+        const auto& cachedFrame = scaledFrames[static_cast<size_t>(frameIndex)];
+        if (!cachedFrame.isValid())
+            return false;
+
+        g.saveState();
+        g.setOpacity(alpha);
         g.drawImageAt(cachedFrame, 0, 0);
-        return;
-    }
+        g.restoreState();
+        return true;
+    };
 
-    const int row = frameIndex / kCols;
-    const int col = frameIndex % kCols;
-    const juce::Rectangle<int> src(col * kFramePx, row * kFramePx, kFramePx, kFramePx);
-    if (!sheet.getBounds().contains(src))
+    bool drew = drawCachedFrame(baseIndex, 1.0f - nextAlpha);
+    if (nextIndex != baseIndex)
+        drew = drawCachedFrame(nextIndex, nextAlpha) || drew;
+
+    if (drew)
         return;
 
-    const juce::Image frame = sheet.getClippedImage(src);
-    g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-    g.drawImageWithin(frame, 0, 0, getWidth(), getHeight(), juce::RectanglePlacement::centred, false);
+    const auto drawFrameFromSheet = [&](int frameIndex, float alpha)
+    {
+        if (alpha <= 0.001f)
+            return false;
+
+        const int row = frameIndex / kCols;
+        const int col = frameIndex % kCols;
+        const juce::Rectangle<int> src(col * kFramePx, row * kFramePx, kFramePx, kFramePx);
+        if (!sheet.getBounds().contains(src))
+            return false;
+
+        const juce::Image frame = sheet.getClippedImage(src);
+        if (!frame.isValid())
+            return false;
+
+        g.saveState();
+        g.setOpacity(alpha);
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImageWithin(frame, 0, 0, getWidth(), getHeight(), juce::RectanglePlacement::centred, false);
+        g.restoreState();
+        return true;
+    };
+
+    drew = drawFrameFromSheet(baseIndex, 1.0f - nextAlpha);
+    if (nextIndex != baseIndex)
+        drawFrameFromSheet(nextIndex, nextAlpha);
 }
 
 void AnimatedToggleButton::rebuildScaledFramesIfNeeded()
@@ -143,6 +188,7 @@ void AnimatedToggleButton::startAnimationToState(bool on)
     animationStartFrame = animatedFrame;
     animationEndFrame = target;
     animationStartMs = juce::Time::getMillisecondCounterHiRes();
+    animationDurationMs = on ? kAnimationDurationOnMs : kAnimationDurationOffMs;
     animationRunning = true;
     startTimerHz(kAnimationTimerHz);
 }
@@ -209,9 +255,7 @@ void AnimatedToggleButton::timerCallback()
     {
         const double nowMs = juce::Time::getMillisecondCounterHiRes();
         const float t = juce::jlimit(0.0f, 1.0f, static_cast<float>((nowMs - animationStartMs) / animationDurationMs));
-        const float eased = 0.5f - 0.5f * std::cos(juce::MathConstants<float>::pi * t);
-        const float snapped = (t > 0.88f) ? (0.88f + (t - 0.88f) * 1.8f) : t;
-        const float blend = juce::jlimit(0.0f, 1.0f, 0.7f * eased + 0.3f * snapped);
+        const float blend = t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
         animatedFrame = animationStartFrame + (animationEndFrame - animationStartFrame) * blend;
         if (t >= 1.0f)
         {

@@ -22,7 +22,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
 
-AboutDialog::AboutDialog()
+AboutDialog::AboutDialog(MessageCallback callback)
+    : showMessageCallback(std::move(callback))
 {
     setSize(450, 520);
 
@@ -93,7 +94,7 @@ AboutDialog::AboutDialog()
 
     // --- Buttons (DevPanel hacker style) ---
     devpanel::styleHackerTextButton(licenseButton, true);
-    licenseButton.setButtonText("View License");
+    licenseButton.setButtonText("View EULA");
     licenseButton.onClick = [this] { showLicense(); };
     addAndMakeVisible(licenseButton);
 
@@ -220,37 +221,21 @@ void AboutDialog::showLicense()
     }
     else
     {
-        juce::AlertWindow::showMessageBoxAsync(
-            juce::AlertWindow::InfoIcon,
-            "End User License Agreement",
-            "Choroboros End User License Agreement\n\n"
-            "Copyright (C) 2026 Kaizen Strategic AI Inc.\n"
+        const juce::String fallbackMessage =
+            "Choroboros Beta — License summary\n\n"
+            "Copyright (C) 2026 Kaizen Strategic AI Inc. (Kaizen DSP)\n"
             "British Columbia, Canada\n\n"
-            "This software is licensed, not sold. By using this software, you agree "
-            "to the terms of the End User License Agreement.\n\n"
-            "PROPRIETARY ALGORITHMS:\n"
-            "The Purple engine algorithms (Phase-Warped Chorus and Orbit Chorus) are "
-            "proprietary intellectual property of Kaizen Strategic AI Inc. These "
-            "algorithms are protected by trade secret law and may not be reverse "
-            "engineered, extracted, copied, or used without explicit written license.\n\n"
-            "THIRD-PARTY COMPONENTS:\n"
-            "This software uses the JUCE framework, subject to its own license terms.\n\n"
-            "For the complete EULA, please contact:\n"
-            "info@kaizenstrategic.ai");
+            "Official beta builds from Kaizen are licensed under the End User License "
+            "Agreement (EULA), not the GPL. The public source on GitHub is available under "
+            "GPLv3 for transparency and self-builds; your obligations differ if you compile "
+            "from that source yourself.\n\n"
+            "The bundled EULA could not be opened from disk. For the full agreement, see "
+            "EULA.md in the repository or contact:\n"
+            "info@kaizenstrategic.ai";
+
+        if (showMessageCallback)
+            showMessageCallback(juce::AlertWindow::InfoIcon,
+                                "End User License Agreement",
+                                fallbackMessage);
     }
-}
-
-void AboutDialog::show()
-{
-    auto* dialog = new AboutDialog();
-
-    juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(dialog);
-    options.dialogTitle = "About Choroboros";
-    options.dialogBackgroundColour = devpanel::hackerBg();
-    options.resizable = false;
-    options.useNativeTitleBar = true;
-
-    auto* window = options.launchAsync();
-    (void)window;
 }

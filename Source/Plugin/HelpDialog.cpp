@@ -28,7 +28,7 @@ constexpr auto kSupportMailto = "mailto:info@kaizenstrategic.ai?subject=Chorobor
 
 HelpDialog::HelpDialog()
 {
-    setSize(500, 390);
+    setSize(500, 436);
 
     const auto accent = devpanel::hackerText();
     const auto body = devpanel::hackerTextDim();
@@ -73,7 +73,9 @@ HelpDialog::HelpDialog()
     supportBodyLabel.setColour(juce::Label::textColourId, body);
     addAndMakeVisible(supportBodyLabel);
 
-    feedbackHintLabel.setText("Bug reports and feature requests use the separate Feedback button\nso support mail stays focused on assistance.",
+    feedbackHintLabel.setText("Bug reports and feature requests: use the Feedback button.\n"
+                              "Licensing: this official Kaizen beta build is under the EULA (About \u2192 View EULA).\n"
+                              "Public source on GitHub remains GPLv3 for self-builds.",
                               juce::dontSendNotification);
     feedbackHintLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::labelSmall, false));
     feedbackHintLabel.setJustificationType(juce::Justification::centred);
@@ -138,7 +140,7 @@ void HelpDialog::resized()
     supportButton.setBounds(supportArea.removeFromTop(28).withWidth(140));
 
     area.removeFromTop(14);
-    feedbackHintLabel.setBounds(area.removeFromTop(34));
+    feedbackHintLabel.setBounds(area.removeFromTop(52));
 
     area.removeFromTop(12);
     auto buttonArea = area.removeFromTop(30);
@@ -176,19 +178,4 @@ void HelpDialog::closeDialog()
     {
         delete safeThis.getComponent();
     });
-}
-
-void HelpDialog::show()
-{
-    auto* dialog = new HelpDialog();
-
-    juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(dialog);
-    options.dialogTitle = "Help & Support";
-    options.dialogBackgroundColour = devpanel::hackerBg();
-    options.resizable = false;
-    options.useNativeTitleBar = true;
-
-    auto* window = options.launchAsync();
-    (void) window;
 }

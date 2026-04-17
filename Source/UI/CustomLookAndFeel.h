@@ -39,6 +39,10 @@ public:
         juce::Image knobSpriteSheetDepthImage;
         juce::Image knobSpriteSheetOffsetImage;
         juce::Image knobSpriteSheetWidthImage;
+        juce::Image knobSpriteSheetRateOnImage;
+        juce::Image knobSpriteSheetDepthOnImage;
+        juce::Image knobSpriteSheetOffsetOnImage;
+        juce::Image knobSpriteSheetWidthOnImage;
         juce::Image mixKnobSpriteSheetImage;
     };
 
@@ -53,6 +57,7 @@ public:
     void installThemeAssetPack(int colorIndex, ThemeAssetPack&& pack);
     static ThemeAssetPack getOrDecodeThemeAssetPack(int colorIndex);
     static ThemeAssetPack decodeThemeAssetPack(int colorIndex);
+    void setHqAnimationState(float progress, bool animationActive, bool hqIsOn) noexcept;
     
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                          float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
@@ -103,9 +108,16 @@ private:
     juce::Image knobSpriteSheetDepthImage;
     juce::Image knobSpriteSheetOffsetImage;
     juce::Image knobSpriteSheetWidthImage;
+    juce::Image knobSpriteSheetRateOnImage;
+    juce::Image knobSpriteSheetDepthOnImage;
+    juce::Image knobSpriteSheetOffsetOnImage;
+    juce::Image knobSpriteSheetWidthOnImage;
     juce::Image mixKnobSpriteSheetImage;
     juce::Typeface::Ptr uiTextTypeface;
     float popupMenuFontHeight = 0.0f;
+    float hqAnimationProgress = 0.0f;
+    bool hqAnimationActive = false;
+    bool hqIsOn = false;
     
     std::array<ThemeAssetPack, 5> cachedThemeAssets {};
     std::array<bool, 5> cachedThemeValid { false, false, false, false, false };
@@ -113,19 +125,6 @@ private:
     
     void loadImages(int colorIndex);
     void applyThemeAssetPack(const ThemeAssetPack& pack);
-    
-    // Helper methods for loadImages
-    static void getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,
-                                     const char*& indicatorName, int& indicatorSize,
-                                     const char*& shadowName, int& shadowSize,
-                                     const char*& trackName, int& trackSize,
-                                     const char*& thumbName, int& thumbSize,
-                                     const char*& mixKnobName, int& mixKnobSize,
-                                     const char*& knobSheetRateName, int& knobSheetRateSize,
-                                     const char*& knobSheetDepthName, int& knobSheetDepthSize,
-                                     const char*& knobSheetOffsetName, int& knobSheetOffsetSize,
-                                     const char*& knobSheetWidthName, int& knobSheetWidthSize,
-                                     const char*& mixKnobSpriteSheetName, int& mixKnobSpriteSheetSize);
     
     // Helper methods for drawLinearSlider
     void drawSliderTrack(juce::Graphics& g, int x, int y, int width, int height);

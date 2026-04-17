@@ -17,9 +17,10 @@
  */
 
 #include "TopHeaderBar.h"
-#include "../Plugin/PluginProcessor.h"
+#include "../Plugin/PluginEditor.h"
 #include "DevPanelSupport.h"
 #include "BinaryData.h"
+#include <cmath>
 
 namespace
 {
@@ -76,6 +77,11 @@ public:
         setAccentColour (devpanel::engineSkinColourForIndex (0));
     }
 
+    void setUiScale (float newUiScale)
+    {
+        uiScale_ = juce::jmax (0.5f, newUiScale);
+    }
+
     void setAccentColour (juce::Colour newAccent)
     {
         accent_ = newAccent;
@@ -122,12 +128,12 @@ public:
 
     juce::Font getComboBoxFont (juce::ComboBox&) override
     {
-        return devpanel::makeLabelFont (11.5f, false);
+        return devpanel::makeLabelFont (11.5f * uiScale_, false);
     }
 
     juce::Font getPopupMenuFont() override
     {
-        return devpanel::makeLabelFont (11.5f, false);
+        return devpanel::makeLabelFont (11.5f * uiScale_, false);
     }
 
     //------------------------------------------------------------------
@@ -197,8 +203,8 @@ public:
         }
 
         // Dropdown chevron — small, right-aligned.
-        const float arrowSize = juce::jmin (8.0f, static_cast<float> (height) * 0.28f);
-        const float arrowX = static_cast<float> (width) - arrowSize - 8.0f;
+        const float arrowSize = juce::jmin (8.0f * uiScale_, static_cast<float> (height) * 0.28f);
+        const float arrowX = static_cast<float> (width) - arrowSize - 8.0f * uiScale_;
         const float arrowY = (static_cast<float> (height) - arrowSize * 0.5f) * 0.5f;
 
         juce::Path arrow;
@@ -214,13 +220,18 @@ public:
 
     void positionComboBoxText (juce::ComboBox& box, juce::Label& label) override
     {
-        const int arrowZone = juce::jmin (box.getHeight(), 24);
-        label.setBounds (6, 0,
-                         juce::jmax (1, box.getWidth() - arrowZone - 6),
+        const int arrowZone = juce::jmin (box.getHeight(), juce::roundToInt (24.0f * uiScale_));
+        const int insetX = juce::roundToInt (6.0f * uiScale_);
+        const int rightInset = juce::roundToInt (6.0f * uiScale_);
+        label.setBounds (insetX, 0,
+                         juce::jmax (1, box.getWidth() - arrowZone - insetX - rightInset),
                          box.getHeight());
         label.setFont (getComboBoxFont (box));
         label.setJustificationType (juce::Justification::centredLeft);
-        label.setBorderSize (juce::BorderSize<int> (0, 4, 0, 2));
+        label.setBorderSize (juce::BorderSize<int> (0,
+                                                    juce::roundToInt (4.0f * uiScale_),
+                                                    0,
+                                                    juce::roundToInt (2.0f * uiScale_)));
         label.setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
         label.setColour (juce::Label::textColourId,
                          box.findColour (juce::ComboBox::textColourId)
@@ -265,7 +276,7 @@ public:
         if (! isActive)
             colour = colour.withAlpha (0.35f);
 
-        auto textArea = area.reduced (14, 0);
+        auto textArea = area.reduced (juce::roundToInt (14.0f * uiScale_), 0);
         if (isTicked)
         {
             // Small check mark.
@@ -288,6 +299,7 @@ public:
 
 private:
     juce::Colour accent_;
+    float uiScale_ = 1.0f;
 };
 
 HeaderLookAndFeel& getHeaderLookAndFeel()
@@ -305,55 +317,10 @@ TopHeaderBar::TopHeaderBar (PresetManager& presetManager, float uiScale)
       barHeight_ (juce::roundToInt (static_cast<float> (kDesignHeight) * uiScale)),
       accentColour_ (devpanel::engineSkinColourForIndex (0))
 {
-    // Render the SVG logo to a raster image, then convert to white-on-transparent.
-    // The source SVG (375x225 viewBox) has embedded raster data with a baked-in
-    // black background — rendering to image and extracting brightness as alpha
-    // gives us a clean white logo we can composite over the dark header.
-    {
-        auto drawable = juce::Drawable::createFromImageData (
-            BinaryData::Kaizen_logo_svg,
-            static_cast<size_t> (BinaryData::Kaizen_logo_svgSize));
-
-        if (drawable != nullptr)
-        {
-            // Render at 3x the bar height for crisp scaling (logo is drawn at
-            // 1.5× the bar-minus-padding height, so 3x gives good retina density).
-            const int renderH = barHeight_ * 3;
-            const int renderW = juce::roundToInt (static_cast<float> (renderH) * (375.0f / 225.0f));
-
-            juce::Image rendered = makeSoftwareImage (juce::Image::ARGB, renderW, renderH, true);
-            {
-                juce::Graphics ig (rendered);
-                drawable->drawWithin (ig,
-                    rendered.getBounds().toFloat(),
-                    juce::RectanglePlacement::centred, 1.0f);
-            }
-
-            // Convert: use pixel brightness as alpha, set colour to white.
-            // This strips the black background (black → transparent) and turns
-            // all visible content white.
-            logoImage_ = makeSoftwareImage (juce::Image::ARGB, renderW, renderH, true);
-            juce::Image::BitmapData src (rendered, juce::Image::BitmapData::readOnly);
-            juce::Image::BitmapData dst (logoImage_, juce::Image::BitmapData::writeOnly);
-
-            for (int y = 0; y < renderH; ++y)
-            {
-                for (int x = 0; x < renderW; ++x)
-                {
-                    auto px = src.getPixelColour (x, y);
-                    // Brightness of the pixel becomes its alpha.
-                    const float brightness = px.getBrightness();
-                    const juce::uint8 alpha = static_cast<juce::uint8> (
-                        juce::jlimit (0.0f, 255.0f, brightness * 255.0f * px.getFloatAlpha()));
-                    dst.setPixelColour (x, y,
-                        juce::Colour::fromRGBA (255, 255, 255, alpha));
-                }
-            }
-        }
-    }
-
     auto* lf = &getHeaderLookAndFeel();
+    lf->setUiScale (uiScale_);
     lf->setAccentColour (accentColour_);
+    rebuildLogoImage();
 
     // Preset combo — shows "Load a preset" when nothing is selected.
     presetMenu_.setLookAndFeel (lf);
@@ -405,6 +372,24 @@ TopHeaderBar::~TopHeaderBar()
 }
 
 //==============================================================================
+void TopHeaderBar::setUiScale (float newUiScale)
+{
+    const float clampedScale = juce::jmax (0.5f, newUiScale);
+    if (std::abs (uiScale_ - clampedScale) < 0.001f)
+        return;
+
+    uiScale_ = clampedScale;
+    barHeight_ = juce::roundToInt (static_cast<float> (kDesignHeight) * uiScale_);
+    getHeaderLookAndFeel().setUiScale (uiScale_);
+    rebuildLogoImage();
+
+    if (getHeight() == barHeight_)
+        resized();
+
+    repaint();
+}
+
+//==============================================================================
 void TopHeaderBar::setEngineSelector (juce::ComboBox* selector)
 {
     engineSelector_ = selector;
@@ -446,6 +431,49 @@ void TopHeaderBar::setAccentColour (juce::Colour newAccent)
     saveButton_.setColour (juce::TextButton::textColourOffId, accentColour_.withAlpha (0.55f));
 
     repaint();
+}
+
+//==============================================================================
+void TopHeaderBar::rebuildLogoImage()
+{
+    auto drawable = juce::Drawable::createFromImageData (
+        BinaryData::Kaizen_logo_svg,
+        static_cast<size_t> (BinaryData::Kaizen_logo_svgSize));
+
+    if (drawable == nullptr)
+    {
+        logoImage_ = {};
+        return;
+    }
+
+    const int renderH = juce::jmax (1, barHeight_ * 3);
+    const int renderW = juce::roundToInt (static_cast<float> (renderH) * (375.0f / 225.0f));
+
+    juce::Image rendered = makeSoftwareImage (juce::Image::ARGB, renderW, renderH, true);
+    {
+        juce::Graphics ig (rendered);
+        drawable->drawWithin (ig,
+                              rendered.getBounds().toFloat(),
+                              juce::RectanglePlacement::centred,
+                              1.0f);
+    }
+
+    logoImage_ = makeSoftwareImage (juce::Image::ARGB, renderW, renderH, true);
+    juce::Image::BitmapData src (rendered, juce::Image::BitmapData::readOnly);
+    juce::Image::BitmapData dst (logoImage_, juce::Image::BitmapData::writeOnly);
+
+    for (int y = 0; y < renderH; ++y)
+    {
+        for (int x = 0; x < renderW; ++x)
+        {
+            auto px = src.getPixelColour (x, y);
+            const float brightness = px.getBrightness();
+            const juce::uint8 alpha = static_cast<juce::uint8> (
+                juce::jlimit (0.0f, 255.0f, brightness * 255.0f * px.getFloatAlpha()));
+            dst.setPixelColour (x, y,
+                                juce::Colour::fromRGBA (255, 255, 255, alpha));
+        }
+    }
 }
 
 //==============================================================================
@@ -584,32 +612,28 @@ void TopHeaderBar::refreshPresetMenu()
 //==============================================================================
 void TopHeaderBar::showSaveDialog()
 {
-    auto* alertWindow = new juce::AlertWindow (
-        "Save Preset",
-        "Enter a name for the preset:",
-        juce::AlertWindow::NoIcon);
+    auto* editor = findParentComponentOfClass<ChoroborosPluginEditor>();
+    if (editor == nullptr)
+        return;
 
-    alertWindow->setLookAndFeel (&getHeaderLookAndFeel());
-    alertWindow->addTextEditor ("name", presetManager_.getCurrentPresetName(),
-                                "Preset name:");
-    alertWindow->addButton ("Save", 1);
-    alertWindow->addButton ("Cancel", 0);
+    juce::Component::SafePointer<TopHeaderBar> safeThis(this);
+    editor->showTextEntryDialog("Save Preset",
+                                "Enter a name for the preset:",
+                                presetManager_.getCurrentPresetName(),
+                                "Save",
+                                "Cancel",
+                                false,
+                                [safeThis](bool accepted, const juce::String& text)
+                                {
+                                    if (!accepted || safeThis == nullptr)
+                                        return;
 
-    alertWindow->enterModalState (true,
-        juce::ModalCallbackFunction::create (
-            [this, alertWindow] (int result)
-            {
-                if (result == 1)
-                {
-                    auto name = alertWindow->getTextEditorContents ("name").trim();
-                    if (name.isNotEmpty())
-                        presetManager_.saveUserPreset (name);
-                }
-
-                alertWindow->setLookAndFeel (nullptr);
-                delete alertWindow;
-            }),
-        false);
+                                    const auto name = text.trim();
+                                    if (name.isNotEmpty())
+                                        safeThis->presetManager_.saveUserPreset(name);
+                                },
+                                "editor_preset_save_dialog",
+                                this);
 }
 
 void TopHeaderBar::showDeleteDialog()
@@ -618,24 +642,24 @@ void TopHeaderBar::showDeleteDialog()
     if (! presetManager_.isUserPreset (index))
         return;
 
-    auto* alertWindow = new juce::AlertWindow (
-        "Delete Preset",
-        "Delete \"" + presetManager_.getCurrentPresetName() + "\"?\nThis cannot be undone.",
-        juce::AlertWindow::WarningIcon);
+    auto* editor = findParentComponentOfClass<ChoroborosPluginEditor>();
+    if (editor == nullptr)
+        return;
 
-    alertWindow->setLookAndFeel (&getHeaderLookAndFeel());
-    alertWindow->addButton ("Delete", 1);
-    alertWindow->addButton ("Cancel", 0);
+    juce::Component::SafePointer<TopHeaderBar> safeThis(this);
+    editor->showConfirmationDialog("Delete Preset",
+                                   "Delete \"" + presetManager_.getCurrentPresetName()
+                                       + "\"?\nThis cannot be undone.",
+                                   "Delete",
+                                   "Cancel",
+                                   true,
+                                   [safeThis, index](bool accepted)
+                                   {
+                                       if (!accepted || safeThis == nullptr)
+                                           return;
 
-    alertWindow->enterModalState (true,
-        juce::ModalCallbackFunction::create (
-            [this, alertWindow, index] (int result)
-            {
-                if (result == 1)
-                    presetManager_.deleteUserPreset (index);
-
-                alertWindow->setLookAndFeel (nullptr);
-                delete alertWindow;
-            }),
-        false);
+                                       safeThis->presetManager_.deleteUserPreset(index);
+                                   },
+                                   "editor_preset_delete_dialog",
+                                   this);
 }

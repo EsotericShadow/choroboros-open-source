@@ -45,6 +45,8 @@ INSTALLER_DIR="installer"
 STAGING_DIR="${INSTALLER_DIR}/staging"
 COMPONENTS_DIR="${INSTALLER_DIR}/components"
 DIST_DIR="dist"
+ASSET_PACK_BUILD_DIR="${STAGING_DIR}/generated-asset-pack"
+ASSET_PACK_OUTPUT_DIR="${ASSET_PACK_BUILD_DIR}/ChoroborosAssets-${VERSION}"
 
 # ---- Preflight checks -------------------------------------------------------
 
@@ -132,7 +134,29 @@ mkdir -p "${STAGING_DIR}" "${COMPONENTS_DIR}" "${DIST_DIR}"
 # pkgbuild uses --install-location / so the directory structure inside the
 # payload becomes the absolute path on the target system.
 
-echo "Staging plugin binaries..."
+echo "Staging installer payloads..."
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required to build the shared asset pack."
+    exit 1
+fi
+
+echo "Generating shared asset pack..."
+python3 scripts/build_asset_pack.py \
+    --source-root Assets \
+    --output-root "${ASSET_PACK_BUILD_DIR}" \
+    --pack-version "${VERSION}" >/dev/null
+
+if [ ! -f "${ASSET_PACK_OUTPUT_DIR}/manifest.json" ]; then
+    echo "ERROR: Shared asset pack manifest missing at ${ASSET_PACK_OUTPUT_DIR}/manifest.json"
+    exit 1
+fi
+
+RESOURCES_PAYLOAD="${STAGING_DIR}/resources/Library/Application Support/Kaizen Strategic AI/Choroboros/Assets/${VERSION}"
+mkdir -p "$(dirname "${RESOURCES_PAYLOAD}")"
+rm -rf "${RESOURCES_PAYLOAD}"
+ditto "${ASSET_PACK_OUTPUT_DIR}" "${RESOURCES_PAYLOAD}"
+echo "  Staged: Shared resources"
 
 # VST3 -> /Library/Audio/Plug-Ins/VST3/
 if [ -e "${BUILD_DIR}/VST3/${BUNDLE_BASENAME}.vst3" ]; then
@@ -186,6 +210,17 @@ if [ -d "${INSTALLER_DIR}/scripts" ]; then
 fi
 if [ -d "${INSTALLER_DIR}/scripts-aax" ]; then
     chmod 755 "${INSTALLER_DIR}/scripts-aax/postinstall" 2>/dev/null || true
+fi
+
+# Shared resources component
+if [ -d "${STAGING_DIR}/resources" ]; then
+    pkgbuild \
+        --root "${STAGING_DIR}/resources" \
+        --identifier "${COMPANY_ID}.choroboros.resources" \
+        --version "${VERSION}" \
+        --install-location / \
+        "${COMPONENTS_DIR}/Choroboros-Resources.pkg"
+    echo "  Built: Choroboros-Resources.pkg"
 fi
 
 # VST3 component

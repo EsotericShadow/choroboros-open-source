@@ -44,6 +44,7 @@ public:
 
     /** Scaled height for this instance. */
     int getBarHeight() const { return barHeight_; }
+    void setUiScale (float newUiScale);
     void setAccentColour (juce::Colour newAccent);
 
     /** Adopt an externally-owned engine-selector ComboBox so the header
@@ -59,6 +60,7 @@ private:
     void presetListChanged() override;
 
     void refreshPresetMenu();
+    void rebuildLogoImage();
     PresetManager& presetManager_;
     float uiScale_;
     int barHeight_;

@@ -362,6 +362,12 @@ void PluginEditorSetup::applyLayout(ChoroborosPluginEditor& editor, const Layout
 
 void PluginEditorSetup::setupSliders(ChoroborosPluginEditor& editor)
 {
+    const auto configureMainControlComponent = [](juce::Component& component)
+    {
+        component.setOpaque(false);
+        component.setRepaintsOnMouseActivity(false);
+    };
+
     // Component IDs for sprite sheet selection
     editor.rateSlider.setComponentID("Rate");
     editor.depthSlider.setComponentID("Depth");
@@ -374,9 +380,14 @@ void PluginEditorSetup::setupSliders(ChoroborosPluginEditor& editor)
     editor.depthSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     editor.offsetSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     editor.widthSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    editor.rateSlider.setVelocityBasedMode(false);
+    editor.depthSlider.setVelocityBasedMode(false);
+    editor.offsetSlider.setVelocityBasedMode(false);
+    editor.widthSlider.setVelocityBasedMode(false);
     editor.colorSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     editor.colorSlider.setVelocityBasedMode(false);  // Position-based drag, not velocity - reduces jank
     editor.mixSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    editor.mixSlider.setVelocityBasedMode(false);
     
     editor.rateSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     editor.depthSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -387,6 +398,13 @@ void PluginEditorSetup::setupSliders(ChoroborosPluginEditor& editor)
     
     // Set mix slider name so CustomLookAndFeel can identify it
     editor.mixSlider.setName("Mix");
+
+    configureMainControlComponent(editor.rateSlider);
+    configureMainControlComponent(editor.depthSlider);
+    configureMainControlComponent(editor.offsetSlider);
+    configureMainControlComponent(editor.widthSlider);
+    configureMainControlComponent(editor.colorSlider);
+    configureMainControlComponent(editor.mixSlider);
     
     // Set visual smoothing times
     editor.rateSlider.setUseExponential(true);
@@ -405,6 +423,12 @@ void PluginEditorSetup::setupSliders(ChoroborosPluginEditor& editor)
 
 void PluginEditorSetup::setupValueLabels(ChoroborosPluginEditor& editor)
 {
+    const auto configureMainControlComponent = [](juce::Component& component)
+    {
+        component.setOpaque(false);
+        component.setRepaintsOnMouseActivity(false);
+    };
+
     const juce::Font valueFont = editor.makeValueLabelFont(15.3f * editor.getUiScale(), true);
 
     editor.rateValueLabel.setJustificationType(juce::Justification::centredRight);
@@ -420,6 +444,13 @@ void PluginEditorSetup::setupValueLabels(ChoroborosPluginEditor& editor)
     editor.widthValueLabel.setValueLabelStyle(true);
     editor.colorValueLabel.setValueLabelStyle(true);
     editor.mixValueLabel.setValueLabelStyle(true);
+
+    configureMainControlComponent(editor.rateValueLabel);
+    configureMainControlComponent(editor.depthValueLabel);
+    configureMainControlComponent(editor.offsetValueLabel);
+    configureMainControlComponent(editor.widthValueLabel);
+    configureMainControlComponent(editor.colorValueLabel);
+    configureMainControlComponent(editor.mixValueLabel);
 
     editor.rateValueLabel.setFont(valueFont);
     editor.depthValueLabel.setFont(valueFont);
@@ -439,6 +470,12 @@ void PluginEditorSetup::setupValueLabels(ChoroborosPluginEditor& editor)
 
 void PluginEditorSetup::setupLabels(ChoroborosPluginEditor& editor)
 {
+    const auto configureMainControlComponent = [](juce::Component& component)
+    {
+        component.setOpaque(false);
+        component.setRepaintsOnMouseActivity(false);
+    };
+
     editor.rateLabel.setVisible(false);
     editor.depthLabel.setVisible(false);
     editor.offsetLabel.setVisible(false);
@@ -450,6 +487,13 @@ void PluginEditorSetup::setupLabels(ChoroborosPluginEditor& editor)
     editor.mixValueLabel.setFont(mixValueFont);
     editor.mixLabel.setVisible(false);
 
+    configureMainControlComponent(editor.rateLabel);
+    configureMainControlComponent(editor.depthLabel);
+    configureMainControlComponent(editor.offsetLabel);
+    configureMainControlComponent(editor.widthLabel);
+    configureMainControlComponent(editor.colorLabel);
+    configureMainControlComponent(editor.mixLabel);
+
     applyLayout(editor, editor.layoutTuning);
 }
 
@@ -457,6 +501,11 @@ void PluginEditorSetup::setupHQButton(ChoroborosPluginEditor& editor)
 {
     editor.addAndMakeVisible(editor.hqButton);
     editor.addAndMakeVisible(editor.hqLabel);
+
+    editor.hqButton.setOpaque(false);
+    editor.hqButton.setRepaintsOnMouseActivity(false);
+    editor.hqLabel.setOpaque(false);
+    editor.hqLabel.setRepaintsOnMouseActivity(false);
     
     editor.hqLabel.setText("HQ", juce::dontSendNotification);
     editor.hqLabel.setColour(juce::Label::textColourId, juce::Colours::white);
@@ -466,8 +515,21 @@ void PluginEditorSetup::setupHQButton(ChoroborosPluginEditor& editor)
     editor.hqButton.setTooltip("High Quality Mode: Enables higher-quality algorithm variant for the selected engine. Increases CPU usage but improves audio fidelity.");
     editor.hqLabel.setVisible(false);
 
-    // Repaint only the lightweight lit overlay while the switch animates.
-    editor.hqButton.onAnimationTick = [&editor] { editor.repaintHQLitOverlay(); };
+    // Keep every HQ-linked visual in sync with the same animation curve.
+    editor.hqButton.onAnimationTick = [&editor]
+    {
+        if (editor.isShuttingDown())
+            return;
+
+        editor.customLookAndFeel.setHqAnimationState(editor.hqButton.getAnimationProgress(),
+                                                    editor.hqButton.isAnimating(),
+                                                    editor.hqButton.isOn());
+        editor.repaintHQLitOverlay();
+        editor.rateSlider.repaint();
+        editor.depthSlider.repaint();
+        editor.offsetSlider.repaint();
+        editor.widthSlider.repaint();
+    };
 
     applyLayout(editor, editor.layoutTuning);
 }

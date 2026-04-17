@@ -44,6 +44,8 @@ PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
 DIST_DIR="dist"
 INSTALLER_DIR="installer"
 COMPONENTS_DIR="${INSTALLER_DIR}/components"
+BUILT_DISTRIBUTION_XML="${INSTALLER_DIR}/staging/distribution.build.xml"
+SOURCE_DISTRIBUTION_XML="${INSTALLER_DIR}/distribution.xml"
 UNSIGNED_PKG="${DIST_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-Installer.pkg"
 SIGNED_PKG="${DIST_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-Installer-Signed.pkg"
 
@@ -61,7 +63,8 @@ if [ ! -f "CMakeLists.txt" ]; then
 fi
 
 HAVE_COMPONENTS=false
-if [ -f "${COMPONENTS_DIR}/Choroboros-VST3.pkg" ] \
+if [ -f "${COMPONENTS_DIR}/Choroboros-Resources.pkg" ] \
+    && [ -f "${COMPONENTS_DIR}/Choroboros-VST3.pkg" ] \
     && [ -f "${COMPONENTS_DIR}/Choroboros-AU.pkg" ] \
     && [ -f "${COMPONENTS_DIR}/Choroboros-Standalone.pkg" ]; then
     HAVE_COMPONENTS=true
@@ -85,6 +88,11 @@ if ! security find-identity -v | grep -Fq "${INSTALLER_IDENTITY}"; then
     exit 1
 fi
 
+DISTRIBUTION_XML="${SOURCE_DISTRIBUTION_XML}"
+if [ -f "${BUILT_DISTRIBUTION_XML}" ]; then
+    DISTRIBUTION_XML="${BUILT_DISTRIBUTION_XML}"
+fi
+
 # ---- Step 1: Sign the .pkg --------------------------------------------------
 
 echo "Step 1: Signing .pkg with Developer ID Installer certificate..."
@@ -97,7 +105,7 @@ if [ "$HAVE_COMPONENTS" = true ]; then
     # productsign on some product archives that reference flaky component metadata.
     echo "Using productbuild --sign with component packages in ${COMPONENTS_DIR}/"
     productbuild \
-        --distribution "${INSTALLER_DIR}/distribution.xml" \
+        --distribution "${DISTRIBUTION_XML}" \
         --resources "${INSTALLER_DIR}/resources" \
         --package-path "${COMPONENTS_DIR}" \
         --sign "$INSTALLER_IDENTITY" \

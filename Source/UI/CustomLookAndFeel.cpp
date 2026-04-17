@@ -19,7 +19,7 @@
 #include "CustomLookAndFeel.h"
 #include "SmoothedSlider.h"
 #include "LabelWithContainer.h"
-#include "BinaryData.h"
+#include "../Assets/AssetRepository.h"
 #include <cmath>
 #include <utility>
 
@@ -33,37 +33,6 @@ juce::Image toSoftwareImage(const juce::Image& image)
     juce::SoftwareImageType softwareType;
     return softwareType.convert(image);
 }
-}
-
-// Returns a copy of the image with every non-transparent pixel set to full opacity (fixes PNGs exported at <100% opacity).
-static juce::Image makeImageFullyOpaque(const juce::Image& image)
-{
-    juce::Image copy = toSoftwareImage(image.createCopy());
-    if (copy.getFormat() != juce::Image::ARGB)
-        return copy;
-    juce::Image::BitmapData bd(copy, 0, 0, copy.getWidth(), copy.getHeight(), juce::Image::BitmapData::readWrite);
-    for (int y = 0; y < bd.height; ++y)
-    {
-        auto* p = reinterpret_cast<juce::PixelARGB*>(bd.getLinePointer(y));
-        for (int x = 0; x < bd.width; ++x)
-        {
-            const juce::uint8 a = p[x].getAlpha();
-            if (a > 0 && a < 255)
-            {
-                p[x].unpremultiply();
-                p[x].setAlpha(255);
-                p[x].premultiply();
-            }
-        }
-    }
-    return copy;
-}
-
-static juce::Image loadImageFromBinary(const char* data, int size)
-{
-    if (data == nullptr || size <= 0)
-        return {};
-    return toSoftwareImage(juce::ImageFileFormat::loadFrom(data, static_cast<size_t>(size)));
 }
 
 namespace
@@ -80,10 +49,23 @@ SharedThemeAssetCache& getSharedThemeAssetCache()
     static SharedThemeAssetCache cache;
     return cache;
 }
+
+juce::Image loadThemeImage(const juce::String& assetId)
+{
+    auto image = choroboros::assets::AssetRepository::instance().loadImage(assetId, true).image;
+    return image.isValid() ? image : juce::Image {};
+}
 } // namespace
 
 CustomLookAndFeel::CustomLookAndFeel()
 {
+}
+
+void CustomLookAndFeel::setHqAnimationState(float progress, bool animationActive, bool hqIsCurrentlyOn) noexcept
+{
+    hqAnimationProgress = juce::jlimit(0.0f, 1.0f, progress);
+    hqAnimationActive = animationActive;
+    hqIsOn = hqIsCurrentlyOn;
 }
 
 void CustomLookAndFeel::setColorTheme(int colorIndex)
@@ -211,206 +193,84 @@ void CustomLookAndFeel::applyThemeAssetPack(const ThemeAssetPack& pack)
     knobSpriteSheetDepthImage = pack.knobSpriteSheetDepthImage;
     knobSpriteSheetOffsetImage = pack.knobSpriteSheetOffsetImage;
     knobSpriteSheetWidthImage = pack.knobSpriteSheetWidthImage;
+    knobSpriteSheetRateOnImage = pack.knobSpriteSheetRateOnImage;
+    knobSpriteSheetDepthOnImage = pack.knobSpriteSheetDepthOnImage;
+    knobSpriteSheetOffsetOnImage = pack.knobSpriteSheetOffsetOnImage;
+    knobSpriteSheetWidthOnImage = pack.knobSpriteSheetWidthOnImage;
     mixKnobSpriteSheetImage = pack.mixKnobSpriteSheetImage;
 }
 
 CustomLookAndFeel::ThemeAssetPack CustomLookAndFeel::decodeThemeAssetPack(int colorIndex)
 {
     ThemeAssetPack pack;
-
     colorIndex = juce::jlimit(0, 4, colorIndex);
-    const char* knobBaseName = nullptr;
-    int knobBaseSize = 0;
-    const char* indicatorName = nullptr;
-    int indicatorSize = 0;
-    const char* shadowName = nullptr;
-    int shadowSize = 0;
-    const char* trackName = nullptr;
-    int trackSize = 0;
-    const char* thumbName = nullptr;
-    int thumbSize = 0;
-    const char* mixKnobName = nullptr;
-    int mixKnobSize = 0;
-    const char* knobSheetRateName = nullptr;  int knobSheetRateSize = 0;
-    const char* knobSheetDepthName = nullptr; int knobSheetDepthSize = 0;
-    const char* knobSheetOffsetName = nullptr; int knobSheetOffsetSize = 0;
-    const char* knobSheetWidthName = nullptr; int knobSheetWidthSize = 0;
-    const char* mixKnobSpriteSheetName = nullptr;
-    int mixKnobSpriteSheetSize = 0;
-    
-    getImageDataForColor(colorIndex,
-                         knobBaseName, knobBaseSize,
-                         indicatorName, indicatorSize,
-                         shadowName, shadowSize,
-                         trackName, trackSize,
-                         thumbName, thumbSize,
-                         mixKnobName, mixKnobSize,
-                         knobSheetRateName, knobSheetRateSize,
-                         knobSheetDepthName, knobSheetDepthSize,
-                         knobSheetOffsetName, knobSheetOffsetSize,
-                         knobSheetWidthName, knobSheetWidthSize,
-                         mixKnobSpriteSheetName, mixKnobSpriteSheetSize);
 
-    pack.knobBaseImage = loadImageFromBinary(knobBaseName, knobBaseSize);
-    pack.knobIndicatorImage = loadImageFromBinary(indicatorName, indicatorSize);
-    pack.knobShadowOverlayImage = loadImageFromBinary(shadowName, shadowSize);
-    pack.sliderTrackImage = loadImageFromBinary(trackName, trackSize);
-    pack.sliderThumbImage = loadImageFromBinary(thumbName, thumbSize);
-    pack.mixKnobImage = loadImageFromBinary(mixKnobName, mixKnobSize);
-
-    auto loadKnobSheet = [](const char* name, int size) -> juce::Image {
-        if (!name || size <= 0)
-            return {};
-        auto image = loadImageFromBinary(name, size);
-        if (image.isValid() && image.getFormat() == juce::Image::ARGB)
-        {
-            const int sampleX = juce::jmin(192, image.getWidth() - 1);
-            const int sampleY = juce::jmin(192, image.getHeight() - 1);
-            if (sampleX >= 0 && sampleY >= 0)
-            {
-                const juce::uint8 alpha = image.getPixelAt(sampleX, sampleY).getAlpha();
-                if (alpha > 0 && alpha < 255)
-                    image = makeImageFullyOpaque(image);
-            }
-        }
-        return image;
-    };
-
-    pack.knobSpriteSheetRateImage = loadKnobSheet(knobSheetRateName, knobSheetRateSize);
-    pack.knobSpriteSheetDepthImage = loadKnobSheet(knobSheetDepthName, knobSheetDepthSize);
-    pack.knobSpriteSheetOffsetImage = loadKnobSheet(knobSheetOffsetName, knobSheetOffsetSize);
-    pack.knobSpriteSheetWidthImage = loadKnobSheet(knobSheetWidthName, knobSheetWidthSize);
-    pack.mixKnobSpriteSheetImage = loadKnobSheet(mixKnobSpriteSheetName, mixKnobSpriteSheetSize);
+    switch (colorIndex)
+    {
+        case 0:
+            pack.sliderThumbImage = loadThemeImage(choroboros::assets::ids::greenSliderThumb);
+            pack.knobSpriteSheetRateImage = loadThemeImage(choroboros::assets::ids::greenRateKnobOff);
+            pack.knobSpriteSheetDepthImage = loadThemeImage(choroboros::assets::ids::greenDepthKnobOff);
+            pack.knobSpriteSheetOffsetImage = loadThemeImage(choroboros::assets::ids::greenOffsetKnobOff);
+            pack.knobSpriteSheetWidthImage = loadThemeImage(choroboros::assets::ids::greenWidthKnobOff);
+            pack.knobSpriteSheetRateOnImage = loadThemeImage(choroboros::assets::ids::greenRateKnobOn);
+            pack.knobSpriteSheetDepthOnImage = loadThemeImage(choroboros::assets::ids::greenDepthKnobOn);
+            pack.knobSpriteSheetOffsetOnImage = loadThemeImage(choroboros::assets::ids::greenOffsetKnobOn);
+            pack.knobSpriteSheetWidthOnImage = loadThemeImage(choroboros::assets::ids::greenWidthKnobOn);
+            pack.mixKnobSpriteSheetImage = loadThemeImage(choroboros::assets::ids::greenMixKnob);
+            break;
+        case 1:
+            pack.sliderThumbImage = loadThemeImage(choroboros::assets::ids::blueSliderThumb);
+            pack.knobSpriteSheetRateImage = loadThemeImage(choroboros::assets::ids::blueRateKnobOff);
+            pack.knobSpriteSheetDepthImage = loadThemeImage(choroboros::assets::ids::blueDepthKnobOff);
+            pack.knobSpriteSheetOffsetImage = loadThemeImage(choroboros::assets::ids::blueOffsetKnobOff);
+            pack.knobSpriteSheetWidthImage = loadThemeImage(choroboros::assets::ids::blueWidthKnobOff);
+            pack.knobSpriteSheetRateOnImage = loadThemeImage(choroboros::assets::ids::blueRateKnobOn);
+            pack.knobSpriteSheetDepthOnImage = loadThemeImage(choroboros::assets::ids::blueDepthKnobOn);
+            pack.knobSpriteSheetOffsetOnImage = loadThemeImage(choroboros::assets::ids::blueOffsetKnobOn);
+            pack.knobSpriteSheetWidthOnImage = loadThemeImage(choroboros::assets::ids::blueWidthKnobOn);
+            pack.mixKnobSpriteSheetImage = loadThemeImage(choroboros::assets::ids::blueMixKnob);
+            break;
+        case 2:
+            pack.sliderThumbImage = loadThemeImage(choroboros::assets::ids::redSliderThumb);
+            pack.knobSpriteSheetRateImage = loadThemeImage(choroboros::assets::ids::redRateKnobOff);
+            pack.knobSpriteSheetDepthImage = loadThemeImage(choroboros::assets::ids::redDepthKnobOff);
+            pack.knobSpriteSheetOffsetImage = loadThemeImage(choroboros::assets::ids::redOffsetKnobOff);
+            pack.knobSpriteSheetWidthImage = loadThemeImage(choroboros::assets::ids::redWidthKnobOff);
+            pack.knobSpriteSheetRateOnImage = loadThemeImage(choroboros::assets::ids::redRateKnobOn);
+            pack.knobSpriteSheetDepthOnImage = loadThemeImage(choroboros::assets::ids::redDepthKnobOn);
+            pack.knobSpriteSheetOffsetOnImage = loadThemeImage(choroboros::assets::ids::redOffsetKnobOn);
+            pack.knobSpriteSheetWidthOnImage = loadThemeImage(choroboros::assets::ids::redWidthKnobOn);
+            pack.mixKnobSpriteSheetImage = loadThemeImage(choroboros::assets::ids::redMixKnob);
+            break;
+        case 3:
+            pack.sliderThumbImage = loadThemeImage(choroboros::assets::ids::purpleSliderThumb);
+            pack.knobSpriteSheetRateImage = loadThemeImage(choroboros::assets::ids::purpleRateKnobOff);
+            pack.knobSpriteSheetDepthImage = loadThemeImage(choroboros::assets::ids::purpleDepthKnobOff);
+            pack.knobSpriteSheetOffsetImage = loadThemeImage(choroboros::assets::ids::purpleOffsetKnobOff);
+            pack.knobSpriteSheetWidthImage = loadThemeImage(choroboros::assets::ids::purpleWidthKnobOff);
+            pack.knobSpriteSheetRateOnImage = loadThemeImage(choroboros::assets::ids::purpleRateKnobOn);
+            pack.knobSpriteSheetDepthOnImage = loadThemeImage(choroboros::assets::ids::purpleDepthKnobOn);
+            pack.knobSpriteSheetOffsetOnImage = loadThemeImage(choroboros::assets::ids::purpleOffsetKnobOn);
+            pack.knobSpriteSheetWidthOnImage = loadThemeImage(choroboros::assets::ids::purpleWidthKnobOn);
+            pack.mixKnobSpriteSheetImage = loadThemeImage(choroboros::assets::ids::purpleMixKnob);
+            break;
+        case 4:
+        default:
+            pack.sliderThumbImage = loadThemeImage(choroboros::assets::ids::blackSliderThumb);
+            pack.knobSpriteSheetRateImage = loadThemeImage(choroboros::assets::ids::blackRateKnobOff);
+            pack.knobSpriteSheetDepthImage = loadThemeImage(choroboros::assets::ids::blackDepthKnobOff);
+            pack.knobSpriteSheetOffsetImage = loadThemeImage(choroboros::assets::ids::blackOffsetKnobOff);
+            pack.knobSpriteSheetWidthImage = loadThemeImage(choroboros::assets::ids::blackWidthKnobOff);
+            pack.knobSpriteSheetRateOnImage = loadThemeImage(choroboros::assets::ids::blackRateKnobOn);
+            pack.knobSpriteSheetDepthOnImage = loadThemeImage(choroboros::assets::ids::blackDepthKnobOn);
+            pack.knobSpriteSheetOffsetOnImage = loadThemeImage(choroboros::assets::ids::blackOffsetKnobOn);
+            pack.knobSpriteSheetWidthOnImage = loadThemeImage(choroboros::assets::ids::blackWidthKnobOn);
+            pack.mixKnobSpriteSheetImage = loadThemeImage(choroboros::assets::ids::blackMixKnob);
+            break;
+    }
 
     return pack;
-}
-
-void CustomLookAndFeel::getImageDataForColor(int colorIndex, const char*& knobBaseName, int& knobBaseSize,
-                                             const char*& indicatorName, int& indicatorSize,
-                                             const char*& shadowName, int& shadowSize,
-                                             const char*& trackName, int& trackSize,
-                                             const char*& thumbName, int& thumbSize,
-                                             const char*& mixKnobName, int& mixKnobSize,
-                                             const char*& knobSheetRateName, int& knobSheetRateSize,
-                                             const char*& knobSheetDepthName, int& knobSheetDepthSize,
-                                             const char*& knobSheetOffsetName, int& knobSheetOffsetSize,
-                                             const char*& knobSheetWidthName, int& knobSheetWidthSize,
-                                             const char*& mixKnobSpriteSheetName, int& mixKnobSpriteSheetSize)
-{
-    knobSheetRateName = nullptr;   knobSheetRateSize = 0;
-    knobSheetDepthName = nullptr;  knobSheetDepthSize = 0;
-    knobSheetOffsetName = nullptr; knobSheetOffsetSize = 0;
-    knobSheetWidthName = nullptr;  knobSheetWidthSize = 0;
-    mixKnobSpriteSheetName = nullptr;
-    mixKnobSpriteSheetSize = 0;
-
-    if (colorIndex == 0) // Green (uses spritesheets only, no base/indicator/shadow)
-    {
-        knobBaseName = nullptr;
-        knobBaseSize = 0;
-        indicatorName = nullptr;
-        indicatorSize = 0;
-        shadowName = nullptr;
-        shadowSize = 0;
-        trackName = nullptr;
-        trackSize = 0;
-        thumbName = BinaryData::green_slider_thumb_png;
-        thumbSize = BinaryData::green_slider_thumb_pngSize;
-        mixKnobName = nullptr;
-        mixKnobSize = 0;
-        knobSheetRateName = BinaryData::rate_knob_spritesheet_png;
-        knobSheetRateSize = BinaryData::rate_knob_spritesheet_pngSize;
-        knobSheetDepthName = BinaryData::depth_knob_spritesheet_png;
-        knobSheetDepthSize = BinaryData::depth_knob_spritesheet_pngSize;
-        knobSheetOffsetName = BinaryData::offset_knob_spritesheet_png;
-        knobSheetOffsetSize = BinaryData::offset_knob_spritesheet_pngSize;
-        knobSheetWidthName = BinaryData::width_knob_spritesheet_png;
-        knobSheetWidthSize = BinaryData::width_knob_spritesheet_pngSize;
-        mixKnobSpriteSheetName = BinaryData::mix_knob_spritesheet_png;
-        mixKnobSpriteSheetSize = BinaryData::mix_knob_spritesheet_pngSize;
-    }
-    else if (colorIndex == 1) // Blue (spritesheets only)
-    {
-        knobBaseName = nullptr;
-        knobBaseSize = 0;
-        indicatorName = nullptr;
-        indicatorSize = 0;
-        shadowName = nullptr;
-        shadowSize = 0;
-        trackName = nullptr;
-        trackSize = 0;
-        thumbName = BinaryData::blue_slider_thumb_png;
-        thumbSize = BinaryData::blue_slider_thumb_pngSize;
-        mixKnobName = nullptr;
-        mixKnobSize = 0;
-        knobSheetRateName = BinaryData::Blue_knob_spritesheet_png;
-        knobSheetRateSize = BinaryData::Blue_knob_spritesheet_pngSize;
-        mixKnobSpriteSheetName = BinaryData::blue_mix_knob_spritesheet_png;
-        mixKnobSpriteSheetSize = BinaryData::blue_mix_knob_spritesheet_pngSize;
-    }
-    else if (colorIndex == 2) // Red (spritesheets only, per-control like Green)
-    {
-        knobBaseName = nullptr;
-        knobBaseSize = 0;
-        indicatorName = nullptr;
-        indicatorSize = 0;
-        shadowName = nullptr;
-        shadowSize = 0;
-        trackName = nullptr;
-        trackSize = 0;
-        thumbName = BinaryData::red_slider_thumb_png;
-        thumbSize = BinaryData::red_slider_thumb_pngSize;
-        mixKnobName = nullptr;
-        mixKnobSize = 0;
-        knobSheetRateName = BinaryData::red_rate_knob_spritesheet_png;
-        knobSheetRateSize = BinaryData::red_rate_knob_spritesheet_pngSize;
-        knobSheetDepthName = BinaryData::red_depth_knob_spritesheet_png;
-        knobSheetDepthSize = BinaryData::red_depth_knob_spritesheet_pngSize;
-        knobSheetOffsetName = BinaryData::red_offset_knob_spritesheet_png;
-        knobSheetOffsetSize = BinaryData::red_offset_knob_spritesheet_pngSize;
-        knobSheetWidthName = BinaryData::red_width_knob_spritesheet_png;
-        knobSheetWidthSize = BinaryData::red_width_knob_spritesheet_pngSize;
-        mixKnobSpriteSheetName = BinaryData::red_mix_knob_spritesheet_png;
-        mixKnobSpriteSheetSize = BinaryData::red_mix_knob_spritesheet_pngSize;
-    }
-    else if (colorIndex == 3) // Purple (spritesheets only)
-    {
-        knobBaseName = nullptr;
-        knobBaseSize = 0;
-        indicatorName = nullptr;
-        indicatorSize = 0;
-        shadowName = nullptr;
-        shadowSize = 0;
-        trackName = nullptr;
-        trackSize = 0;
-        thumbName = BinaryData::purple_slider_thumb_png;
-        thumbSize = BinaryData::purple_slider_thumb_pngSize;
-        mixKnobName = nullptr;
-        mixKnobSize = 0;
-        knobSheetRateName = BinaryData::purple_knob_spritesheet_png;
-        knobSheetRateSize = BinaryData::purple_knob_spritesheet_pngSize;
-        mixKnobSpriteSheetName = BinaryData::purple_mix_knob_spritesheet_png;
-        mixKnobSpriteSheetSize = BinaryData::purple_mix_knob_spritesheet_pngSize;
-    }
-    else // Black (colorIndex == 4, spritesheets only)
-    {
-        knobBaseName = nullptr;
-        knobBaseSize = 0;
-        indicatorName = nullptr;
-        indicatorSize = 0;
-        shadowName = nullptr;
-        shadowSize = 0;
-        trackName = nullptr;
-        trackSize = 0;
-        thumbName = BinaryData::black__slider_thumb_png;
-        thumbSize = BinaryData::black__slider_thumb_pngSize;
-        mixKnobName = nullptr;
-        mixKnobSize = 0;
-        knobSheetRateName = BinaryData::black_Knob_spritesheet_png;
-        knobSheetRateSize = BinaryData::black_Knob_spritesheet_pngSize;
-        mixKnobSpriteSheetName = BinaryData::black_mix_knob_spritesheet_png;
-        mixKnobSpriteSheetSize = BinaryData::black_mix_knob_spritesheet_pngSize;
-    }
 }
 
 // Codacy: Parameter count warning unavoidable - this is a JUCE override method
@@ -448,242 +308,285 @@ void CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wi
     if (mappedVisualSliderPos < 0.0f)
         mappedVisualSliderPos += 1.0f;
 
-    const auto selectFilmstripFrameIndex = [requestedFrameCount](float mappedPos, int availableFrames)
+    struct FilmstripBlend
+    {
+        int baseIndex = 0;
+        int nextIndex = 0;
+        float nextAlpha = 0.0f;
+    };
+
+    const auto selectFilmstripFrameBlend = [requestedFrameCount](float mappedPos, int availableFrames, bool reverseOrder)
     {
         const int effectiveFrames = juce::jlimit(2, availableFrames, requestedFrameCount);
         const float clampedPos = juce::jlimit(0.0f, 1.0f, mappedPos);
-        const int effectiveForwardIndex = juce::jlimit(0, effectiveFrames - 1,
-            juce::roundToInt(clampedPos * static_cast<float>(effectiveFrames - 1)));
-        const int remappedForwardIndex = (effectiveFrames > 1)
-            ? juce::roundToInt(static_cast<float>(effectiveForwardIndex) * static_cast<float>(availableFrames - 1) / static_cast<float>(effectiveFrames - 1))
-            : 0;
-        return (availableFrames - 1) - juce::jlimit(0, availableFrames - 1, remappedForwardIndex);
+        const float effectiveForwardPos = clampedPos * static_cast<float>(effectiveFrames - 1);
+        const float remappedForwardPos = (effectiveFrames > 1)
+            ? effectiveForwardPos * static_cast<float>(availableFrames - 1) / static_cast<float>(effectiveFrames - 1)
+            : 0.0f;
+        const float clampedFramePos = juce::jlimit(0.0f, static_cast<float>(availableFrames - 1), remappedForwardPos);
+        const float framePos = reverseOrder
+            ? static_cast<float>(availableFrames - 1) - clampedFramePos
+            : clampedFramePos;
+
+        FilmstripBlend blend;
+        blend.baseIndex = juce::jlimit(0, availableFrames - 1, static_cast<int>(std::floor(framePos)));
+        blend.nextIndex = juce::jlimit(0, availableFrames - 1, blend.baseIndex + 1);
+        blend.nextAlpha = juce::jlimit(0.0f, 1.0f, framePos - static_cast<float>(blend.baseIndex));
+
+        if (blend.baseIndex == blend.nextIndex)
+            blend.nextAlpha = 0.0f;
+
+        return blend;
     };
 
-    // Green theme filmstrip knobs (individual sheets per control)
-    if (currentColorIndex == 0 && !isMixKnob)
+    const auto drawBlendedFilmstrip = [&](const juce::Image& sheet,
+                                          int numColumns,
+                                          int numRows,
+                                          int frameWidth,
+                                          int frameHeight,
+                                          int paddingX,
+                                          int paddingY,
+                                          int stepX,
+                                          int stepY,
+                                          float overallAlpha = 1.0f,
+                                          bool reverseOrder = true,
+                                          bool keepBaseOpaque = false,
+                                          bool snapToNearestFrame = false)
     {
-        const auto knobId = slider.getComponentID();
-        const juce::Image* knobSheet = nullptr;
-        if (knobId == "Rate" && knobSpriteSheetRateImage.isValid())
-            knobSheet = &knobSpriteSheetRateImage;
-        else if (knobId == "Depth" && knobSpriteSheetDepthImage.isValid())
-            knobSheet = &knobSpriteSheetDepthImage;
-        else if (knobId == "Offset" && knobSpriteSheetOffsetImage.isValid())
-            knobSheet = &knobSpriteSheetOffsetImage;
-        else if (knobId == "Width" && knobSpriteSheetWidthImage.isValid())
-            knobSheet = &knobSpriteSheetWidthImage;
-        else if (knobSpriteSheetRateImage.isValid())
-            knobSheet = &knobSpriteSheetRateImage;
+        if (overallAlpha <= 0.001f)
+            return false;
 
-        if (knobSheet)
+        const int numFrames = numColumns * numRows;
+        const auto blend = selectFilmstripFrameBlend(mappedVisualSliderPos, numFrames, reverseOrder);
+
+        const auto drawFrame = [&](int frameIndex, float alpha)
         {
-            // 12 rows x 13 columns, 512x512 px per frame, 12px padding
-            const int numColumns = 13;
-            const int numRows = 12;
-            const int numFrames = numColumns * numRows; // 156
-            const int frameWidth = 512;
-            const int frameHeight = 512;
-            const int padding = 12;
-            const int stepX = frameWidth + padding;
-            const int stepY = frameHeight + padding;
+            if (alpha <= 0.001f)
+                return false;
 
-            const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
             const int col = frameIndex % numColumns;
             const int row = frameIndex / numColumns;
+            const juce::Rectangle<int> srcRect(paddingX + col * stepX, paddingY + row * stepY,
+                                               frameWidth, frameHeight);
 
-            // Sheets include an outer padding border, so frame origin starts at +padding.
-            const int sx = padding + col * stepX;
-            const int sy = padding + row * stepY;
-
-            // Extract exactly one frame so we never draw the full spritesheet
-            const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-            const juce::Rectangle<int> imgBounds(0, 0, knobSheet->getWidth(), knobSheet->getHeight());
-            const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-            if (clip.isEmpty())
-                return;
-            const juce::Image frame = knobSheet->getClippedImage(clip);
-            if (!frame.isValid())
-                return;
+            if (!sheet.getBounds().contains(srcRect))
+                return false;
 
             g.saveState();
-            g.setOpacity(1.0f);
-            g.drawImage(frame,
-                        x, y, width, height,
-                        0, 0, frame.getWidth(), frame.getHeight());
+            g.setOpacity(alpha * overallAlpha);
+            g.drawImage(sheet, x, y, width, height,
+                        srcRect.getX(), srcRect.getY(), srcRect.getWidth(), srcRect.getHeight());
             g.restoreState();
-            return;
+            return true;
+        };
+
+        if (snapToNearestFrame)
+        {
+            const int snappedFrame = (blend.nextAlpha >= 0.5f) ? blend.nextIndex : blend.baseIndex;
+            return drawFrame(snappedFrame, 1.0f);
         }
-    }
 
-    // Blue theme filmstrip knob (shared sheet for all main knobs)
-    if (currentColorIndex == 1 && !isMixKnob && knobSpriteSheetRateImage.isValid())
+        const float baseAlpha = keepBaseOpaque ? 1.0f : (1.0f - blend.nextAlpha);
+        bool drew = drawFrame(blend.baseIndex, baseAlpha);
+        if (blend.nextIndex != blend.baseIndex)
+            drew = drawFrame(blend.nextIndex, blend.nextAlpha) || drew;
+        return drew;
+    };
+
+    const auto drawCrossfadedFilmstripPair = [&](const juce::Image& offSheet,
+                                                 const juce::Image& onSheet,
+                                                 int numColumns,
+                                                 int numRows,
+                                                 int frameWidth,
+                                                 int frameHeight,
+                                                 int paddingX,
+                                                 int paddingY,
+                                                 int stepX,
+                                                 int stepY,
+                                                 float onBlend,
+                                                 bool reverseOrder = true)
     {
-        const juce::Image& knobSheet = knobSpriteSheetRateImage;
-        const int numColumns = 13;
-        const int numRows = 12;
-        const int numFrames = numColumns * numRows; // 156
-        const int frameWidth = 512;
-        const int frameHeight = 512;
-        const int padding = 12;
-        const int stepX = frameWidth + padding;
-        const int stepY = frameHeight + padding;
-
-        const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
+        const int numFrames = numColumns * numRows;
+        const auto blend = selectFilmstripFrameBlend(mappedVisualSliderPos, numFrames, reverseOrder);
+        const int frameIndex = (blend.nextAlpha >= 0.5f) ? blend.nextIndex : blend.baseIndex;
         const int col = frameIndex % numColumns;
         const int row = frameIndex / numColumns;
+        const juce::Rectangle<int> srcRect(paddingX + col * stepX, paddingY + row * stepY,
+                                           frameWidth, frameHeight);
 
-        const int sx = padding + col * stepX;
-        const int sy = padding + row * stepY;
+        if (!offSheet.getBounds().contains(srcRect) || !onSheet.getBounds().contains(srcRect))
+            return false;
 
-        const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-        const juce::Rectangle<int> imgBounds(0, 0, knobSheet.getWidth(), knobSheet.getHeight());
-        const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-        if (!clip.isEmpty())
+        const auto offFrame = offSheet.getClippedImage(srcRect);
+        const auto onFrame = onSheet.getClippedImage(srcRect);
+        if (!offFrame.isValid() || !onFrame.isValid())
+            return false;
+
+        juce::Image blendedFrame(juce::Image::ARGB, frameWidth, frameHeight, true);
+        juce::Image::BitmapData offData(offFrame, juce::Image::BitmapData::readOnly);
+        juce::Image::BitmapData onData(onFrame, juce::Image::BitmapData::readOnly);
+        juce::Image::BitmapData blendedData(blendedFrame, 0, 0, frameWidth, frameHeight, juce::Image::BitmapData::writeOnly);
+
+        const float t = juce::jlimit(0.0f, 1.0f, onBlend);
+        const float invT = 1.0f - t;
+
+        for (int py = 0; py < frameHeight; ++py)
         {
-            const juce::Image frame = knobSheet.getClippedImage(clip);
-            if (frame.isValid())
+            auto* offPixels = reinterpret_cast<juce::PixelARGB*>(offData.getLinePointer(py));
+            auto* onPixels = reinterpret_cast<juce::PixelARGB*>(onData.getLinePointer(py));
+            auto* outPixels = reinterpret_cast<juce::PixelARGB*>(blendedData.getLinePointer(py));
+
+            for (int px = 0; px < frameWidth; ++px)
             {
-                g.saveState();
-                g.setOpacity(1.0f);
-                g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
-                g.restoreState();
-                return;
+                auto offPixel = offPixels[px];
+                auto onPixel = onPixels[px];
+                offPixel.unpremultiply();
+                onPixel.unpremultiply();
+
+                const float offA = static_cast<float>(offPixel.getAlpha()) / 255.0f;
+                const float onA = static_cast<float>(onPixel.getAlpha()) / 255.0f;
+
+                const float blendedA = offA * invT + onA * t;
+                const float blendedRPremul = (static_cast<float>(offPixel.getRed()) * offA) * invT
+                                           + (static_cast<float>(onPixel.getRed()) * onA) * t;
+                const float blendedGPremul = (static_cast<float>(offPixel.getGreen()) * offA) * invT
+                                           + (static_cast<float>(onPixel.getGreen()) * onA) * t;
+                const float blendedBPremul = (static_cast<float>(offPixel.getBlue()) * offA) * invT
+                                           + (static_cast<float>(onPixel.getBlue()) * onA) * t;
+
+                const juce::uint8 outA = static_cast<juce::uint8>(std::round(juce::jlimit(0.0f, 255.0f, blendedA * 255.0f)));
+                juce::uint8 outR = 0;
+                juce::uint8 outG = 0;
+                juce::uint8 outB = 0;
+
+                if (blendedA > 1.0e-6f)
+                {
+                    outR = static_cast<juce::uint8>(std::round(juce::jlimit(0.0f, 255.0f, blendedRPremul / blendedA)));
+                    outG = static_cast<juce::uint8>(std::round(juce::jlimit(0.0f, 255.0f, blendedGPremul / blendedA)));
+                    outB = static_cast<juce::uint8>(std::round(juce::jlimit(0.0f, 255.0f, blendedBPremul / blendedA)));
+                }
+
+                outPixels[px].setARGB(outA, outR, outG, outB);
             }
         }
-    }
 
-    // Red theme filmstrip knobs (individual sheets per control, like Green)
-    if (currentColorIndex == 2 && !isMixKnob)
+        g.drawImage(blendedFrame, x, y, width, height, 0, 0, frameWidth, frameHeight);
+        return true;
+    };
+
+    const auto drawBlendedFilmstripWithin = [&](const juce::Image& sheet,
+                                                int numColumns,
+                                                int numRows,
+                                                int frameWidth,
+                                                int frameHeight,
+                                                int paddingX,
+                                                int paddingY,
+                                                int stepX,
+                                                int stepY,
+                                                int drawHeight,
+                                                float overallAlpha = 1.0f,
+                                                bool reverseOrder = true,
+                                                bool snapToNearestFrame = false)
     {
-        const auto knobId = slider.getComponentID();
-        const juce::Image* knobSheet = nullptr;
-        if (knobId == "Rate" && knobSpriteSheetRateImage.isValid())
-            knobSheet = &knobSpriteSheetRateImage;
-        else if (knobId == "Depth" && knobSpriteSheetDepthImage.isValid())
-            knobSheet = &knobSpriteSheetDepthImage;
-        else if (knobId == "Offset" && knobSpriteSheetOffsetImage.isValid())
-            knobSheet = &knobSpriteSheetOffsetImage;
-        else if (knobId == "Width" && knobSpriteSheetWidthImage.isValid())
-            knobSheet = &knobSpriteSheetWidthImage;
-        else if (knobSpriteSheetRateImage.isValid())
-            knobSheet = &knobSpriteSheetRateImage;
+        if (overallAlpha <= 0.001f)
+            return false;
 
-        if (knobSheet)
+        const int numFrames = numColumns * numRows;
+        const auto blend = selectFilmstripFrameBlend(mappedVisualSliderPos, numFrames, reverseOrder);
+
+        const auto drawFrame = [&](int frameIndex, float alpha)
         {
-            // Red sheets: 13 columns x 12 rows = 156 frames, 384x384 px per frame, 12px padding
-            const int numColumns = 13;
-            const int numRows = 12;
-            const int numFrames = numColumns * numRows; // 156
-            const int frameWidth = 384;
-            const int frameHeight = 384;
-            const int padding = 12;
-            const int stepX = frameWidth + padding;
-            const int stepY = frameHeight + padding;
+            if (alpha <= 0.001f)
+                return false;
 
-            const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
             const int col = frameIndex % numColumns;
             const int row = frameIndex / numColumns;
+            const juce::Rectangle<int> srcRect(paddingX + col * stepX, paddingY + row * stepY,
+                                               frameWidth, frameHeight);
+            const auto clip = srcRect.getIntersection(sheet.getBounds());
 
-            const int sx = padding + col * stepX;
-            const int sy = padding + row * stepY;
+            if (clip.isEmpty())
+                return false;
 
-            const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-            const juce::Rectangle<int> imgBounds(0, 0, knobSheet->getWidth(), knobSheet->getHeight());
-            const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-            if (!clip.isEmpty())
+            const auto frame = sheet.getClippedImage(clip);
+            if (!frame.isValid())
+                return false;
+
+            g.saveState();
+            g.setOpacity(alpha * overallAlpha);
+            g.drawImageWithin(frame, x, y, width, drawHeight,
+                              juce::RectanglePlacement::centred | juce::RectanglePlacement::onlyReduceInSize,
+                              false);
+            g.restoreState();
+            return true;
+        };
+
+        if (snapToNearestFrame)
+        {
+            const int snappedFrame = (blend.nextAlpha >= 0.5f) ? blend.nextIndex : blend.baseIndex;
+            return drawFrame(snappedFrame, 1.0f);
+        }
+
+        bool drew = drawFrame(blend.baseIndex, 1.0f - blend.nextAlpha);
+        if (blend.nextIndex != blend.baseIndex)
+            drew = drawFrame(blend.nextIndex, blend.nextAlpha) || drew;
+        return drew;
+    };
+
+    // Main engine knobs now all use the optimized per-control on/off filmstrips.
+    if (!isMixKnob)
+    {
+        const auto knobId = slider.getComponentID();
+        const juce::Image* knobSheetOff = nullptr;
+        const juce::Image* knobSheetOn = nullptr;
+        if (knobId == "Rate" && knobSpriteSheetRateImage.isValid())
+        {
+            knobSheetOff = &knobSpriteSheetRateImage;
+            knobSheetOn = knobSpriteSheetRateOnImage.isValid() ? &knobSpriteSheetRateOnImage : nullptr;
+        }
+        else if (knobId == "Depth" && knobSpriteSheetDepthImage.isValid())
+        {
+            knobSheetOff = &knobSpriteSheetDepthImage;
+            knobSheetOn = knobSpriteSheetDepthOnImage.isValid() ? &knobSpriteSheetDepthOnImage : nullptr;
+        }
+        else if (knobId == "Offset" && knobSpriteSheetOffsetImage.isValid())
+        {
+            knobSheetOff = &knobSpriteSheetOffsetImage;
+            knobSheetOn = knobSpriteSheetOffsetOnImage.isValid() ? &knobSpriteSheetOffsetOnImage : nullptr;
+        }
+        else if (knobId == "Width" && knobSpriteSheetWidthImage.isValid())
+        {
+            knobSheetOff = &knobSpriteSheetWidthImage;
+            knobSheetOn = knobSpriteSheetWidthOnImage.isValid() ? &knobSpriteSheetWidthOnImage : nullptr;
+        }
+        else if (knobSpriteSheetRateImage.isValid())
+        {
+            knobSheetOff = &knobSpriteSheetRateImage;
+            knobSheetOn = knobSpriteSheetRateOnImage.isValid() ? &knobSpriteSheetRateOnImage : nullptr;
+        }
+
+        if (knobSheetOff != nullptr)
+        {
+            const bool hasCrossfadePair = (knobSheetOn != nullptr);
+            const float blendProgress = juce::jlimit(0.0f, 1.0f, hqAnimationProgress);
+
+            float offAlpha = hqIsOn ? 0.0f : 1.0f;
+            float onAlpha = hqIsOn ? 1.0f : 0.0f;
+
+            if (hasCrossfadePair && hqAnimationActive)
             {
-                const juce::Image frame = knobSheet->getClippedImage(clip);
-                if (frame.isValid())
-                {
-                    g.saveState();
-                    g.setOpacity(1.0f);
-                    g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
-                    g.restoreState();
+                if (drawCrossfadedFilmstripPair(*knobSheetOff, *knobSheetOn,
+                                                10, 10, 300, 300, 12, 12, 312, 312,
+                                                blendProgress, false))
                     return;
-                }
             }
-        }
-    }
 
-    // Purple theme filmstrip knob (shared sheet for all main knobs)
-    if (currentColorIndex == 3 && !isMixKnob && knobSpriteSheetRateImage.isValid())
-    {
-        const juce::Image& knobSheet = knobSpriteSheetRateImage;
-        const int numColumns = 13;
-        const int numRows = 12;
-        const int numFrames = numColumns * numRows; // 156
-        const int frameWidth = 512;
-        const int frameHeight = 512;
-        // Derive spacing from the sheet dimensions so purple works even if exported
-        // without the same padding layout used by other themes.
-        const int padding = juce::jmax(0, (knobSheet.getWidth() - (numColumns * frameWidth)) / (numColumns + 1));
-        const int stepX = frameWidth + padding;
-        const int stepY = frameHeight + padding;
+            bool drew = drawBlendedFilmstrip(*knobSheetOff, 10, 10, 300, 300, 12, 12, 312, 312, offAlpha, false, false, true);
+            if (hasCrossfadePair)
+                drew = drawBlendedFilmstrip(*knobSheetOn, 10, 10, 300, 300, 12, 12, 312, 312, onAlpha, false, false, true) || drew;
 
-        const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
-        const int col = frameIndex % numColumns;
-        const int row = frameIndex / numColumns;
-
-        const int sx = padding + col * stepX;
-        const int sy = padding + row * stepY;
-
-        const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-        const juce::Rectangle<int> imgBounds(0, 0, knobSheet.getWidth(), knobSheet.getHeight());
-        const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-        if (!clip.isEmpty())
-        {
-            const juce::Image frame = knobSheet.getClippedImage(clip);
-            if (frame.isValid())
-            {
-                g.saveState();
-                g.setOpacity(1.0f);
-                // Purple knob shadow extends below frame; add bottom overflow so it isn't clipped
-                constexpr int shadowOverflowBottom = 12;
-                const int drawHeight = height + shadowOverflowBottom;
-                g.drawImageWithin(frame, x, y, width, drawHeight,
-                                 juce::RectanglePlacement::centred | juce::RectanglePlacement::onlyReduceInSize,
-                                  false);
-                g.restoreState();
+            if (drew)
                 return;
-            }
-        }
-    }
-
-    // Black theme filmstrip knob (shared sheet for all main knobs)
-    if (currentColorIndex == 4 && !isMixKnob && knobSpriteSheetRateImage.isValid())
-    {
-        const juce::Image& knobSheet = knobSpriteSheetRateImage;
-        const int numColumns = 13;
-        const int numRows = 12;
-        const int numFrames = numColumns * numRows; // 156
-        const int frameWidth = 512;
-        const int frameHeight = 512;
-        const int padding = 12;
-        const int stepX = frameWidth + padding;
-        const int stepY = frameHeight + padding;
-
-        const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
-        const int col = frameIndex % numColumns;
-        const int row = frameIndex / numColumns;
-
-        const int sx = padding + col * stepX;
-        const int sy = padding + row * stepY;
-
-        const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-        const juce::Rectangle<int> imgBounds(0, 0, knobSheet.getWidth(), knobSheet.getHeight());
-        const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-        if (!clip.isEmpty())
-        {
-            const juce::Image frame = knobSheet.getClippedImage(clip);
-            if (frame.isValid())
-            {
-                g.saveState();
-                g.setOpacity(1.0f);
-                g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
-                g.restoreState();
-                return;
-            }
         }
     }
 
@@ -693,36 +596,8 @@ void CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wi
 
     if (isMixKnob && mixKnobSpriteSheetImage.isValid())
     {
-        const int numColumns = 13;
-        const int numFrames = 156;
-        const int frameWidth = 512;
-        const int frameHeight = 512;
-        const int padding = 64;
-        const int stepX = frameWidth + padding;
-        const int stepY = frameHeight + padding;
-
-        const int frameIndex = selectFilmstripFrameIndex(mappedVisualSliderPos, numFrames);
-        const int col = frameIndex % numColumns;
-        const int row = frameIndex / numColumns;
-
-        // Sheets include an outer padding border, so frame origin starts at +padding.
-        const int sx = padding + col * stepX;
-        const int sy = padding + row * stepY;
-
-        const juce::Rectangle<int> srcRect(sx, sy, frameWidth, frameHeight);
-        const juce::Rectangle<int> imgBounds(0, 0, mixKnobSpriteSheetImage.getWidth(), mixKnobSpriteSheetImage.getHeight());
-        const juce::Rectangle<int> clip = srcRect.getIntersection(imgBounds);
-        if (clip.isEmpty())
+        if (drawBlendedFilmstrip(mixKnobSpriteSheetImage, 13, 12, 512, 512, 64, 64, 576, 576, 1.0f, true, false, true))
             return;
-        const juce::Image frame = mixKnobSpriteSheetImage.getClippedImage(clip);
-        if (!frame.isValid())
-            return;
-
-        g.saveState();
-        g.setOpacity(1.0f);
-        g.drawImage(frame, x, y, width, height, 0, 0, frame.getWidth(), frame.getHeight());
-        g.restoreState();
-        return;
     }
 
     if (knobBaseImage.isValid())

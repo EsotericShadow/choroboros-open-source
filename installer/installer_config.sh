@@ -11,7 +11,7 @@
 #    - CHOROBOROS_VERSION (internal bundle/pkg version)
 #    - CHOROBOROS_PUBLIC_VERSION (tester-facing release label)
 #    - CHOROBOROS_BUNDLE_BASENAME / CHOROBOROS_PRODUCT_SLUG
-# 3. installer/distribution.xml — all pkg-ref version="x.y.z" attributes (four places: VST3, AU, Standalone, AAX)
+# 3. installer/distribution.xml — all pkg-ref version="x.y.z" attributes (five places: Resources, VST3, AU, Standalone, AAX)
 #
 # One command for the full macOS pipeline (from repo root):
 #   ./scripts/release_macos_signed_installer.sh

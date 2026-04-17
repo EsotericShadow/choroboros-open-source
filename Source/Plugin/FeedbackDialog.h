@@ -37,13 +37,6 @@ public:
     void resized() override;
     void buttonClicked (juce::Button* button) override;
 
-    /** Launch feedback dialog (normal mode). */
-    static void show (FeedbackCollector& collector);
-
-    /** Launch crash report dialog (pre-filled with crash log). */
-    static void showCrashReport (const juce::String& crashReport,
-                                 FeedbackCollector* collector = nullptr);
-
 private:
     FeedbackCollector* feedbackCollector = nullptr;
     bool crashReportMode = false;

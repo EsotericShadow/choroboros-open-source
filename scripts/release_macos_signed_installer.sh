@@ -114,8 +114,8 @@ verify_release_versions() {
 
     local ver_count
     ver_count=$(grep -cF "version=\"${CHOROBOROS_VERSION}\"" "${INSTALLER_DIR}/distribution.xml" || true)
-    if [[ "$ver_count" -ne 4 ]]; then
-        echo "ERROR: distribution.xml must contain exactly four pkg-ref version=\"${CHOROBOROS_VERSION}\" lines."
+    if [[ "$ver_count" -ne 5 ]]; then
+        echo "ERROR: distribution.xml must contain exactly five pkg-ref version=\"${CHOROBOROS_VERSION}\" lines."
         echo "Found ${ver_count}. Update installer/distribution.xml to match CHOROBOROS_VERSION."
         return 1
     fi

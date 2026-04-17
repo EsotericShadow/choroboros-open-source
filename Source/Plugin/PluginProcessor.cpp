@@ -583,19 +583,18 @@ void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::Run
     dst.tapeHermiteTension.store(src.tapeHermiteTension.load());
 }
 
-void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
+bool applyDefaultsFromJson(ChoroborosAudioProcessor& processor, const juce::String& json)
 {
-    const auto json = DefaultsPersistence::load();
     if (json.isEmpty())
-        return;
+        return false;
 
     const auto parsed = juce::JSON::parse(json);
     if (parsed.isVoid())
-        return;
+        return false;
 
     const auto* root = parsed.getDynamicObject();
     if (root == nullptr)
-        return;
+        return false;
 
     choroboros::CoreAssignmentTable loadedAssignments;
     bool assignmentsLoaded = false;
@@ -710,6 +709,18 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
 
     if (root->hasProperty("engineParamProfiles"))
         processor.loadEngineParamProfilesFromVar(root->getProperty("engineParamProfiles"));
+
+    return true;
+}
+
+void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
+{
+    juce::String loadError;
+    auto json = DefaultsPersistence::loadUser(&loadError);
+    if (json.isEmpty())
+        json = DefaultsPersistence::loadFactory(&loadError);
+
+    applyDefaultsFromJson(processor, json);
 }
 
 void seedPersistedDefaultsFromBundledFactory()
@@ -723,8 +734,10 @@ void seedPersistedDefaultsFromBundledFactory()
 
 #if JUCE_WINDOWS
     const char* resourceName = "windows_factory_defaults_json";
+#elif JUCE_LINUX
+    const char* resourceName = "linux_factory_defaults_json";
 #else
-    // macOS and Linux both use the same bundled factory defaults.
+    // macOS ships its own bundled factory defaults.
     const char* resourceName = "json_defaults_dump_json";
 #endif
 
@@ -1971,9 +1984,17 @@ void ChoroborosAudioProcessor::resetToFactoryDefaults()
     setToDefault(MIX_ID);
     setToDefault(OUTPUT_TRIM_ID);
 
+    juce::String factoryLoadError;
+    const auto factoryJson = DefaultsPersistence::loadFactory(&factoryLoadError);
+    const bool loadedFactoryDefaults = applyDefaultsFromJson(*this, factoryJson);
+
     if (auto* p = parameters.getRawParameterValue(ENGINE_COLOR_ID))
         lastEngineIndex = juce::jlimit(0, 4, static_cast<int>(p->load()));
-    saveCurrentParamsToEngineProfile(lastEngineIndex);
+
+    if (loadedFactoryDefaults)
+        applyEngineParamProfile(getCurrentEngineColorIndex());
+
+    saveCurrentParamsToEngineProfile(getCurrentEngineColorIndex());
 
     syncEngineInternalsToActiveDsp(getCurrentEngineColorIndex(), isHqEnabled());
     stateLoadInProgress.store(false, std::memory_order_relaxed);

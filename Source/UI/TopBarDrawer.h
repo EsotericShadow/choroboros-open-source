@@ -57,6 +57,7 @@ public:
 
     /** Compute all internal layout values from the global UI scale. */
     void setupLayout (float uiScale);
+    void setUiScale (float uiScale);
 
     /** Update the accent colour used for icon tinting, arrow, and tooltip title.
         Call this whenever the engine colour changes. */

@@ -170,7 +170,8 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     float toneMin = tuning.tapeToneMinHz;
     if (toneMin > toneMax)
         std::swap(toneMin, toneMax);
-    const float targetToneCutoff = toneMax - (toneMax - toneMin) * color;
+    // Higher Color opens the tone LP (brighter); drive still increases with Color below.
+    const float targetToneCutoff = toneMin + (toneMax - toneMin) * color;
     // Sample-rate-invariant tone cutoff smoothing: snapshot stores τ in ms,
     // converted here to a per-sample α.  Matches lfoModSmoothAlpha / ratioSmoothAlpha
     // pattern 10 lines above.  (Was hardcoded α = 0.08 — only correct at 48 k.)
@@ -293,7 +294,7 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             toneState.state1 = g * toneState.state1 + (1.0f - g) * wet;
             toneState.state2 = g * toneState.state2 + (1.0f - g) * toneState.state1;
             const float toned = toneState.state2;
-            // Keep Color at 0 as a neutral tape path and scale tone darkening with Color.
+            // Color at 0: toneAmount 0 => bypass. Higher Color blends in more shaped (LP) wet.
             wet = wet + toneAmount * (toned - wet);
             
             samples[i] = wet;

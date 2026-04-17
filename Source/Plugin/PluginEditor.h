@@ -36,6 +36,7 @@
 #endif
 
 #include <atomic>
+#include <functional>
 #include <future>
 #include <mutex>
 #include <thread>
@@ -79,6 +80,28 @@ public:
     juce::Font makeValueLabelFont(float heightPx, bool bold = true) const;
     juce::Font makeUiTextFont(float heightPx, bool bold = true) const;
     void setTooltipsEnabled(bool enabled);
+    void showStatusDialog(juce::AlertWindow::AlertIconType iconType,
+                          const juce::String& title,
+                          const juce::String& message,
+                          const juce::String& telemetryContext,
+                          juce::Component* anchorComponent = nullptr);
+    void showConfirmationDialog(const juce::String& title,
+                                const juce::String& message,
+                                const juce::String& confirmText,
+                                const juce::String& cancelText,
+                                bool warningTone,
+                                std::function<void(bool)> onDecision,
+                                const juce::String& telemetryContext,
+                                juce::Component* anchorComponent = nullptr);
+    void showTextEntryDialog(const juce::String& title,
+                             const juce::String& prompt,
+                             const juce::String& initialText,
+                             const juce::String& confirmText,
+                             const juce::String& cancelText,
+                             bool warningTone,
+                             std::function<void(bool, const juce::String&)> onDecision,
+                             const juce::String& telemetryContext,
+                             juce::Component* anchorComponent = nullptr);
 
 #if CHOROBOROS_INSPECTOR_ENABLED
     bool keyPressed (const juce::KeyPress& key) override;
@@ -156,6 +179,10 @@ private:
     void updateValueLabelColors(int colorIndex);
     void repaintHQLitOverlay();
     void invalidateHQLitOverlayCache();
+    void invalidateScaleSensitiveCaches();
+    void layoutTopChrome();
+    void rebuildScaleSensitiveUI(float newScale);
+    void applyLayoutInternal(bool shouldRepaint);
     void setupSlider(juce::Slider& slider, LabelWithContainer& label, LabelWithContainer& valueLabel,
                      const juce::String& name, const juce::String& paramId);
     void updateValueLabel(LabelWithContainer& label, float value, const juce::String& paramId);
@@ -177,8 +204,33 @@ private:
     void stopDeferredThemePrewarm();
     void scheduleDeferredDevPanelPrewarm();
     void ensureDevPanelWindowCreated(bool triggeredByUser);
-    void forceSoftwareRenderingForPeer();
-    static void forceSoftwareRenderingForWindow(juce::DocumentWindow* window);
+    void applyWindowsRenderPolicyToMainPeer();
+    void applyWindowsRenderPolicyToManagedWindows();
+    void closeManagedDialogWindow(std::unique_ptr<juce::DialogWindow>& window);
+    void closeManagedDocumentWindow(std::unique_ptr<juce::DocumentWindow>& window);
+    void closeManagedWindows();
+    void showManagedDialogWindow(std::unique_ptr<juce::DialogWindow>& slot,
+                                 std::unique_ptr<juce::Component> content,
+                                 const juce::String& title,
+                                 bool resizable,
+                                 int minWidth,
+                                 int minHeight,
+                                 int maxWidth,
+                                 int maxHeight,
+                                 const juce::String& telemetryContext,
+                                 juce::Component* centreAround = nullptr);
+    void showAboutWindow();
+    void showHelpWindow();
+    void showFeedbackWindow();
+    void showCrashReportWindow(const juce::String& crashReport);
+    void showStatusWindow(juce::AlertWindow::AlertIconType iconType,
+                          const juce::String& title,
+                          const juce::String& message,
+                          const juce::String& telemetryContext,
+                          juce::Component* anchorComponent = nullptr);
+    void postUiTask(std::function<void(ChoroborosPluginEditor&)> task);
+    void postUiTaskAfterDelay(int delayMs, std::function<void(ChoroborosPluginEditor&)> task);
+    bool isShuttingDown() const noexcept { return shutdownFence.load(); }
     double getHostBpm() const;
     void showRateSyncMenu(juce::Slider& rateControl);
     std::unique_ptr<RateSyncOverlay> rateSyncOverlay_;
@@ -192,9 +244,16 @@ private:
     float parseMixValue(const juce::String& trimmed);
 
     float dpiScale = 1.0f;  // Host-reported DPI scale factor (1.0 = 100%, 2.0 = Retina/200%)
+    std::atomic<bool> shutdownFence { false };
 
     std::thread themePrewarmThread;
     std::shared_ptr<std::atomic<bool>> themePrewarmStopFlag = std::make_shared<std::atomic<bool>>(false);
+    std::unique_ptr<juce::DialogWindow> aboutWindow;
+    std::unique_ptr<juce::DialogWindow> helpWindow;
+    std::unique_ptr<juce::DialogWindow> feedbackWindow;
+    std::unique_ptr<juce::DialogWindow> messageWindow;
+    std::unique_ptr<juce::DialogWindow> confirmationWindow;
+    std::unique_ptr<juce::DialogWindow> textEntryWindow;
 
 #if CHOROBOROS_INSPECTOR_ENABLED
     std::unique_ptr<melatonin::Inspector> inspector;

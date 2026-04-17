@@ -13,6 +13,9 @@ echo "  ${PRODUCT_NAME} Installer"
 echo "  Version ${PUBLIC_VERSION}"
 echo "=========================================="
 echo ""
+echo "Official Kaizen beta builds are under the EULA (see EULA.md when included in this package)."
+echo "Public source on GitHub is GPLv3 for self-builds."
+echo ""
 
 # Colors for output
 GREEN='\033[0;32m'

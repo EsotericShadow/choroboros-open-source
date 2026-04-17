@@ -2,10 +2,8 @@
 
 ## High Priority - Licensing and Transparency
 
-- [ ] Resolve licensing model conflict for distribution:
-  choose one clear release posture (GPL artifacts vs EULA artifacts) and apply consistently.
-- [ ] Align all public/license surfaces to the chosen model:
-  `README.md`, `LICENSE`, `COPYING`, `EULA.md`, About dialog/license text, packaged docs.
+- [x] **Beta licensing posture (v2.05):** Official Kaizen-distributed **beta binaries** are governed by `EULA.md` (including beta scope, proprietary terms, and JUCE commercial use). **Public source** in this repo remains **GPLv3** (`LICENSE` / `COPYING`) for transparency and self-builds. Documented in `README.md` (License section), `EULA.md` (Beta program and relationship to the public source repository), `installer/resources/license.html`, and About dialog fallback in `AboutDialog.cpp`.
+- [x] **Align primary license surfaces for beta:** README, EULA, macOS installer HTML, About fallback — done. `LICENSE` / `COPYING` stay as the full GPLv3 text for the **published source tree** (unchanged).
 - [ ] Add/refresh a machine-readable third-party notice manifest
   (framework/sdk/font + license file path + shipped/not-shipped status).
 - [ ] Ensure release bundles include required notices for all shipped dependencies

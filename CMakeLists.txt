@@ -11,6 +11,10 @@ set(CHOROBOROS_PRODUCT_NAME "Choroboros Beta")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(CHOROBOROS_USE_EXTERNAL_ASSET_PACK "Load shared external asset packs before BinaryData fallback" ON)
+option(CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK "Allow BinaryData fallback when the shared asset pack is missing" ON)
+set(CHOROBOROS_ASSET_PACK_VERSION "${PROJECT_VERSION}" CACHE STRING "Expected shared asset pack version")
+
 # ---------- Sanitizer support (development only) ----------
 # Applied per-target via choroboros_apply_sanitizers() so JUCE juceaide/helpers stay clean.
 option(CHOROBOROS_ENABLE_ASAN "Enable AddressSanitizer + LeakSanitizer (Debug-oriented builds)" OFF)
@@ -114,6 +118,15 @@ target_sources(Choroboros PRIVATE
     # Plugin core
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor.h
+    Source/Assets/AssetPackVersion.h
+    Source/Assets/AssetManifest.cpp
+    Source/Assets/AssetManifest.h
+    Source/Assets/AssetLocator.cpp
+    Source/Assets/AssetLocator.h
+    Source/Assets/AssetRepository.cpp
+    Source/Assets/AssetRepository.h
+    Source/Assets/EmbeddedAssetFallback.cpp
+    Source/Assets/EmbeddedAssetFallback.h
     Source/Plugin/PluginEditor.cpp
     Source/Plugin/PluginEditor.h
     Source/Plugin/ConsentService.cpp
@@ -124,8 +137,17 @@ target_sources(Choroboros PRIVATE
     Source/Plugin/FeedbackDialog.h
     Source/Plugin/AboutDialog.cpp
     Source/Plugin/AboutDialog.h
+    Source/Plugin/ConfirmDialog.cpp
+    Source/Plugin/ConfirmDialog.h
     Source/Plugin/HelpDialog.cpp
     Source/Plugin/HelpDialog.h
+    Source/Plugin/ManagedDialogStyle.h
+    Source/Plugin/MessageDialog.cpp
+    Source/Plugin/MessageDialog.h
+    Source/Plugin/TextEntryDialog.cpp
+    Source/Plugin/TextEntryDialog.h
+    Source/Plugin/WindowsRenderPolicy.cpp
+    Source/Plugin/WindowsRenderPolicy.h
     Source/Plugin/PresetManager.cpp
     Source/Plugin/PresetManager.h
     Source/Plugin/PresetState.cpp
@@ -219,61 +241,121 @@ target_compile_definitions(Choroboros
         # teardown during DLL unload deadlocks the message thread in Cubase.
         JUCE_DIRECT2D=0
         "CHOROBOROS_VERSION_STRING=\"${CHOROBOROS_VERSION_STRING}\""
+        "CHOROBOROS_ASSET_PACK_VERSION=\"${CHOROBOROS_ASSET_PACK_VERSION}\""
+        CHOROBOROS_USE_EXTERNAL_ASSET_PACK=$<BOOL:${CHOROBOROS_USE_EXTERNAL_ASSET_PACK}>
+        CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK=$<BOOL:${CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK}>
 )
+
+set(CHOROBOROS_BINARY_DATA_CORE_SOURCES
+    Assets/gui_icons/lock.svg
+    Assets/gui_icons/unlock.svg
+    Assets/gui_icons/about.png
+    Assets/gui_icons/dev.png
+    Assets/gui_icons/help.png
+    Assets/gui_icons/bug_feedback_button.png
+    Assets/gui_icons/kaizen_logo.png
+    Kaizen_logo.svg
+    Assets/fonts/Technology.ttf
+    Assets/fonts/Retroica.ttf
+    Assets/fonts/labels/JetBrainsMonoNL-Thin.ttf
+    Assets/fonts/labels/JetBrainsMono-ThinItalic.ttf
+    Assets/fonts/titles/JetBrainsMono-ExtraBold.ttf
+    Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLight.ttf
+    Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLightItalic.ttf
+    json_defaults_dump.json
+    linux/linux_factory_defaults.json
+    windows/windows_factory_defaults.json
+    EULA.md
+)
+
+set(CHOROBOROS_BINARY_DATA_HEAVY_FALLBACK_SOURCES
+    Assets/green/green_light_off_backpanel.png
+    Assets/green/green_light_on_backpanel.png
+    Assets/green/rate/green_1_off.png
+    Assets/green/rate/green_1_on.png
+    Assets/green/depth/green_2_off.png
+    Assets/green/depth/green_2_on.png
+    Assets/green/offset/green_3_off.png
+    Assets/green/offset/green_3_on.png
+    Assets/green/width/green_4_off.png
+    Assets/green/width/green_4_on.png
+    Assets/green/green_mix_knob_spritesheet.png
+    Assets/green/green_slider_thumb.png
+    Assets/blue/blue_light_off_backpanel.png
+    Assets/blue/blue_light_on_backpanel.png
+    Assets/blue/blue_slider_thumb.png
+    Assets/blue/rate/blue_1_off.png
+    Assets/blue/rate/blue_1_on.png
+    Assets/blue/depth/blue_2_off.png
+    Assets/blue/depth/blue_2_on.png
+    Assets/blue/offset/blue_3_off.png
+    Assets/blue/offset/blue_3_on.png
+    Assets/blue/width/blue_4_off.png
+    Assets/blue/width/blue_4_on.png
+    Assets/blue/blue_mix_knob_spritesheet.png
+    Assets/red/red_light_off_backpanel.png
+    Assets/red/red_light_on_backpanel.png
+    Assets/red/rate/red_1_off.png
+    Assets/red/rate/red_1_on.png
+    Assets/red/depth/red_2_off.png
+    Assets/red/depth/red_2_on.png
+    Assets/red/offset/red_3_off.png
+    Assets/red/offset/red_3_on.png
+    Assets/red/width/red_4_off.png
+    Assets/red/width/red_4_on.png
+    Assets/red/red_slider_thumb.png
+    Assets/red/red_mix_knob_spritesheet.png
+    Assets/purple/purple_light_off_backpanel.png
+    Assets/purple/purple_light_on_backpanel.png
+    Assets/purple/rate/purple_1_off.png
+    Assets/purple/rate/purple_1_on.png
+    Assets/purple/depth/purple_2_off.png
+    Assets/purple/depth/purple_2_on.png
+    Assets/purple/offset/purple_3_off.png
+    Assets/purple/offset/purple_3_on.png
+    Assets/purple/width/purple_4_off.png
+    Assets/purple/width/purple_4_on.png
+    Assets/purple/purple_mix_knob_spritesheet.png
+    Assets/purple/purple_slider_thumb.png
+    Assets/black/black_light_off_backpanel.png
+    Assets/black/black_light_on_backpanel.png
+    Assets/black/rate/black_1_off.png
+    Assets/black/rate/black_1_on.png
+    Assets/black/depth/black_2_off.png
+    Assets/black/depth/black_2_on.png
+    Assets/black/offset/black_3_off.png
+    Assets/black/offset/black_3_on.png
+    Assets/black/width/black_4_off.png
+    Assets/black/width/black_4_on.png
+    Assets/black/black_mix_knob_spritesheet.png
+    Assets/black/black__slider_thumb.png
+    Assets/switch_a_spritesheet.png
+)
+
+set(CHOROBOROS_BINARY_DATA_SOURCES ${CHOROBOROS_BINARY_DATA_CORE_SOURCES})
+if(CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK)
+    list(APPEND CHOROBOROS_BINARY_DATA_SOURCES ${CHOROBOROS_BINARY_DATA_HEAVY_FALLBACK_SOURCES})
+    message(STATUS "Choroboros: embedded heavy asset fallback enabled")
+else()
+    message(STATUS "Choroboros: embedded heavy asset fallback disabled; release binaries require the shared asset pack")
+endif()
 
 juce_add_binary_data(ChoroborosBinaryData
     SOURCES
-        Assets/green/green_light_off_backpanel.png
-        Assets/green/green_light_on_backpanel.png
-        Assets/green/rate_knob_spritesheet.png
-        Assets/green/depth_knob_spritesheet.png
-        Assets/green/offset_knob_spritesheet.png
-        Assets/green/width_knob_spritesheet.png
-        Assets/green/mix_knob_spritesheet.png
-        Assets/green/green_slider_thumb.png
-        Assets/blue/blue_light_off_backpanel.png
-        Assets/blue/blue_light_on_backpanel.png
-        Assets/blue/blue_slider_thumb.png
-        Assets/blue/Blue_knob_spritesheet.png
-        Assets/blue/blue_mix_knob_spritesheet.png
-        Assets/red/red_light_off_backpanel.png
-        Assets/red/red_light_on_backpanel.png
-        Assets/red/red_rate_knob_spritesheet.png
-        Assets/red/red_depth_knob_spritesheet.png
-        Assets/red/red_offset_knob_spritesheet.png
-        Assets/red/red_width_knob_spritesheet.png
-        Assets/red/red_slider_thumb.png
-        Assets/red/red_mix_knob_spritesheet.png
-        Assets/purple/purple_light_off_backpanel.png
-        Assets/purple/purple_light_on_backpanel.png
-        Assets/purple/purple_knob_spritesheet.png
-        Assets/purple/purple_mix_knob_spritesheet.png
-        Assets/purple/purple_slider_thumb.png
-        Assets/black/black_light_off_backpanel.png
-        Assets/black/black_light_on_backpanel.png
-        Assets/black/black_Knob_spritesheet.png
-        Assets/black/black_mix_knob_spritesheet.png
-        Assets/black/black__slider_thumb.png
-        Assets/switch_a_spritesheet.png
-        Assets/gui_icons/lock.svg
-        Assets/gui_icons/unlock.svg
-        Assets/gui_icons/about.png
-        Assets/gui_icons/dev.png
-        Assets/gui_icons/help.png
-        Assets/gui_icons/bug_feedback_button.png
-        Assets/gui_icons/kaizen_logo.png
-        Kaizen_logo.svg
-        Assets/fonts/Technology.ttf
-        Assets/fonts/Retroica.ttf
-        Assets/fonts/labels/JetBrainsMonoNL-Thin.ttf
-        Assets/fonts/labels/JetBrainsMono-ThinItalic.ttf
-        Assets/fonts/titles/JetBrainsMono-ExtraBold.ttf
-        Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLight.ttf
-        Assets/fonts/tooltips/JetBrainsMonoNL-ExtraLightItalic.ttf
-        json_defaults_dump.json
-        windows/windows_factory_defaults.json
-        EULA.md
+        ${CHOROBOROS_BINARY_DATA_SOURCES}
 )
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(ChoroborosAssetPack
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_asset_pack.py
+                --source-root ${CMAKE_CURRENT_SOURCE_DIR}/Assets
+                --output-root ${CMAKE_CURRENT_BINARY_DIR}/asset-pack
+                --pack-version ${CHOROBOROS_ASSET_PACK_VERSION}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Build versioned Choroboros shared asset pack")
+endif()
 
 target_link_libraries(Choroboros
     PRIVATE
@@ -420,4 +502,13 @@ if(APPLE)
     # Do not auto-copy AAX after build. Pro Tools scans the system Avid folder,
     # which requires an explicit install step and should stay aligned with the
     # signed installer / install_aax_pro_tools_system.sh workflow.
+endif()
+
+# Release hygiene: mac / linux / windows / dump factory JSON must stay byte-identical
+# to avoid cross-build behavior drift. Run: cmake --build build --target verify_factory_json_sync
+if(UNIX)
+    add_custom_target(verify_factory_json_sync
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/verify_factory_json_sync.sh"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Verify factory defaults JSON copies match Assets/defaults_factory_mac.json")
 endif()

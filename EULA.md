@@ -1,10 +1,18 @@
 # END USER LICENSE AGREEMENT
 
-## Choroboros Audio Plugin
+## Choroboros Beta — Audio Plugin
 
-**IMPORTANT - READ CAREFULLY:** This End User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity) and Kaizen Strategic AI Inc., doing business as Kaizen DSP ("Licensor", "we", "us", or "our") for the Choroboros audio plugin software product, which includes computer software and may include associated media, printed materials, and "online" or electronic documentation ("Software Product").
+**IMPORTANT - READ CAREFULLY:** This End User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity) and Kaizen Strategic AI Inc., doing business as Kaizen DSP ("Licensor", "we", "us", or "our") for the **Choroboros Beta** audio plugin software product, which includes computer software and may include associated media, printed materials, and "online" or electronic documentation ("Software Product"). This Agreement governs **pre-release beta** builds that Licensor distributes in compiled form (for example via installer, signed package, or other official download channels).
 
 By installing, copying, or otherwise using the Software Product, you agree to be bound by the terms of this EULA. If you do not agree to the terms of this EULA, do not install or use the Software Product.
+
+## Beta program and relationship to the public source repository
+
+- **Official beta binaries from Licensor.** The compiled Software Product (VST3, AU, AAX where offered, Standalone, and bundled resources) that you obtain **from Kaizen / Kaizen DSP** is licensed to you **under this EULA**, not under the GNU General Public License (GPL). Licensor uses the **JUCE framework** under a commercial license from Raw Material Software Limited for building and distributing this product, in addition to Licensor’s own rights in the Software Product.
+
+- **Public source on GitHub.** Licensor may publish corresponding or related **source code** for transparency, collaboration, or community builds at the public repository. That source is offered **under GPLv3** (see the `LICENSE` / `COPYING` files there). **If you compile the Software Product yourself from that GPLv3-covered source**, your use and distribution of **your own build** is governed by **GPLv3**, not this EULA. This EULA applies to **official beta binaries** Licensor provides, not to third-party or self-built binaries unless Licensor expressly states otherwise.
+
+- **Commercial development.** Licensor may maintain separate private or commercial repositories; presence of public source does not by itself waive proprietary rights in official beta binaries distributed under this EULA.
 
 ---
 
@@ -166,9 +174,9 @@ The Software Product, including all source code, algorithms, graphical user inte
 
 ---
 
-**Version:** 1.0  
+**Version:** 1.1 (Beta)  
 **Effective Date:** January 2026  
-**Last Updated:** January 2026
+**Last Updated:** April 2026
 
 ---
 

@@ -18,20 +18,24 @@
 
 #pragma once
 
+#include <functional>
 #include <juce_gui_basics/juce_gui_basics.h>
 
 class AboutDialog : public juce::Component
 {
 public:
-    AboutDialog();
+    using MessageCallback = std::function<void(juce::AlertWindow::AlertIconType,
+                                               const juce::String&,
+                                               const juce::String&)>;
+
+    explicit AboutDialog(MessageCallback callback = {});
     ~AboutDialog() override = default;
     
     void paint(juce::Graphics& g) override;
     void resized() override;
-    
-    static void show();
-    
+
 private:
+    MessageCallback showMessageCallback;
     juce::Label titleLabel;
     juce::Label versionLabel;
     juce::Label descriptionLabel;

@@ -20,7 +20,9 @@ $buildDir = Join-Path $repoRoot ("build\windows-x64-" + $Config.ToLowerInvariant
 
 Write-Host ""
 Write-Host "Configure: $buildDir" -ForegroundColor Cyan
-cmake -S $repoRoot -B $buildDir -G "Visual Studio 17 2022" -A x64
+$embedHeavyFallback = if ($Config -eq "Release") { "OFF" } else { "ON" }
+cmake -S $repoRoot -B $buildDir -G "Visual Studio 17 2022" -A x64 `
+    "-DCHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK=$embedHeavyFallback"
 
 Write-Host ""
 Write-Host "Build: VST3 + Standalone" -ForegroundColor Cyan

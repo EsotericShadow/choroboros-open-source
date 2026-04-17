@@ -30,10 +30,13 @@ public:
 
     /** Returns 0..1 for animation progress toward ON state (1 = fully lit). Use to sync overlays. */
     float getAnimationProgress() const;
+    bool isAnimating() const noexcept { return animationRunning; }
+    bool isOn() const noexcept { return getValue() >= 0.5; }
 
     /** Optional: called each animation tick so parent can repaint (e.g. for synced backpanel overlay). */
     std::function<void()> onAnimationTick;
 
+    void invalidateScaledFrameCache();
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
@@ -53,11 +56,13 @@ private:
     static constexpr int kFramePx = 512;
     static constexpr int kDragToggleThresholdPx = 12;   // drag distance to toggle (was 4)
     static constexpr int kClickMaxMovePx = 6;            // max move for a "click"
+    static constexpr double kAnimationDurationOnMs = 420.0;
+    static constexpr double kAnimationDurationOffMs = 560.0;
     float animatedFrame = 0.0f;
     float animationStartFrame = 0.0f;
     float animationEndFrame = 0.0f;
     double animationStartMs = 0.0;
-    double animationDurationMs = 185.0;
+    double animationDurationMs = kAnimationDurationOnMs;
     bool animationRunning = false;
     int dragStartScreenY = 0;
     int dragAnchorScreenY = 0;

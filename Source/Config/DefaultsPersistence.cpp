@@ -171,10 +171,10 @@ namespace
 {
 juce::String getEmbeddedFactoryDefaults()
 {
-    // Windows ships its own factory defaults JSON; all other platforms
-    // (macOS, Linux) use the same file — contents are platform-agnostic.
 #if JUCE_WINDOWS
     const char* resourceName = "windows_factory_defaults_json";
+#elif JUCE_LINUX
+    const char* resourceName = "linux_factory_defaults_json";
 #else
     const char* resourceName = "json_defaults_dump_json";
 #endif

@@ -157,6 +157,13 @@ void TopBarDrawer::setupLayout (float uiScale)
     feedbackButton.setBounds (feedbackFinalX_, btnY_, btnSize_, btnSize_);
 }
 
+void TopBarDrawer::setUiScale (float uiScale)
+{
+    setupLayout (uiScale);
+    updateButtonStates();
+    repaint();
+}
+
 int TopBarDrawer::getTotalHeight() const
 {
     return drawerH_ + juce::roundToInt (static_cast<float> (tooltipH_) * tooltipProgress_);

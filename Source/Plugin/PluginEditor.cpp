@@ -19,12 +19,17 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "../Config/DefaultsPersistence.h"
+#include "../Assets/AssetRepository.h"
 #include "../UI/LabelWithContainer.h"
 #include "../UI/DevPanelSupport.h"
 #include "BinaryData.h"
 #include "FeedbackDialog.h"
 #include "AboutDialog.h"
 #include "HelpDialog.h"
+#include "ConfirmDialog.h"
+#include "MessageDialog.h"
+#include "TextEntryDialog.h"
+#include "WindowsRenderPolicy.h"
 #include "../KZN/ChoroborosKznImporter.h"
 #include "../UI/PluginEditorSetup.h"
 #include "../UI/DevPanel.h"
@@ -32,11 +37,8 @@
 #include <chrono>
 #include <cmath>
 #include <future>
+#include <limits>
 #include <vector>
-#if JUCE_WINDOWS
- #include <windows.h>
-#endif
-
 #if CHOROBOROS_PERFETTO_ENABLED
 #include <melatonin_perfetto/melatonin_perfetto.h>
 #endif
@@ -89,19 +91,18 @@ int getIntOrDefault(const juce::var& objectVar, const juce::Identifier& key, int
     return fallback;
 }
 
-void loadPersistedLayoutDefaults(LayoutTuning& layout)
+bool loadLayoutDefaultsFromJson(LayoutTuning& layout, const juce::String& json)
 {
-    const auto json = DefaultsPersistence::load();
     if (json.isEmpty())
-        return;
+        return false;
 
     const auto parsed = juce::JSON::parse(json);
     if (parsed.isVoid())
-        return;
+        return false;
 
     const auto* root = parsed.getDynamicObject();
     if (root == nullptr || !root->hasProperty("layout"))
-        return;
+        return false;
 
     const juce::var layoutVar = root->getProperty("layout");
     layout.mainKnobSize = getIntOrDefault(layoutVar, "mainKnobSize", layout.mainKnobSize);
@@ -501,57 +502,58 @@ void loadPersistedLayoutDefaults(LayoutTuning& layout)
             anim.flip.minScalePct = getIntOrDefault(layoutVar, key("FlipMinScalePct"), layout.mainValueFlipMinScalePct);
         }
     }
+
+    return true;
+}
+
+void loadPersistedLayoutDefaults(LayoutTuning& layout)
+{
+    juce::String loadError;
+    auto json = DefaultsPersistence::loadUser(&loadError);
+    if (json.isEmpty())
+        json = DefaultsPersistence::loadFactory(&loadError);
+
+    loadLayoutDefaultsFromJson(layout, json);
+}
+
+void loadFactoryLayoutDefaults(LayoutTuning& layout)
+{
+    juce::String loadError;
+    const auto json = DefaultsPersistence::loadFactory(&loadError);
+    loadLayoutDefaultsFromJson(layout, json);
 }
 
 BackgroundAssetPack decodeBackgroundAssetPack(int colorIndex)
 {
     colorIndex = juce::jlimit(0, 4, colorIndex);
-    const char* offName = nullptr;
-    int offSize = 0;
-    const char* onName = nullptr;
-    int onSize = 0;
-
-    if (colorIndex == 0) // Green
-    {
-        offName = BinaryData::green_light_off_backpanel_png;
-        offSize = BinaryData::green_light_off_backpanel_pngSize;
-        onName = BinaryData::green_light_on_backpanel_png;
-        onSize = BinaryData::green_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 1) // Blue
-    {
-        offName = BinaryData::blue_light_off_backpanel_png;
-        offSize = BinaryData::blue_light_off_backpanel_pngSize;
-        onName = BinaryData::blue_light_on_backpanel_png;
-        onSize = BinaryData::blue_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 2) // Red
-    {
-        offName = BinaryData::red_light_off_backpanel_png;
-        offSize = BinaryData::red_light_off_backpanel_pngSize;
-        onName = BinaryData::red_light_on_backpanel_png;
-        onSize = BinaryData::red_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 3) // Purple
-    {
-        offName = BinaryData::purple_light_off_backpanel_png;
-        offSize = BinaryData::purple_light_off_backpanel_pngSize;
-        onName = BinaryData::purple_light_on_backpanel_png;
-        onSize = BinaryData::purple_light_on_backpanel_pngSize;
-    }
-    else // Black (colorIndex == 4)
-    {
-        offName = BinaryData::black_light_off_backpanel_png;
-        offSize = BinaryData::black_light_off_backpanel_pngSize;
-        onName = BinaryData::black_light_on_backpanel_png;
-        onSize = BinaryData::black_light_on_backpanel_pngSize;
-    }
-
+    auto& assetRepository = choroboros::assets::AssetRepository::instance();
     BackgroundAssetPack pack;
-    if (offName && offSize > 0)
-        pack.off = loadSoftwareImageFromMemory(offName, offSize);
-    if (onName && onSize > 0)
-        pack.lit = loadSoftwareImageFromMemory(onName, onSize);
+
+    switch (colorIndex)
+    {
+        case 0:
+            pack.off = assetRepository.loadImage(choroboros::assets::ids::greenBackgroundOff, true).image;
+            pack.lit = assetRepository.loadImage(choroboros::assets::ids::greenBackgroundOn, true).image;
+            break;
+        case 1:
+            pack.off = assetRepository.loadImage(choroboros::assets::ids::blueBackgroundOff, true).image;
+            pack.lit = assetRepository.loadImage(choroboros::assets::ids::blueBackgroundOn, true).image;
+            break;
+        case 2:
+            pack.off = assetRepository.loadImage(choroboros::assets::ids::redBackgroundOff, true).image;
+            pack.lit = assetRepository.loadImage(choroboros::assets::ids::redBackgroundOn, true).image;
+            break;
+        case 3:
+            pack.off = assetRepository.loadImage(choroboros::assets::ids::purpleBackgroundOff, true).image;
+            pack.lit = assetRepository.loadImage(choroboros::assets::ids::purpleBackgroundOn, true).image;
+            break;
+        case 4:
+        default:
+            pack.off = assetRepository.loadImage(choroboros::assets::ids::blackBackgroundOff, true).image;
+            pack.lit = assetRepository.loadImage(choroboros::assets::ids::blackBackgroundOn, true).image;
+            break;
+    }
+
     return pack;
 }
 
@@ -712,7 +714,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Create branded top header bar with preset browser
     if (audioProcessor.presetManager)
     {
-        topHeaderBar_ = std::make_unique<TopHeaderBar> (*audioProcessor.presetManager, kBaseUiScale);
+        topHeaderBar_ = std::make_unique<TopHeaderBar> (*audioProcessor.presetManager, getUiScale());
         addAndMakeVisible (*topHeaderBar_);
     }
 
@@ -745,6 +747,9 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     PluginEditorSetup::setupHQButton(*this);
     hqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.getValueTreeState(), ChoroborosAudioProcessor::HQ_ID, hqButton);
+    customLookAndFeel.setHqAnimationState(hqButton.getAnimationProgress(),
+                                         hqButton.isAnimating(),
+                                         hqButton.isOn());
     
     PluginEditorSetup::setupValueLabels(*this);
     PluginEditorSetup::setupLabels(*this);
@@ -783,7 +788,7 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
             BinaryData::bug_feedback_button_png, BinaryData::bug_feedback_button_pngSize);
 
         topBarDrawer.setupIcons (devIcon, aboutIcon, helpIcon, feedbackIcon);
-        topBarDrawer.setupLayout (kBaseUiScale);
+        topBarDrawer.setupLayout (getUiScale());
 
         // Set initial drawer accent colour to match the current engine
         if (auto* engineColorParam = audioProcessor.getValueTreeState().getRawParameterValue(ChoroborosAudioProcessor::ENGINE_COLOR_ID))
@@ -799,41 +804,38 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
         // itself via hover-expansion, not native JUCE tooltips)
         topBarDrawer.devButton.onClick = [this]
         {
+            if (isShuttingDown())
+                return;
+
             ensureDevPanelWindowCreated (true);
+            if (devWindow == nullptr)
+                return;
+
             const bool shouldShow = !devWindow->isVisible();
             devWindow->setVisible (shouldShow);
             if (shouldShow)
             {
-                forceSoftwareRenderingForWindow(devWindow.get());
+                choroboros::windows::applyPreferredRenderer(*devWindow,
+                                                            "editor_dev_panel_show",
+                                                            &audioProcessor);
                 devWindow->toFront (true);
             }
         };
 
-        topBarDrawer.aboutButton.onClick = [] { AboutDialog::show(); };
+        topBarDrawer.aboutButton.onClick = [this] { showAboutWindow(); };
 
-        topBarDrawer.helpButton.onClick = [] { HelpDialog::show(); };
+        topBarDrawer.helpButton.onClick = [this] { showHelpWindow(); };
 
         topBarDrawer.feedbackButton.onClick = [this] {
-            if (auto* collector = audioProcessor.getFeedbackCollector())
-                FeedbackDialog::show (*collector);
+            showFeedbackWindow();
         };
 
-        // Position drawer inside the header bar (right-aligned, vertically centred).
-        const int windowW = uiScaleInt (700);
-        const int marginR = uiScaleInt (4);
-        const int dw = topBarDrawer.getExpandedWidth();
-        const int dh = topBarDrawer.getDrawerHeight();
-        const int barH = getHeaderBarHeight();
-        const int marginT = (barH - dh) / 2;   // vertically centred in header
-        // Give enough vertical room for the hover tooltip expansion area
-        topBarDrawer.setBounds (windowW - dw - marginR, marginT, dw, dh + 40);
         addAndMakeVisible (topBarDrawer);
     }
 
-    juce::Timer::callAfterDelay(0, [safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]()
+    postUiTask([](ChoroborosPluginEditor& editor)
     {
-        if (safeThis != nullptr)
-            safeThis->forceSoftwareRenderingForPeer();
+        editor.applyWindowsRenderPolicyToMainPeer();
     });
     
     // Listen for engine color changes (preset load or manual) to update value label colors
@@ -855,12 +857,11 @@ ChoroborosPluginEditor::ChoroborosPluginEditor (ChoroborosAudioProcessor& p)
     // Deferred so the editor is fully visible before the dialog appears.
     if (SessionLog::hasPendingCrashReport())
     {
-        juce::Timer::callAfterDelay(1500, [safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]
+        postUiTaskAfterDelay(1500, [](ChoroborosPluginEditor& editor)
         {
-            if (safeThis == nullptr) return;
             auto crashReport = SessionLog::readPendingCrashReport();
             if (crashReport.isNotEmpty())
-                FeedbackDialog::showCrashReport(crashReport, safeThis->audioProcessor.getFeedbackCollector());
+                editor.showCrashReportWindow(crashReport);
             // Crash report file is NOT deleted here -- FeedbackDialog clears
             // it after the user sends, saves, or dismisses.
         });
@@ -889,6 +890,65 @@ void ChoroborosPluginEditor::setTooltipsEnabled(bool enabled)
 {
     if (tooltipWindow != nullptr)
         tooltipWindow->setEnabled(enabled);
+}
+
+void ChoroborosPluginEditor::showStatusDialog(juce::AlertWindow::AlertIconType iconType,
+                                              const juce::String& title,
+                                              const juce::String& message,
+                                              const juce::String& telemetryContext,
+                                              juce::Component* anchorComponent)
+{
+    showStatusWindow(iconType, title, message, telemetryContext, anchorComponent);
+}
+
+void ChoroborosPluginEditor::showConfirmationDialog(const juce::String& title,
+                                                    const juce::String& message,
+                                                    const juce::String& confirmText,
+                                                    const juce::String& cancelText,
+                                                    bool warningTone,
+                                                    std::function<void(bool)> onDecision,
+                                                    const juce::String& telemetryContext,
+                                                    juce::Component* anchorComponent)
+{
+    closeManagedDialogWindow(confirmationWindow);
+    showManagedDialogWindow(confirmationWindow,
+                            std::make_unique<ConfirmDialog>(title,
+                                                            message,
+                                                            confirmText,
+                                                            cancelText,
+                                                            warningTone,
+                                                            std::move(onDecision)),
+                            title,
+                            true,
+                            420, 260, 860, 720,
+                            telemetryContext,
+                            anchorComponent);
+}
+
+void ChoroborosPluginEditor::showTextEntryDialog(const juce::String& title,
+                                                 const juce::String& prompt,
+                                                 const juce::String& initialText,
+                                                 const juce::String& confirmText,
+                                                 const juce::String& cancelText,
+                                                 bool warningTone,
+                                                 std::function<void(bool, const juce::String&)> onDecision,
+                                                 const juce::String& telemetryContext,
+                                                 juce::Component* anchorComponent)
+{
+    closeManagedDialogWindow(textEntryWindow);
+    showManagedDialogWindow(textEntryWindow,
+                            std::make_unique<TextEntryDialog>(title,
+                                                              prompt,
+                                                              initialText,
+                                                              confirmText,
+                                                              cancelText,
+                                                              warningTone,
+                                                              std::move(onDecision)),
+                            title,
+                            false,
+                            420, 200, 640, 360,
+                            telemetryContext,
+                            anchorComponent);
 }
 
 void ChoroborosPluginEditor::loadValueLabelTypeface()
@@ -941,6 +1001,8 @@ juce::Font ChoroborosPluginEditor::makeUiTextFont(float heightPx, bool bold) con
 
 ChoroborosPluginEditor::~ChoroborosPluginEditor()
 {
+    shutdownFence.store(true);
+
     // 1. Remove parameter listener FIRST -- prevents audio thread from calling
     //    parameterChanged() on a half-destroyed editor (Cubase/Reaper freeze).
     audioProcessor.getValueTreeState().removeParameterListener(ChoroborosAudioProcessor::ENGINE_COLOR_ID, this);
@@ -976,12 +1038,9 @@ ChoroborosPluginEditor::~ChoroborosPluginEditor()
     //    On Windows, visible DocumentWindows destroyed during DLL_PROCESS_DETACH
     //    can trigger cascading HWND messages that deadlock or crash (Cubase).
     //    Hide first, remove native peer, THEN delete the C++ object.
+    closeManagedWindows();
     if (devWindow != nullptr)
-    {
-        devWindow->setVisible(false);
-        devWindow->removeFromDesktop();
-        devWindow.reset();
-    }
+        closeManagedDocumentWindow(devWindow);
 
     // 6. Detach look-and-feel last.
     setLookAndFeel(nullptr);
@@ -1004,7 +1063,8 @@ bool ChoroborosPluginEditor::keyPressed (const juce::KeyPress& key)
 void ChoroborosPluginEditor::parentHierarchyChanged()
 {
     AudioProcessorEditor::parentHierarchyChanged();
-    forceSoftwareRenderingForPeer();
+    applyWindowsRenderPolicyToMainPeer();
+    applyWindowsRenderPolicyToManagedWindows();
 }
 
 void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
@@ -1012,21 +1072,23 @@ void ChoroborosPluginEditor::parameterChanged(const juce::String& parameterID, f
     if (parameterID == ChoroborosAudioProcessor::ENGINE_COLOR_ID)
     {
         const int newId = juce::roundToInt(newValue) + 1;
-        juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-        juce::MessageManager::callAsync([safeThis, newId]()
+        postUiTask([newId](ChoroborosPluginEditor& editor)
         {
-            if (safeThis == nullptr)
-                return;
-
-            if (!safeThis->audioProcessor.hasActiveCustomEngine()
-                && safeThis->engineColorBox.getSelectedId() != newId)
+            if (!editor.audioProcessor.hasActiveCustomEngine()
+                && editor.engineColorBox.getSelectedId() != newId)
             {
-                safeThis->engineColorBox.setSelectedId(newId, juce::sendNotificationSync);
+                editor.engineColorBox.setSelectedId(newId, juce::sendNotificationSync);
             }
 
-            if (safeThis->audioProcessor.presetManager
-                && ! safeThis->audioProcessor.presetManager->isLoadInProgress())
-                safeThis->audioProcessor.presetManager->invalidatePreset();
+            // Engine switches can arrive from host state restore, preset loads,
+            // or the engine selector itself. Reapplying the current engine visual
+            // here ensures the per-engine layout follows the settled parameter
+            // value rather than a stale pre-notify engine index.
+            editor.applyCurrentEngineVisual();
+
+            if (editor.audioProcessor.presetManager
+                && ! editor.audioProcessor.presetManager->isLoadInProgress())
+                editor.audioProcessor.presetManager->invalidatePreset();
         });
     }
 }
@@ -1046,10 +1108,9 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
             // Not ready yet. Draw black fallback and check again next frame.
             g.fillAll(juce::Colours::black);
             // Schedule repaint so we poll again on the next message loop iteration.
-            juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<ChoroborosPluginEditor>(this)]()
+            postUiTask([](ChoroborosPluginEditor& editor)
             {
-                if (safeThis != nullptr)
-                    safeThis->repaint();
+                editor.repaint();
             });
             return;
         }
@@ -1123,16 +1184,7 @@ void ChoroborosPluginEditor::paint (juce::Graphics& g)
 
 void ChoroborosPluginEditor::resized()
 {
-    const int yOff = getHeaderBarHeight();
-    if (hqLitOverlay_ != nullptr)
-    {
-        hqLitOverlay_->setBounds(0, yOff, getWidth(), juce::jmax(0, getHeight() - yOff));
-        hqLitOverlay_->toBack();
-    }
-
-    // Position header bar across the full width at the very top
-    if (topHeaderBar_)
-        topHeaderBar_->setBounds (0, 0, getWidth(), topHeaderBar_->getBarHeight());
+    layoutTopChrome();
 }
 
 void ChoroborosPluginEditor::visibilityChanged()
@@ -1145,20 +1197,23 @@ void ChoroborosPluginEditor::visibilityChanged()
     if (!isVisible())
     {
         stopDeferredThemePrewarm();
+        return;
     }
+
+    applyWindowsRenderPolicyToMainPeer();
+    applyWindowsRenderPolicyToManagedWindows();
 }
 
 void ChoroborosPluginEditor::setScaleFactor(float newScale)
 {
-    // JUCE 8.0.12's VST3 wrapper applies the DPI scaling transform
-    // automatically via AffineTransform on the Graphics context.
-    // We just need to store the scale so getUiScale() returns the
-    // combined base × DPI value for any layout helpers that use it,
-    // then let the base class do the actual transform work.
-    dpiScale = newScale;
-    juce::AudioProcessorEditor::setScaleFactor(newScale);
-    invalidateHQLitOverlayCache();
-    repaint();
+    if (!std::isfinite(newScale))
+        return;
+
+    const float clampedScale = juce::jmax(0.5f, newScale);
+    if (std::abs(clampedScale - dpiScale) < 0.001f)
+        return;
+
+    rebuildScaleSensitiveUI(clampedScale);
 }
 
 void ChoroborosPluginEditor::repaintHQLitOverlay()
@@ -1173,15 +1228,71 @@ void ChoroborosPluginEditor::invalidateHQLitOverlayCache()
         hqLitOverlay_->invalidateCache();
 }
 
-void ChoroborosPluginEditor::applyLayout()
+void ChoroborosPluginEditor::invalidateScaleSensitiveCaches()
+{
+    invalidateHQLitOverlayCache();
+    hqButton.invalidateScaledFrameCache();
+}
+
+void ChoroborosPluginEditor::layoutTopChrome()
+{
+    const auto s = [this](int value)
+    {
+        return juce::roundToInt(static_cast<float>(value) * getUiScale());
+    };
+
+    const int headerBarHeight = getHeaderBarHeight();
+    if (topHeaderBar_ != nullptr)
+        topHeaderBar_->setBounds(0, 0, getWidth(), headerBarHeight);
+
+    if (hqLitOverlay_ != nullptr)
+    {
+        hqLitOverlay_->setBounds(0, headerBarHeight, getWidth(), juce::jmax(0, getHeight() - headerBarHeight));
+        hqLitOverlay_->toBack();
+    }
+
+    const int drawerWidth = topBarDrawer.getExpandedWidth();
+    const int drawerHeight = topBarDrawer.getTotalHeight();
+    const int marginRight = s(4);
+    const int marginTop = juce::jmax(0, (headerBarHeight - topBarDrawer.getDrawerHeight()) / 2);
+    topBarDrawer.setBounds(juce::jmax(0, getWidth() - drawerWidth - marginRight),
+                           marginTop,
+                           drawerWidth,
+                           drawerHeight);
+}
+
+void ChoroborosPluginEditor::applyLayoutInternal(bool shouldRepaint)
 {
     PluginEditorSetup::applyLayout(*this, layoutTuning);
+    layoutTopChrome();
+
+    if (shouldRepaint)
+        repaint();
+}
+
+void ChoroborosPluginEditor::rebuildScaleSensitiveUI(float newScale)
+{
+    dpiScale = newScale;
+    juce::AudioProcessorEditor::setScaleFactor(newScale);
+
+    if (topHeaderBar_ != nullptr)
+        topHeaderBar_->setUiScale(getUiScale());
+
+    topBarDrawer.setUiScale(getUiScale());
+    applyLayoutInternal(false);
+    invalidateScaleSensitiveCaches();
     repaint();
+}
+
+void ChoroborosPluginEditor::applyLayout()
+{
+    applyLayoutInternal(true);
 }
 
 void ChoroborosPluginEditor::resetLayoutToFactoryDefaults()
 {
     layoutTuning = PluginEditorSetup::makeDefaultLayout();
+    loadFactoryLayoutDefaults(layoutTuning);
     applyLayout();
     refreshValueLabels();
 }
@@ -1338,8 +1449,233 @@ void ChoroborosPluginEditor::stopDeferredThemePrewarm()
         themePrewarmThread.join();
 }
 
+void ChoroborosPluginEditor::postUiTask(std::function<void(ChoroborosPluginEditor&)> task)
+{
+    if (shutdownFence.load())
+        return;
+
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, task = std::move(task)]() mutable
+    {
+        if (safeThis == nullptr || safeThis->shutdownFence.load())
+            return;
+
+        task(*safeThis);
+    });
+}
+
+void ChoroborosPluginEditor::postUiTaskAfterDelay(int delayMs,
+                                                  std::function<void(ChoroborosPluginEditor&)> task)
+{
+    if (delayMs <= 0)
+    {
+        postUiTask(std::move(task));
+        return;
+    }
+
+    if (shutdownFence.load())
+        return;
+
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    juce::Timer::callAfterDelay(delayMs, [safeThis, task = std::move(task)]() mutable
+    {
+        if (safeThis == nullptr || safeThis->shutdownFence.load())
+            return;
+
+        task(*safeThis);
+    });
+}
+
+void ChoroborosPluginEditor::applyWindowsRenderPolicyToMainPeer()
+{
+    choroboros::windows::applyPreferredRenderer(*this, "editor_main_peer", &audioProcessor);
+}
+
+void ChoroborosPluginEditor::applyWindowsRenderPolicyToManagedWindows()
+{
+    if (devWindow != nullptr && devWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*devWindow, "editor_dev_panel", &audioProcessor);
+
+    if (aboutWindow != nullptr && aboutWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*aboutWindow, "editor_about_dialog", &audioProcessor);
+
+    if (helpWindow != nullptr && helpWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*helpWindow, "editor_help_dialog", &audioProcessor);
+
+    if (feedbackWindow != nullptr && feedbackWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*feedbackWindow, "editor_feedback_dialog", &audioProcessor);
+
+    if (messageWindow != nullptr && messageWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*messageWindow, "editor_status_dialog", &audioProcessor);
+
+    if (confirmationWindow != nullptr && confirmationWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*confirmationWindow, "editor_confirmation_dialog", &audioProcessor);
+
+    if (textEntryWindow != nullptr && textEntryWindow->isVisible())
+        choroboros::windows::applyPreferredRenderer(*textEntryWindow, "editor_text_entry_dialog", &audioProcessor);
+}
+
+void ChoroborosPluginEditor::closeManagedDialogWindow(std::unique_ptr<juce::DialogWindow>& window)
+{
+    if (window == nullptr)
+        return;
+
+    window->exitModalState(0);
+    window->setVisible(false);
+    window->removeFromDesktop();
+    window.reset();
+}
+
+void ChoroborosPluginEditor::closeManagedDocumentWindow(std::unique_ptr<juce::DocumentWindow>& window)
+{
+    if (window == nullptr)
+        return;
+
+    window->setVisible(false);
+    window->removeFromDesktop();
+    window.reset();
+}
+
+void ChoroborosPluginEditor::closeManagedWindows()
+{
+    closeManagedDialogWindow(textEntryWindow);
+    closeManagedDialogWindow(confirmationWindow);
+    closeManagedDialogWindow(messageWindow);
+    closeManagedDialogWindow(feedbackWindow);
+    closeManagedDialogWindow(helpWindow);
+    closeManagedDialogWindow(aboutWindow);
+}
+
+void ChoroborosPluginEditor::showManagedDialogWindow(std::unique_ptr<juce::DialogWindow>& slot,
+                                                     std::unique_ptr<juce::Component> content,
+                                                     const juce::String& title,
+                                                     bool resizable,
+                                                     int minWidth,
+                                                     int minHeight,
+                                                     int maxWidth,
+                                                     int maxHeight,
+                                                     const juce::String& telemetryContext,
+                                                     juce::Component* centreAround)
+{
+    if (shutdownFence.load())
+        return;
+
+    if (slot == nullptr)
+    {
+        juce::DialogWindow::LaunchOptions options;
+        options.content.setOwned(content.release());
+        options.dialogTitle = title;
+        options.dialogBackgroundColour = devpanel::hackerBg();
+        options.componentToCentreAround = centreAround != nullptr ? centreAround : this;
+        options.resizable = resizable;
+        options.useNativeTitleBar = true;
+
+        slot.reset(options.create());
+        if (slot == nullptr)
+            return;
+
+        if (resizable && minWidth > 0 && minHeight > 0 && maxWidth >= minWidth && maxHeight >= minHeight)
+            slot->setResizeLimits(minWidth, minHeight, maxWidth, maxHeight);
+    }
+
+    if (centreAround != nullptr)
+        slot->centreAroundComponent(centreAround, slot->getWidth(), slot->getHeight());
+
+    slot->setVisible(true);
+    choroboros::windows::applyPreferredRenderer(*slot, telemetryContext, &audioProcessor);
+    slot->toFront(true);
+}
+
+void ChoroborosPluginEditor::showAboutWindow()
+{
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
+    showManagedDialogWindow(aboutWindow,
+                            aboutWindow == nullptr
+                                ? std::unique_ptr<juce::Component>(std::make_unique<AboutDialog>(
+                                    [safeThis](juce::AlertWindow::AlertIconType iconType,
+                                               const juce::String& title,
+                                               const juce::String& message)
+                                    {
+                                        if (safeThis == nullptr || safeThis->isShuttingDown())
+                                            return;
+
+                                        safeThis->showStatusWindow(iconType, title, message, "editor_about_license");
+                                    }).release())
+                                : std::unique_ptr<juce::Component>(),
+                            "About Choroboros",
+                            false,
+                            0, 0, 0, 0,
+                            "editor_about_dialog",
+                            this);
+}
+
+void ChoroborosPluginEditor::showHelpWindow()
+{
+    showManagedDialogWindow(helpWindow,
+                            helpWindow == nullptr
+                                ? std::unique_ptr<juce::Component>(std::make_unique<HelpDialog>().release())
+                                : std::unique_ptr<juce::Component>(),
+                            "Help & Support",
+                            false,
+                            0, 0, 0, 0,
+                            "editor_help_dialog",
+                            this);
+}
+
+void ChoroborosPluginEditor::showFeedbackWindow()
+{
+    auto* collector = audioProcessor.getFeedbackCollector();
+    if (collector == nullptr)
+        return;
+
+    closeManagedDialogWindow(feedbackWindow);
+    showManagedDialogWindow(feedbackWindow,
+                            std::make_unique<FeedbackDialog>(*collector),
+                            "Feedback",
+                            true,
+                            500, 440, 800, 800,
+                            "editor_feedback_dialog",
+                            this);
+}
+
+void ChoroborosPluginEditor::showCrashReportWindow(const juce::String& crashReport)
+{
+    if (crashReport.isEmpty())
+        return;
+
+    closeManagedDialogWindow(feedbackWindow);
+    showManagedDialogWindow(feedbackWindow,
+                            std::make_unique<FeedbackDialog>(crashReport, audioProcessor.getFeedbackCollector()),
+                            "Crash Report",
+                            true,
+                            500, 440, 800, 800,
+                            "editor_crash_report_dialog",
+                            this);
+}
+
+void ChoroborosPluginEditor::showStatusWindow(juce::AlertWindow::AlertIconType iconType,
+                                              const juce::String& title,
+                                              const juce::String& message,
+                                              const juce::String& telemetryContext,
+                                              juce::Component* anchorComponent)
+{
+    closeManagedDialogWindow(messageWindow);
+    showManagedDialogWindow(messageWindow,
+                            std::make_unique<MessageDialog>(title,
+                                                            message,
+                                                            iconType == juce::AlertWindow::WarningIcon),
+                            title,
+                            true,
+                            420, 260, 860, 720,
+                            telemetryContext,
+                            anchorComponent != nullptr ? anchorComponent : this);
+}
+
 void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)
 {
+    if (shutdownFence.load())
+        return;
+
     if (devWindow != nullptr)
         return;
 
@@ -1353,48 +1689,20 @@ void ChoroborosPluginEditor::ensureDevPanelWindowCreated(bool triggeredByUser)
                                      juce::Time::getMillisecondCounterHiRes() - startMs);
 
     devPanelPrewarmComplete = true;
-    forceSoftwareRenderingForWindow(devWindow.get());
-}
-
-void ChoroborosPluginEditor::forceSoftwareRenderingForPeer()
-{
-    if (auto* peer = getPeer())
-    {
-        const auto engines = peer->getAvailableRenderingEngines();
-        const auto gdiIndex = engines.indexOf("GDI");
-
-        if (gdiIndex >= 0 && peer->getCurrentRenderingEngine() != gdiIndex)
-            peer->setCurrentRenderingEngine(gdiIndex);
-    }
-}
-
-void ChoroborosPluginEditor::forceSoftwareRenderingForWindow(juce::DocumentWindow* window)
-{
-    if (window == nullptr)
-        return;
-
-    if (auto* peer = window->getPeer())
-    {
-        const auto engines = peer->getAvailableRenderingEngines();
-        const auto gdiIndex = engines.indexOf("GDI");
-
-        if (gdiIndex >= 0 && peer->getCurrentRenderingEngine() != gdiIndex)
-            peer->setCurrentRenderingEngine(gdiIndex);
-    }
+    choroboros::windows::applyPreferredRenderer(*devWindow,
+                                                "editor_dev_panel_create",
+                                                &audioProcessor);
 }
 
 void ChoroborosPluginEditor::scheduleDeferredDevPanelPrewarm()
 {
-    if (devPanelPrewarmScheduled || devPanelPrewarmComplete)
+    if (shutdownFence.load() || devPanelPrewarmScheduled || devPanelPrewarmComplete)
         return;
 
     devPanelPrewarmScheduled = true;
-    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
-    juce::Timer::callAfterDelay(1500, [safeThis]()
+    postUiTaskAfterDelay(1500, [](ChoroborosPluginEditor& editor)
     {
-        if (safeThis == nullptr)
-            return;
-        safeThis->ensureDevPanelWindowCreated(false);
+        editor.ensureDevPanelWindowCreated(false);
     });
 }
 
@@ -1530,6 +1838,7 @@ void ChoroborosPluginEditor::applyCurrentEngineVisual()
         updateValueLabelColors(colorIndex);
         customLookAndFeel.setColorTheme(colorIndex);
         loadBackgroundImage(colorIndex);
+        PluginEditorSetup::applyLayout(*this, layoutTuning);
         return;
     }
 
@@ -1609,15 +1918,17 @@ void ChoroborosPluginEditor::filesDropped(const juce::StringArray& files, int, i
         if (result.warningMessage.isNotEmpty())
             message << "\n\nWarning:\n" << result.warningMessage;
 
-        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-                                               "KZN Import Successful",
-                                               message);
+        showStatusWindow(juce::AlertWindow::InfoIcon,
+                         "KZN Import Successful",
+                         message,
+                         "editor_kzn_import_success");
         return;
     }
 
-    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-                                           "KZN Import Failed",
-                                           result.errorMessage);
+    showStatusWindow(juce::AlertWindow::WarningIcon,
+                     "KZN Import Failed",
+                     result.errorMessage,
+                     "editor_kzn_import_failure");
 }
 
 int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const
@@ -1651,7 +1962,7 @@ void ChoroborosPluginEditor::setupSlider(juce::Slider& slider, LabelWithContaine
     else if (paramId == ChoroborosAudioProcessor::WIDTH_ID)
         slider.setTooltip("Stereo Width: Controls the stereo spread from 0% (mono) to 200% (wide). Adjusts the phase relationship between left and right channels.");
     else if (paramId == ChoroborosAudioProcessor::COLOR_ID)
-        slider.setTooltip("Tone/Character: Engine-specific parameter. Green=bloom (wet body/softness), Blue=focus (wet clarity/presence), Red NQ=post-chorus drive, Red HQ=tape tone+drive, Purple=warp/orbit shape, Black=modulation intensity/ensemble spread.");
+        slider.setTooltip("Tone/Character: Engine-specific parameter. Green=bloom (wet body/softness), Blue=focus (wet clarity/presence), Red NQ=post-chorus drive, Red HQ=tape tone (brighter as Color rises) + record drive, Purple=warp/orbit shape, Black=modulation intensity/ensemble spread.");
     else if (paramId == ChoroborosAudioProcessor::MIX_ID)
         slider.setTooltip("Dry/Wet Mix: Blends the original signal (0%) with the processed signal (100%). 50% = equal blend.");
 

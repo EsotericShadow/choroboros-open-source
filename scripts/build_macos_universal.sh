@@ -9,6 +9,8 @@
 #   CHOROBOROS_RELEASE_DIR     folder for the universal .zip (default: repo/Release, or
 #                              $(dirname cmake-tree)/Release when CHOROBOROS_CMAKE_BUILD_DIR is under /Volumes/...)
 #   TMPDIR                     use a folder on an external SSD when internal disk is tight (linker temp)
+#   CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK  optional override for cmake (default here: OFF).
+#                              Set to ON only for local experiments without the shared asset pack.
 #
 # Full signed installer pipeline:
 #   ./scripts/release_macos_signed_installer.sh
@@ -63,10 +65,13 @@ else
 fi
 rm -rf "${REPO_ROOT}/Build"
 
+: "${CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK:=OFF}"
+
 echo "⚙️  Configuring CMake for universal build..."
 cmake -B "${CMAKE_BIN_DIR}" \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_BUILD_TYPE=Release \
+    "-DCHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK=${CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK}"
 
 echo "🔨 Building universal binary..."
 cmake --build "${CMAKE_BIN_DIR}" --config Release --parallel
@@ -106,14 +111,14 @@ mkdir -p "${RELEASE_DIR}"
 cd "${RELEASE_DIR}"
 unzip -q -o "${ARCHIVE_BASENAME}" || true
 cp "${REPO_ROOT}/README.md" "${REPO_ROOT}/DISTRIBUTION.md" "${REPO_ROOT}/INSTALL.txt" \
-    "${REPO_ROOT}/LICENSE" "${REPO_ROOT}/COPYING" "${REPO_ROOT}/SOURCE_LINK.txt" . 2>/dev/null || true
+    "${REPO_ROOT}/LICENSE" "${REPO_ROOT}/COPYING" "${REPO_ROOT}/EULA.md" "${REPO_ROOT}/SOURCE_LINK.txt" . 2>/dev/null || true
 cp "${REPO_ROOT}/install.sh" . 2>/dev/null || true
 cp "${REPO_ROOT}/install.sh" "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
 chmod +x install.sh "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
 zip -r -o "${ARCHIVE_BASENAME}" \
-    README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt \
+    README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING EULA.md SOURCE_LINK.txt \
     install.sh "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
-rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING SOURCE_LINK.txt install.sh "Install ${PRODUCT_NAME}.command"
+rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING EULA.md SOURCE_LINK.txt install.sh "Install ${PRODUCT_NAME}.command"
 rm -rf VST3 AU Standalone
 cd "${REPO_ROOT}"
 

@@ -74,16 +74,22 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         if (settingsConfirmSetDefaults)
         {
-            const bool accepted = juce::AlertWindow::showOkCancelBox(
-                juce::AlertWindow::WarningIcon,
-                "Set Current as Defaults",
-                "Save all current tuning, internals, and layout values as startup defaults?",
-                "Set Defaults",
-                "Cancel",
-                this,
-                nullptr);
-            if (!accepted)
-                return;
+            juce::Component::SafePointer<DevPanel> safeThis(this);
+            editor.showConfirmationDialog("Set Current as Defaults",
+                                          "Save all current tuning, internals, and layout values as startup defaults?",
+                                          "Set Defaults",
+                                          "Cancel",
+                                          true,
+                                          [safeThis](bool accepted)
+                                          {
+                                              if (!accepted || safeThis == nullptr)
+                                                  return;
+
+                                              safeThis->saveCurrentAsDefaults();
+                                          },
+                                          "devpanel_set_defaults_dialog",
+                                          this);
+            return;
         }
         saveCurrentAsDefaults();
     };
@@ -95,16 +101,22 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
     {
         if (settingsConfirmResetFactory)
         {
-            const bool accepted = juce::AlertWindow::showOkCancelBox(
-                juce::AlertWindow::WarningIcon,
-                "Reset to Factory",
-                "Reset all runtime tuning, internals, and layout values to factory defaults?",
-                "Reset",
-                "Cancel",
-                this,
-                nullptr);
-            if (!accepted)
-                return;
+            juce::Component::SafePointer<DevPanel> safeThis(this);
+            editor.showConfirmationDialog("Reset to Factory",
+                                          "Reset all runtime tuning, internals, and layout values to factory defaults?",
+                                          "Reset",
+                                          "Cancel",
+                                          true,
+                                          [safeThis](bool accepted)
+                                          {
+                                              if (!accepted || safeThis == nullptr)
+                                                  return;
+
+                                              safeThis->resetToFactoryDefaults();
+                                          },
+                                          "devpanel_reset_factory_dialog",
+                                          this);
+            return;
         }
         resetToFactoryDefaults();
     };
@@ -1206,7 +1218,11 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
             juce::String status;
             if (!startTutorial(tutorialTopicKeys[idx], status))
             {
-                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Tutorial", status);
+                editor.showStatusDialog(juce::AlertWindow::WarningIcon,
+                                        "Tutorial",
+                                        status,
+                                        "devpanel_tutorial_dialog",
+                                        this);
                 return;
             }
             if (!settingsShowTutorialHintsOnOpen)
