@@ -10,6 +10,7 @@
 
 ## Root Docs (operational)
 
+- `FACTORY_DEFAULTS_JSON_SYNC.md` - **Maintainers:** four factory JSON files must stay byte-identical; `verify_factory_json_sync.sh` and CMake target
 - `README.md` - Main project readme
 - `../CHANGELOG.md` - Version history
 - `KNOWN_ISSUES.md` - Beta known issues

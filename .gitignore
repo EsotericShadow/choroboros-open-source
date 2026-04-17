@@ -70,7 +70,6 @@ feedback/
 /windows/CHECKLIST.md
 /windows/HOST_PLUGIN_PATHS.md
 /windows/README.md
-/windows/RELEASE_CHECKLIST_HARD.md
 
 # Local workspace noise (duplicate root-level source copies)
 /AnimatedToggleButton.cpp

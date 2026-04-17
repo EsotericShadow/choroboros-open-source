@@ -127,6 +127,10 @@ After installation, rescan plugins in your DAW.
 
 > **Note:** Macs that cannot run macOS 10.13 (such as Mac Pro Early 2009 and older) are not supported. The JUCE 8 framework requires 10.13 as a minimum deployment target. AU validation will fail on unsupported systems.
 
+## Maintainers: factory defaults JSON
+
+The bundled factory sheet exists as **four copies** that must stay **byte-identical** (`Assets/defaults_factory_mac.json` plus the three platform BinaryData inputs). Before you merge factory changes or cut a release, run `./scripts/verify_factory_json_sync.sh` from the repo root. Full procedure: [docs/FACTORY_DEFAULTS_JSON_SYNC.md](docs/FACTORY_DEFAULTS_JSON_SYNC.md).
+
 ## Technical Details
 
 - **Version:** v2.05
@@ -140,37 +144,25 @@ After installation, rescan plugins in your DAW.
 
 ## License
 
-**Choroboros is free software licensed under the GNU General Public License version 3 (GPLv3).**
+Licensing depends on **what you are using**: the **public source tree** in this repository, or an **official Choroboros Beta binary** from Kaizen (installer, signed build, or other channel Kaizen provides). This section is a plain-language summary; the **End User License Agreement** (`EULA.md`) governs official beta binaries, and **GPLv3** governs the published source as described below. *This is not legal advice.*
+
+### Source code in this repository (GPLv3)
+
+The source code in **https://github.com/EsotericShadow/choroboros-open-source** is free software licensed under the **GNU General Public License version 3 (GPLv3)** (or, at your option, any later version). See `LICENSE` and `COPYING` for the full license text.
+
+You may run, study, modify, and redistribute **your own builds** made from that source under the terms of GPLv3.
 
 Copyright (C) 2026 Kaizen Strategic AI Inc.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+### Official Choroboros Beta binaries (EULA)
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+**Pre-built beta plug-ins** that Kaizen Strategic AI Inc. / Kaizen DSP distributes in compiled form (for example a **signed / notarized macOS installer**, or other official beta download) are **not** offered to you under GPLv3. Your use of those builds is under the **End User License Agreement** in `EULA.md` (also bundled in the plug-in where applicable). That agreement includes proprietary terms, beta disclaimers, and restrictions that do **not** apply in the same way to GPLv3-only self-builds from this repo.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+Kaizen builds Choroboros using the **JUCE** framework under a **commercial JUCE license** for this product, in addition to its own rights in the Software Product. For JUCE’s own terms, see https://juce.com/legal/juce-8-licence/
 
-### Source Code
+### Third-party components
 
-The complete source code for Choroboros is available at:
-**https://github.com/EsotericShadow/choroboros-open-source**
-
-You are free to view, modify, and redistribute the source code under the terms of the GPLv3 license.
-
-### Third-Party Components
-
-This software uses the JUCE framework, which is dual-licensed under:
-- GNU Affero General Public License v3 (AGPLv3), or
-- Commercial license from Raw Material Software Limited
-
-For more information about JUCE licensing, visit: https://juce.com/legal/juce-8-licence/
+This software uses the JUCE framework and other components that may be subject to their own license terms; see repository notices and bundled documentation where shipped.
 
 ## Support & Contact
 
