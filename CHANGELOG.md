@@ -21,6 +21,7 @@ Sample-rate invariance structural fix — all 5 hardcoded DSP constants now deri
 - **Factory defaults JSON parity (maintainers):** `Assets/defaults_factory_mac.json`, `json_defaults_dump.json`, `linux/linux_factory_defaults.json`, and `windows/windows_factory_defaults.json` must stay byte-identical; `scripts/verify_factory_json_sync.sh` and CMake target `verify_factory_json_sync` (Unix) enforce it before release. Documented in `docs/FACTORY_DEFAULTS_JSON_SYNC.md`; `windows/RELEASE_CHECKLIST_HARD.md` is tracked again. Linux factory JSON is included in the repo for the same payload as macOS/Windows embedded defaults.
 - **DevPanel slider labels:** Pre-emphasis level smoother shows "PreEmph Level τ (s)" with range 0.001–2.0s. Tape tone smoother shows "Tape Tone τ (ms)" with range 0.01–10.0ms. Tape phase damping shows "Tape Phase Damp/s" with range 0.01–1.0.
 - **Factory defaults updated:** All three JSON factory files and PluginProcessor per-engine defaults converted from raw coefficients to physical time constants.
+- **Green engine UI (factory):** Layout defaults `mainKnobSizeGreen` 134, `knobTopYGreen` 85; refreshed green main-knob filmstrip PNGs (rate, depth, offset, width off/on pairs).
 - **Shared interpolation utility:** New `InterpolationUtils.h` with `readCubicInterp()` deduplicating cubic interpolation across Blue, Purple, and Black cores.
 - **Tape core robustness:** Per-channel smoothedDepth with NaN guard in Red HQ. Per-channel colour smoothing in Black HQ.
 
