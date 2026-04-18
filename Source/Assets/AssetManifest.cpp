@@ -19,8 +19,10 @@ int64_t readInt64Property(const juce::DynamicObject* object, const juce::Identif
         return 0;
 
     const auto value = object->getProperty(propertyName);
-    if (value.isInt() || value.isInt64())
-        return static_cast<int64_t>(value);
+    if (value.isInt64())
+        return static_cast<int64_t>(static_cast<juce::int64>(value));
+    if (value.isInt())
+        return static_cast<int64_t>(static_cast<int>(value));
     if (value.isDouble())
         return static_cast<int64_t>(std::llround(static_cast<double>(value)));
     return 0;
