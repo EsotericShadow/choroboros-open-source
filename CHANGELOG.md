@@ -54,7 +54,7 @@ Sample-rate invariance structural fix — all 5 hardcoded DSP constants now deri
 - **Dev Panel tutorials rewritten:** Orientation-first walkthrough replacing concept-first approach. 13-topic index (orientation, core, primers, deep-dive tasks).
 - **Dialog destruction safety:** delete-this replaced with SafePointer + MessageManager::callAsync in About/Feedback/Help dialogs. Non-blocking theme decode via polling in paint().
 - **Debug I/O removal (Phase 4):** Removed debug file logging and trace disk writes. Clean shutdown paths.
-- **CMakeLists JUCE resolution:** Uses `./JUCE`, optional sibling `../JUCE`, or FetchContent JUCE 8.0.12 (no private sibling repo path). Supersedes the earlier v2.05 note about a `../choroboros-commercial/JUCE` lookup, which was removed so the open-source project stays self-contained.
+- **CMakeLists JUCE resolution:** Uses `./JUCE`, optional sibling `../JUCE`, or FetchContent JUCE 8.0.12 only (removed an extra optional sibling-repo JUCE path so the open-source tree stays self-contained).
 - **Installer improvements:** installer_config.sh sourced by all sign/build/notarize scripts. Fixed wrong bundle paths that broke signing, pkgbuild, and notarization. Stage payloads with ditto, strip xattrs, chmod postinstall before pkgbuild. Detect invalid notarization and fetch log.
 - **Build artifact retention:** 30 days down to 3 days (build) / 1 day (release).
 - **Binary size 400 MB to <120 MB:** All engine spritesheets reprocessed and optimized (not just Black).
