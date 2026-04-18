@@ -38,14 +38,11 @@ endif()
 # Generate compile_commands.json for IDE language servers
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Look for JUCE in the repo first, then as a sibling directory, then inside
-# the commercial repo (common layout when both repos live under CHOROS_MASTER/).
+# Look for JUCE in this repo first, then a sibling ../JUCE checkout; otherwise FetchContent.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/CMakeLists.txt")
     set(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/JUCE")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE/CMakeLists.txt")
     get_filename_component(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE" ABSOLUTE)
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../choroboros-commercial/JUCE/CMakeLists.txt")
-    get_filename_component(_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../choroboros-commercial/JUCE" ABSOLUTE)
 endif()
 
 if(DEFINED _JUCE_DIR)
