@@ -1,27 +1,45 @@
 # Windows AAX in GitHub Actions
 
+## Current status — **deferred**
+
+**Windows AAX is not built or packaged in GitHub Actions** (`build.yml` / `release.yml`) until we can **PACE-sign** it in a way that matches shipping (typically **PACE Cloud Signing** or another PACE-approved path on **GitHub-hosted** runners, or an out-of-band sign on Windows x64 with Eden).
+
+**macOS** releases continue to ship **signed + notarized** installers including **PACE-signed AAX** via the local/mac pipeline (`scripts/release_macos_signed_installer.sh`). This document and `windows/sign_aax_pace_windows.ps1` remain a **playbook for when Windows AAX returns to CI**.
+
+---
+
 **PACE materials:** PACE Central downloads and the AAX Code Signing manuals are **confidential** under your PACE agreement. Do **not** commit installers, manuals, or license keys into this repo—only store CI credentials in **GitHub Secrets** / **Variables**.
 
-This repo builds **unsigned** Windows AAX on every **Windows x64** CI job (`Choroboros_AAX`). **Retail Pro Tools will not load unsigned AAX** for end users; treat CI output as **build verification only** until you run **PACE `wraptool sign`** (or use Avid/PACE **developer** host setups for internal testing only). JUCE 8 bundles the AAX SDK headers/libs under the fetched JUCE tree, so you **do not** need to upload the full Avid AAX SDK zip for that compile step.
+**Retail Pro Tools will not load unsigned AAX** for end users. Any future CI build of `Choroboros_AAX` must be followed by **PACE `wraptool sign`** (or equivalent) before that binary is treated as shippable.
 
-**PACE signing** (wraptool) is **optional** and controlled by a repository **variable** plus **secrets**. GitHub-hosted `windows-latest` does **not** include PACE Eden; typical approaches:
+When re-enabled, typical approaches on **GitHub-hosted** runners:
 
-1. **Self-hosted Windows runner** — Install **Eden SDK Lite** for Windows from PACE Central (`EdenSDKLiteInstallerWin64.zip` per PACE’s “Install the Tools” flow). PACE documents **silent / unattended** installs for CI; expect tools under something like `C:\Program Files (x86)\PACEAntiPiracy\Eden\Fusion\Versions\<major>\bin\wraptool.exe` (version folder may change—set `WRAPTOOL` explicitly if needed). **Eden Tools** license must be active on that machine (**iLok USB** or **iLok Cloud** session, per PACE).
-2. **PACE Cloud Signing Service** — For cloud agents that cannot use a USB, PACE describes a **Cloud Signing** option; contact PACE sales/support per their docs (`--allowsigningservice` in our script maps to that class of workflow when enabled).
-3. **`PACE_WRAPTOOL_ZIP_URL`** — Only if you have a **private** layout you are allowed to host; respect PACE redistribution terms.
+1. **PACE Cloud Signing Service** — contact PACE per their docs (`--allowsigningservice` in our script aligns with that class of workflow when enabled).
+2. **Self-hosted Windows runner** — Eden SDK Lite + **Eden Tools** on iLok USB or iLok Cloud (per PACE “Install the Tools”).
+3. **`PACE_WRAPTOOL_ZIP_URL`** — only if you may host a private tool layout; respect PACE redistribution terms.
 
 Follow **PACE license terms** for redistributing or copying wraptool.
 
 ---
 
-## What CI does
+## What CI does today (Windows x64)
+
+| Step | Status |
+|------|--------|
+| `Choroboros_AAX` build | **Not run** in Actions (deferred). |
+| PACE wraptool steps | **Not run** in Actions. |
+| Zip contents | **VST3 + Standalone** (+ license files on release workflow). **No Windows AAX.** |
+
+---
+
+## When Windows AAX CI is re-enabled (playbook)
 
 | Step | When |
 |------|------|
-| `cmake --build … --target Choroboros_AAX` | Always on Windows x64 (`build.yml` + `release.yml`). |
-| Download wraptool zip | Only if `WINDOWS_AAX_SIGNING_ENABLED` **variable** is `true` **and** secret `PACE_WRAPTOOL_ZIP_URL` is non-empty. |
-| `windows/sign_aax_pace_windows.ps1` | Only if `WINDOWS_AAX_SIGNING_ENABLED` == `true`. |
-| Zip contents | VST3, Standalone, and **AAX bundle** (if the build produced it). |
+| `cmake --build … --target Choroboros_AAX` | Restore a **Build AAX** step on Windows x64 after signing is sorted. |
+| Download wraptool zip | If `WINDOWS_AAX_SIGNING_ENABLED` **variable** is `true` **and** secret `PACE_WRAPTOOL_ZIP_URL` is non-empty. |
+| `windows/sign_aax_pace_windows.ps1` | If `WINDOWS_AAX_SIGNING_ENABLED` == `true`. |
+| Zip contents | Add **signed** `.aaxplugin` to the zip only after `wraptool verify` succeeds. |
 
 ---
 
@@ -31,7 +49,7 @@ GitHub → **Settings** → **Secrets and variables** → **Actions** → **Vari
 
 | Name | Value | Purpose |
 |------|--------|---------|
-| `WINDOWS_AAX_SIGNING_ENABLED` | `true` | Turns on PACE steps. Omit or set anything other than `true` to **skip** signing (still builds unsigned AAX). |
+| `WINDOWS_AAX_SIGNING_ENABLED` | `true` | Reserved for when AAX build + PACE steps are **re-added** to workflows; currently unused while Windows AAX is deferred. |
 
 Optional:
 

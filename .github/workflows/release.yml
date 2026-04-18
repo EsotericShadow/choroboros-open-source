@@ -234,37 +234,8 @@ jobs:
         run: |
           build\windows-x64-release\Release\ChoroborosRegressionTests.exe --tier=1,2,3
 
-      - name: Build AAX (Windows x64)
-        run: |
-          cmake --build build/windows-x64-release `
-            --config Release `
-            --target Choroboros_AAX `
-            --parallel
-
-      - name: Prepare PACE wraptool (optional private zip)
-        if: ${{ vars.WINDOWS_AAX_SIGNING_ENABLED == 'true' }}
-        env:
-          PACE_WRAPTOOL_ZIP_URL: ${{ secrets.PACE_WRAPTOOL_ZIP_URL }}
-          PACE_WRAPTOOL_ZIP_TOKEN: ${{ secrets.PACE_WRAPTOOL_ZIP_TOKEN }}
-        shell: pwsh
-        run: |
-          if ($env:PACE_WRAPTOOL_ZIP_URL) {
-            & "$env:GITHUB_WORKSPACE/windows/ci_install_pace_wraptool.ps1"
-          } else {
-            Write-Host "PACE_WRAPTOOL_ZIP_URL not set; using Eden install on runner (e.g. self-hosted) if present."
-          }
-
-      - name: Sign AAX (PACE wraptool)
-        if: ${{ vars.WINDOWS_AAX_SIGNING_ENABLED == 'true' }}
-        env:
-          ILOK_USER: ${{ secrets.ILOK_USER }}
-          ILOK_PASSWORD: ${{ secrets.ILOK_PASSWORD }}
-          WCGUID: ${{ secrets.WCGUID }}
-          PACE_SIGNID: ${{ secrets.PACE_SIGNID }}
-          WRAPTOOL_ALLOW_SIGNING_SERVICE: ${{ vars.WRAPTOOL_ALLOW_SIGNING_SERVICE }}
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE/windows/sign_aax_pace_windows.ps1" -CMakeBuildDir "build\windows-x64-release"
+      # Windows AAX: deferred in CI until PACE signing is viable on hosted runners
+      # (e.g. Cloud Signing) — see docs/GITHUB_ACTIONS_WINDOWS_AAX.md
 
       - name: Package and checksum
         shell: pwsh
@@ -277,10 +248,6 @@ jobs:
             "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
           Copy-Item "README.md", "LICENSE", "COPYING", "EULA.md" dist\contents\
-          $aaxSrc = "build\windows-x64-release\Choroboros_artefacts\Release\AAX\Choroboros Beta.aaxplugin"
-          if (Test-Path $aaxSrc) {
-            Copy-Item -Recurse $aaxSrc dist\contents\
-          }
           Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x64.zip
           $hash = (Get-FileHash dist\Choroboros-Beta-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  Choroboros-Beta-windows-x64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x64.zip.sha256 -Encoding ascii
