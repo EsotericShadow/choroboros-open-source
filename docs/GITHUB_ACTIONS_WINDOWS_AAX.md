@@ -2,7 +2,7 @@
 
 **PACE materials:** PACE Central downloads and the AAX Code Signing manuals are **confidential** under your PACE agreement. Do **not** commit installers, manuals, or license keys into this repo—only store CI credentials in **GitHub Secrets** / **Variables**.
 
-This repo builds **unsigned** Windows AAX on every **Windows x64** CI job (`Choroboros_AAX`). JUCE 8 bundles the AAX SDK headers/libs under the fetched JUCE tree, so you **do not** need to upload the full Avid AAX SDK zip for a basic CI build.
+This repo builds **unsigned** Windows AAX on every **Windows x64** CI job (`Choroboros_AAX`). **Retail Pro Tools will not load unsigned AAX** for end users; treat CI output as **build verification only** until you run **PACE `wraptool sign`** (or use Avid/PACE **developer** host setups for internal testing only). JUCE 8 bundles the AAX SDK headers/libs under the fetched JUCE tree, so you **do not** need to upload the full Avid AAX SDK zip for that compile step.
 
 **PACE signing** (wraptool) is **optional** and controlled by a repository **variable** plus **secrets**. GitHub-hosted `windows-latest` does **not** include PACE Eden; typical approaches:
 
