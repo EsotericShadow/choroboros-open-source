@@ -16,6 +16,7 @@
     <root>\wraptool.exe
     <root>\bin\wraptool.exe
     <root>\PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe
+    <root>\PACEAntiPiracy\Eden\Fusion\Versions\5\bin\wraptool.exe
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -46,7 +47,8 @@ Expand-Archive -LiteralPath $zipPath -DestinationPath $destRoot -Force
 $candidates = @(
     (Join-Path $destRoot "wraptool.exe"),
     (Join-Path $destRoot "bin\wraptool.exe"),
-    (Join-Path $destRoot "PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe")
+    (Join-Path $destRoot "PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe"),
+    (Join-Path $destRoot "PACEAntiPiracy\Eden\Fusion\Versions\5\bin\wraptool.exe")
 )
 $found = $null
 foreach ($c in $candidates) {

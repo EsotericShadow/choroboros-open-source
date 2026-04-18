@@ -46,9 +46,13 @@ function Find-Wraptool {
         if (Test-Path -LiteralPath $p) { return $p }
         throw "WRAPTOOL is set but file not found: $p"
     }
+    # PACE Eden Lite / Fusion layouts (see PACE “Install the Tools” — Windows install tree
+    # is commonly under Program Files (x86) … Fusion\Versions\<major>\bin).
     $candidates = @(
-        "${env:ProgramFiles}\PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe",
-        "${env:ProgramFiles(x86)}\PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe"
+        "${env:ProgramFiles(x86)}\PACEAntiPiracy\Eden\Fusion\Versions\5\bin\wraptool.exe",
+        "${env:ProgramFiles(x86)}\PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe",
+        "${env:ProgramFiles}\PACEAntiPiracy\Eden\Fusion\Versions\5\bin\wraptool.exe",
+        "${env:ProgramFiles}\PACEAntiPiracy\Eden\Fusion\Current\bin\wraptool.exe"
     )
     foreach ($c in $candidates) {
         if (Test-Path -LiteralPath $c) { return $c }
