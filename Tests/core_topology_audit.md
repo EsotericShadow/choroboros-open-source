@@ -333,11 +333,9 @@ The `while` loop is safe (converges because delaySamples < bufferSize), but if `
 
 ### 🟡 DANGEROUS Findings
 
-**D1-A: Thiran coefficient recomputation per-sample**
+**D1-A: Thiran coefficient work**
 
-`ChorusCoreThiran::processDelay()` calls `computeCoefficients()` on every sample (line `computeCoefficients(thiranD, activeAp.a)` inside the per-sample loop). This function does a double-precision nested loop (ORDER=5, so 30 multiply/divide operations). While it doesn't allocate, it's ~150 FLOPs per sample per channel — the heaviest per-sample cost in the entire plugin.
-
-**Not a correctness bug**, but a performance concern. If CPU budget is tight, the coefficients could be linearly interpolated between block-start and block-end values.
+`ChorusCoreThiran::processDelay()` uses **one-pole smoothing** toward `computeCoefficients` targets (not a full double loop every sample). Full `computeCoefficients` still costs ~150 FLOPs when probe **3** snaps coeffs or on integer-hop init.
 
 **D1-B: BBD filter cutoff update every 32 samples — potential allocation**
 

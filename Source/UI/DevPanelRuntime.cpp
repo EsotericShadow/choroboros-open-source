@@ -455,6 +455,8 @@ void DevPanel::resized()
         auto* dualScopeCard = findRoleCard("lfo_dual_scope");
         auto* lissajousCard = findRoleCard("lfo_lissajous");
         auto* trajectoryCard = findRoleCard("trajectory");
+        auto* thiranDqCard = findRoleCard("thiran_dq");
+        auto* thiranXfadeCard = findRoleCard("thiran_xfade");
         auto* workbenchCard = findRoleCard("lfo_workbench");
 
         if (dualScopeCard == nullptr && modulationVisualDeckCards.size() > 0)
@@ -467,7 +469,8 @@ void DevPanel::resized()
             workbenchCard = modulationVisualDeckCards[3];
 
         if (dualScopeCard == nullptr && lissajousCard == nullptr
-            && trajectoryCard == nullptr && workbenchCard == nullptr)
+            && trajectoryCard == nullptr && thiranDqCard == nullptr && thiranXfadeCard == nullptr
+            && workbenchCard == nullptr)
         {
             modulationVisualDeck.setBounds(0, 0, 0, 0);
             return;
@@ -478,6 +481,7 @@ void DevPanel::resized()
         int rowTopY = spacing.deckPadding;
         int dualScopeHeight = 0;
         int secondRowHeight = 0;
+        int thiranRowHeight = 0;
         int workbenchHeight = 0;
 
         if (dualScopeCard != nullptr)
@@ -492,6 +496,14 @@ void DevPanel::resized()
             const int trajHeight = trajectoryCard != nullptr ? trajectoryCard->getPreferredHeight() : 0;
             secondRowHeight = juce::jmax(lissHeight, trajHeight);
             rowTopY += secondRowHeight + rowGap;
+        }
+
+        if (thiranDqCard != nullptr || thiranXfadeCard != nullptr)
+        {
+            const int dqH = thiranDqCard != nullptr ? thiranDqCard->getPreferredHeight() : 0;
+            const int xfH = thiranXfadeCard != nullptr ? thiranXfadeCard->getPreferredHeight() : 0;
+            thiranRowHeight = juce::jmax(dqH, xfH);
+            rowTopY += thiranRowHeight + rowGap;
         }
 
         if (workbenchCard != nullptr)
@@ -536,7 +548,36 @@ void DevPanel::resized()
             cy += secondRowHeight + rowGap;
         }
 
-        // Row 3: Workbench card (full width)
+        // Row 3: Thiran telemetry (50/50 when both present)
+        if (thiranDqCard != nullptr || thiranXfadeCard != nullptr)
+        {
+            const int twoUpGap = juce::jmax(10, rowGap);
+            const int dqW = thiranDqCard != nullptr && thiranXfadeCard != nullptr
+                ? juce::jmax(80, juce::roundToInt(static_cast<float>(innerWidth) * 0.5f))
+                : innerWidth;
+            const int xfW = thiranDqCard != nullptr && thiranXfadeCard != nullptr
+                ? juce::jmax(80, innerWidth - dqW - twoUpGap)
+                : innerWidth;
+
+            if (thiranDqCard != nullptr)
+            {
+                thiranDqCard->setVisible(true);
+                thiranDqCard->setBounds(spacing.deckPadding, cy,
+                                        thiranXfadeCard != nullptr ? dqW : innerWidth, thiranRowHeight);
+            }
+
+            if (thiranXfadeCard != nullptr)
+            {
+                thiranXfadeCard->setVisible(true);
+                const int x0 = thiranDqCard != nullptr ? spacing.deckPadding + dqW + twoUpGap : spacing.deckPadding;
+                thiranXfadeCard->setBounds(x0, cy,
+                                           thiranDqCard != nullptr ? xfW : innerWidth, thiranRowHeight);
+            }
+
+            cy += thiranRowHeight + rowGap;
+        }
+
+        // Row 4: Workbench card (full width)
         if (workbenchCard != nullptr)
         {
             workbenchCard->setVisible(true);

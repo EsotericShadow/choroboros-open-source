@@ -25,7 +25,10 @@
 #include <melatonin_perfetto/melatonin_perfetto.h>
 #endif
 
-void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
+void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP,
+                                          juce::dsp::AudioBlock<float>& block,
+                                          juce::dsp::IIR::Filter<float>& filter,
+                                          float& inputLevelState)
 {
     if (block.getNumSamples() == 0 || block.getNumChannels() == 0)
         return;
@@ -55,20 +58,13 @@ void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::Audio
     rmsLevel /= block.getNumChannels();
     
     const auto& tuning = chorusDSP.runtimeTuningSnapshot;
-
-    // Sample-rate-invariant level smoothing: snapshot stores τ in seconds,
-    // converted here to a per-block α coefficient.
-    // (Was hardcoded α = 0.95 — only correct at 48 k / 512-sample blocks.)
-    const float blockDurationSec = static_cast<float>(blockSize)
-                                 / static_cast<float>(chorusDSP.spec.sampleRate);
-    const float levelTauSec = std::max(0.001f, tuning.preEmphasisLevelSmoothing);
-    const float levelSmoothing = std::exp(-blockDurationSec / levelTauSec);
-    chorusDSP.inputLevel = levelSmoothing * chorusDSP.inputLevel + (1.0f - levelSmoothing) * rmsLevel;
+    const float levelSmoothing = juce::jlimit(0.0f, 1.0f, tuning.preEmphasisLevelSmoothing);
+    inputLevelState = levelSmoothing * inputLevelState + (1.0f - levelSmoothing) * rmsLevel;
     
     const float quietThreshold = tuning.preEmphasisQuietThreshold;
     float preEmphAmount = 0.0f;
-    if (quietThreshold > 0.0f && chorusDSP.inputLevel < quietThreshold)
-        preEmphAmount = (quietThreshold - chorusDSP.inputLevel) / quietThreshold * tuning.preEmphasisMaxAmount;
+    if (quietThreshold > 0.0f && inputLevelState < quietThreshold)
+        preEmphAmount = (quietThreshold - inputLevelState) / quietThreshold * tuning.preEmphasisMaxAmount;
     
     if (preEmphAmount > 0.0f)
     {
@@ -77,7 +73,7 @@ void ChorusDSPProcess::processPreEmphasis(ChorusDSP& chorusDSP, juce::dsp::Audio
             chorusDSP.preEmphOriginalBuffer.copyFrom(ch, 0, block.getChannelPointer(ch), blockSize);
         
         auto context = juce::dsp::ProcessContextReplacing<float>(block);
-        chorusDSP.preEmphasis.process(context);
+        filter.process(context);
         
         for (int ch = 0; ch < block.getNumChannels(); ++ch)
         {
@@ -97,55 +93,48 @@ void ChorusDSPProcess::processPreChorusSaturation(ChorusDSP& chorusDSP, juce::ds
     (void) block;
 }
 
-void ChorusDSPProcess::processWetCharacter(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
+void ChorusDSPProcess::processWetCharacter(ChorusDSP& chorusDSP,
+                                           juce::dsp::AudioBlock<float>& block,
+                                           const choroboros::CorePackageDescriptor& descriptor,
+                                           int engineIndex,
+                                           ChorusDSP::WetCharacterState& state)
 {
     // Color drives wet-only character macros:
     // Green => Bloom, Blue => Focus, others => handled elsewhere.
     const float currentColor = juce::jlimit(0.0f, 1.0f, chorusDSP.colorBlockValue);
     if (chorusDSP.isModularCoreModeEnabled())
     {
-        const auto& descriptor = chorusDSP.getCurrentCoreDescriptor();
         if (descriptor.bloomWetCharacter)
         {
-            chorusDSP.processGreenBloomWet(block, currentColor);
+            chorusDSP.processGreenBloomWet(block, currentColor, state);
             return;
         }
 
         if (descriptor.focusWetCharacter)
         {
-            chorusDSP.processBlueFocusWet(block, currentColor);
+            chorusDSP.processBlueFocusWet(block, currentColor, state);
             return;
         }
 
         return;
     }
 
-    if (chorusDSP.currentColorIndex == 0)
+    if (engineIndex == 0)
     {
-        chorusDSP.processGreenBloomWet(block, currentColor);
+        chorusDSP.processGreenBloomWet(block, currentColor, state);
         return;
     }
 
-    if (chorusDSP.currentColorIndex == 1)
+    if (engineIndex == 1)
     {
-        chorusDSP.processBlueFocusWet(block, currentColor);
+        chorusDSP.processBlueFocusWet(block, currentColor, state);
         return;
     }
 }
 
-void ChorusDSPProcess::processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block)
+void ChorusDSPProcess::processPostChorusSaturation(ChorusDSP& chorusDSP, juce::dsp::AudioBlock<float>& block, const choroboros::CorePackageDescriptor& descriptor, int engineIndex)
 {
-    bool usesPostSaturation = false;
-    if (chorusDSP.isModularCoreModeEnabled())
-    {
-        usesPostSaturation = chorusDSP.getCurrentCoreDescriptor().postChorusSaturation;
-    }
-    else
-    {
-        // Red NQ is the only legacy engine where Color is post-chorus saturation.
-        const int engine = chorusDSP.currentColorIndex;
-        usesPostSaturation = (engine == 2 && !chorusDSP.currentQualityHQ);
-    }
+    bool usesPostSaturation = descriptor.postChorusSaturation;
 
     if (!usesPostSaturation)
         return;
@@ -384,13 +373,139 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     const int blockNumSamples = static_cast<int>(block.getNumSamples());
     
     jassert(blockNumSamples <= chorusDSP.maxBlockSize);
+
+    struct SelectionState
+    {
+        int colorIndex = 0;
+        bool qualityHQ = false;
+        bool modularMode = false;
+        choroboros::CoreId coreId = choroboros::CoreId::lagrange3;
+    };
+
+    const auto depthForSelection = [&chorusDSP](const SelectionState& selection, float rawDepth) -> float
+    {
+        if (selection.modularMode)
+        {
+            if (choroboros::descriptorForCore(selection.coreId).depthCompression)
+                return rawDepth * 0.45f;
+            return rawDepth;
+        }
+
+        if (selection.colorIndex == 3)
+            return rawDepth * 0.45f;
+
+        return rawDepth;
+    };
+
+    const auto centreDelayForSelection = [&chorusDSP, &depthForSelection](const SelectionState& selection,
+                                                                          float rawDepth,
+                                                                          float colorValue) -> float
+    {
+        const auto& tuning = chorusDSP.runtimeTuningSnapshot;
+        float mappedDepth = depthForSelection(selection, rawDepth);
+
+        const bool bloomDepth =
+            selection.modularMode
+                ? choroboros::descriptorForCore(selection.coreId).bloomDepthScale
+                : (selection.colorIndex == 0);
+
+        if (bloomDepth)
+        {
+            const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
+            const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, colorValue), bloomExp);
+            mappedDepth *= (1.0f + juce::jmax(0.0f, tuning.greenBloomDepthScale) * bloom);
+        }
+
+        float centreDelayMs = chorusDSP.calculateCentreDelay(mappedDepth);
+
+        const bool bloomOffset =
+            selection.modularMode
+                ? choroboros::descriptorForCore(selection.coreId).bloomCentreOffset
+                : (selection.colorIndex == 0);
+
+        if (bloomOffset)
+        {
+            const float bloomExp = juce::jmax(0.1f, tuning.greenBloomExponent);
+            const float bloom = std::pow(juce::jlimit(0.0f, 1.0f, colorValue), bloomExp);
+            centreDelayMs += juce::jmax(0.0f, tuning.greenBloomCentreOffsetMs) * bloom;
+        }
+
+        return centreDelayMs;
+    };
+
+    const auto withSelectionContext = [&chorusDSP](const SelectionState& selection,
+                                                   float scopedRate,
+                                                   float scopedColor,
+                                                   auto&& fn)
+    {
+        const int savedColorIndex = chorusDSP.currentColorIndex;
+        const bool savedQualityHQ = chorusDSP.currentQualityHQ;
+        const bool savedModularMode = chorusDSP.modularCoreModeEnabled;
+        const auto savedCoreId = chorusDSP.currentCoreId;
+        const float savedRateCurrent = chorusDSP.smoothedRate.getCurrentValue();
+        const float savedRateTarget = chorusDSP.smoothedRate.getTargetValue();
+        const float savedColorCurrent = chorusDSP.smoothedColor.getCurrentValue();
+        const float savedColorTarget = chorusDSP.smoothedColor.getTargetValue();
+        const float savedColorBlock = chorusDSP.colorBlockValue;
+
+        chorusDSP.currentColorIndex = selection.colorIndex;
+        chorusDSP.currentQualityHQ = selection.qualityHQ;
+        chorusDSP.modularCoreModeEnabled = selection.modularMode;
+        chorusDSP.currentCoreId = selection.coreId;
+        chorusDSP.smoothedRate.setCurrentAndTargetValue(scopedRate);
+        chorusDSP.smoothedColor.setCurrentAndTargetValue(scopedColor);
+        chorusDSP.colorBlockValue = scopedColor;
+
+        fn();
+
+        chorusDSP.currentColorIndex = savedColorIndex;
+        chorusDSP.currentQualityHQ = savedQualityHQ;
+        chorusDSP.modularCoreModeEnabled = savedModularMode;
+        chorusDSP.currentCoreId = savedCoreId;
+        chorusDSP.smoothedRate.setCurrentAndTargetValue(savedRateCurrent);
+        chorusDSP.smoothedRate.setTargetValue(savedRateTarget);
+        chorusDSP.smoothedColor.setCurrentAndTargetValue(savedColorCurrent);
+        chorusDSP.smoothedColor.setTargetValue(savedColorTarget);
+        chorusDSP.colorBlockValue = savedColorBlock;
+    };
+
+    const auto resetWetCharacterState = [](ChorusDSP::WetCharacterState& state)
+    {
+        std::fill(state.greenWetLPState.begin(), state.greenWetLPState.end(), 0.0f);
+        std::fill(state.blueWetHPState.begin(), state.blueWetHPState.end(), 0.0f);
+        std::fill(state.blueWetLPState.begin(), state.blueWetLPState.end(), 0.0f);
+        for (auto& biquad : state.bluePresenceState)
+            biquad = {};
+        state.bluePresenceB0 = 1.0f;
+        state.bluePresenceB1 = 0.0f;
+        state.bluePresenceB2 = 0.0f;
+        state.bluePresenceA1 = 0.0f;
+        state.bluePresenceA2 = 0.0f;
+        state.bluePresenceCachedFreqHz = -1.0f;
+        state.bluePresenceCachedQ = -1.0f;
+        state.bluePresenceCachedGainDb = -1000.0f;
+    };
     
     float currentDepth, currentRate, currentCentreDelayMs;
     processChorusParameters(chorusDSP, blockNumSamples, currentDepth, currentRate, currentCentreDelayMs);
     processChorusLFO(chorusDSP, blockNumSamples, numChannels, currentRate, currentDepth);
+
+    const SelectionState pendingSelection
+    {
+        chorusDSP.pendingColorIndex,
+        chorusDSP.pendingQualityHQ,
+        chorusDSP.pendingModularCoreModeEnabled,
+        chorusDSP.pendingCoreId
+    };
+    const SelectionState previousSelection
+    {
+        chorusDSP.coreSwitchOldColorIndex,
+        chorusDSP.coreSwitchOldQualityHQ,
+        chorusDSP.coreSwitchOldModularCoreModeEnabled,
+        chorusDSP.previousCoreId
+    };
     
     chorusDSP.dryWet.pushDrySamples(block);
-    processPreEmphasis(chorusDSP, block);
 
     bool pendingCoreReady = false;
     if (chorusDSP.pendingCore != nullptr)
@@ -407,13 +522,24 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
         auto wetPending = juce::dsp::AudioBlock<float>(chorusDSP.coreCrossfadeBufferA.getArrayOfWritePointers(),
                                                        static_cast<size_t>(numChannels),
                                                        static_cast<size_t>(blockNumSamples));
-        chorusDSP.pendingCore->processDelay(chorusDSP, wetPending, currentCentreDelayMs);
+        const float pendingCentreDelayMs = centreDelayForSelection(pendingSelection,
+                                                                   chorusDSP.smoothedDepthValue,
+                                                                   chorusDSP.colorBlockValue);
+        withSelectionContext(pendingSelection, currentRate, chorusDSP.colorBlockValue, [&]
+        {
+            chorusDSP.pendingCore->processDelay(chorusDSP, wetPending, pendingCentreDelayMs);
+        });
 
         if (chorusDSP.coreSwitchWarmupSamplesRemaining > 0)
             chorusDSP.coreSwitchWarmupSamplesRemaining = juce::jmax(0, chorusDSP.coreSwitchWarmupSamplesRemaining - blockNumSamples);
 
         pendingCoreReady = (chorusDSP.coreSwitchWarmupSamplesRemaining <= 0);
     }
+
+    bool applyWetCharacterShared = false;
+    bool applySaturationShared = false;
+    const choroboros::CorePackageDescriptor* sharedDesc = nullptr;
+    int sharedColorIndex = chorusDSP.currentColorIndex;
 
     if (chorusDSP.coreSwitchCrossfadeActive && chorusDSP.previousCore != nullptr)
     {
@@ -436,7 +562,13 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
                                                         static_cast<size_t>(blockNumSamples));
 
         if (chorusDSP.currentCore != nullptr)
+        {
+            processPreEmphasis(chorusDSP,
+                               wetCurrent,
+                               chorusDSP.preEmphasis,
+                               chorusDSP.inputLevel);
             chorusDSP.currentCore->processDelay(chorusDSP, wetCurrent, currentCentreDelayMs);
+        }
 
         if (chorusDSP.coreSwitchOldParamsSnapshotValid)
         {
@@ -462,27 +594,58 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
             }
             chorusDSP.coreSwitchOldBasePhaseRad = phase;
 
-            const float savedRateCurrent = chorusDSP.smoothedRate.getCurrentValue();
-            const float savedRateTarget = chorusDSP.smoothedRate.getTargetValue();
-            const float savedColorCurrent = chorusDSP.smoothedColor.getCurrentValue();
-            const float savedColorTarget = chorusDSP.smoothedColor.getTargetValue();
-            const float savedColorBlock = chorusDSP.colorBlockValue;
-
-            chorusDSP.smoothedRate.setCurrentAndTargetValue(chorusDSP.coreSwitchOldRateHz);
-            chorusDSP.smoothedColor.setCurrentAndTargetValue(chorusDSP.coreSwitchOldColor);
-            chorusDSP.colorBlockValue = chorusDSP.coreSwitchOldColor;
-
-            chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, chorusDSP.coreSwitchOldCentreDelayMs);
-
-            chorusDSP.smoothedRate.setCurrentAndTargetValue(savedRateCurrent);
-            chorusDSP.smoothedRate.setTargetValue(savedRateTarget);
-            chorusDSP.smoothedColor.setCurrentAndTargetValue(savedColorCurrent);
-            chorusDSP.smoothedColor.setTargetValue(savedColorTarget);
-            chorusDSP.colorBlockValue = savedColorBlock;
+            withSelectionContext(previousSelection, chorusDSP.coreSwitchOldRateHz, chorusDSP.coreSwitchOldColor, [&]
+            {
+                processPreEmphasis(chorusDSP,
+                                   wetPrevious,
+                                   chorusDSP.preEmphasis,
+                                   chorusDSP.previousInputLevel);
+                chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, chorusDSP.coreSwitchOldCentreDelayMs);
+            });
         }
         else
         {
-            chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, currentCentreDelayMs);
+            withSelectionContext(previousSelection, currentRate, chorusDSP.colorBlockValue, [&]
+            {
+                processPreEmphasis(chorusDSP,
+                                   wetPrevious,
+                                   chorusDSP.preEmphasis,
+                                   chorusDSP.previousInputLevel);
+                chorusDSP.previousCore->processDelay(chorusDSP, wetPrevious, currentCentreDelayMs);
+            });
+        }
+
+        sharedDesc = &chorusDSP.getCurrentCoreDescriptor();
+        const auto& prevDesc = chorusDSP.getCorePackageDescriptor(chorusDSP.previousCoreId);
+
+        const bool sameColorMacro = std::abs(chorusDSP.coreSwitchOldColor - chorusDSP.colorBlockValue) <= 1.0e-4f;
+        applyWetCharacterShared = (prevDesc.bloomWetCharacter == sharedDesc->bloomWetCharacter
+                                   && prevDesc.focusWetCharacter == sharedDesc->focusWetCharacter
+                                   && sameColorMacro);
+        applySaturationShared = (prevDesc.postChorusSaturation == sharedDesc->postChorusSaturation
+                                 && sameColorMacro);
+
+        if (!applyWetCharacterShared) {
+            withSelectionContext(previousSelection, chorusDSP.coreSwitchOldRateHz, chorusDSP.coreSwitchOldColor, [&]
+            {
+                processWetCharacter(chorusDSP,
+                                    wetPrevious,
+                                    prevDesc,
+                                    chorusDSP.coreSwitchOldColorIndex,
+                                    chorusDSP.previousWetCharacterState);
+            });
+            processWetCharacter(chorusDSP,
+                                wetCurrent,
+                                *sharedDesc,
+                                chorusDSP.currentColorIndex,
+                                chorusDSP.wetCharacterState);
+        }
+        if (!applySaturationShared) {
+            withSelectionContext(previousSelection, chorusDSP.coreSwitchOldRateHz, chorusDSP.coreSwitchOldColor, [&]
+            {
+                processPostChorusSaturation(chorusDSP, wetPrevious, prevDesc, chorusDSP.coreSwitchOldColorIndex);
+            });
+            processPostChorusSaturation(chorusDSP, wetCurrent, *sharedDesc, chorusDSP.currentColorIndex);
         }
 
         const int totalSamples = juce::jmax(1, chorusDSP.coreSwitchCrossfadeTotalSamples);
@@ -531,17 +694,33 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     }
     else
     {
+        processPreEmphasis(chorusDSP,
+                           block,
+                           chorusDSP.preEmphasis,
+                           chorusDSP.inputLevel);
         processChorusDelay(chorusDSP, block, currentCentreDelayMs);
+        sharedDesc = &chorusDSP.getCorePackageDescriptor(chorusDSP.currentCoreId);
+        sharedColorIndex = chorusDSP.currentColorIndex;
+        applyWetCharacterShared = true;
+        applySaturationShared = true;
     }
 
     if (!chorusDSP.coreSwitchCrossfadeActive && pendingCoreReady && chorusDSP.pendingCore != nullptr)
     {
         chorusDSP.previousCore = chorusDSP.currentCore;
+        chorusDSP.previousCoreId = chorusDSP.currentCoreId;
+        chorusDSP.previousInputLevel = chorusDSP.inputLevel;
+        chorusDSP.previousWetCharacterState = chorusDSP.wetCharacterState;
         chorusDSP.currentCore = chorusDSP.pendingCore;
         chorusDSP.currentCoreId = chorusDSP.pendingCoreId;
+        chorusDSP.currentColorIndex = chorusDSP.pendingColorIndex;
+        chorusDSP.currentQualityHQ = chorusDSP.pendingQualityHQ;
+        chorusDSP.modularCoreModeEnabled = chorusDSP.pendingModularCoreModeEnabled;
+        chorusDSP.inputLevel = chorusDSP.pendingInputLevel;
         chorusDSP.pendingCore = nullptr;
         chorusDSP.coreSwitchWarmupSamplesRemaining = 0;
         chorusDSP.coreSwitchWarmupTotalSamples = 0;
+        resetWetCharacterState(chorusDSP.wetCharacterState);
 
         if (chorusDSP.previousCore != nullptr && chorusDSP.spec.sampleRate > 0.0)
         {
@@ -562,8 +741,16 @@ void ChorusDSPProcess::processChorus(ChorusDSP& chorusDSP, juce::dsp::AudioBlock
     }
 
     // Apply wet-character (Green/Blue) and Red NQ saturation before dry/wet mix.
-    processWetCharacter(chorusDSP, block);
-    processPostChorusSaturation(chorusDSP, block);
+    if (applyWetCharacterShared && sharedDesc != nullptr)
+        processWetCharacter(chorusDSP,
+                            block,
+                            *sharedDesc,
+                            sharedColorIndex,
+                            chorusDSP.wetCharacterState);
+        
+    if (applySaturationShared && sharedDesc != nullptr)
+        processPostChorusSaturation(chorusDSP, block, *sharedDesc, sharedColorIndex);
+
     chorusDSP.dryWet.mixWetSamples(block);
     processOutputPeakCatch(chorusDSP, block);
     processOutputTrim(chorusDSP, block);

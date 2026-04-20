@@ -220,7 +220,7 @@ void DevPanel::buildOverviewTab(DevPanelBuildContext& ctx)
     overviewVisualDeck.addAndMakeVisible(overviewSignalFlowCard);
     overviewVisualDeckCards.add(overviewSignalFlowCard);
 
-    auto* overviewDelayTrajectoryCard = makeSparkline("Delay Trajectory (ms)", [readAnalyzerSnapshot]() -> std::vector<float>
+    auto* overviewDelayTrajectoryCard = makeSparkline("Delay Trajectory (tap, ms)", [readAnalyzerSnapshot]() -> std::vector<float>
     {
         std::vector<float> values;
         constexpr int pointCount = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS;
@@ -280,7 +280,20 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
             maxDelay = juce::jmax(maxDelay, snapshot.delayTrajectoryMs[static_cast<size_t>(i)]);
         }
         const float depth = maxDelay - minDelay;
-        return juce::String(depth, 2) + " ms";
+        const juce::String tag = snapshot.delayTrajectoryUsesChorus20msLaw
+            ? " ms (Lagrange tap L)"
+            : " ms";
+        return juce::String(depth, 2) + tag;
+    }));
+    modulationReadouts.add(makeReadOnly("Thiran D_q / xfade (live)", [readAnalyzerSnapshot]() -> juce::String
+    {
+        const auto snapshot = readAnalyzerSnapshot();
+        if (!snapshot.thiranTelemetryFromAudioThread)
+            return "n/a (not Thiran core)";
+        constexpr int lastIdx = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS - 1;
+        const float dq = snapshot.thiranDqMsTrajectory[static_cast<size_t>(lastIdx)];
+        const float xf = snapshot.thiranCoeffXfadeTrajectory[static_cast<size_t>(lastIdx)];
+        return "D_q " + juce::String(dq, 3) + " ms, coeff xfade " + juce::String(xf * 100.0f, 1) + "%";
     }));
     setSectionRowHeight(modulationReadouts, kRowHeightCompact);
     addPanelSection(modulationPanel, "Modulation Readouts -- live values from DSP", modulationReadouts, false);
@@ -361,7 +374,7 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     modulationVisualizerProperties.add(lissajousCard);
     liveReadoutProperties.add(lissajousCard);
 
-    auto* modulationDelayTrajectoryCard = makeSparkline("Delay Trajectory", [readAnalyzerSnapshot]() -> std::vector<float>
+    auto* modulationDelayTrajectoryCard = makeSparkline("Delay Trajectory (tap, ms)", [readAnalyzerSnapshot]() -> std::vector<float>
     {
         std::vector<float> values;
         constexpr int pointCount = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS;
@@ -376,9 +389,41 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
     modulationDelayTrajectoryCard->setPreferredHeight(170);
     modulationVisuals.add(modulationDelayTrajectoryCard);
 
+    auto* thiranDqSpark = makeSparkline("Thiran D (ms, L / audio ring)", [readAnalyzerSnapshot]() -> std::vector<float>
+    {
+        std::vector<float> values;
+        constexpr int pointCount = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS;
+        values.reserve(pointCount);
+        const auto snapshot = readAnalyzerSnapshot();
+        for (int i = 0; i < pointCount; ++i)
+            values.push_back(snapshot.thiranDqMsTrajectory[static_cast<size_t>(i)]);
+        return values;
+    }, LinkGroup::modulation);
+    thiranDqSpark->setName("Thiran Dq Sparkline Card");
+    thiranDqSpark->getProperties().set("devpanelModRole", "thiran_dq");
+    thiranDqSpark->setPreferredHeight(140);
+    modulationVisuals.add(thiranDqSpark);
+    modulationVisualizerProperties.add(thiranDqSpark);
+
+    auto* thiranXfadeSpark = makeSparkline("Thiran integer hop crossfade (0-1, sin^2 law)", [readAnalyzerSnapshot]() -> std::vector<float>
+    {
+        std::vector<float> values;
+        constexpr int pointCount = ChoroborosAudioProcessor::ANALYZER_WAVEFORM_POINTS;
+        values.reserve(pointCount);
+        const auto snapshot = readAnalyzerSnapshot();
+        for (int i = 0; i < pointCount; ++i)
+            values.push_back(snapshot.thiranCoeffXfadeTrajectory[static_cast<size_t>(i)]);
+        return values;
+    }, LinkGroup::modulation);
+    thiranXfadeSpark->setName("Thiran Xfade Sparkline Card");
+    thiranXfadeSpark->getProperties().set("devpanelModRole", "thiran_xfade");
+    thiranXfadeSpark->setPreferredHeight(140);
+    modulationVisuals.add(thiranXfadeSpark);
+    modulationVisualizerProperties.add(thiranXfadeSpark);
+
     auto* modulationWorkbenchCard = new HorizontalControlStripCard(
         "LFO Control Workbench (active profile)",
-        "Drag sliders to adjust -- changes appear in the scopes above in real time");
+        "Drag sliders to adjust -- changes appear in the scopes above in real time. Includes Color and Mix for parity with the main macro row.");
     modulationWorkbenchCard->setName("Modulation LFO Workbench Card");
     modulationWorkbenchCard->getProperties().set("devpanelModRole", "lfo_workbench");
     modulationWorkbenchCard->addControl("LFO Rate (Hz)",
@@ -397,7 +442,16 @@ void DevPanel::buildModulationTab(DevPanelBuildContext& ctx)
                                         makeLiveMappedControl("Stereo Width (x)",
                                                               ChoroborosAudioProcessor::WIDTH_ID,
                                                               0.0f, 4.0f, 0.01f, 1.0f, 1.0f));
+    modulationWorkbenchCard->addControl("Color / Character (%)",
+                                        makeLiveMappedControl("Color / Character (%)",
+                                                              ChoroborosAudioProcessor::COLOR_ID,
+                                                              0.0f, 100.0f, 0.1f, 1.0f, 100.0f));
+    modulationWorkbenchCard->addControl("Dry / Wet Mix (%)",
+                                        makeLiveMappedControl("Dry / Wet Mix (%)",
+                                                              ChoroborosAudioProcessor::MIX_ID,
+                                                              0.0f, 100.0f, 0.1f, 1.0f, 100.0f));
     modulationVisuals.add(modulationWorkbenchCard);
+    liveReadoutProperties.add(modulationWorkbenchCard);
 
     for (auto* visual : modulationVisuals)
     {
@@ -415,46 +469,10 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
     const auto& makeSpectrumOverlay = ctx.makeSpectrumOverlay;
     const auto& makeTransferCurve = ctx.makeTransferCurve;
     const auto& makeLockable = ctx.makeLockable;
+    const auto& makeLiveMappedControl = ctx.makeLiveMappedControl;
     const auto& readRawParam = ctx.readRawParam;
     const auto& readAnalyzerSnapshot = ctx.readAnalyzerSnapshot;
     const auto& registerControlMetadata = ctx.registerControlMetadata;
-    auto makeMappedMacroControl = [this, &makeLockable](const juce::String& name,
-                                                         const char* paramId,
-                                                         float minDisplay,
-                                                         float maxDisplay,
-                                                         float stepDisplay,
-                                                         float skew,
-                                                         float displayScale = 1.0f) -> juce::PropertyComponent*
-    {
-        const float safeScale = juce::jmax(0.0001f, displayScale);
-        return makeLockable(
-            makeFloatValue(
-                [this, paramId, safeScale]
-                {
-                    if (auto* raw = processor.getValueTreeState().getRawParameterValue(paramId))
-                        return processor.mapParameterValue(paramId, raw->load()) * safeScale;
-                    return 0.0f;
-                },
-                [this, paramId, minDisplay, maxDisplay, safeScale](float displayValue)
-                {
-                    if (auto* param = processor.getValueTreeState().getParameter(paramId))
-                    {
-                        const float clampedDisplay = juce::jlimit(minDisplay, maxDisplay, displayValue);
-                        const float mappedValue = clampedDisplay / safeScale;
-                        const float rawValue = processor.unmapParameterValue(paramId, mappedValue);
-                        const auto& range = processor.getValueTreeState().getParameterRange(paramId);
-                        const float normalized = juce::jlimit(0.0f, 1.0f, range.convertTo0to1(rawValue));
-                        param->beginChangeGesture();
-                        param->setValueNotifyingHost(normalized);
-                        param->endChangeGesture();
-                    }
-                }),
-            name,
-            static_cast<double>(minDisplay),
-            static_cast<double>(maxDisplay),
-            static_cast<double>(stepDisplay),
-            static_cast<double>(skew));
-    };
     juce::Array<juce::PropertyComponent*> toneReadouts;
     toneReadouts.add(makeReadOnly("HPF / LPF", [this]() -> juce::String
     {
@@ -543,15 +561,15 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
     };
     auto createColorMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Color Macro (%)",
-                                      ChoroborosAudioProcessor::COLOR_ID,
-                                      0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
+        return makeLiveMappedControl("Color Macro (%)",
+                                     ChoroborosAudioProcessor::COLOR_ID,
+                                     0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
     };
     auto createMixMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Mix Macro (%)",
-                                      ChoroborosAudioProcessor::MIX_ID,
-                                      0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
+        return makeLiveMappedControl("Mix Macro (%)",
+                                     ChoroborosAudioProcessor::MIX_ID,
+                                     0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
     };
     auto addInternalControlToCard = [&](HorizontalControlStripCard& card,
                                         const juce::String& label,
@@ -609,6 +627,7 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
         card->getProperties().set("devpanelToneRole", "transfer_controls");
         populate(*card);
         toneVisuals.add(card);
+        liveReadoutProperties.add(card);
     };
 
     addToneTransferCurveCard("Green Bloom Response Curve", 0, -1,
@@ -869,48 +888,12 @@ void DevPanel::buildToneTab(DevPanelBuildContext& ctx)
 void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
 {
     const auto& makeLockable = ctx.makeLockable;
+    const auto& makeLiveMappedControl = ctx.makeLiveMappedControl;
     const auto& makeReadOnly = ctx.makeReadOnly;
     const auto& makeMultiLineReadOnly = ctx.makeMultiLineReadOnly;
     const auto& makeSignalFlow = ctx.makeSignalFlow;
     const auto& readRawParam = ctx.readRawParam;
     const auto& readAnalyzerSnapshot = ctx.readAnalyzerSnapshot;
-    auto makeMappedMacroControl = [this, &makeLockable](const juce::String& name,
-                                                         const char* paramId,
-                                                         float minDisplay,
-                                                         float maxDisplay,
-                                                         float stepDisplay,
-                                                         float skew,
-                                                         float displayScale = 1.0f) -> juce::PropertyComponent*
-    {
-        const float safeScale = juce::jmax(0.0001f, displayScale);
-        return makeLockable(
-            makeFloatValue(
-                [this, paramId, safeScale]
-                {
-                    if (auto* raw = processor.getValueTreeState().getRawParameterValue(paramId))
-                        return processor.mapParameterValue(paramId, raw->load()) * safeScale;
-                    return 0.0f;
-                },
-                [this, paramId, minDisplay, maxDisplay, safeScale](float displayValue)
-                {
-                    if (auto* param = processor.getValueTreeState().getParameter(paramId))
-                    {
-                        const float clampedDisplay = juce::jlimit(minDisplay, maxDisplay, displayValue);
-                        const float mappedValue = clampedDisplay / safeScale;
-                        const float rawValue = processor.unmapParameterValue(paramId, mappedValue);
-                        const auto& range = processor.getValueTreeState().getParameterRange(paramId);
-                        const float normalized = juce::jlimit(0.0f, 1.0f, range.convertTo0to1(rawValue));
-                        param->beginChangeGesture();
-                        param->setValueNotifyingHost(normalized);
-                        param->endChangeGesture();
-                    }
-                }),
-            name,
-            static_cast<double>(minDisplay),
-            static_cast<double>(maxDisplay),
-            static_cast<double>(stepDisplay),
-            static_cast<double>(skew));
-    };
     auto makeActiveEngineInternalControl = [this, &makeLockable](const juce::String& name,
                                                                   std::function<float(const ChorusDSP::RuntimeTuning&)> getter,
                                                                   std::function<void(ChorusDSP::RuntimeTuning&, float)> setter,
@@ -936,45 +919,45 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     };
     auto createColorMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Color Macro (%)",
-                                      ChoroborosAudioProcessor::COLOR_ID,
-                                      0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
+        return makeLiveMappedControl("Color Macro (%)",
+                                     ChoroborosAudioProcessor::COLOR_ID,
+                                     0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
     };
     auto createMixMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Mix Macro (%)",
-                                      ChoroborosAudioProcessor::MIX_ID,
-                                      0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
+        return makeLiveMappedControl("Mix Macro (%)",
+                                     ChoroborosAudioProcessor::MIX_ID,
+                                     0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
     };
     auto createRateMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Rate Macro (Hz)",
-                                      ChoroborosAudioProcessor::RATE_ID,
-                                      ChoroborosAudioProcessor::RATE_MIN,
-                                      ChoroborosAudioProcessor::RATE_MAX,
-                                      0.01f, 1.0f, 1.0f);
+        return makeLiveMappedControl("Rate Macro (Hz)",
+                                     ChoroborosAudioProcessor::RATE_ID,
+                                     ChoroborosAudioProcessor::RATE_MIN,
+                                     ChoroborosAudioProcessor::RATE_MAX,
+                                     0.01f, 1.0f, 1.0f);
     };
     auto createDepthMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Depth Macro (%)",
-                                      ChoroborosAudioProcessor::DEPTH_ID,
-                                      0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
+        return makeLiveMappedControl("Depth Macro (%)",
+                                     ChoroborosAudioProcessor::DEPTH_ID,
+                                     0.0f, 100.0f, 0.1f, 1.0f, 100.0f);
     };
     auto createOffsetMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Offset Macro (\xC2\xB0)",
-                                      ChoroborosAudioProcessor::OFFSET_ID,
-                                      ChoroborosAudioProcessor::OFFSET_MIN,
-                                      ChoroborosAudioProcessor::OFFSET_MAX,
-                                      0.1f, 1.0f, 1.0f);
+        return makeLiveMappedControl("Offset Macro (\xC2\xB0)",
+                                     ChoroborosAudioProcessor::OFFSET_ID,
+                                     ChoroborosAudioProcessor::OFFSET_MIN,
+                                     ChoroborosAudioProcessor::OFFSET_MAX,
+                                     0.1f, 1.0f, 1.0f);
     };
     auto createWidthMacroControl = [&]() -> juce::PropertyComponent*
     {
-        return makeMappedMacroControl("Width Macro (x)",
-                                      ChoroborosAudioProcessor::WIDTH_ID,
-                                      ChoroborosAudioProcessor::WIDTH_MIN,
-                                      ChoroborosAudioProcessor::WIDTH_MAX,
-                                      0.01f, 1.0f, 1.0f);
+        return makeLiveMappedControl("Width Macro (x)",
+                                     ChoroborosAudioProcessor::WIDTH_ID,
+                                     ChoroborosAudioProcessor::WIDTH_MIN,
+                                     ChoroborosAudioProcessor::WIDTH_MAX,
+                                     0.01f, 1.0f, 1.0f);
     };
     auto createCentreBaseControl = [&]() -> juce::PropertyComponent*
     {
@@ -1306,6 +1289,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     coreAssignmentCard->addControl("NQ Core", makeCoreAssignmentChoice("NQ Core", false));
     coreAssignmentCard->addControl("HQ Core", makeCoreAssignmentChoice("HQ Core", true));
     engineVisuals.add(coreAssignmentCard);
+    liveReadoutProperties.add(coreAssignmentCard);
 
     auto* duplicateWarningCard = makeMultiLineReadOnly("Assignment Warnings", [buildDuplicateWarningSummary]() -> juce::String
     {
@@ -1329,6 +1313,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
     engineMacroWorkbenchCard->addControl("Color Macro (%)", createColorMacroControl());
     engineMacroWorkbenchCard->addControl("Mix Macro (%)", createMixMacroControl());
     engineVisuals.add(engineMacroWorkbenchCard);
+    liveReadoutProperties.add(engineMacroWorkbenchCard);
 
     auto addInternalControlToCard = [&](HorizontalControlStripCard& card,
                                         const juce::String& label,
@@ -1356,6 +1341,7 @@ void DevPanel::buildEngineTab(DevPanelBuildContext& ctx)
         card->getProperties().set("devpanelEngineRole", "engine_specific_macros");
         populate(*card);
         engineVisuals.add(card);
+        liveReadoutProperties.add(card);
     };
 
     addEngineSpecificMacroCard("Green Bloom Macros", 0, -1,
@@ -1631,10 +1617,13 @@ void DevPanel::buildValidationTab(DevPanelBuildContext& ctx)
     auto* analyzerDelayProbeProp = makeReadOnly("Analyzer Delay Probe", [readAnalyzerSnapshot]() -> juce::String
     {
         const auto snapshot = readAnalyzerSnapshot();
-        return snapshot.valid
-            ? (juce::String(snapshot.centerDelayMs, 3) + " ms center, depth "
-               + juce::String(snapshot.modulationDepthMs, 3) + " ms")
-            : "pending";
+        if (!snapshot.valid)
+            return "pending";
+        if (snapshot.delayTrajectoryUsesChorus20msLaw)
+            return juce::String(snapshot.centerDelayMs, 3) + " ms centre, Lagrange tap ±"
+                + juce::String(snapshot.modulationDepthMs, 3) + " ms pk (20 ms × depth×½)";
+        return juce::String(snapshot.centerDelayMs, 3) + " ms center, depth "
+            + juce::String(snapshot.modulationDepthMs, 3) + " ms";
     });
     validationTelemetry.add(analyzerDelayProbeProp);
     analyzerTelemetryProperties.add(analyzerDelayProbeProp);

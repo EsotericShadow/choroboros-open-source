@@ -69,7 +69,8 @@ void ChorusCoreLagrange3rd::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
     const float maxDelaySamples = getMaxDelaySamples();
     
     constexpr float maximumDelayModulation = 20.0f;
-    float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
+    const float centreDelaySamplesBlock = currentCentreDelayMs * spec.sampleRate / 1000.0f;
     float depthSamples = maximumDelayModulation * spec.sampleRate / 1000.0f;
     
     // Access LFO buffers from ChorusDSP (friend class)
@@ -85,13 +86,15 @@ void ChorusCoreLagrange3rd::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
 
         if (!centreDelayInitialized[chIdx])
         {
-            smoothedCentreDelay[chIdx] = centreDelaySamples;
+            smoothedCentreDelay[chIdx] = centreDelaySamplesBlock;
             centreDelayInitialized[chIdx] = true;
         }
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float centreDelaySamplesThis = centreMsThis * spec.sampleRate / 1000.0f;
+            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamplesThis - smoothedCentreDelay[chIdx]);
 
             float delaySamp = smoothedCentreDelay[chIdx] + depthSamples * channelLfo[i];
             delaySamp = juce::jlimit(guardSamples, maxDelaySamples, delaySamp);

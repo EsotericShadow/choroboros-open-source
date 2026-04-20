@@ -74,7 +74,7 @@ void ChorusCoreLinear::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
 
     const auto& tuning = dsp.runtimeTuningSnapshot;
     const float colour = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
-    const float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
     // In Black normal mode, Color controls modulation intensity.
     const float depthScale = juce::jmax(0.0f, tuning.blackNqDepthBase)
                            + juce::jmax(0.0f, tuning.blackNqDepthScale) * colour;
@@ -103,7 +103,9 @@ void ChorusCoreLinear::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
             const float in = channelSamples[i];
             delayLine.pushSample(ch, in);
 
-            float delaySamp = centreDelaySamples + depthSamples * channelLfo[i];
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float centreDelaySamplesThis = centreMsThis * spec.sampleRate / 1000.0f;
+            float delaySamp = centreDelaySamplesThis + depthSamples * channelLfo[i];
             if (static_cast<size_t>(ch) < smoothedDelaySamplesByChannel.size())
             {
                 if (!smoothedDelayInitializedByChannel[static_cast<size_t>(ch)])

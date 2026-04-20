@@ -684,7 +684,15 @@ DevPanel::DevPanel(ChoroborosPluginEditor& editorRef, ChoroborosAudioProcessor& 
         if (n.contains("analyzer frame"))
             return "Latest analyzer snapshot sequence and sample rate. \"pending\" means the analyzer has not produced a valid frame yet.";
         if (n.contains("analyzer delay probe"))
-            return "Live analyzer-derived center delay and modulation depth estimate. Use this to verify motion depth reacts as expected while tuning.";
+            return "Live analyzer-derived centre delay and modulation depth. On Green/Blue/Purple, \"Lagrange tap\" matches the delay-line read (20 ms full-scale × depth × ½ × LFO) used by Cubic/Thiran/Lagrange cores; Thiran then applies a quantized allpass whose group delay is accurate near DC, not a uniform fractional delay at HF.";
+        if (n.contains("delay trajectory"))
+            return "Models total delay-line read time in ms for the active engine. Green/Blue/Purple: matches DSP (centre ms + 20 ms × (depth×½) × sin phase on the left tap). Blue HQ Thiran: same tap law, then a separate Thiran allpass (frequency-dependent delay; see JOS Thiran group-delay plots). Red NQ: BBD band model. Other engines: legacy estimate.";
+        if (n.contains("lfo oscilloscope"))
+            return "Analyzer L/R traces. Green/Blue/Purple: amplitude matches the LFO sent into the delay core (sin/cos × depth × ½ after the global depth mapping, including Purple’s 0–100% → 0–45% depth compression). Other engines may still use the legacy full-scale sketch.";
+        if (n.contains("thiran d_q"))
+            return "Left-channel quantised Thiran design delay D_q (ms), streamed from the audio thread ring. During coefficient crossfades this follows the fade-to slot. Flat steps = piecewise-constant coefficients; compare to the Lagrange tap trajectory above.";
+        if (n.contains("thiran coeff crossfade") || n.contains("sin^2"))
+            return "Crossfade progress 0–1 while two Thiran allpass coefficient sets blend (sin²/cos² weights on the wet branch). Zero when not crossfading.";
         if (n.contains("trace matrix"))
             return "Validation table mapping UI raw values to mapped values, active profile snapshot values, and effective runtime probes for sync checks.";
         if (n.contains("recent touches"))

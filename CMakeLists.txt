@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(CHOROBOROS_USE_EXTERNAL_ASSET_PACK "Load shared external asset packs before BinaryData fallback" ON)
-option(CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK "Allow BinaryData fallback when the shared asset pack is missing" ON)
+option(CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK "Allow BinaryData fallback when the shared asset pack is missing" OFF)
 set(CHOROBOROS_ASSET_PACK_VERSION "${PROJECT_VERSION}" CACHE STRING "Expected shared asset pack version")
 
 # ---------- Sanitizer support (development only) ----------

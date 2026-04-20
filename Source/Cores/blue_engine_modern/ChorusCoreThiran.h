@@ -1,40 +1,9 @@
-/*
- * Choroboros - A chorus that eats its own tail
- * Copyright (C) 2026 Kaizen Strategic AI Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 #pragma once
 
 #include "../ChorusCore.h"
+#include "../InterpolationUtils.h"
 #include <array>
 #include <vector>
-
-// Thiran allpass fractional delay chorus core
-// Blue HQ mode — 5th-order maximally flat group delay allpass filter
-//
-// Uses a dual-allpass crossfade strategy to handle integer delay boundary
-// crossings cleanly. When the integer part of the delay changes, the active
-// allpass (with settled DFII-T state) becomes the "fading out" instance while
-// a fresh allpass (with coefficients for the new integer delay) fades in.
-// A sin²/cos² crossfade (~6ms, sample-rate-invariant) masks the coefficient discontinuity
-// that would otherwise produce scratchy artifacts.
-//
-// Reference: J.-P. Thiran, "Recursive digital filters with maximally
-// flat group delay," IEEE Trans. Circuit Theory, vol. CT-18, no. 6,
-// pp. 659-664, Nov. 1971.
 
 class ChorusCoreThiran : public ChorusCore
 {
@@ -46,94 +15,77 @@ public:
     void reset() override;
     void processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& block, float currentCentreDelayMs) override;
 
-    float getGuardSamples() const override { return static_cast<float>(ORDER) + 1.0f; }
+    // Match cubic-style moving-read requirements
+    float getGuardSamples() const override { return 2.0f; }
     float getMaxDelaySamples() const override;
 
+    // Kept for compatibility with any existing tooling/tests that reference these.
+    static constexpr int thiranCoefficientCount = 6;
+    static constexpr int thiranAllpassOrder = 5;
+    static void computeCoefficientsForTests(float D, std::array<float, thiranCoefficientCount>& out);
+    static float processAllpassForTests(const std::array<float, thiranCoefficientCount>& coeffs,
+                                        std::array<float, thiranAllpassOrder>& state,
+                                        float input);
+
 private:
-    // 5th-order Thiran allpass for HQ fractional delay
     static constexpr int ORDER = 5;
 
-    // Single allpass filter instance
-    struct AllpassInstance
+    struct ChannelState
     {
-        std::array<float, ORDER + 1> a {};
-        std::array<float, ORDER> state {};
-        int intDelay = 0;
-
-        void resetState()
-        {
-            a.fill(0.0f);
-            a[0] = 1.0f;
-            state.fill(0.0f);
-            intDelay = 0;
-        }
-    };
-
-    // Per-channel state with dual-allpass crossfade
-    struct ThiranChannel
-    {
-        AllpassInstance apA;   // Currently active allpass
-        AllpassInstance apB;   // Secondary allpass (used during crossfade)
-
-        // Crossfade state: when integer delay changes, we fade from apA to apB
-        // over xfadeLength samples using sin²/cos² envelope
-        int xfadeCounter = 0;      // Counts down from xfadeLength to 0; 0 = no crossfade active
-        bool aIsActive = true;     // Which instance is the "new" one after crossfade
-
-        // Smoothed delay for stability
         float smoothedDelay = 0.0f;
         bool delayInitialized = false;
-        int lastIntDelay = 0;
-
-        // Gentle one-pole lowpass on output (~16 kHz)
         float outputLpState = 0.0f;
+        std::array<float, 4> voicePhases {{ 0.0f, 1.7f, 3.4f, 5.1f }};
 
         void resetState()
         {
-            apA.resetState();
-            apB.resetState();
-            xfadeCounter = 0;
-            aIsActive = true;
             smoothedDelay = 0.0f;
             delayInitialized = false;
-            lastIntDelay = 0;
             outputLpState = 0.0f;
+            voicePhases = {{ 0.0f, 1.7f, 3.4f, 5.1f }};
         }
     };
 
-    // Compute Thiran allpass coefficients for fractional delay D
-    // D must satisfy ORDER <= D < ORDER + 1
+    // Retained only so old test surfaces still compile.
     static void computeCoefficients(float D, std::array<float, ORDER + 1>& a);
 
-    // Process one sample through Nth-order allpass
-    static float processAllpass(AllpassInstance& ap, float input);
+    float readCubic(int channel, float delaySamples) const
+    {
+        const auto& buf = delayBuffers[static_cast<size_t>(channel)];
+        const int writePos = writePositions[static_cast<size_t>(channel)];
+        float readPos = static_cast<float>(writePos) - delaySamples;
+        while (readPos < 0.0f)
+            readPos += static_cast<float>(bufferSize);
+        return readCubicInterp(buf.data(), bufferMask, readPos);
+    }
 
-    std::vector<ThiranChannel> channels;
-
-    // Integer delay line (circular buffer) for the bulk delay
+    std::vector<ChannelState> channels;
     std::vector<std::vector<float>> delayBuffers;
     std::vector<int> writePositions;
     int bufferSize = 0;
     int bufferMask = 0;
-
     juce::dsp::ProcessSpec spec {};
     int maxDelaySamples = 0;
 
-    // One-pole output lowpass coefficient: y[n] = (1-a)*x[n] + a*y[n-1]
     float outputLpAlpha = 0.0f;
+    float delaySmoothingCoeff = 0.0f;
 
-    // Sample-rate-invariant delay smoothing coefficient.
-    // Derived from a 14ms time constant in prepare() so behaviour is identical
-    // at 44.1 k, 48 k, 96 k, 192 k.  (Was hardcoded 0.9985 — only correct at 48 k.)
-    float delaySmoothingCoeff_ = 0.9985f;
-
-    // Sample-rate-invariant crossfade length (samples).
-    // Derived from a 6.0 ms target duration in prepare().
-    // (Was static constexpr 48 — only 1 ms at 48 k, leaked 1.5% THD transients.)
-    int xfadeLength_ = 288;
-
-    // Per-channel one-pole centre delay smoothing
     std::array<float, 2> smoothedCentreDelay {{ 0.0f, 0.0f }};
     std::array<bool, 2> centreDelayInitialized {{ false, false }};
     float centreDelaySmoothAlpha = 0.0f;
+
+    // HQ multi-voice tuning. The live "thiran" slot is currently a denser
+    // cubic chorus, so the support voices need genuinely different motion and
+    // wider time separation than NQ, not a tight correlated tap cluster.
+    float voice2StaticOffsetSamples = 28.0f;
+    float voice3StaticOffsetSamples = -24.0f;
+    float voice4StaticOffsetSamples = 63.0f;
+    float voice5StaticOffsetSamples = -74.0f;
+    float voice2ModDepthScale = 0.070f;
+    float voice3ModDepthScale = 0.080f;
+    float voice4ModDepthScale = 0.055f;
+    float voice5ModDepthScale = 0.060f;
+    float outerStereoOffsetSamples = 9.0f;
+
+    std::array<float, 5> voiceGain {{ 0.50f, 0.17f, 0.13f, 0.11f, 0.09f }};
 };

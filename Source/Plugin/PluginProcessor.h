@@ -151,6 +151,8 @@ public:
     const std::array<EngineParamProfile, 5>& getEngineParamProfiles() const { return engineParamProfiles; }
     void loadEngineParamProfilesFromVar(const juce::var& profilesVar);
     void syncEngineInternalsToActiveDsp(int colorIndex, bool hqEnabled = false);
+    /** Copy active engine internals into the live DSP buffer and publish tuning (e.g. dev console probe). */
+    void publishActiveRuntimeTuningSnapshotNow();
     void syncCustomEngineTuningToActiveDsp();
     float mapParameterValue(const juce::String& paramId, float rawValue) const;
     float unmapParameterValue(const juce::String& paramId, float mappedValue) const;
@@ -196,6 +198,8 @@ public:
         int blockSize = 0;
         float centerDelayMs = 0.0f;
         float modulationDepthMs = 0.0f;
+        /** When true, delayTrajectoryMs / LFO scopes follow the 20 ms × (depth×½) law used by Green/Blue/Purple Lagrange-family cores (incl. Thiran tap). */
+        bool delayTrajectoryUsesChorus20msLaw = false;
         float inputPeakDb = -100.0f;
         float wetPeakDb = -100.0f;
         float outputPeakDb = -100.0f;
@@ -205,6 +209,10 @@ public:
         std::array<float, ANALYZER_WAVEFORM_POINTS> lfoLeft {};
         std::array<float, ANALYZER_WAVEFORM_POINTS> lfoRight {};
         std::array<float, ANALYZER_WAVEFORM_POINTS> delayTrajectoryMs {};
+        /** Populated from the audio thread when the running core is Thiran (see ChorusDSP ring). */
+        bool thiranTelemetryFromAudioThread = false;
+        std::array<float, ANALYZER_WAVEFORM_POINTS> thiranDqMsTrajectory {};
+        std::array<float, ANALYZER_WAVEFORM_POINTS> thiranCoeffXfadeTrajectory {};
         std::array<float, ANALYZER_FFT_SIZE / 2> inputSpectrum {};
         std::array<float, ANALYZER_FFT_SIZE / 2> wetSpectrum {};
         std::array<float, ANALYZER_FFT_SIZE / 2> outputSpectrum {};

@@ -18,6 +18,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "../Assets/AssetRepository.h"
 #include "../Config/DefaultsPersistence.h"
 #include "../UI/LabelWithContainer.h"
 #include "BinaryData.h"
@@ -783,57 +784,37 @@ void ChoroborosPluginEditor::updateValueLabelColors(int colorIndex)
 void ChoroborosPluginEditor::loadBackgroundImage(int colorIndex)
 {
     colorIndex = juce::jlimit(0, 4, colorIndex);
-    
-    const char* offName = nullptr;
-    int offSize = 0;
-    const char* onName = nullptr;
-    int onSize = 0;
-    
-    if (colorIndex == 0) // Green
-    {
-        offName = BinaryData::green_light_off_backpanel_png;
-        offSize = BinaryData::green_light_off_backpanel_pngSize;
-        onName = BinaryData::green_light_on_backpanel_png;
-        onSize = BinaryData::green_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 1) // Blue
-    {
-        offName = BinaryData::blue_light_off_backpanel_png;
-        offSize = BinaryData::blue_light_off_backpanel_pngSize;
-        onName = BinaryData::blue_light_on_backpanel_png;
-        onSize = BinaryData::blue_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 2) // Red
-    {
-        offName = BinaryData::red_light_off_backpanel_png;
-        offSize = BinaryData::red_light_off_backpanel_pngSize;
-        onName = BinaryData::red_light_on_backpanel_png;
-        onSize = BinaryData::red_light_on_backpanel_pngSize;
-    }
-    else if (colorIndex == 3) // Purple
-    {
-        offName = BinaryData::purple_light_off_backpanel_png;
-        offSize = BinaryData::purple_light_off_backpanel_pngSize;
-        onName = BinaryData::purple_light_on_backpanel_png;
-        onSize = BinaryData::purple_light_on_backpanel_pngSize;
-    }
-    else // Black (colorIndex == 4)
-    {
-        offName = BinaryData::black_light_off_backpanel_png;
-        offSize = BinaryData::black_light_off_backpanel_pngSize;
-        onName = BinaryData::black_light_on_backpanel_png;
-        onSize = BinaryData::black_light_on_backpanel_pngSize;
-    }
-    
-    if (offName && offSize > 0)
-        backgroundImage = juce::ImageCache::getFromMemory(offName, offSize);
-    else
-        backgroundImage = juce::Image();
 
-    if (onName && onSize > 0)
-        backgroundImageLit = juce::ImageCache::getFromMemory(onName, onSize);
-    else
-        backgroundImageLit = juce::Image();
+    juce::String offAssetId;
+    juce::String onAssetId;
+
+    switch (colorIndex)
+    {
+        case 0:
+            offAssetId = choroboros::assets::ids::greenBackgroundOff;
+            onAssetId = choroboros::assets::ids::greenBackgroundOn;
+            break;
+        case 1:
+            offAssetId = choroboros::assets::ids::blueBackgroundOff;
+            onAssetId = choroboros::assets::ids::blueBackgroundOn;
+            break;
+        case 2:
+            offAssetId = choroboros::assets::ids::redBackgroundOff;
+            onAssetId = choroboros::assets::ids::redBackgroundOn;
+            break;
+        case 3:
+            offAssetId = choroboros::assets::ids::purpleBackgroundOff;
+            onAssetId = choroboros::assets::ids::purpleBackgroundOn;
+            break;
+        case 4:
+        default:
+            offAssetId = choroboros::assets::ids::blackBackgroundOff;
+            onAssetId = choroboros::assets::ids::blackBackgroundOn;
+            break;
+    }
+
+    backgroundImage = choroboros::assets::AssetRepository::instance().loadImage(offAssetId, true).image;
+    backgroundImageLit = choroboros::assets::AssetRepository::instance().loadImage(onAssetId, true).image;
 }
 
 int ChoroborosPluginEditor::calculateLabelWidth(const juce::String& text, const juce::Font& font) const

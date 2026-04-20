@@ -2,9 +2,46 @@
 
 namespace choroboros::assets
 {
+namespace
+{
+juce::File getPlatformAppDataBase(juce::File::SpecialLocationType locationType)
+{
+    auto base = juce::File::getSpecialLocation(locationType);
+
+#if JUCE_MAC
+    base = base.getChildFile("Application Support");
+#endif
+
+    return base;
+}
+
+juce::File getUserAssetRoot()
+{
+    return getPlatformAppDataBase(juce::File::userApplicationDataDirectory)
+        .getChildFile("Kaizen Strategic AI")
+        .getChildFile("Choroboros")
+        .getChildFile("Assets");
+}
+
+juce::String getNamedPackDirectoryName()
+{
+    return "ChoroborosAssets-" + juce::String(kExpectedPackVersion);
+}
+
+void appendPackCandidates(juce::Array<juce::File>& candidates, const juce::File& root)
+{
+    if (root == juce::File())
+        return;
+
+    candidates.addIfNotAlreadyThere(root.getChildFile(kExpectedPackVersion));
+    candidates.addIfNotAlreadyThere(root.getChildFile(getNamedPackDirectoryName()));
+    candidates.addIfNotAlreadyThere(root);
+}
+}
+
 juce::File AssetLocator::getSharedAssetRoot()
 {
-    return juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
+    return getPlatformAppDataBase(juce::File::commonApplicationDataDirectory)
         .getChildFile("Kaizen Strategic AI")
         .getChildFile("Choroboros")
         .getChildFile("Assets");
@@ -22,11 +59,13 @@ juce::Array<juce::File> AssetLocator::getCandidatePackDirectories()
     if (const auto overrideDir = juce::SystemStats::getEnvironmentVariable(kAssetPackOverrideEnvVar, {});
         overrideDir.isNotEmpty())
     {
-        candidates.add(juce::File(overrideDir));
+        const juce::File overrideFile(overrideDir);
+        appendPackCandidates(candidates, overrideFile);
+        candidates.addIfNotAlreadyThere(overrideFile);
     }
 
-    candidates.addIfNotAlreadyThere(getExpectedPackDirectory());
-    candidates.addIfNotAlreadyThere(getSharedAssetRoot());
+    appendPackCandidates(candidates, getUserAssetRoot());
+    appendPackCandidates(candidates, getSharedAssetRoot());
 
     return candidates;
 }

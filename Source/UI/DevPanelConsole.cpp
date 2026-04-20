@@ -155,6 +155,36 @@ bool parseModeToken(const juce::String& token, bool& hqEnabledOut)
     return false;
 }
 
+/** Dev isolation: one mode at a time; see docs/HIL_V205_A_THIRAN_BLUE_HQ.md */
+const char* reductionProbeHint(int mode)
+{
+    static const char* const hints[] = {
+        "normal (all processing on)",
+        "Thiran: bypass wet output one-pole (~9.5 kHz)",
+        "Thiran: bypass delay-line slew (target delay per sample)",
+        "Thiran: snap fractional coeff smooth (full computeCoefficients + V&L cold-start state)",
+        "Thiran: bypass integer sin^2/cos^2 crossfade (instant hop)",
+        "Blue: skip Focus wet path (presence/tilt); Thiran unchanged",
+        "Chorus path: skip pre-emphasis before delay core (wet input shaping off)",
+        "Global: skip output LPF after chorus (input HPF still runs)",
+        "Global: skip stereo width M/S after chorus",
+        "Global: skip safety lookahead limiter (may clip on hot material)",
+        "Global: skip input HPF before chorus (full band into chorus)",
+        "Chorus path: skip post-mix wet peak catch (compressor-style GR off)",
+        "Chorus path: skip output trim gain (smoother still advances)",
+        "Thiran: snap inner centre-delay smoother to block target each sample",
+        "Chorus path: LFO depth block-constant (skip oscVolume SmoothedValue multiplyBy)",
+        "Thiran EXP: integer-hop incoming branch starts with zero IIR state (no state copy)",
+        "Thiran EXP: freeze coeff updates within integer-delay buckets (no intra-bucket glide)",
+        "Thiran EXP: pin integer-delay bucket (no hop scheduler/xfade), modulate fractional D only",
+        "Thiran EXP: keep hops but add hop hysteresis + min dwell (diagnostic anti-chatter)"
+    };
+    static constexpr int hintCount = static_cast<int>(sizeof(hints) / sizeof(hints[0]));
+    if (mode >= 0 && mode < hintCount)
+        return hints[static_cast<size_t>(mode)];
+    return "?";
+}
+
 template <typename Fn>
 void forEachRuntimeTuningValue(const ChorusDSP::RuntimeTuning& tuning, Fn&& fn)
 {
@@ -260,6 +290,7 @@ void forEachRuntimeTuningValue(const ChorusDSP::RuntimeTuning& tuning, Fn&& fn)
     fn("tape_ratio_max", tuning.tapeRatioMax.load());
     fn("tape_wet_gain", tuning.tapeWetGain.load());
     fn("tape_hermite_tension", tuning.tapeHermiteTension.load());
+    fn("thiran_reduction_probe", static_cast<float>(tuning.thiranReductionProbe.load()));
 }
 } // namespace
 
@@ -383,6 +414,8 @@ juce::StringArray DevPanel::buildConsoleAutocompleteCommands() const
         "view engine", "view tape", "view layout", "view look", "view lookfeel", "view validation", "view settings",
         "macro rate", "macro depth", "macro offset", "macro width", "macro color", "macro mix",
         "dump green", "dump blue", "dump red", "dump purple", "dump black",
+        "probe 0", "probe 1", "probe 2", "probe 3", "probe 4", "probe 5",
+        "probe 6", "probe 7", "probe 8", "probe 9", "probe 10", "probe 11", "probe 12", "probe 13", "probe 14", "probe list",
         "list green", "list blue", "list red", "list purple", "list black", "list globals",
         "list green all", "list blue all", "list red all", "list purple all", "list black all",
         "list green full", "list blue full", "list red full", "list purple full", "list black full", "list globals full",
@@ -911,6 +944,7 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
             "  watch <target>\n"
             "  unwatch <target>\n"
             "  dump <color>\n"
+            "  probe <0..18|list>  (isolation; 1-18 = one bypass/experiment; 0 = clear both; list = all modes)\n"
             "  diff factory\n"
             "  search <term>\n"
             "  stats\n"
@@ -1995,6 +2029,52 @@ ConsoleCommandResult DevPanel::executeConsoleCommand(const juce::String& command
 
         runSnapshotAction("fx " + juce::String(preset), [this, preset] { applyValueFxPreset(preset); });
         result.output = "Applied FX preset " + juce::String(preset) + ".";
+        return result;
+    }
+
+    if (action == "probe")
+    {
+        if (tokens.size() < 2)
+        {
+            result.output = "ERROR: usage: probe <0..18|list>  (0=normal; probe list = describe all).";
+            return result;
+        }
+
+        const juce::String sub = tokens[1].trim().toLowerCase();
+        if (sub == "list")
+        {
+            juce::StringArray lines;
+            lines.add("Reduction probe modes (one at a time). Rough signal order:");
+            lines.add("  [10: input HPF] -> pre-chorus sat -> LFO [14: depth snap] -> [6: pre-emphasis] -> delay core [13: inner centre snap] -> wet char -> dry/wet ->");
+            lines.add("  [11: peak catch] -> [12: output trim] -> [7: output LPF] -> [8: width] -> [9: safety limiter]");
+            lines.add("Thiran-only: 1-4. Blue Focus wet: 5.");
+            lines.add("");
+            for (int m = 0; m <= 18; ++m)
+                lines.add("  " + juce::String(m) + " - " + juce::String(reductionProbeHint(m)));
+            lines.add("");
+            lines.add("If no mode removes the buzz: likely core+LFO interaction or a host/level artefact. A mode that only changes timbre/level may mask, not fix.");
+            result.output = lines.joinIntoString("\n");
+            return result;
+        }
+
+        const int mode = juce::jlimit(0, 18, tokens[1].getIntValue());
+        runSnapshotAction("probe " + juce::String(mode), [this, mode]
+        {
+            const int engine = juce::jlimit(0, 4, processor.getCurrentEngineColorIndex());
+            if (mode == 0)
+            {
+                processor.getEngineDspInternals(engine, false).thiranReductionProbe.store(0);
+                processor.getEngineDspInternals(engine, true).thiranReductionProbe.store(0);
+            }
+            else
+            {
+                const bool hq = processor.isHqEnabled();
+                processor.getEngineDspInternals(engine, hq).thiranReductionProbe.store(mode);
+            }
+            processor.publishActiveRuntimeTuningSnapshotNow();
+        });
+
+        result.output = "probe " + juce::String(mode) + " - " + juce::String(reductionProbeHint(mode));
         return result;
     }
 

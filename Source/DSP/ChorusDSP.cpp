@@ -30,6 +30,7 @@
 #include "../Cores/purple_engine_experimental/ChorusCoreOrbit.h"
 #include "../Cores/black_engine_linear/ChorusCoreLinear.h"
 #include "../Cores/black_engine_linear/ChorusCoreLinearEnsemble.h"
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -65,6 +66,7 @@ std::unique_ptr<ChorusCore> createCoreForId(choroboros::CoreId coreId)
 
     return std::make_unique<ChorusCoreLagrange3rd>();
 }
+
 }
 
 ChorusDSP::ChorusDSP()
@@ -99,8 +101,27 @@ ChorusDSP::ChorusDSP()
     currentColorIndex = 0;
     currentQualityHQ = false;
     coreAssignments.resetToLegacy();
-    currentCore = resolveCorePointer(currentColorIndex, currentQualityHQ, &currentCoreId);
+    currentCore = resolveCorePointer(currentColorIndex, currentQualityHQ, modularCoreModeEnabled, &currentCoreId);
     pendingCoreId = currentCoreId;
+    pendingColorIndex = currentColorIndex;
+    pendingQualityHQ = currentQualityHQ;
+    pendingModularCoreModeEnabled = modularCoreModeEnabled;
+}
+
+void ChorusDSP::resetWetCharacterState(WetCharacterState& state, size_t channelCount)
+{
+    state.greenWetLPState.assign(channelCount, 0.0f);
+    state.blueWetHPState.assign(channelCount, 0.0f);
+    state.blueWetLPState.assign(channelCount, 0.0f);
+    state.bluePresenceState.assign(channelCount, BiquadState{});
+    state.bluePresenceB0 = 1.0f;
+    state.bluePresenceB1 = 0.0f;
+    state.bluePresenceB2 = 0.0f;
+    state.bluePresenceA1 = 0.0f;
+    state.bluePresenceA2 = 0.0f;
+    state.bluePresenceCachedFreqHz = -1.0f;
+    state.bluePresenceCachedQ = -1.0f;
+    state.bluePresenceCachedGainDb = -1000.0f;
 }
 
 ChorusDSP::~ChorusDSP()
@@ -138,7 +159,7 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningSnapshot.preEmphasisFreqHz = juce::jmax(20.0f, runtimeTuning.preEmphasisFreqHz.load());
     runtimeTuningSnapshot.preEmphasisQ = juce::jmax(0.1f, runtimeTuning.preEmphasisQ.load());
     runtimeTuningSnapshot.preEmphasisGain = juce::jmax(0.01f, runtimeTuning.preEmphasisGain.load());
-    runtimeTuningSnapshot.preEmphasisLevelSmoothing = juce::jmax(0.001f, runtimeTuning.preEmphasisLevelSmoothing.load());  // τ in seconds
+    runtimeTuningSnapshot.preEmphasisLevelSmoothing = clamp01(runtimeTuning.preEmphasisLevelSmoothing.load());
     runtimeTuningSnapshot.preEmphasisQuietThreshold = juce::jmax(0.0f, runtimeTuning.preEmphasisQuietThreshold.load());
     runtimeTuningSnapshot.preEmphasisMaxAmount = juce::jmax(0.0f, runtimeTuning.preEmphasisMaxAmount.load());
     runtimeTuningSnapshot.compressorAttackMs = juce::jmax(0.1f, runtimeTuning.compressorAttackMs.load());
@@ -215,12 +236,13 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningSnapshot.tapeCentreScale = runtimeTuning.tapeCentreScale.load();
     runtimeTuningSnapshot.tapeToneMaxHz = juce::jmax(20.0f, runtimeTuning.tapeToneMaxHz.load());
     runtimeTuningSnapshot.tapeToneMinHz = juce::jmax(20.0f, runtimeTuning.tapeToneMinHz.load());
-    runtimeTuningSnapshot.tapeToneSmoothingCoeff = juce::jmax(0.01f, runtimeTuning.tapeToneSmoothingCoeff.load());  // τ in ms
+    runtimeTuningSnapshot.tapeToneSmoothingCoeff = clamp01(runtimeTuning.tapeToneSmoothingCoeff.load());
     runtimeTuningSnapshot.tapeDriveScale = juce::jmax(0.0f, runtimeTuning.tapeDriveScale.load());
     runtimeTuningSnapshot.tapeLfoRatioScale = runtimeTuning.tapeLfoRatioScale.load();
     runtimeTuningSnapshot.tapeLfoModSmoothingCoeff = clamp01(runtimeTuning.tapeLfoModSmoothingCoeff.load());
     runtimeTuningSnapshot.tapeRatioSmoothingCoeff = clamp01(runtimeTuning.tapeRatioSmoothingCoeff.load());
-    runtimeTuningSnapshot.tapePhaseDampingPerSec = clamp01(runtimeTuning.tapePhaseDampingPerSec.load());
+    runtimeTuningSnapshot.tapePhaseDamping = clamp01(runtimeTuning.tapePhaseDampingPerSec.load());
+    runtimeTuningSnapshot.tapePhaseDampingPerSec = runtimeTuningSnapshot.tapePhaseDamping;
     runtimeTuningSnapshot.tapeWowFreqBase = juce::jmax(0.0f, runtimeTuning.tapeWowFreqBase.load());
     runtimeTuningSnapshot.tapeWowFreqSpread = runtimeTuning.tapeWowFreqSpread.load();
     runtimeTuningSnapshot.tapeFlutterFreqBase = juce::jmax(0.0f, runtimeTuning.tapeFlutterFreqBase.load());
@@ -233,6 +255,7 @@ void ChorusDSP::applyRuntimeTuning()
     runtimeTuningSnapshot.tapeRatioMax = runtimeTuning.tapeRatioMax.load();
     runtimeTuningSnapshot.tapeWetGain = juce::jmax(0.0f, runtimeTuning.tapeWetGain.load());
     runtimeTuningSnapshot.tapeHermiteTension = juce::jlimit(0.0f, 1.0f, runtimeTuning.tapeHermiteTension.load());
+    runtimeTuningSnapshot.thiranReductionProbe = juce::jlimit(0.0f, 18.0f, runtimeTuning.thiranReductionProbe.load());
 
     const bool forceApply = !runtimeTuningApplied;
 
@@ -351,6 +374,7 @@ void ChorusDSP::applyRuntimeTuning()
     lastAppliedTuningSnapshot.tapeToneSmoothingCoeff = runtimeTuningSnapshot.tapeToneSmoothingCoeff;
     lastAppliedTuningSnapshot.tapeLfoModSmoothingCoeff = runtimeTuningSnapshot.tapeLfoModSmoothingCoeff;
     lastAppliedTuningSnapshot.tapeRatioSmoothingCoeff = runtimeTuningSnapshot.tapeRatioSmoothingCoeff;
+    lastAppliedTuningSnapshot.tapePhaseDamping = runtimeTuningSnapshot.tapePhaseDamping;
     lastAppliedTuningSnapshot.tapePhaseDampingPerSec = runtimeTuningSnapshot.tapePhaseDampingPerSec;
     lastAppliedTuningSnapshot.centreDelayBaseMs = runtimeTuningSnapshot.centreDelayBaseMs;
     lastAppliedTuningSnapshot.centreDelayScale = runtimeTuningSnapshot.centreDelayScale;
@@ -358,6 +382,7 @@ void ChorusDSP::applyRuntimeTuning()
     lastAppliedTuningSnapshot.preEmphasisQuietThreshold = runtimeTuningSnapshot.preEmphasisQuietThreshold;
     lastAppliedTuningSnapshot.preEmphasisMaxAmount = runtimeTuningSnapshot.preEmphasisMaxAmount;
     lastAppliedTuningSnapshot.saturationDriveScale = runtimeTuningSnapshot.saturationDriveScale;
+    lastAppliedTuningSnapshot.thiranReductionProbe = runtimeTuningSnapshot.thiranReductionProbe;
     runtimeTuningApplied = true;
 }
 
@@ -398,7 +423,7 @@ TuningSnapshot ChorusDSP::precomputeTuningSnapshot()
     snapshot.preEmphasisFreqHz = juce::jmax(20.0f, runtimeTuning.preEmphasisFreqHz.load());
     snapshot.preEmphasisQ = juce::jmax(0.1f, runtimeTuning.preEmphasisQ.load());
     snapshot.preEmphasisGain = juce::jmax(0.01f, runtimeTuning.preEmphasisGain.load());
-    snapshot.preEmphasisLevelSmoothing = juce::jmax(0.001f, runtimeTuning.preEmphasisLevelSmoothing.load());  // τ in seconds
+    snapshot.preEmphasisLevelSmoothing = clamp01(runtimeTuning.preEmphasisLevelSmoothing.load());
     snapshot.preEmphasisQuietThreshold = juce::jmax(0.0f, runtimeTuning.preEmphasisQuietThreshold.load());
     snapshot.preEmphasisMaxAmount = juce::jmax(0.0f, runtimeTuning.preEmphasisMaxAmount.load());
     snapshot.compressorAttackMs = juce::jmax(0.1f, runtimeTuning.compressorAttackMs.load());
@@ -475,12 +500,13 @@ TuningSnapshot ChorusDSP::precomputeTuningSnapshot()
     snapshot.tapeCentreScale = runtimeTuning.tapeCentreScale.load();
     snapshot.tapeToneMaxHz = juce::jmax(20.0f, runtimeTuning.tapeToneMaxHz.load());
     snapshot.tapeToneMinHz = juce::jmax(20.0f, runtimeTuning.tapeToneMinHz.load());
-    snapshot.tapeToneSmoothingCoeff = juce::jmax(0.01f, runtimeTuning.tapeToneSmoothingCoeff.load());  // τ in ms
+    snapshot.tapeToneSmoothingCoeff = clamp01(runtimeTuning.tapeToneSmoothingCoeff.load());
     snapshot.tapeDriveScale = juce::jmax(0.0f, runtimeTuning.tapeDriveScale.load());
     snapshot.tapeLfoRatioScale = runtimeTuning.tapeLfoRatioScale.load();
     snapshot.tapeLfoModSmoothingCoeff = clamp01(runtimeTuning.tapeLfoModSmoothingCoeff.load());
     snapshot.tapeRatioSmoothingCoeff = clamp01(runtimeTuning.tapeRatioSmoothingCoeff.load());
-    snapshot.tapePhaseDampingPerSec = clamp01(runtimeTuning.tapePhaseDampingPerSec.load());
+    snapshot.tapePhaseDamping = clamp01(runtimeTuning.tapePhaseDampingPerSec.load());
+    snapshot.tapePhaseDampingPerSec = snapshot.tapePhaseDamping;
     snapshot.tapeWowFreqBase = juce::jmax(0.0f, runtimeTuning.tapeWowFreqBase.load());
     snapshot.tapeWowFreqSpread = runtimeTuning.tapeWowFreqSpread.load();
     snapshot.tapeFlutterFreqBase = juce::jmax(0.0f, runtimeTuning.tapeFlutterFreqBase.load());
@@ -493,6 +519,7 @@ TuningSnapshot ChorusDSP::precomputeTuningSnapshot()
     snapshot.tapeRatioMax = runtimeTuning.tapeRatioMax.load();
     snapshot.tapeWetGain = juce::jmax(0.0f, runtimeTuning.tapeWetGain.load());
     snapshot.tapeHermiteTension = juce::jlimit(0.0f, 1.0f, runtimeTuning.tapeHermiteTension.load());
+    snapshot.thiranReductionProbe = juce::jlimit(0.0f, 18.0f, runtimeTuning.thiranReductionProbe.load());
 
     // Precompute filter coefficients (heap allocation OK on message thread)
     auto hpfCoeffsPtr = juce::dsp::IIR::Coefficients<float>::makeHighPass(
@@ -636,6 +663,7 @@ void ChorusDSP::applyTuningOnAudioThread(const TuningSnapshot& snapshot)
     runtimeTuningSnapshot.tapeLfoRatioScale = snapshot.tapeLfoRatioScale;
     runtimeTuningSnapshot.tapeLfoModSmoothingCoeff = snapshot.tapeLfoModSmoothingCoeff;
     runtimeTuningSnapshot.tapeRatioSmoothingCoeff = snapshot.tapeRatioSmoothingCoeff;
+    runtimeTuningSnapshot.tapePhaseDamping = snapshot.tapePhaseDamping;
     runtimeTuningSnapshot.tapePhaseDampingPerSec = snapshot.tapePhaseDampingPerSec;
     runtimeTuningSnapshot.tapeWowFreqBase = snapshot.tapeWowFreqBase;
     runtimeTuningSnapshot.tapeWowFreqSpread = snapshot.tapeWowFreqSpread;
@@ -649,6 +677,7 @@ void ChorusDSP::applyTuningOnAudioThread(const TuningSnapshot& snapshot)
     runtimeTuningSnapshot.tapeRatioMax = snapshot.tapeRatioMax;
     runtimeTuningSnapshot.tapeWetGain = snapshot.tapeWetGain;
     runtimeTuningSnapshot.tapeHermiteTension = snapshot.tapeHermiteTension;
+    runtimeTuningSnapshot.thiranReductionProbe = snapshot.thiranReductionProbe;
 
     // Install filter coefficients into pre-allocated Coefficients objects.
     // Overwrite the internal coefficient arrays without allocating new shared_ptr.
@@ -699,18 +728,8 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     coreCrossfadeBufferB.setSize(static_cast<int>(spec.numChannels), maxBlockSize, false, false, true);
 
     const size_t channelCount = static_cast<size_t>(juce::jmax(0, static_cast<int>(spec.numChannels)));
-    greenWetLPState.assign(channelCount, 0.0f);
-    blueWetHPState.assign(channelCount, 0.0f);
-    blueWetLPState.assign(channelCount, 0.0f);
-    bluePresenceState.assign(channelCount, BiquadState{});
-    bluePresenceB0 = 1.0f;
-    bluePresenceB1 = 0.0f;
-    bluePresenceB2 = 0.0f;
-    bluePresenceA1 = 0.0f;
-    bluePresenceA2 = 0.0f;
-    bluePresenceCachedFreqHz = -1.0f;
-    bluePresenceCachedQ = -1.0f;
-    bluePresenceCachedGainDb = -1000.0f;
+    resetWetCharacterState(wetCharacterState, channelCount);
+    resetWetCharacterState(previousWetCharacterState, channelCount);
     
     // Initialize parameter smoothers
     // CRITICAL: Smooth ALL delay-related parameters to prevent read pointer discontinuities
@@ -742,10 +761,6 @@ void ChorusDSP::prepare(const juce::dsp::ProcessSpec& processSpec)
     preallocatedHpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 30.0f, 0.707f);
     preallocatedLpfCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 20000.0f, 0.707f);
     preallocatedPreEmphasisCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter(spec.sampleRate, 3000.0f, 0.707f, 1.2f);
-
-    // Safety limiter lookahead buffers (pre-allocated, no allocation in process)
-    safetyLimiterL.prepare (spec.sampleRate, static_cast<int> (spec.maximumBlockSize));
-    safetyLimiterR.prepare (spec.sampleRate, static_cast<int> (spec.maximumBlockSize));
 
     reset();
 }
@@ -782,10 +797,10 @@ void ChorusDSP::reset()
     compressor.reset();
     for (auto& comp : wetCompressors)
         comp.envelope = 0.0f;
-    safetyLimiterL.reset();
-    safetyLimiterR.reset();
     
     inputLevel = 0.0f;
+    previousInputLevel = 0.0f;
+    pendingInputLevel = 0.0f;
     coreSwitchCrossfadeActive = false;
     coreSwitchCrossfadeSamplesRemaining = 0;
     coreSwitchCrossfadeTotalSamples = 0;
@@ -804,17 +819,14 @@ void ChorusDSP::reset()
     lastLfoAmplitude = 0.0f;
     previousCore = nullptr;
     pendingCore = nullptr;
-    currentCore = resolveCorePointer(currentColorIndex, currentQualityHQ, &currentCoreId);
+    currentCore = resolveCorePointer(currentColorIndex, currentQualityHQ, modularCoreModeEnabled, &currentCoreId);
     pendingCoreId = currentCoreId;
+    pendingColorIndex = currentColorIndex;
+    pendingQualityHQ = currentQualityHQ;
+    pendingModularCoreModeEnabled = modularCoreModeEnabled;
 
-    std::fill(greenWetLPState.begin(), greenWetLPState.end(), 0.0f);
-    std::fill(blueWetHPState.begin(), blueWetHPState.end(), 0.0f);
-    std::fill(blueWetLPState.begin(), blueWetLPState.end(), 0.0f);
-    for (auto& state : bluePresenceState)
-        state = {};
-    bluePresenceCachedFreqHz = -1.0f;
-    bluePresenceCachedQ = -1.0f;
-    bluePresenceCachedGainDb = -1000.0f;
+    resetWetCharacterState(wetCharacterState, wetCharacterState.greenWetLPState.size());
+    resetWetCharacterState(previousWetCharacterState, previousWetCharacterState.greenWetLPState.size());
     colorBlockValue = smoothedColor.getCurrentValue();
     
     // Reset raw depth smoothing state to the current 0-1 parameter value.
@@ -898,7 +910,9 @@ float ChorusDSP::applySaturation(float sample, float colorValue)
     return sample + color * (saturated - sample);
 }
 
-void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float colorValue)
+void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block,
+                                     float colorValue,
+                                     WetCharacterState& state)
 {
     if (block.getNumSamples() == 0 || spec.sampleRate <= 0.0)
         return;
@@ -926,7 +940,7 @@ void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float 
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* data = block.getChannelPointer(ch);
-        float lpState = greenWetLPState[static_cast<size_t>(ch)];
+        float lpState = state.greenWetLPState[static_cast<size_t>(ch)];
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -936,11 +950,13 @@ void ChorusDSP::processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float 
             data[i] = bloomed * bloomGain;
         }
 
-        greenWetLPState[static_cast<size_t>(ch)] = lpState;
+        state.greenWetLPState[static_cast<size_t>(ch)] = lpState;
     }
 }
 
-void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float colorValue)
+void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block,
+                                    float colorValue,
+                                    WetCharacterState& state)
 {
     if (block.getNumSamples() == 0 || spec.sampleRate <= 0.0)
         return;
@@ -975,9 +991,9 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
     const float presenceQ = juce::jmap(focus, 0.0f, 1.0f, presenceQMin, presenceQMax);
     const float presenceGainDb = juce::jmap(focus, 0.0f, 1.0f, 0.0f, presenceGainMaxDb);
     const bool needsCoeffUpdate =
-        std::abs(presenceFreqHz - bluePresenceCachedFreqHz) > 1.0f
-        || std::abs(presenceQ - bluePresenceCachedQ) > 0.005f
-        || std::abs(presenceGainDb - bluePresenceCachedGainDb) > 0.02f;
+        std::abs(presenceFreqHz - state.bluePresenceCachedFreqHz) > 1.0f
+        || std::abs(presenceQ - state.bluePresenceCachedQ) > 0.005f
+        || std::abs(presenceGainDb - state.bluePresenceCachedGainDb) > 0.02f;
 
     if (needsCoeffUpdate)
     {
@@ -995,14 +1011,14 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
         const float a2 = 1.0f - alpha / A;
         const float invA0 = 1.0f / a0;
 
-        bluePresenceB0 = b0 * invA0;
-        bluePresenceB1 = b1 * invA0;
-        bluePresenceB2 = b2 * invA0;
-        bluePresenceA1 = a1 * invA0;
-        bluePresenceA2 = a2 * invA0;
-        bluePresenceCachedFreqHz = presenceFreqHz;
-        bluePresenceCachedQ = presenceQ;
-        bluePresenceCachedGainDb = presenceGainDb;
+        state.bluePresenceB0 = b0 * invA0;
+        state.bluePresenceB1 = b1 * invA0;
+        state.bluePresenceB2 = b2 * invA0;
+        state.bluePresenceA1 = a1 * invA0;
+        state.bluePresenceA2 = a2 * invA0;
+        state.bluePresenceCachedFreqHz = presenceFreqHz;
+        state.bluePresenceCachedQ = presenceQ;
+        state.bluePresenceCachedGainDb = presenceGainDb;
     }
 
     const float wetBlend = juce::jlimit(0.0f, 1.0f, tuning.blueFocusWetBlend) * focus;
@@ -1012,9 +1028,9 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* data = block.getChannelPointer(ch);
-        float hpState = blueWetHPState[static_cast<size_t>(ch)];
-        float lpState = blueWetLPState[static_cast<size_t>(ch)];
-        BiquadState& presenceState = bluePresenceState[static_cast<size_t>(ch)];
+        float hpState = state.blueWetHPState[static_cast<size_t>(ch)];
+        float lpState = state.blueWetLPState[static_cast<size_t>(ch)];
+        BiquadState& presenceState = state.bluePresenceState[static_cast<size_t>(ch)];
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -1024,11 +1040,11 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
             lpState = (1.0f - lpAlpha) * highPassed + lpAlpha * lpState;
 
             const float peqOut =
-                bluePresenceB0 * lpState
-                + bluePresenceB1 * presenceState.x1
-                + bluePresenceB2 * presenceState.x2
-                - bluePresenceA1 * presenceState.y1
-                - bluePresenceA2 * presenceState.y2;
+                state.bluePresenceB0 * lpState
+                + state.bluePresenceB1 * presenceState.x1
+                + state.bluePresenceB2 * presenceState.x2
+                - state.bluePresenceA1 * presenceState.y1
+                - state.bluePresenceA2 * presenceState.y2;
             presenceState.x2 = presenceState.x1;
             presenceState.x1 = lpState;
             presenceState.y2 = presenceState.y1;
@@ -1038,8 +1054,8 @@ void ChorusDSP::processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float c
             data[i] = focused * outputGain;
         }
 
-        blueWetHPState[static_cast<size_t>(ch)] = hpState;
-        blueWetLPState[static_cast<size_t>(ch)] = lpState;
+        state.blueWetHPState[static_cast<size_t>(ch)] = hpState;
+        state.blueWetLPState[static_cast<size_t>(ch)] = lpState;
     }
 }
 
@@ -1082,6 +1098,24 @@ void ChorusDSP::process(const juce::dsp::AudioBlock<float>& block)
         return;
     
     juce::ScopedNoDenormals noDenormals;
+
+    const int nextColor = targetColorIndex.load(std::memory_order_acquire);
+    const bool nextHq = targetQualityHQ.load(std::memory_order_acquire);
+    const bool nextModular = targetModularMode.load(std::memory_order_acquire);
+    const bool topologyDirty = modularTopologyDirty.load(std::memory_order_acquire);
+
+    if (!coreSwitchCrossfadeActive
+        && (currentColorIndex != nextColor
+            || currentQualityHQ != nextHq
+            || modularCoreModeEnabled != nextModular
+            || topologyDirty))
+    {
+        // Update the color map smoother target here on the audio thread
+        smoothedColor.setTargetValue(mapColorToEngineRange(color));
+        switchCore(nextColor, nextHq, nextModular);
+        if (topologyDirty)
+            modularTopologyDirty.store(false, std::memory_order_release);
+    }
     
     juce::dsp::AudioBlock<float> nonConstBlock = block;
     auto context = juce::dsp::ProcessContextReplacing<float>(nonConstBlock);
@@ -1094,27 +1128,8 @@ void ChorusDSP::process(const juce::dsp::AudioBlock<float>& block)
     lpf.process(context);
     if (nonConstBlock.getNumChannels() >= 2)
         processWidth(nonConstBlock);
-
-    // Safety limiter: lookahead true-peak limiting AFTER width processing.
-    // Width M/S can amplify side channel → new peaks the peak catcher missed.
-    // Scan both channels for true peaks, then apply delayed+ramped gain.
-    {
-        const int numSamples = static_cast<int>(nonConstBlock.getNumSamples());
-        auto* left  = nonConstBlock.getChannelPointer (0);
-        auto* right = (nonConstBlock.getNumChannels() >= 2)
-                    ? nonConstBlock.getChannelPointer (1) : nullptr;
-
-        safetyLimiterL.scanBlock (left, numSamples);
-        if (right != nullptr)
-            safetyLimiterR.scanBlock (right, numSamples);
-
-        for (int i = 0; i < numSamples; ++i)
-        {
-            left[i] = safetyLimiterL.process (left[i]);
-            if (right != nullptr)
-                right[i] = safetyLimiterR.process (right[i]);
-        }
-    }
+    // Legacy full-output compression is bypassed. A transparent post-sum peak
+    // catcher runs inside processChorus after dry/wet mixing instead.
 }
 
 void ChorusDSP::setRate(float rateHz_)
@@ -1153,23 +1168,14 @@ void ChorusDSP::setColor(float color_)
 void ChorusDSP::setEngineColor(int colorIndex)
 {
     colorIndex = juce::jlimit(0, 4, colorIndex);
-    if (currentColorIndex != colorIndex)
-    {
-        currentColorIndex = colorIndex;
-        // Preserve the raw depth smoother state across engine switches. The
-        // per-engine mapping is applied after smoothing during processing.
-        smoothedColor.setTargetValue(mapColorToEngineRange(color));
-        switchCore(currentColorIndex, currentQualityHQ);
-    }
+    if (targetColorIndex.load(std::memory_order_relaxed) != colorIndex)
+        targetColorIndex.store(colorIndex, std::memory_order_release);
 }
 
 void ChorusDSP::setQualityEnabled(bool enabled)
 {
-    if (currentQualityHQ != enabled)
-    {
-        currentQualityHQ = enabled;
-        switchCore(currentColorIndex, currentQualityHQ);
-    }
+    if (targetQualityHQ.load(std::memory_order_relaxed) != enabled)
+        targetQualityHQ.store(enabled, std::memory_order_release);
 }
 
 void ChorusDSP::setMix(float mix_)
@@ -1185,17 +1191,23 @@ void ChorusDSP::setOutputTrim(float trimDb)
     smoothedOutputTrimGain.setTargetValue(trimGain);
 }
 
-void ChorusDSP::switchCore(int colorIndex, bool hq)
+void ChorusDSP::switchCore(int colorIndex, bool hq, bool modularMode)
 {
     choroboros::CoreId resolvedCoreId = choroboros::CoreId::lagrange3;
-    ChorusCore* newCore = resolveCorePointer(colorIndex, hq, &resolvedCoreId);
+    ChorusCore* newCore = resolveCorePointer(colorIndex, hq, modularMode, &resolvedCoreId);
     if (newCore == nullptr)
         return;
 
     if (newCore == currentCore)
     {
+        currentColorIndex = colorIndex;
+        currentQualityHQ = hq;
+        modularCoreModeEnabled = modularMode;
         currentCoreId = resolvedCoreId;
         pendingCoreId = resolvedCoreId;
+        pendingColorIndex = colorIndex;
+        pendingQualityHQ = hq;
+        pendingModularCoreModeEnabled = modularMode;
         pendingCore = nullptr;
         coreSwitchTargetCrossfadeSamples = 0;
         coreSwitchWarmupSamplesRemaining = 0;
@@ -1206,6 +1218,9 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     if (newCore == pendingCore)
     {
         pendingCoreId = resolvedCoreId;
+        pendingColorIndex = colorIndex;
+        pendingQualityHQ = hq;
+        pendingModularCoreModeEnabled = modularMode;
         return;
     }
 
@@ -1273,6 +1288,9 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     // Warm up the target core silently before audible crossfade to avoid residual-state zippering
     // when revisiting a previously used engine.
     coreSwitchOldParamsSnapshotValid = true;
+    coreSwitchOldColorIndex = currentColorIndex;
+    coreSwitchOldQualityHQ = currentQualityHQ;
+    coreSwitchOldModularCoreModeEnabled = modularCoreModeEnabled;
     coreSwitchOldRateHz = smoothedRate.getCurrentValue();
     coreSwitchOldDepth = smoothedDepthValue;
     coreSwitchOldCentreDelayMs = smoothedCentreDelay.getCurrentValue();
@@ -1282,15 +1300,24 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
     coreSwitchOldLfoAmplitude = lastLfoAmplitude;
     pendingCore = newCore;
     pendingCoreId = resolvedCoreId;
+    pendingColorIndex = colorIndex;
+    pendingQualityHQ = hq;
+    pendingModularCoreModeEnabled = modularMode;
 
     // Reset the pending core's delay buffers and internal state so warmup
     // starts from silence rather than stale content from a previous engine
     // configuration. Without this, residual buffer data can produce a click
     // at the start of the crossfade.
     pendingCore->reset();
+    pendingInputLevel = inputLevel;
 
     if (spec.sampleRate > 0.0)
     {
+        // A core's delay read-pointer can jump backwards up to (centreDelay + depthSamples) ms.
+        // We must push AT LEAST this much audio during warmup to flush zeroes from the new core's buffer.
+        // Max UI Depth is 20ms (+ LFO interpolation margin). Add 35ms of safety buffer.
+        const float requiredWarmupMs = smoothedCentreDelay.getCurrentValue() + 35.0f;
+
         float warmupMs, crossfadeMs;
         if (qualityToggleOnly)
         {
@@ -1304,34 +1331,32 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
             const bool deepSwitch = structurallyDifferent || (colorIndex == 3);
             if (deepSwitch)
             {
-                warmupMs  = juce::jmap(switchSeverity, 50.0f, 100.0f);
+                warmupMs  = juce::jmax(requiredWarmupMs, juce::jmap(switchSeverity, 50.0f, 100.0f));
                 crossfadeMs = juce::jmap(switchSeverity, 65.0f, 140.0f);
             }
             else
             {
                 // Green (Lagrange3↔5) — similar architectures, shorter crossfade
-                warmupMs  = 30.0f;
+                warmupMs  = juce::jmax(requiredWarmupMs, 30.0f);
                 crossfadeMs = 40.0f;
             }
         }
         else
         {
-            warmupMs = juce::jmap(switchSeverity, 35.0f, 100.0f);
+            warmupMs = juce::jmax(requiredWarmupMs, juce::jmap(switchSeverity, 35.0f, 100.0f));
             crossfadeMs = juce::jmap(switchSeverity, 55.0f, 180.0f);
         }
         coreSwitchWarmupTotalSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * warmupMs * 0.001f)));
         coreSwitchTargetCrossfadeSamples = juce::jmax(1, static_cast<int>(std::round(spec.sampleRate * crossfadeMs * 0.001f)));
         coreSwitchWarmupSamplesRemaining = coreSwitchWarmupTotalSamples;
-        dryWet.reset();
-        if (coreCrossfadeBufferA.getNumSamples() > 0)
-            coreCrossfadeBufferA.clear();
-        if (coreCrossfadeBufferB.getNumSamples() > 0)
-            coreCrossfadeBufferB.clear();
     }
     else
     {
         currentCore = pendingCore;
         currentCoreId = pendingCoreId;
+        currentColorIndex = pendingColorIndex;
+        currentQualityHQ = pendingQualityHQ;
+        modularCoreModeEnabled = pendingModularCoreModeEnabled;
         pendingCore = nullptr;
         coreSwitchCrossfadeTotalSamples = 0;
         coreSwitchCrossfadeSamplesRemaining = 0;
@@ -1346,18 +1371,15 @@ void ChorusDSP::switchCore(int colorIndex, bool hq)
 
 void ChorusDSP::setModularCoreModeEnabled(bool enabled)
 {
-    if (modularCoreModeEnabled == enabled)
-        return;
-
-    modularCoreModeEnabled = enabled;
-    switchCore(currentColorIndex, currentQualityHQ);
+    if (targetModularMode.load(std::memory_order_relaxed) != enabled)
+        targetModularMode.store(enabled, std::memory_order_release);
 }
 
 void ChorusDSP::setCoreAssignments(const choroboros::CoreAssignmentTable& assignments)
 {
     coreAssignments = assignments;
-    if (modularCoreModeEnabled)
-        switchCore(currentColorIndex, currentQualityHQ);
+    if (targetModularMode.load(std::memory_order_relaxed))
+        modularTopologyDirty.store(true, std::memory_order_release);
 }
 
 bool ChorusDSP::setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::CoreId coreId)
@@ -1371,8 +1393,8 @@ bool ChorusDSP::setCoreAssignment(int colorIndex, bool hqEnabled, choroboros::Co
     const bool duplicate = choroboros::assignmentIsDuplicate(coreAssignments, safeEngine, hqEnabled, safeCoreId);
     coreAssignments.set(safeEngine, hqEnabled, safeCoreId);
 
-    if (modularCoreModeEnabled && safeEngine == currentColorIndex && hqEnabled == currentQualityHQ)
-        switchCore(currentColorIndex, currentQualityHQ);
+    if (targetModularMode.load(std::memory_order_relaxed) && safeEngine == targetColorIndex.load(std::memory_order_relaxed) && hqEnabled == targetQualityHQ.load(std::memory_order_relaxed))
+        modularTopologyDirty.store(true, std::memory_order_release);
 
     return duplicate;
 }
@@ -1424,12 +1446,35 @@ const choroboros::CorePackageDescriptor& ChorusDSP::getCorePackageDescriptor(cho
     return choroboros::descriptorForCore(coreId);
 }
 
-ChorusCore* ChorusDSP::resolveCorePointer(int colorIndex, bool hqEnabled, choroboros::CoreId* outCoreId)
+int ChorusDSP::getSafetyLimiterLatencySamples() const noexcept
+{
+    return 0;
+}
+
+void ChorusDSP::pushThiranTelemetrySample(float, float) noexcept
+{
+}
+
+void ChorusDSP::copyLatestThiranTelemetryForAnalyzer(float* dqOut, float* xfadeOut, int numSamples) const noexcept
+{
+    if (dqOut == nullptr || xfadeOut == nullptr || numSamples <= 0)
+        return;
+
+    std::fill(dqOut, dqOut + numSamples, 0.0f);
+    std::fill(xfadeOut, xfadeOut + numSamples, 0.0f);
+}
+
+const float* ChorusDSP::getCentreDelayMsPerSample(int) const noexcept
+{
+    return nullptr;
+}
+
+ChorusCore* ChorusDSP::resolveCorePointer(int colorIndex, bool hqEnabled, bool modularMode, choroboros::CoreId* outCoreId)
 {
     const int safeEngine = juce::jlimit(0, 4, colorIndex);
     const int safeMode = hqEnabled ? 1 : 0;
 
-    if (modularCoreModeEnabled)
+    if (modularMode)
     {
         const choroboros::CoreId assigned = coreAssignments.get(safeEngine, hqEnabled);
         std::size_t coreIndex = static_cast<std::size_t>(assigned);

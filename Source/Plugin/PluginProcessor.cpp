@@ -305,6 +305,10 @@ void loadRuntimeTuningFromVar(const juce::var& internalsVar, ChorusDSP::RuntimeT
     internals.tapeRatioMax.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeRatioMax", internals.tapeRatioMax.load())));
     internals.tapeWetGain.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeWetGain", internals.tapeWetGain.load())));
     internals.tapeHermiteTension.store(static_cast<float>(getNumberOrDefault(internalsVar, "tapeHermiteTension", internals.tapeHermiteTension.load())));
+    internals.thiranReductionProbe.store(
+        juce::jlimit(0, 14, static_cast<int>(std::lround(
+            getNumberOrDefault(internalsVar, "thiranReductionProbe",
+                               static_cast<float>(internals.thiranReductionProbe.load()))))));
 }
 
 void setRedNQDefaults(ChorusDSP::RuntimeTuning& r)
@@ -581,6 +585,7 @@ void copyRuntimeTuningValues(const ChorusDSP::RuntimeTuning& src, ChorusDSP::Run
     dst.tapeRatioMax.store(src.tapeRatioMax.load());
     dst.tapeWetGain.store(src.tapeWetGain.load());
     dst.tapeHermiteTension.store(src.tapeHermiteTension.load());
+    dst.thiranReductionProbe.store(src.thiranReductionProbe.load());
 }
 
 bool applyDefaultsFromJson(ChoroborosAudioProcessor& processor, const juce::String& json)
@@ -723,14 +728,41 @@ void loadPersistedDefaults(ChoroborosAudioProcessor& processor)
     applyDefaultsFromJson(processor, json);
 }
 
+juce::File getFactorySeedHashFile()
+{
+    return DefaultsPersistence::getFactoryDefaultsFile()
+        .getParentDirectory()
+        .getChildFile("defaults_factory_seed_hash.txt");
+}
+
+void backupDefaultsFileIfNeeded(const juce::File& file,
+                                const juce::String& bundledJson,
+                                const juce::String& stem,
+                                const juce::String& bundledHash)
+{
+    if (!file.existsAsFile())
+        return;
+
+    const auto existing = file.loadFileAsString();
+    if (existing.isEmpty() || existing == bundledJson)
+        return;
+
+    const auto suffixHash = bundledHash.substring(0, juce::jmin(8, bundledHash.length()));
+    const auto millis = juce::String(juce::Time::getCurrentTime().toMilliseconds());
+    const auto backup = file.getParentDirectory().getChildFile(
+        stem + "_pre_factory_refresh_" + suffixHash + "_" + millis + ".json");
+
+    if (!file.copyFileTo(backup))
+        DefaultsPersistence::logFailure("Failed to back up defaults before factory refresh: " + file.getFullPathName());
+}
+
 void seedPersistedDefaultsFromBundledFactory()
 {
     const auto userFile = DefaultsPersistence::getUserDefaultsFile();
     const auto factoryFile = DefaultsPersistence::getFactoryDefaultsFile();
+    const auto seedHashFile = getFactorySeedHashFile();
     const bool seedUser = !userFile.existsAsFile() || userFile.getSize() <= 0;
     const bool seedFactory = !factoryFile.existsAsFile() || factoryFile.getSize() <= 0;
-    if (!seedUser && !seedFactory)
-        return;
 
 #if JUCE_WINDOWS
     const char* resourceName = "windows_factory_defaults_json";
@@ -750,11 +782,37 @@ void seedPersistedDefaultsFromBundledFactory()
     if (bundledJson.isEmpty() || juce::JSON::parse(bundledJson).isVoid())
         return;
 
+    const juce::String bundledHash = juce::String::toHexString(static_cast<juce::int64>(bundledJson.hashCode64()));
+    const juce::String seededHash = seedHashFile.existsAsFile() ? seedHashFile.loadFileAsString().trim() : juce::String{};
+    const bool needsForcedRefresh = seededHash != bundledHash;
+    // Factory refreshes should never silently clobber an existing user-authored
+    // defaults_user.json. Seed user defaults only when the file is missing.
+    const bool shouldWriteUser = seedUser;
+    const bool shouldWriteFactory = seedFactory || needsForcedRefresh;
+
+    if (!shouldWriteUser && !shouldWriteFactory)
+        return;
+
+    if (needsForcedRefresh && shouldWriteFactory)
+        backupDefaultsFileIfNeeded(factoryFile, bundledJson, "defaults_factory", bundledHash);
+
     juce::String writeError;
-    if (seedFactory)
-        DefaultsPersistence::saveFactory(bundledJson, &writeError);
-    if (seedUser)
-        DefaultsPersistence::saveUser(bundledJson, &writeError);
+    bool writeOk = true;
+
+    if (shouldWriteFactory)
+        writeOk = DefaultsPersistence::forceWriteFactory(bundledJson, &writeError) && writeOk;
+    if (shouldWriteUser)
+        writeOk = DefaultsPersistence::saveUser(bundledJson, &writeError) && writeOk;
+
+    if (!writeOk)
+    {
+        if (writeError.isNotEmpty())
+            DefaultsPersistence::logFailure("Factory default refresh failed: " + writeError);
+        return;
+    }
+
+    if (!seedHashFile.replaceWithText(bundledHash))
+        DefaultsPersistence::logFailure("Failed to write defaults factory seed hash marker: " + seedHashFile.getFullPathName());
 }
 } // namespace
 
@@ -1538,6 +1596,22 @@ bool ChoroborosAudioProcessor::isHqEnabled() const
     return false;
 }
 
+void ChoroborosAudioProcessor::publishActiveRuntimeTuningSnapshotNow()
+{
+    if (chorusDSP == nullptr || isShuttingDown.load(std::memory_order_acquire))
+        return;
+
+    const int color = juce::jlimit(0, 4, getCurrentEngineColorIndex());
+    const bool hq = isHqEnabled();
+    syncEngineInternalsToActiveDsp(color, hq);
+    // Custom engines replace tuning from their own object; keep dev probe on the colour slot.
+    chorusDSP->getRuntimeTuning().thiranReductionProbe.store(
+        engineInternals[color][hq ? 1 : 0].thiranReductionProbe.load());
+
+    const auto snapshot = chorusDSP->precomputeTuningSnapshot();
+    chorusDSP->getTuningConfigManager().publishTuning(snapshot);
+}
+
 void ChoroborosAudioProcessor::syncEngineInternalsToActiveDsp(int colorIndex, bool hqEnabled)
 {
     const int clamped = juce::jlimit(0, 4, colorIndex);
@@ -2243,7 +2317,15 @@ void ChoroborosAudioProcessor::runAnalyzerPass()
     const float offsetDeg = mapParameterValue(OFFSET_ID, readRaw(OFFSET_ID));
     const float offsetRad = juce::degreesToRadians(offsetDeg);
     const auto& rt = getDspInternals();
-    const bool isRedNQ = getCurrentEngineColorIndex() == 2 && !isHqEnabled();
+    const int engineColor = juce::jlimit(0, 4, getCurrentEngineColorIndex());
+    const bool isRedNQ = engineColor == 2 && !isHqEnabled();
+
+    float depthEngine = depthMapped;
+    if (engineColor == 3)
+        depthEngine *= 0.45f;
+
+    const bool chorusStyleFixed20ms = !isRedNQ
+        && (engineColor == 0 || engineColor == 1 || engineColor == 3);
 
     float centerDelayMs = rt.centreDelayBaseMs.load() + rt.centreDelayScale.load() * depthMapped;
     float modulationDepthMs = juce::jmax(0.02f, rt.centreDelayScale.load() * depthMapped * 0.25f);
@@ -2256,11 +2338,16 @@ void ChoroborosAudioProcessor::runAnalyzerPass()
         bbdMinMs = rt.bbdDelayMinMs.load();
         bbdMaxMs = rt.bbdDelayMaxMs.load();
     }
+    else if (chorusStyleFixed20ms)
+    {
+        modulationDepthMs = juce::jmax(0.02f, 10.0f * depthEngine);
+    }
 
     if (needModulation || needTelemetry)
     {
         snapshot.centerDelayMs = centerDelayMs;
         snapshot.modulationDepthMs = modulationDepthMs;
+        snapshot.delayTrajectoryUsesChorus20msLaw = chorusStyleFixed20ms;
     }
 
     if (needModulation)
@@ -2271,15 +2358,39 @@ void ChoroborosAudioProcessor::runAnalyzerPass()
         {
             const float t = static_cast<float>(i) / static_cast<float>(waveformPoints - 1);
             const float phase = phaseScale * t;
-            const float lfoL = std::sin(phase) * depthMapped;
-            const float lfoR = std::sin(phase + offsetRad) * depthMapped;
+            float lfoL;
+            float lfoR;
+            float delayMs;
+            if (chorusStyleFixed20ms)
+            {
+                lfoL = std::sin(phase) * (0.5f * depthEngine);
+                lfoR = std::sin(phase + offsetRad) * (0.5f * depthEngine);
+                delayMs = centerDelayMs + lfoL * 20.0f;
+            }
+            else
+            {
+                lfoL = std::sin(phase) * depthMapped;
+                lfoR = std::sin(phase + offsetRad) * depthMapped;
+                delayMs = centerDelayMs + lfoL * modulationDepthMs;
+                if (isRedNQ)
+                    delayMs = juce::jlimit(bbdMinMs, bbdMaxMs, delayMs);
+            }
             snapshot.lfoLeft[static_cast<size_t>(i)] = lfoL;
             snapshot.lfoRight[static_cast<size_t>(i)] = lfoR;
-
-            float delayMs = centerDelayMs + lfoL * modulationDepthMs;
-            if (isRedNQ)
-                delayMs = juce::jlimit(bbdMinMs, bbdMaxMs, delayMs);
             snapshot.delayTrajectoryMs[static_cast<size_t>(i)] = delayMs;
+        }
+
+        snapshot.thiranTelemetryFromAudioThread = false;
+        snapshot.thiranDqMsTrajectory.fill(0.0f);
+        snapshot.thiranCoeffXfadeTrajectory.fill(0.0f);
+        if (chorusDSP != nullptr
+            && chorusDSP->getCurrentResolvedCoreId() == choroboros::CoreId::thiran)
+        {
+            chorusDSP->copyLatestThiranTelemetryForAnalyzer(
+                snapshot.thiranDqMsTrajectory.data(),
+                snapshot.thiranCoeffXfadeTrajectory.data(),
+                waveformPoints);
+            snapshot.thiranTelemetryFromAudioThread = true;
         }
     }
 

@@ -1,34 +1,51 @@
-/*
- * Choroboros - A chorus that eats its own tail
- * Copyright (C) 2026 Kaizen Strategic AI Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 #include "ChorusCoreThiran.h"
 #include "../../DSP/ChorusDSP.h"
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
-ChorusCoreThiran::ChorusCoreThiran()
+namespace
 {
+float wrapPhasePositive(float phase)
+{
+    constexpr float twoPi = juce::MathConstants<float>::twoPi;
+
+    while (phase >= twoPi)
+        phase -= twoPi;
+    while (phase < 0.0f)
+        phase += twoPi;
+
+    return phase;
 }
+
+float thiranProcessAllpassOneStep(const std::array<float, ChorusCoreThiran::thiranCoefficientCount>& a,
+                                  std::array<float, ChorusCoreThiran::thiranAllpassOrder>& s,
+                                  const float input)
+{
+    constexpr int N = ChorusCoreThiran::thiranAllpassOrder;
+    static_assert(ChorusCoreThiran::thiranCoefficientCount == N + 1, "Thiran coeff count");
+
+    const float output = a[static_cast<size_t>(N)] * input + s[0];
+
+    for (int k = 0; k < N - 1; ++k)
+    {
+        s[static_cast<size_t>(k)] = a[static_cast<size_t>(N - 1 - k)] * input
+                                 - a[static_cast<size_t>(k + 1)] * output
+                                 + s[static_cast<size_t>(k + 1)];
+    }
+
+    s[static_cast<size_t>(N - 1)] = a[0] * input - a[static_cast<size_t>(N)] * output;
+    return output;
+}
+} // namespace
+
+ChorusCoreThiran::ChorusCoreThiran() = default;
 
 void ChorusCoreThiran::computeCoefficients(float D, std::array<float, ORDER + 1>& a)
 {
-    const float Df = juce::jlimit(static_cast<float>(ORDER) + 0.01f,
-                                  static_cast<float>(ORDER) + 0.99f, D);
+    // Retained for compatibility with existing tests/tooling.
+    const float dMin = static_cast<float>(ORDER) - 0.5f + 0.01f;
+    const float dMax = static_cast<float>(ORDER) + 0.5f - 0.01f;
+    const float Df = juce::jlimit(dMin, dMax, D);
     const int N = ORDER;
 
     a[0] = 1.0f;
@@ -44,11 +61,13 @@ void ChorusCoreThiran::computeCoefficients(float D, std::array<float, ORDER + 1>
         {
             const double num = static_cast<double>(Df) - static_cast<double>(N) + static_cast<double>(n);
             const double den = static_cast<double>(Df) - static_cast<double>(N) + static_cast<double>(k) + static_cast<double>(n);
-            if (std::abs(den) < 1e-12)
+
+            if (std::abs(den) < 1.0e-12)
             {
                 prod = 0.0;
                 break;
             }
+
             prod *= num / den;
         }
 
@@ -57,23 +76,19 @@ void ChorusCoreThiran::computeCoefficients(float D, std::array<float, ORDER + 1>
     }
 }
 
-float ChorusCoreThiran::processAllpass(AllpassInstance& ap, float input)
+void ChorusCoreThiran::computeCoefficientsForTests(float D, std::array<float, thiranCoefficientCount>& out)
 {
-    const auto& a = ap.a;
-    auto& s = ap.state;
+    static_assert(ORDER + 1 == thiranCoefficientCount, "coefficient array size");
+    std::array<float, ORDER + 1> tmp {};
+    computeCoefficients(D, tmp);
+    out = tmp;
+}
 
-    const float output = a[ORDER] * input + s[0];
-
-    for (int k = 0; k < ORDER - 1; ++k)
-    {
-        s[static_cast<size_t>(k)] = a[static_cast<size_t>(ORDER - 1 - k)] * input
-                                   - a[static_cast<size_t>(k + 1)] * output
-                                   + s[static_cast<size_t>(k + 1)];
-    }
-
-    s[ORDER - 1] = a[0] * input - a[ORDER] * output;
-
-    return output;
+float ChorusCoreThiran::processAllpassForTests(const std::array<float, thiranCoefficientCount>& coeffs,
+                                               std::array<float, thiranAllpassOrder>& state,
+                                               const float input)
+{
+    return thiranProcessAllpassOneStep(coeffs, state, input);
 }
 
 void ChorusCoreThiran::prepare(const juce::dsp::ProcessSpec& processSpec, ChorusDSP*)
@@ -84,65 +99,78 @@ void ChorusCoreThiran::prepare(const juce::dsp::ProcessSpec& processSpec, Chorus
     constexpr float oscVolumeMultiplier = 0.5f;
     constexpr float maxDepth = 1.0f;
     constexpr float maxCentreDelayMs = 100.0f;
-    constexpr int guardMarginSamples = ORDER + 2;
+    constexpr int guardMarginSamples = 4;
 
     maxDelaySamples = static_cast<int>(std::ceil(
         (maximumDelayModulation * maxDepth * oscVolumeMultiplier + maxCentreDelayMs)
-        * spec.sampleRate / 1000.0)) + guardMarginSamples;
+        * spec.sampleRate / 1000.0f)) + guardMarginSamples;
 
     bufferSize = 1;
-    while (bufferSize < maxDelaySamples + ORDER + 2)
+    while (bufferSize < maxDelaySamples + 4)
         bufferSize <<= 1;
     bufferMask = bufferSize - 1;
 
-    channels.resize(static_cast<size_t>(spec.numChannels));
     delayBuffers.resize(static_cast<size_t>(spec.numChannels));
     writePositions.resize(static_cast<size_t>(spec.numChannels));
-
-    // Gentle one-pole lowpass on output (~16 kHz)
-    {
-        constexpr float outputLpCutoffHz = 16000.0f;
-        const float w = 2.0f * juce::MathConstants<float>::pi * outputLpCutoffHz
-                        / static_cast<float>(spec.sampleRate);
-        outputLpAlpha = std::exp(-w);
-    }
-
-    // Sample-rate-invariant delay smoothing: 14ms time constant
-    // (was hardcoded 0.9985 which is only ~14ms at 48k; halves at 96k)
-    {
-        constexpr float delaySmoothingTauMs = 14.0f;
-        delaySmoothingCoeff_ = std::exp(-1.0f / (delaySmoothingTauMs * 0.001f
-                                                  * static_cast<float>(spec.sampleRate)));
-    }
-
-    // Sample-rate-invariant crossfade length: 6.0ms
-    // Originally 1ms (48 samples @ 48k), which leaked boundary-crossing
-    // transients at ~1.5% THD.  At 6ms the sin²/cos² envelope masks the
-    // state-copy transient fully (THD drops to ~0.14%).  The longer window
-    // also means fewer crossings per second (guard prevents overlapping
-    // crossfades), which further reduces artifacts.
-    xfadeLength_ = std::max(4, static_cast<int>(0.006f * static_cast<float>(spec.sampleRate)));
-
-    // ~3ms centre delay smoothing
-    centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
-    smoothedCentreDelay.fill(0.0f);
-    centreDelayInitialized.fill(false);
+    channels.resize(static_cast<size_t>(spec.numChannels));
 
     for (size_t ch = 0; ch < delayBuffers.size(); ++ch)
     {
         delayBuffers[ch].assign(static_cast<size_t>(bufferSize), 0.0f);
         writePositions[ch] = 0;
         channels[ch].resetState();
+        auto& phases = channels[ch].voicePhases;
+        for (size_t voiceIndex = 0; voiceIndex < phases.size(); ++voiceIndex)
+        {
+            const float phaseSeed = 0.61f * static_cast<float>(voiceIndex)
+                                  + 0.43f * static_cast<float>(ch)
+                                  + 0.29f * static_cast<float>(voiceIndex * voiceIndex);
+            phases[voiceIndex] = wrapPhasePositive(phaseSeed);
+        }
     }
+
+    // Similar center smoothing to cubic NQ so the family feels related.
+    centreDelaySmoothAlpha = 1.0f - std::exp(-1.0f / (0.003f * static_cast<float>(spec.sampleRate)));
+
+    // Small extra slew smoothing for HQ polish.
+    {
+        constexpr float delaySmoothingTauMs = 6.0f;
+        delaySmoothingCoeff = std::exp(-1.0f / (delaySmoothingTauMs * 0.001f * static_cast<float>(spec.sampleRate)));
+    }
+
+    {
+        constexpr float outputLpCutoffHz = 8200.0f;
+        const float w = 2.0f * juce::MathConstants<float>::pi * outputLpCutoffHz
+                      / static_cast<float>(spec.sampleRate);
+        outputLpAlpha = std::exp(-w);
+    }
+
+    smoothedCentreDelay.fill(0.0f);
+    centreDelayInitialized.fill(false);
 }
 
 void ChorusCoreThiran::reset()
 {
     for (auto& buffer : delayBuffers)
         std::fill(buffer.begin(), buffer.end(), 0.0f);
+
     std::fill(writePositions.begin(), writePositions.end(), 0);
+
     for (auto& ch : channels)
         ch.resetState();
+
+    for (size_t ch = 0; ch < channels.size(); ++ch)
+    {
+        auto& phases = channels[ch].voicePhases;
+        for (size_t voiceIndex = 0; voiceIndex < phases.size(); ++voiceIndex)
+        {
+            const float phaseSeed = 0.61f * static_cast<float>(voiceIndex)
+                                  + 0.43f * static_cast<float>(ch)
+                                  + 0.29f * static_cast<float>(voiceIndex * voiceIndex);
+            phases[voiceIndex] = wrapPhasePositive(phaseSeed);
+        }
+    }
+
     smoothedCentreDelay.fill(0.0f);
     centreDelayInitialized.fill(false);
 }
@@ -157,18 +185,25 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
     const int numChannels = static_cast<int>(block.getNumChannels());
     const int blockNumSamples = static_cast<int>(block.getNumSamples());
 
+    const int p = dsp.runtimeTuningSnapshot.thiranReductionProbe;
+    const int reductionProbe = (p >= 1 && p <= 4) ? p : 0;
+    const bool snapInnerCentreProbe = (p == 13);
+
     const float guardSamples = getGuardSamples();
     const float maxDelay = getMaxDelaySamples();
 
     constexpr float maximumDelayModulation = 20.0f;
-    const float centreDelaySamples = currentCentreDelayMs * static_cast<float>(spec.sampleRate) / 1000.0f;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
+    const float centreDelaySamplesBlock = currentCentreDelayMs * static_cast<float>(spec.sampleRate) / 1000.0f;
     const float depthSamples = maximumDelayModulation * static_cast<float>(spec.sampleRate) / 1000.0f;
+    const float baseRateHz = juce::jlimit(0.01f, 20.0f, dsp.smoothedRate.getCurrentValue());
+    const float phaseScale = juce::MathConstants<float>::twoPi / static_cast<float>(spec.sampleRate);
+    const std::array<float, 4> voiceRateMultipliers {{ 0.71f, 1.09f, 0.47f, 1.61f }};
 
     auto* lfoLeft = dsp.lfoBuffer.getReadPointer(0);
     auto* lfoRight = (numChannels >= 2) ? dsp.cosBuffer.getReadPointer(0) : lfoLeft;
 
-    // Precompute crossfade table constants
-    const float xfadeInvLen = 1.0f / static_cast<float>(xfadeLength_);
+    const bool pushThiranTelem = (dsp.getCurrentResolvedCoreId() == choroboros::CoreId::thiran);
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -177,136 +212,113 @@ void ChorusCoreThiran::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>
         const float* channelLfo = (ch == 0) ? lfoLeft : lfoRight;
         auto& buffer = delayBuffers[static_cast<size_t>(ch)];
         int& writePos = writePositions[static_cast<size_t>(ch)];
-        auto& thiranCh = channels[static_cast<size_t>(ch)];
+        auto& tc = channels[static_cast<size_t>(ch)];
         const auto chIdx = static_cast<size_t>(ch);
+        const float stereoSign = (ch == 0) ? 1.0f : -1.0f;
 
         if (!centreDelayInitialized[chIdx])
         {
-            smoothedCentreDelay[chIdx] = centreDelaySamples;
+            smoothedCentreDelay[chIdx] = centreDelaySamplesBlock;
             centreDelayInitialized[chIdx] = true;
         }
 
-        // Initialize delay smoothing on first block
-        if (!thiranCh.delayInitialized)
+        if (!tc.delayInitialized)
         {
-            float initialDelay = centreDelaySamples + depthSamples * channelLfo[0];
+            float initialDelay = centreDelaySamplesBlock + depthSamples * channelLfo[0];
             initialDelay = juce::jlimit(guardSamples, maxDelay, initialDelay);
-            thiranCh.smoothedDelay = initialDelay;
-            thiranCh.delayInitialized = true;
-
-            const int intDelay = static_cast<int>(std::floor(initialDelay));
-            const float fracDelay = initialDelay - static_cast<float>(intDelay);
-            const float thiranD = static_cast<float>(ORDER) + fracDelay;
-
-            auto& activeAp = thiranCh.aIsActive ? thiranCh.apA : thiranCh.apB;
-            computeCoefficients(thiranD, activeAp.a);
-            activeAp.intDelay = intDelay;
-            thiranCh.lastIntDelay = intDelay;
+            tc.smoothedDelay = initialDelay;
+            tc.delayInitialized = true;
         }
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            const float in = inputSamples[i];
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float centreDelaySamplesThis = centreMsThis * static_cast<float>(spec.sampleRate) / 1000.0f;
 
-            // Per-sample centre delay smoothing
-            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
+            if (snapInnerCentreProbe)
+                smoothedCentreDelay[chIdx] = centreDelaySamplesThis;
+            else
+                smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamplesThis - smoothedCentreDelay[chIdx]);
 
-            // Calculate target delay from LFO
             float targetDelay = smoothedCentreDelay[chIdx] + depthSamples * channelLfo[i];
             targetDelay = juce::jlimit(guardSamples, maxDelay, targetDelay);
 
-            // Smooth delay for stability (14ms τ, sample-rate-invariant)
-            thiranCh.smoothedDelay = delaySmoothingCoeff_ * thiranCh.smoothedDelay
-                                   + (1.0f - delaySmoothingCoeff_) * targetDelay;
-
-            const float totalDelay = thiranCh.smoothedDelay;
-            const int intDelay = static_cast<int>(std::floor(totalDelay));
-            const float fracDelay = totalDelay - static_cast<float>(intDelay);
-            const float thiranD = static_cast<float>(ORDER) + fracDelay;
-
-            // Determine which allpass is active
-            auto& activeAp = thiranCh.aIsActive ? thiranCh.apA : thiranCh.apB;
-            auto& fadingAp = thiranCh.aIsActive ? thiranCh.apB : thiranCh.apA;
-
-            // Between integer boundaries: do NOT call computeCoefficients() per sample.
-            // Välimäki & Laakso ("Elimination of Transients in Time-Varying Allpass
-            // Fractional Delay Filters"): updating DFII-T Thiran coefficients every
-            // sample while state was built under the previous set causes mismatch
-            // transients — broadband fuzz/distortion at 5th order. Coefficients only
-            // change at init and at crossings below; fractional drift is slow enough
-            // that a fixed set is fine until the next integer step.
-            //
-            // Do NOT assign lastIntDelay here either: during xfadeCounter > 0, intDelay
-            // can step again; advancing lastIntDelay without a new crossfade desyncs
-            // curActive.intDelay from the tap the filter state was built for.
-            if (intDelay != thiranCh.lastIntDelay && thiranCh.xfadeCounter <= 0)
-            {
-                // The currently active allpass becomes the fading-out one.
-                // The other allpass gets fresh coefficients for the new integer delay.
-                thiranCh.aIsActive = !thiranCh.aIsActive;
-
-                // After the swap, "activeAp" and "fadingAp" have swapped roles
-                auto& newActive = thiranCh.aIsActive ? thiranCh.apA : thiranCh.apB;
-                auto& oldActive = thiranCh.aIsActive ? thiranCh.apB : thiranCh.apA;
-
-                // Copy state from the fading (old-active) allpass instead of zeroing.
-                // Zeroing creates a transient discontinuity every integer-delay boundary
-                // crossing that a short crossfade cannot fully mask — heard as
-                // "ping-pong aliasing" on slow sweeps. The old allpass has settled DFII-T
-                // state representing recent signal history, so copying it gives the new
-                // allpass a warm start that preserves continuity.
-                newActive.state = oldActive.state;
-                computeCoefficients(thiranD, newActive.a);
-                newActive.intDelay = intDelay;
-
-                thiranCh.xfadeCounter = xfadeLength_;
-                thiranCh.lastIntDelay = intDelay;
-            }
-
-            // Write input to delay buffer
-            buffer[static_cast<size_t>(writePos)] = in;
-
-            // Re-reference after potential swap
-            auto& curActive = thiranCh.aIsActive ? thiranCh.apA : thiranCh.apB;
-            auto& curFading = thiranCh.aIsActive ? thiranCh.apB : thiranCh.apA;
-
-            // Read from integer delay position for active allpass
-            const int activeReadOffset = std::max(0, curActive.intDelay - ORDER);
-            const int activeReadPos = (writePos - activeReadOffset) & bufferMask;
-            const float activeDelayed = buffer[static_cast<size_t>(activeReadPos)];
-            const float activeOut = processAllpass(curActive, activeDelayed);
-
-            float allpassOut;
-
-            if (thiranCh.xfadeCounter > 0)
-            {
-                // During crossfade: also process the fading allpass and blend
-                const int fadingReadOffset = std::max(0, curFading.intDelay - ORDER);
-                const int fadingReadPos = (writePos - fadingReadOffset) & bufferMask;
-                const float fadingDelayed = buffer[static_cast<size_t>(fadingReadPos)];
-                const float fadingOut = processAllpass(curFading, fadingDelayed);
-
-                // sin²/cos² crossfade — energy-preserving
-                const float progress = static_cast<float>(xfadeLength_ - thiranCh.xfadeCounter)
-                                     * xfadeInvLen;
-                const float fadeInGain = std::sin(progress * juce::MathConstants<float>::halfPi);
-                const float fadeOutGain = std::cos(progress * juce::MathConstants<float>::halfPi);
-
-                allpassOut = activeOut * fadeInGain + fadingOut * fadeOutGain;
-                --thiranCh.xfadeCounter;
-            }
+            if (reductionProbe == 2)
+                tc.smoothedDelay = targetDelay;
             else
+                tc.smoothedDelay = delaySmoothingCoeff * tc.smoothedDelay + (1.0f - delaySmoothingCoeff) * targetDelay;
+
+            const float in = inputSamples[i];
+
+            // Write input first, matching the cubic core's basic operating style.
+            buffer[static_cast<size_t>(writePos)] = in;
+            writePos = (writePos + 1) & bufferMask;
+
+            const float d = tc.smoothedDelay;
+            const float lfoA = channelLfo[i];
+            const float lfoB = (numChannels >= 2)
+                ? ((ch == 0) ? lfoRight[i] : lfoLeft[i])
+                : -lfoA;
+            const float outerStereoBias = outerStereoOffsetSamples * stereoSign;
+            const float anchorA = depthSamples * lfoA;
+            const float anchorB = depthSamples * lfoB;
+
+            std::array<float, 4> supportVoiceMods {};
+            for (size_t voiceIndex = 0; voiceIndex < supportVoiceMods.size(); ++voiceIndex)
             {
-                allpassOut = activeOut;
+                const float phase = tc.voicePhases[voiceIndex];
+                const float sinePrimary = std::sin(phase);
+                const float sineSecondary = std::sin(phase * (voiceIndex >= 2 ? 2.0f : 1.0f)
+                                                     + 0.37f * static_cast<float>(voiceIndex + 1));
+                supportVoiceMods[voiceIndex] = 0.82f * sinePrimary + 0.18f * sineSecondary;
+
+                const float phaseInc = phaseScale * baseRateHz * voiceRateMultipliers[voiceIndex];
+                tc.voicePhases[voiceIndex] = wrapPhasePositive(phase + phaseInc);
             }
 
-            // Gentle one-pole lowpass (~16 kHz)
-            const float out = (1.0f - outputLpAlpha) * allpassOut
-                            + outputLpAlpha * thiranCh.outputLpState;
-            thiranCh.outputLpState = out;
+            // Voice 1: main stable chorus read
+            const float v1 = readCubic(ch, d);
 
-            writePos = (writePos + 1) & bufferMask;
+            const float d2 = juce::jlimit(guardSamples, maxDelay,
+                d + voice2StaticOffsetSamples
+                  + voice2ModDepthScale * depthSamples * supportVoiceMods[0]
+                  + 0.025f * anchorA);
+
+            const float d3 = juce::jlimit(guardSamples, maxDelay,
+                d + voice3StaticOffsetSamples
+                  + voice3ModDepthScale * depthSamples * supportVoiceMods[1]
+                  - 0.020f * anchorB);
+
+            const float d4 = juce::jlimit(guardSamples, maxDelay,
+                d + voice4StaticOffsetSamples + outerStereoBias
+                  + voice4ModDepthScale * depthSamples * supportVoiceMods[2]);
+
+            const float d5 = juce::jlimit(guardSamples, maxDelay,
+                d + voice5StaticOffsetSamples - outerStereoBias
+                  + voice5ModDepthScale * depthSamples * supportVoiceMods[3]);
+
+            const float v2 = readCubic(ch, d2);
+            const float v3 = readCubic(ch, d3);
+            const float v4 = readCubic(ch, d4);
+            const float v5 = readCubic(ch, d5);
+
+            const float wet = (reductionProbe == 3)
+                ? v1
+                : (voiceGain[0] * v1
+                   + voiceGain[1] * v2
+                   + voiceGain[2] * v3
+                   + voiceGain[3] * v4
+                   + voiceGain[4] * v5);
+
+            const float out = (reductionProbe == 1)
+                ? wet
+                : ((1.0f - outputLpAlpha) * wet + outputLpAlpha * tc.outputLpState);
+
+            tc.outputLpState = out;
             outputSamples[i] = out;
+
+            if (pushThiranTelem && ch == 0)
+                dsp.pushThiranTelemetrySample(0.0f, (reductionProbe == 3) ? 0.0f : 1.0f);
         }
     }
 }

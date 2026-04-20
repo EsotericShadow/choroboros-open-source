@@ -72,7 +72,8 @@ void ChorusCoreLinearEnsemble::processDelay(ChorusDSP& dsp, juce::dsp::AudioBloc
     const float maxDelay = getMaxDelaySamples();
     constexpr float maximumDelayModulation = 20.0f;
 
-    const float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
+    const float centreDelaySamplesBlock = currentCentreDelayMs * spec.sampleRate / 1000.0f;
     const float depthSamples = maximumDelayModulation * spec.sampleRate / 1000.0f;
 
     auto* lfoLeft = dsp.lfoBuffer.getReadPointer(0);
@@ -96,15 +97,17 @@ void ChorusCoreLinearEnsemble::processDelay(ChorusDSP& dsp, juce::dsp::AudioBloc
 
         if (!centreDelayInitialized[chIdx])
         {
-            smoothedCentreDelay[chIdx] = centreDelaySamples;
+            smoothedCentreDelay[chIdx] = centreDelaySamplesBlock;
             centreDelayInitialized[chIdx] = true;
         }
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float centreDelaySamplesThis = centreMsThis * spec.sampleRate / 1000.0f;
             // Per-sample colour and centre delay smoothing (now per-channel to prevent L/R crosstalk)
             smoothedColour[chIdx] += colourSmoothAlpha * (targetColour - smoothedColour[chIdx]);
-            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamples - smoothedCentreDelay[chIdx]);
+            smoothedCentreDelay[chIdx] += centreDelaySmoothAlpha * (centreDelaySamplesThis - smoothedCentreDelay[chIdx]);
 
             const float col = smoothedColour[chIdx];
             const float centre = smoothedCentreDelay[chIdx];

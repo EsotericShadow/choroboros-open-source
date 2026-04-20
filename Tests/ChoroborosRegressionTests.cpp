@@ -5,9 +5,11 @@
 
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginEditor.h"
+#include "Cores/blue_engine_modern/ChorusCoreThiran.h"
 #include "UI/DevPanel.h"
 #include "UI/DevPanelSupport.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -83,6 +85,232 @@ static bool hasNaNOrInf(const juce::AudioBuffer<float>& buf)
             if (!isFinite(p[i])) return true;
     }
     return false;
+}
+
+/** Golden vectors: double reference generated offline (Laakso §3.4.3); see docs/THIRAN_CANONICAL_SPEC.md. */
+static void testThiranCanonicalGoldenCoefficients()
+{
+    struct Case
+    {
+        float D;
+        std::array<float, 6> expect;
+    };
+
+    const std::array<Case, 6> cases {{
+        { 4.51f, { 1.0000000000f, 0.4446460980f, -0.0696680522f, 0.0140078241f, -0.0020657837f, 0.0001524900f } },
+        { 4.75f, { 1.0000000000f, 0.2173913043f, -0.0483091787f, 0.0109085242f, -0.0017141967f, 0.0001318613f } },
+        { 5.00f, { 1.0000000000f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f } },
+        { 5.25f, { 1.0000000000f, -0.2000000000f, 0.0689655172f, -0.0188087774f, 0.0033042447f, -0.0002740105f } },
+        { 5.49f, { 1.0000000000f, -0.3775038521f, 0.1501951241f, -0.0440501601f, 0.0080998450f, -0.0006933900f } },
+        { 5.30f, { 1.0000000000f, -0.2380952381f, 0.0848010437f, -0.0234990844f, 0.0041691924f, -0.0003481073f } },
+    }};
+
+    for (const auto& c : cases)
+    {
+        std::array<float, ChorusCoreThiran::thiranCoefficientCount> got {};
+        ChorusCoreThiran::computeCoefficientsForTests(c.D, got);
+        for (int i = 0; i < 6; ++i)
+        {
+            const float tol = (c.D == 5.0f && i > 0) ? 2.0e-5f : 5.0e-6f;
+            if (!nearlyEqual(got[static_cast<size_t>(i)], c.expect[static_cast<size_t>(i)], tol))
+            {
+                std::cerr << "FAIL: Thiran golden D=" << c.D << " i=" << i << " got=" << got[static_cast<size_t>(i)]
+                          << " expect=" << c.expect[static_cast<size_t>(i)] << "\n";
+                ++g_failCount;
+            }
+        }
+    }
+}
+
+namespace thiran_vl_test_detail
+{
+constexpr int kN = ChorusCoreThiran::thiranAllpassOrder;
+
+static std::array<double, kN> fMul(const std::array<double, ChorusCoreThiran::thiranCoefficientCount>& a,
+                                   const std::array<double, kN>& v)
+{
+    return { -a[1] * v[0] + v[1],
+             -a[2] * v[0] + v[2],
+             -a[3] * v[0] + v[3],
+             -a[4] * v[0] + v[4],
+             -a[5] * v[0] };
+}
+
+static std::array<double, kN> qVec(const std::array<double, ChorusCoreThiran::thiranCoefficientCount>& a)
+{
+    const double a5 = a[5];
+    return { a[4] - a[1] * a5,
+             a[3] - a[2] * a5,
+             a[2] - a[3] * a5,
+             a[1] - a[4] * a5,
+             a[0] - a5 * a5 };
+}
+
+static void coldStartStateDouble(const std::array<double, ChorusCoreThiran::thiranCoefficientCount>& a,
+                                 const float* x,
+                                 int count,
+                                 std::array<double, kN>* vOut)
+{
+    const auto q = qVec(a);
+    std::array<double, kN> v {};
+    for (int i = 0; i < count; ++i)
+    {
+        const auto fv = fMul(a, v);
+        const double xi = static_cast<double>(x[i]);
+        for (int j = 0; j < kN; ++j)
+            v[static_cast<size_t>(j)] = fv[static_cast<size_t>(j)] + q[static_cast<size_t>(j)] * xi;
+    }
+    *vOut = v;
+}
+
+static std::array<double, ChorusCoreThiran::thiranCoefficientCount> toDouble(
+    const std::array<float, ChorusCoreThiran::thiranCoefficientCount>& a)
+{
+    std::array<double, ChorusCoreThiran::thiranCoefficientCount> d {};
+    for (int i = 0; i < ChorusCoreThiran::thiranCoefficientCount; ++i)
+        d[static_cast<size_t>(i)] = static_cast<double>(a[static_cast<size_t>(i)]);
+    return d;
+}
+
+static std::array<double, kN> companionNext(const std::array<double, ChorusCoreThiran::thiranCoefficientCount>& a,
+                                          const std::array<double, kN>& v,
+                                          double x)
+{
+    const auto q = qVec(a);
+    const auto fv = fMul(a, v);
+    std::array<double, kN> out {};
+    for (int j = 0; j < kN; ++j)
+        out[static_cast<size_t>(j)] = fv[static_cast<size_t>(j)] + q[static_cast<size_t>(j)] * x;
+    return out;
+}
+} // namespace thiran_vl_test_detail
+
+/** Phase 2: shipped recursion matches sparse companion \(v' = Fv + qx\) (see docs/THIRAN_VL_STATE_PORT.md). */
+static void testThiranAllpassCompanionFormMatchesProcessStep()
+{
+    using namespace thiran_vl_test_detail;
+    std::array<float, ChorusCoreThiran::thiranCoefficientCount> a {};
+    ChorusCoreThiran::computeCoefficientsForTests(4.73f, a);
+
+    const auto ad = toDouble(a);
+    uint32_t seed = 24601;
+    auto rnd = [&seed]() -> float
+    {
+        seed = seed * 1664525u + 1013904223u;
+        const uint32_t u = seed >> 9;
+        return static_cast<float>(u) / static_cast<float>(1u << 23) - 1.0f;
+    };
+
+    for (int iter = 0; iter < 200; ++iter)
+    {
+        std::array<float, kN> s {};
+        for (float& c : s)
+            c = rnd() * 0.5f;
+        const float x = rnd() * 0.5f;
+
+        std::array<float, kN> sCode = s;
+        const float yCode = ChorusCoreThiran::processAllpassForTests(a, sCode, x);
+
+        std::array<double, kN> vd {};
+        for (int i = 0; i < kN; ++i)
+            vd[static_cast<size_t>(i)] = static_cast<double>(s[static_cast<size_t>(i)]);
+        const double yMat = static_cast<double>(a[5]) * static_cast<double>(x) + vd[0];
+        const auto vNext = companionNext(ad, vd, static_cast<double>(x));
+
+        REGRESS_ASSERT(nearlyEqual(yCode, static_cast<float>(yMat), 2.0e-5f), "Thiran y vs companion");
+        for (int i = 0; i < kN; ++i)
+        {
+            const float expect = static_cast<float>(vNext[static_cast<size_t>(i)]);
+            if (!nearlyEqual(sCode[static_cast<size_t>(i)], expect, 3.0e-4f))
+            {
+                std::cerr << "FAIL: Thiran companion state i=" << i << " got=" << sCode[static_cast<size_t>(i)]
+                          << " expect=" << expect << "\n";
+                ++g_failCount;
+            }
+        }
+    }
+}
+
+/** ICMC 1995 Eq. (9) trajectory: cold-start \(F_2\) state equals recursion \(v \leftarrow F_2 v + q x\). */
+static void testThiranVLStateMatchesColdStartF2Trajectory()
+{
+    using namespace thiran_vl_test_detail;
+    const std::array<float, 8> dList {{ 4.52f, 4.71f, 4.88f, 5.05f, 5.19f, 5.33f, 5.41f, 5.46f }};
+    const int lengths[] { 12, 48, 160 };
+
+    uint32_t seed = 90091;
+    auto rnd = [&seed]() -> float
+    {
+        seed = seed * 1103515245u + 12345u;
+        const uint32_t u = seed >> 8;
+        return (static_cast<float>(u) / static_cast<float>(1u << 24)) * 2.0f - 1.0f;
+    };
+
+    for (float d2 : dList)
+    {
+        std::array<float, ChorusCoreThiran::thiranCoefficientCount> a2 {};
+        ChorusCoreThiran::computeCoefficientsForTests(d2, a2);
+        const auto a2d = toDouble(a2);
+
+        for (int C : lengths)
+        {
+            std::vector<float> xbuf(static_cast<size_t>(C));
+            for (float& xf : xbuf)
+                xf = rnd() * 0.6f;
+
+            std::array<double, kN> vDouble {};
+            coldStartStateDouble(a2d, xbuf.data(), C, &vDouble);
+
+            std::array<float, kN> vFloat {};
+            for (int i = 0; i < C; ++i)
+                ChorusCoreThiran::processAllpassForTests(a2, vFloat, xbuf[static_cast<size_t>(i)]);
+
+            for (int i = 0; i < kN; ++i)
+            {
+                const float expect = static_cast<float>(vDouble[static_cast<size_t>(i)]);
+                if (!nearlyEqual(vFloat[static_cast<size_t>(i)], expect, 5.0e-4f))
+                {
+                    std::cerr << "FAIL: VL cold-start D=" << d2 << " C=" << C << " i=" << i
+                              << " float=" << vFloat[static_cast<size_t>(i)] << " double=" << expect << "\n";
+                    ++g_failCount;
+                }
+            }
+        }
+    }
+}
+
+/** After prefix under \(D_0\), naive carry-forward vs VL (F₂ cold) yields different first post-hop output when \(D_0 \neq D_1\). */
+static void testThiranNaiveJumpOutputDiffersFromVLAtStep()
+{
+    using namespace thiran_vl_test_detail;
+    std::array<float, ChorusCoreThiran::thiranCoefficientCount> a0 {};
+    std::array<float, ChorusCoreThiran::thiranCoefficientCount> a1 {};
+    ChorusCoreThiran::computeCoefficientsForTests(4.58f, a0);
+    ChorusCoreThiran::computeCoefficientsForTests(5.38f, a1);
+    const auto a1d = toDouble(a1);
+
+    constexpr int C = 96;
+    std::array<float, static_cast<size_t>(C)> xbuf {};
+    for (int i = 0; i < C; ++i)
+        xbuf[static_cast<size_t>(i)] = 0.15f * std::sin(static_cast<float>(i) * 0.07f);
+
+    std::array<float, kN> vNaive {};
+    for (int i = 0; i < C; ++i)
+        ChorusCoreThiran::processAllpassForTests(a0, vNaive, xbuf[static_cast<size_t>(i)]);
+
+    std::array<double, kN> vVlDouble {};
+    coldStartStateDouble(a1d, xbuf.data(), C, &vVlDouble);
+    std::array<float, kN> vVl {};
+    for (int i = 0; i < kN; ++i)
+        vVl[static_cast<size_t>(i)] = static_cast<float>(vVlDouble[static_cast<size_t>(i)]);
+
+    const float xC = 0.31f;
+    std::array<float, kN> sN = vNaive;
+    std::array<float, kN> sV = vVl;
+    const float yNaive = ChorusCoreThiran::processAllpassForTests(a1, sN, xC);
+    const float yVl = ChorusCoreThiran::processAllpassForTests(a1, sV, xC);
+
+    REGRESS_ASSERT(std::abs(yNaive - yVl) > 2.0e-5f, "Thiran naive vs VL should differ for this D0/D1 prefix");
 }
 
 static void testProcessBlockSizes()
@@ -879,6 +1107,10 @@ int main(int argc, char** argv)
 
         // DSP regression tests (no UI, no audio load complexity)
         testProcessBlockSizes();
+        testThiranCanonicalGoldenCoefficients();
+        testThiranAllpassCompanionFormMatchesProcessStep();
+        testThiranVLStateMatchesColdStartF2Trajectory();
+        testThiranNaiveJumpOutputDiffersFromVLAtStep();
         testEngineHQTorture();
         testStateRoundTrip();
         testRuntimeTuningLockFree();

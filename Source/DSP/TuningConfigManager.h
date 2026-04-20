@@ -53,7 +53,7 @@ struct TuningSnapshot
     float preEmphasisFreqHz = 3000.0f;
     float preEmphasisQ = 0.707f;
     float preEmphasisGain = 1.2f;
-    float preEmphasisLevelSmoothing = 0.208f;  // τ in seconds (was raw α = 0.95)
+    float preEmphasisLevelSmoothing = 0.95f;
     float preEmphasisQuietThreshold = 0.125f;
     float preEmphasisMaxAmount = 0.5f;
     float compressorAttackMs = 50.0f;
@@ -130,12 +130,13 @@ struct TuningSnapshot
     float tapeCentreScale = 2.0f;
     float tapeToneMaxHz = 16000.0f;
     float tapeToneMinHz = 12000.0f;
-    float tapeToneSmoothingCoeff = 0.25f;  // τ in ms (was raw α = 0.08)
+    float tapeToneSmoothingCoeff = 0.08f;
     float tapeDriveScale = 0.35f;
     float tapeLfoRatioScale = 0.05f;
     float tapeLfoModSmoothingCoeff = 0.008f;
     float tapeRatioSmoothingCoeff = 0.004f;
-    float tapePhaseDampingPerSec = 0.6188f;  // per-second retention (was per-sample 0.99999)
+    float tapePhaseDamping = 0.99999f;
+    float tapePhaseDampingPerSec = 0.99999f;
     float tapeWowFreqBase = 0.33f;
     float tapeWowFreqSpread = 0.03f;
     float tapeFlutterFreqBase = 5.8f;
@@ -148,6 +149,7 @@ struct TuningSnapshot
     float tapeRatioMax = 1.04f;
     float tapeWetGain = 1.05f;
     float tapeHermiteTension = 0.75f;
+    float thiranReductionProbe = 0.0f;
 
     // Precomputed filter coefficients (raw arrays, not shared_ptr).
     // JUCE 2nd-order IIR uses 6 normalized coefficients:

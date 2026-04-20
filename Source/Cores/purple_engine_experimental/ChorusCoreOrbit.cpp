@@ -132,7 +132,7 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
     const float maxDelaySamples = getMaxDelaySamples();
     
     constexpr float maximumDelayModulation = 20.0f;
-    float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
     float depthSamples = maximumDelayModulation * spec.sampleRate / 1000.0f;
     
     // Get smoothed rate and color (computed once per block)
@@ -192,11 +192,13 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
         // Initialize delays on first sample if needed
         if (!state.initialized)
         {
+            const float ms0 = cdPerMs != nullptr ? cdPerMs[0] : currentCentreDelayMs;
+            const float centreS0 = ms0 * spec.sampleRate / 1000.0f;
             float mod1 = computeOrbitModulation(state.phase, state.theta + thetaOffset, eccentricity);
             float mod2 = computeOrbitModulation(state.phase, state.theta2 + thetaOffset, eccentricity2);
             
-            float initialDelay1 = centreDelaySamples + depthSamples * mod1;
-            float initialDelay2 = centreDelaySamples + depthSamples * mod2;
+            float initialDelay1 = centreS0 + depthSamples * mod1;
+            float initialDelay2 = centreS0 + depthSamples * mod2;
             initialDelay1 = juce::jlimit(guardSamples, maxDelaySamples, initialDelay1);
             initialDelay2 = juce::jlimit(guardSamples, maxDelaySamples, initialDelay2);
             
@@ -232,9 +234,11 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
             float mod1 = computeOrbitModulation(state.phase, state.theta + thetaOffset, eccentricity);
             float mod2 = computeOrbitModulation(state.phase, state.theta2 + thetaOffset, eccentricity2);
             
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float centreDelaySamplesThis = centreMsThis * spec.sampleRate / 1000.0f;
             // Calculate target delays
-            float targetDelay1 = centreDelaySamples + depthSamples * mod1;
-            float targetDelay2 = centreDelaySamples + depthSamples * mod2;
+            float targetDelay1 = centreDelaySamplesThis + depthSamples * mod1;
+            float targetDelay2 = centreDelaySamplesThis + depthSamples * mod2;
             targetDelay1 = juce::jlimit(guardSamples, maxDelaySamples, targetDelay1);
             targetDelay2 = juce::jlimit(guardSamples, maxDelaySamples, targetDelay2);
             

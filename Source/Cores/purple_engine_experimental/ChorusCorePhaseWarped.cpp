@@ -115,7 +115,7 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
     const float maxDelaySamples = getMaxDelaySamples();
     
     constexpr float maximumDelayModulation = 20.0f;
-    float centreDelaySamples = currentCentreDelayMs * spec.sampleRate / 1000.0f;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
     float depthSamples = maximumDelayModulation * spec.sampleRate / 1000.0f;
     
     // Get smoothed rate and color (computed once per block)
@@ -156,8 +156,10 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
         // Initialize delay on first sample if needed
         if (!state.initialized)
         {
+            const float ms0 = cdPerMs != nullptr ? cdPerMs[0] : currentCentreDelayMs;
+            const float centreS0 = ms0 * spec.sampleRate / 1000.0f;
             float initialMod = computeWarpedModulation(state.phase, warpA, warpB, warpK);
-            float initialDelay = centreDelaySamples + depthSamples * initialMod;
+            float initialDelay = centreS0 + depthSamples * initialMod;
             initialDelay = juce::jlimit(guardSamples, maxDelaySamples, initialDelay);
             state.smoothedDelay = initialDelay;
             delaySmoother.setCurrentAndTargetValue(initialDelay);
@@ -180,8 +182,10 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
             // Compute warped modulation
             float mod = computeWarpedModulation(state.phase, warpA, warpB, warpK);
             
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float centreDelaySamplesThis = centreMsThis * spec.sampleRate / 1000.0f;
             // Calculate target delay
-            float targetDelay = centreDelaySamples + depthSamples * mod;
+            float targetDelay = centreDelaySamplesThis + depthSamples * mod;
             targetDelay = juce::jlimit(guardSamples, maxDelaySamples, targetDelay);
             
             // Smooth delay (20ms ramp)
