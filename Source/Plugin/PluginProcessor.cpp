@@ -19,6 +19,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "../DSP/ChorusDSP.h"
+#include "../Config/FactoryDefaults.h"
 
 #if CHOROBOROS_PERFETTO_ENABLED
 #include <melatonin_perfetto/melatonin_perfetto.h>
@@ -1113,7 +1114,7 @@ double ChoroborosAudioProcessor::getTailLengthSeconds() const
 
 int ChoroborosAudioProcessor::getNumPrograms()
 {
-    return 7; // Classic, Vintage, Modern, Psychedelic, Core, Duck, Ouroboros
+    return choroboros::factory::getPresetCount();
 }
 
 int ChoroborosAudioProcessor::getCurrentProgram()
@@ -1146,21 +1147,7 @@ void ChoroborosAudioProcessor::setCurrentProgram (int index)
 
 const juce::String ChoroborosAudioProcessor::getProgramName (int index)
 {
-    if (index == 0)
-        return "Classic (Green)";
-    else if (index == 1)
-        return "Vintage (Red)";
-    else if (index == 2)
-        return "Modern (Blue)";
-    else if (index == 3)
-        return "Psychedelic (Purple)";
-    else if (index == 4)
-        return "Core (Black)";
-    else if (index == 5)
-        return "Duck";
-    else if (index == 6)
-        return "Ouroboros";
-    return {};
+    return choroboros::factory::getPresetName(index);
 }
 
 void ChoroborosAudioProcessor::changeProgramName (int index, const juce::String& newName)
@@ -2532,26 +2519,28 @@ bool ChoroborosAudioProcessor::migrateKnownBadEngineParamProfiles()
 
 EngineParamProfile ChoroborosAudioProcessor::getEngineDefaults(int engineIndex) const
 {
-    EngineParamProfile mappedDefaults;
-    mappedDefaults.valid = true;
-    switch (engineIndex)
-    {
-        case 0: mappedDefaults.rate = 0.65f; mappedDefaults.depth = 0.21f; mappedDefaults.offset = 33.0f; mappedDefaults.width = 1.5f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.16f; break;
-        case 1: mappedDefaults.rate = 0.26f; mappedDefaults.depth = 0.53f; mappedDefaults.offset = 59.0f; mappedDefaults.width = 1.0f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.41f; break;
-        case 2: mappedDefaults.rate = 0.62f; mappedDefaults.depth = 0.21f; mappedDefaults.offset = 56.0f; mappedDefaults.width = 1.5f;  mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.5f;  break;
-        case 3: mappedDefaults.rate = 0.12f; mappedDefaults.depth = 0.52f; mappedDefaults.offset = 52.0f; mappedDefaults.width = 2.0f;  mappedDefaults.mix = 0.69f; mappedDefaults.color = 0.13f; break;
-        case 4: mappedDefaults.rate = 0.8f;  mappedDefaults.depth = 0.35f; mappedDefaults.offset = 41.0f; mappedDefaults.width = 1.59f; mappedDefaults.mix = 0.5f;  mappedDefaults.color = 0.28f; break;
-        default: mappedDefaults.rate = 0.5f; mappedDefaults.depth = 0.5f; mappedDefaults.offset = 90.0f; mappedDefaults.width = 1.0f; mappedDefaults.mix = 0.5f; mappedDefaults.color = 0.5f;
-    }
+    const auto mappedDefaults = choroboros::factory::getEngineProfile(engineIndex);
 
     EngineParamProfile rawDefaults;
-    rawDefaults.valid = true;
-    rawDefaults.rate = unmapParameterValue(RATE_ID, mappedDefaults.rate);
-    rawDefaults.depth = unmapParameterValue(DEPTH_ID, mappedDefaults.depth);
-    rawDefaults.offset = unmapParameterValue(OFFSET_ID, mappedDefaults.offset);
-    rawDefaults.width = unmapParameterValue(WIDTH_ID, mappedDefaults.width);
-    rawDefaults.mix = unmapParameterValue(MIX_ID, mappedDefaults.mix);
-    rawDefaults.color = unmapParameterValue(COLOR_ID, mappedDefaults.color);
+    rawDefaults.valid = mappedDefaults.has_value();
+
+    if (mappedDefaults.has_value())
+    {
+        rawDefaults.rate = unmapParameterValue(RATE_ID, mappedDefaults->rate);
+        rawDefaults.depth = unmapParameterValue(DEPTH_ID, mappedDefaults->depth);
+        rawDefaults.offset = unmapParameterValue(OFFSET_ID, mappedDefaults->offset);
+        rawDefaults.width = unmapParameterValue(WIDTH_ID, mappedDefaults->width);
+        rawDefaults.mix = unmapParameterValue(MIX_ID, mappedDefaults->mix);
+        rawDefaults.color = unmapParameterValue(COLOR_ID, mappedDefaults->color);
+        return rawDefaults;
+    }
+
+    rawDefaults.rate = unmapParameterValue(RATE_ID, 0.5f);
+    rawDefaults.depth = unmapParameterValue(DEPTH_ID, 0.5f);
+    rawDefaults.offset = unmapParameterValue(OFFSET_ID, 90.0f);
+    rawDefaults.width = unmapParameterValue(WIDTH_ID, 1.0f);
+    rawDefaults.mix = unmapParameterValue(MIX_ID, 0.5f);
+    rawDefaults.color = unmapParameterValue(COLOR_ID, 0.5f);
     return rawDefaults;
 }
 

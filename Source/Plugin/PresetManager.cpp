@@ -92,6 +92,36 @@ bool PresetManager::isUserPreset (int index) const
     return index >= getNumFactoryPresets();
 }
 
+bool PresetManager::isFactoryPresetName (const juce::String& name) const
+{
+    const auto trimmedName = name.trim();
+    if (trimmedName.isEmpty())
+        return false;
+
+    for (int i = 0; i < getNumFactoryPresets(); ++i)
+    {
+        if (processor_.getProgramName(i).equalsIgnoreCase(trimmedName))
+            return true;
+    }
+
+    return false;
+}
+
+bool PresetManager::hasUserPresetName (const juce::String& name) const
+{
+    const auto trimmedName = name.trim();
+    if (trimmedName.isEmpty())
+        return false;
+
+    for (const auto& presetName : userPresetNames_)
+    {
+        if (presetName.equalsIgnoreCase(trimmedName))
+            return true;
+    }
+
+    return false;
+}
+
 //==============================================================================
 // Browsing
 

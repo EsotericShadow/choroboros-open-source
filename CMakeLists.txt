@@ -202,6 +202,8 @@ target_sources(Choroboros PRIVATE
     Source/Cores/black_engine_linear/ChorusCoreLinearEnsemble.h
     
     # Config
+    Source/Config/FactoryDefaults.cpp
+    Source/Config/FactoryDefaults.h
     Source/Config/DefaultsPersistence.cpp
     
     # UI components

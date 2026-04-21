@@ -629,8 +629,43 @@ void TopHeaderBar::showSaveDialog()
                                         return;
 
                                     const auto name = text.trim();
-                                    if (name.isNotEmpty())
+                                    if (name.isEmpty())
+                                        return;
+
+                                    auto* currentEditor = safeThis->findParentComponentOfClass<ChoroborosPluginEditor>();
+                                    if (currentEditor == nullptr)
+                                        return;
+
+                                    if (safeThis->presetManager_.isFactoryPresetName(name))
+                                    {
+                                        currentEditor->showStatusDialog(juce::AlertWindow::WarningIcon,
+                                                                        "Factory Preset Name Reserved",
+                                                                        "\"" + name + "\" is a factory preset name.\n\nChoose a new name for your user preset instead of overwriting the factory bank.",
+                                                                        "editor_preset_save_factory_name_reserved",
+                                                                        safeThis);
+                                        return;
+                                    }
+
+                                    if (!safeThis->presetManager_.hasUserPresetName(name))
+                                    {
                                         safeThis->presetManager_.saveUserPreset(name);
+                                        return;
+                                    }
+
+                                    juce::Component::SafePointer<TopHeaderBar> safeHeader(safeThis);
+                                    currentEditor->showConfirmationDialog("Overwrite User Preset",
+                                                                          "Overwrite your existing preset \"" + name + "\"?",
+                                                                          "Overwrite",
+                                                                          "Cancel",
+                                                                          true,
+                                                                          [safeHeader, name](bool overwriteAccepted)
+                                                                          {
+                                                                              if (!overwriteAccepted || safeHeader == nullptr)
+                                                                                  return;
+                                                                              safeHeader->presetManager_.saveUserPreset(name);
+                                                                          },
+                                                                          "editor_preset_save_overwrite_user",
+                                                                          safeThis);
                                 },
                                 "editor_preset_save_dialog",
                                 this);

@@ -18,6 +18,7 @@
 
 #include "PresetState.h"
 #include "PluginProcessor.h"
+#include "../Config/FactoryDefaults.h"
 #include <cmath>
 
 //==============================================================================
@@ -337,105 +338,22 @@ std::optional<PresetState> PresetState::loadFromFile(const juce::File& file)
 
 std::optional<PresetState> PresetState::makeFactoryPreset(int index)
 {
+    const auto preset = choroboros::factory::getPreset(index);
+    if (!preset.has_value())
+        return std::nullopt;
+
     PresetState state;
     state.version = 1;
-
-    switch (index)
-    {
-        case 0: // Classic (Green): NQ, R=0.65Hz, D=21%, O=33°, W=150%, M=50%, C=16%
-            state.rate = 0.65f;
-            state.depth = 0.21f;
-            state.offset = 33.0f;
-            state.width = 1.5f;
-            state.mix = 0.5f;
-            state.color = 0.16f;
-            state.hqEnabled = false;
-            state.engineColorIndex = 0;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        case 1: // Vintage (Red): HQ, R=0.62Hz, D=21%, O=56°, W=150%, M=50%, C=50%
-            state.rate = 0.62f;
-            state.depth = 0.21f;
-            state.offset = 56.0f;
-            state.width = 1.5f;
-            state.mix = 0.5f;
-            state.color = 0.5f;
-            state.hqEnabled = true;
-            state.engineColorIndex = 2;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        case 2: // Modern (Blue): HQ, R=0.26Hz, D=53%, O=59°, W=100%, M=50%, C=41%
-            state.rate = 0.26f;
-            state.depth = 0.53f;
-            state.offset = 59.0f;
-            state.width = 1.0f;
-            state.mix = 0.5f;
-            state.color = 0.41f;
-            state.hqEnabled = true;
-            state.engineColorIndex = 1;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        case 3: // Psychedelic (Purple): NQ, R=0.12Hz, D=52%, O=52°, W=200%, M=69%, C=13%
-            state.rate = 0.12f;
-            state.depth = 0.52f;
-            state.offset = 52.0f;
-            state.width = 2.0f;
-            state.mix = 0.69f;
-            state.color = 0.13f;
-            state.hqEnabled = false;
-            state.engineColorIndex = 3;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        case 4: // Core (Black): HQ, R=0.8Hz, D=35%, O=41°, W=159%, M=50%, C=28%
-            state.rate = 0.8f;
-            state.depth = 0.35f;
-            state.offset = 41.0f;
-            state.width = 1.59f;
-            state.mix = 0.5f;
-            state.color = 0.28f;
-            state.hqEnabled = true;
-            state.engineColorIndex = 4;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        case 5: // Duck: R=10.0Hz, D=14%, O=50°, W=50%, M=100%, C=10%, Purple HQ
-            state.rate = 10.0f;
-            state.depth = 0.14f;
-            state.offset = 50.0f;
-            state.width = 0.5f;
-            state.mix = 1.0f;
-            state.color = 0.1f;
-            state.hqEnabled = true;
-            state.engineColorIndex = 3;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        case 6: // Ouroboros: R=2.0Hz, D=11%, O=33°, W=33%, M=100%, C=65%, Blue HQ
-            state.rate = 2.0f;
-            state.depth = 0.11f;
-            state.offset = 33.0f;
-            state.width = 0.33f;
-            state.mix = 1.0f;
-            state.color = 0.65f;
-            state.hqEnabled = true;
-            state.engineColorIndex = 1;
-            state.modularCoresEnabled = false;
-            state.coreAssignments.resetToLegacy();
-            break;
-
-        default:
-            return std::nullopt;
-    }
+    state.rate = preset->rate;
+    state.depth = preset->depth;
+    state.offset = preset->offset;
+    state.width = preset->width;
+    state.color = preset->color;
+    state.mix = preset->mix;
+    state.hqEnabled = preset->hqEnabled;
+    state.engineColorIndex = preset->engineColorIndex;
+    state.modularCoresEnabled = preset->modularCoresEnabled;
+    state.coreAssignments = preset->coreAssignments;
 
     if (!state.isValid())
         return std::nullopt;

@@ -26,7 +26,7 @@ class ChoroborosAudioProcessor;
 /**
     Manages factory presets and user-saved presets for Choroboros.
 
-    Factory presets are the 7 built-in programs from PluginProcessor.
+    Factory presets come from the platform factory defaults JSON.
     User presets are stored as XML files in a dedicated directory.
 
     currentIndex_ == -1 means "no preset active" — the user has tweaked
@@ -84,6 +84,8 @@ public:
 
     /** Returns true if the given index is a user preset (not factory). */
     bool isUserPreset (int index) const;
+    bool isFactoryPresetName (const juce::String& name) const;
+    bool hasUserPresetName (const juce::String& name) const;
 
     /** Number of factory presets. */
     int getNumFactoryPresets() const;

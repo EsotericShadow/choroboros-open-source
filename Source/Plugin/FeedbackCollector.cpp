@@ -17,6 +17,7 @@
  */
 
 #include "FeedbackCollector.h"
+#include "../Config/FactoryDefaults.h"
 #include "SessionLog.h"
 
 //==============================================================================
@@ -184,16 +185,16 @@ juce::String FeedbackCollector::getUsageSummary() const
     s << "  HQ toggles: " << stats.hqEnabledCount << "\n";
 
     // Preset usage
-    const char* presetNames[] = { "Classic", "Vintage", "Modern", "Psychedelic",
-                                  "Core", "Duck", "Ouroboros" };
     bool anyPresets = false;
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < static_cast<int>(std::size(stats.presetLoads)); ++i)
     {
         if (stats.presetLoads[i] > 0)
         {
             if (! anyPresets) { s << "Presets: "; anyPresets = true; }
             else              { s << ", "; }
-            s << presetNames[i] << "(" << stats.presetLoads[i] << ")";
+            const auto presetName = choroboros::factory::getPresetName(i);
+            s << (presetName.isNotEmpty() ? presetName : juce::String("Preset ") + juce::String(i + 1))
+              << "(" << stats.presetLoads[i] << ")";
         }
     }
     if (anyPresets) s << "\n";
