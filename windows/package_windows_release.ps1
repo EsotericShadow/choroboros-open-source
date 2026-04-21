@@ -75,7 +75,9 @@ function New-WindowsPackage {
     New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "Standalone") | Out-Null
 
     Copy-Item $SharedAssetPackDir (Join-Path $stageRoot "Assets") -Recurse -Force
-    Copy-Item $srcVst3 (Join-Path $stageRoot ("VST3\" + $ProductName + ".vst3")) -Recurse -Force
+    $stagedVst3 = Join-Path $stageRoot ("VST3\" + $ProductName + ".vst3")
+    Copy-Item $srcVst3 $stagedVst3 -Recurse -Force
+    Copy-Item (Join-Path $stageRoot "Assets") (Join-Path $stagedVst3 "Assets") -Recurse -Force
     Copy-Item $srcStandalone (Join-Path $stageRoot ("Standalone\" + $ProductName + ".exe")) -Force
 
     foreach ($doc in $SharedDocs) {

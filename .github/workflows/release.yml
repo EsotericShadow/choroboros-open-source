@@ -178,6 +178,7 @@ jobs:
             --output-root dist/Assets \
             --pack-version "$CHOROBOROS_VERSION" >/dev/null
           cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
+          cp -r dist/Assets "dist/Choroboros Beta.vst3/Assets"
           cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta" dist/
           cp "README.md" "LICENSE" "COPYING" "EULA.md" dist/
           cd dist
@@ -260,6 +261,9 @@ jobs:
           Copy-Item -Recurse `
             "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
+          Copy-Item -Recurse `
+            dist\contents\Assets `
+            "dist\contents\Choroboros Beta.vst3\Assets"
           Copy-Item `
             "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
@@ -340,6 +344,9 @@ jobs:
           Copy-Item -Recurse `
             "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
+          Copy-Item -Recurse `
+            dist\contents\Assets `
+            "dist\contents\Choroboros Beta.vst3\Assets"
           Copy-Item `
             "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
@@ -408,6 +415,9 @@ jobs:
           Copy-Item -Recurse `
             "build\windows-arm64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
+          Copy-Item -Recurse `
+            dist\contents\Assets `
+            "dist\contents\Choroboros Beta.vst3\Assets"
           Copy-Item `
             "build\windows-arm64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
