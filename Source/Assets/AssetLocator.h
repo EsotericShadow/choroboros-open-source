@@ -11,6 +11,7 @@ public:
     static juce::File getSharedAssetRoot();
     static juce::File getExpectedPackDirectory();
     static juce::Array<juce::File> getCandidatePackDirectories();
+    static juce::File resolvePackDirectoryFromCandidates(const juce::Array<juce::File>& candidates);
     static juce::File resolvePackDirectory();
 };
 }

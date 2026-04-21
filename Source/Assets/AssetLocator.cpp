@@ -28,6 +28,12 @@ juce::String getNamedPackDirectoryName()
     return "ChoroborosAssets-" + juce::String(kExpectedPackVersion);
 }
 
+bool isValidPackDirectory(const juce::File& candidate)
+{
+    return candidate.isDirectory()
+        && candidate.getChildFile("manifest.json").existsAsFile();
+}
+
 void appendPackCandidates(juce::Array<juce::File>& candidates, const juce::File& root)
 {
     if (root == juce::File())
@@ -99,14 +105,19 @@ juce::Array<juce::File> AssetLocator::getCandidatePackDirectories()
     return candidates;
 }
 
-juce::File AssetLocator::resolvePackDirectory()
+juce::File AssetLocator::resolvePackDirectoryFromCandidates(const juce::Array<juce::File>& candidates)
 {
-    for (const auto& candidate : getCandidatePackDirectories())
+    for (const auto& candidate : candidates)
     {
-        if (candidate.isDirectory())
+        if (isValidPackDirectory(candidate))
             return candidate;
     }
 
     return {};
+}
+
+juce::File AssetLocator::resolvePackDirectory()
+{
+    return resolvePackDirectoryFromCandidates(getCandidatePackDirectories());
 }
 }

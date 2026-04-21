@@ -5,6 +5,7 @@
 
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginEditor.h"
+#include "Assets/AssetLocator.h"
 #include "Config/FactoryDefaults.h"
 #include "Cores/blue_engine_modern/ChorusCoreThiran.h"
 #include "UI/DevPanel.h"
@@ -514,6 +515,36 @@ static void testKnownBadBundledEngineProfilesMigrateToDefaults()
         expectNear(actual.color, proc.unmapParameterValue(ChoroborosAudioProcessor::COLOR_ID, expected->color),
                    "Engine " + juce::String(i) + " profile color mismatch");
     }
+}
+
+static void testAssetLocatorRejectsNonPackDirectories()
+{
+    const auto tempRoot = juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getNonexistentChildFile("choroboros-asset-locator-regression", "");
+    const auto invalidDir = tempRoot.getChildFile("host_dir");
+    const auto validDir = tempRoot.getChildFile("asset_pack");
+
+    invalidDir.createDirectory();
+    validDir.createDirectory();
+
+    const auto manifestFile = validDir.getChildFile("manifest.json");
+    const auto manifestJson = juce::String(R"JSON({
+  "schemaVersion": 1,
+  "assetPackVersion": "2.0.50",
+  "assets": []
+})JSON");
+    REGRESS_ASSERT(manifestFile.replaceWithText(manifestJson),
+                   "Asset locator regression fixture should write manifest.json");
+
+    juce::Array<juce::File> candidates;
+    candidates.add(invalidDir);
+    candidates.add(validDir);
+
+    const auto resolved = choroboros::assets::AssetLocator::resolvePackDirectoryFromCandidates(candidates);
+    REGRESS_ASSERT(resolved.getFullPathName() == validDir.getFullPathName(),
+                   "Asset locator should skip non-pack directories and keep searching");
+
+    tempRoot.deleteRecursively();
 }
 
 static devpanel::CommandConsolePropertyComponent* findConsoleComponentRecursive(juce::Component& root)
@@ -1105,6 +1136,7 @@ int main(int argc, char** argv)
         testRuntimeTuningLockFree();
         testMaxBlockChannels();
         testKnownBadBundledEngineProfilesMigrateToDefaults();
+        testAssetLocatorRejectsNonPackDirectories();
 
         // TODO: Add Tier 1 headless console command behavior tests here
         // when ConsoleEngine API stabilizes.
