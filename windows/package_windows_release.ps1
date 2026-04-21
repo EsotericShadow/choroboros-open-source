@@ -20,6 +20,22 @@ function Resolve-ExistingPath {
     return (Resolve-Path $PathValue).Path
 }
 
+function Get-AssetPackVersion {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $headerPath = Join-Path $RepoRoot "Source\Assets\AssetPackVersion.h"
+    if (-not (Test-Path $headerPath)) {
+        throw "AssetPackVersion.h not found: $headerPath"
+    }
+
+    $match = Select-String -Path $headerPath -Pattern 'CHOROBOROS_ASSET_PACK_VERSION "([^"]+)"'
+    if (-not $match -or -not $match.Matches.Count) {
+        throw "Could not parse CHOROBOROS_ASSET_PACK_VERSION from $headerPath"
+    }
+
+    return $match.Matches[0].Groups[1].Value
+}
+
 function New-WindowsPackage {
     param(
         [Parameter(Mandatory = $true)][string]$ArchLabel,
@@ -29,7 +45,8 @@ function New-WindowsPackage {
         [Parameter(Mandatory = $true)][string]$PackageVersion,
         [Parameter(Mandatory = $true)][string]$GitSha,
         [Parameter(Mandatory = $true)][string]$BuiltUtcIso,
-        [Parameter(Mandatory = $true)][string[]]$SharedDocs
+        [Parameter(Mandatory = $true)][string[]]$SharedDocs,
+        [Parameter(Mandatory = $true)][string]$SharedAssetPackDir
     )
 
     $artefactsDir = Join-Path $BuildDir ("Choroboros_artefacts\" + $ConfigName)
@@ -53,9 +70,11 @@ function New-WindowsPackage {
     if (Test-Path $hashPath) { Remove-Item $hashPath -Force }
 
     New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "Assets") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "VST3") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "Standalone") | Out-Null
 
+    Copy-Item $SharedAssetPackDir (Join-Path $stageRoot "Assets") -Recurse -Force
     Copy-Item $srcVst3 (Join-Path $stageRoot ("VST3\" + $ProductName + ".vst3")) -Recurse -Force
     Copy-Item $srcStandalone (Join-Path $stageRoot ("Standalone\" + $ProductName + ".exe")) -Force
 
@@ -105,6 +124,16 @@ $safeVersion = $VersionLabel -replace '[^A-Za-z0-9._-]', '-'
 $releaseDir = Join-Path $RepoRoot "Release"
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
+$assetPackVersion = Get-AssetPackVersion -RepoRoot $RepoRoot
+$assetPackBuildRoot = Join-Path $releaseDir "_asset_pack_build"
+if (Test-Path $assetPackBuildRoot) { Remove-Item $assetPackBuildRoot -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $assetPackBuildRoot | Out-Null
+py -3 (Join-Path $RepoRoot "scripts\build_asset_pack.py") `
+    --source-root (Join-Path $RepoRoot "Assets") `
+    --output-root $assetPackBuildRoot `
+    --pack-version $assetPackVersion | Out-Null
+$sharedAssetPackDir = Resolve-ExistingPath -PathValue (Join-Path $assetPackBuildRoot ("ChoroborosAssets-" + $assetPackVersion))
+
 $x64BuildDir = ""
 $x86BuildDir = ""
 if (-not $SkipX64) {
@@ -135,11 +164,13 @@ $sharedDocs = @(
 
 $results = New-Object System.Collections.Generic.List[object]
 if (-not $SkipX64) {
-    $results.Add((New-WindowsPackage -ArchLabel "x64" -BuildDir $x64BuildDir -ConfigName $Config -ReleaseDir $releaseDir -PackageVersion $safeVersion -GitSha $gitSha -BuiltUtcIso $builtUtc -SharedDocs $sharedDocs))
+    $results.Add((New-WindowsPackage -ArchLabel "x64" -BuildDir $x64BuildDir -ConfigName $Config -ReleaseDir $releaseDir -PackageVersion $safeVersion -GitSha $gitSha -BuiltUtcIso $builtUtc -SharedDocs $sharedDocs -SharedAssetPackDir $sharedAssetPackDir))
 }
 if (-not $SkipX86) {
-    $results.Add((New-WindowsPackage -ArchLabel "x86-compat" -BuildDir $x86BuildDir -ConfigName $Config -ReleaseDir $releaseDir -PackageVersion $safeVersion -GitSha $gitSha -BuiltUtcIso $builtUtc -SharedDocs $sharedDocs))
+    $results.Add((New-WindowsPackage -ArchLabel "x86-compat" -BuildDir $x86BuildDir -ConfigName $Config -ReleaseDir $releaseDir -PackageVersion $safeVersion -GitSha $gitSha -BuiltUtcIso $builtUtc -SharedDocs $sharedDocs -SharedAssetPackDir $sharedAssetPackDir))
 }
+
+if (Test-Path $assetPackBuildRoot) { Remove-Item $assetPackBuildRoot -Recurse -Force }
 
 Write-Host ""
 Write-Host "Windows release packages created:" -ForegroundColor Green

@@ -37,6 +37,34 @@ void appendPackCandidates(juce::Array<juce::File>& candidates, const juce::File&
     candidates.addIfNotAlreadyThere(root.getChildFile(getNamedPackDirectoryName()));
     candidates.addIfNotAlreadyThere(root);
 }
+
+void appendRelativeModulePackCandidates(juce::Array<juce::File>& candidates)
+{
+    auto moduleFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    if (moduleFile == juce::File())
+        return;
+
+    auto currentDir = moduleFile.getParentDirectory();
+
+    // Walk up the loaded module path so packaged zips can ship a single shared
+    // asset pack beside the install root (for example: VST3/Assets/...).
+    for (int depth = 0; depth < 6 && currentDir != juce::File(); ++depth)
+    {
+        appendPackCandidates(candidates, currentDir.getChildFile("Assets"));
+        appendPackCandidates(candidates, currentDir);
+        currentDir = currentDir.getParentDirectory();
+    }
+
+#if JUCE_MAC
+    const auto moduleDir = moduleFile.getParentDirectory();
+    if (moduleDir.getFileName() == "MacOS")
+    {
+        const auto contentsDir = moduleDir.getParentDirectory();
+        appendPackCandidates(candidates, contentsDir.getChildFile("Resources").getChildFile("Assets"));
+        appendPackCandidates(candidates, contentsDir.getChildFile("Resources"));
+    }
+#endif
+}
 }
 
 juce::File AssetLocator::getSharedAssetRoot()
@@ -64,6 +92,7 @@ juce::Array<juce::File> AssetLocator::getCandidatePackDirectories()
         candidates.addIfNotAlreadyThere(overrideFile);
     }
 
+    appendRelativeModulePackCandidates(candidates);
     appendPackCandidates(candidates, getUserAssetRoot());
     appendPackCandidates(candidates, getSharedAssetRoot());
 

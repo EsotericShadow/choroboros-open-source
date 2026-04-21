@@ -75,14 +75,23 @@ jobs:
       - name: Package and checksum
         run: |
           mkdir -p dist
+          source installer/installer_config.sh
+          mkdir -p dist/Assets
+          python3 scripts/build_asset_pack.py \
+            --source-root Assets \
+            --output-root dist/Assets \
+            --pack-version "$CHOROBOROS_VERSION" >/dev/null
           cp -R "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
           cp -R "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component" dist/
           cp -R "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app" dist/
+          cp "README.md" "LICENSE" "COPYING" "EULA.md" dist/
           cd dist
           zip -r Choroboros-Beta-macOS-Universal.zip \
             "Choroboros Beta.vst3" \
             "Choroboros Beta.component" \
-            "Choroboros Beta.app"
+            "Choroboros Beta.app" \
+            Assets \
+            README.md LICENSE COPYING EULA.md
           shasum -a 256 Choroboros-Beta-macOS-Universal.zip > Choroboros-Beta-macOS-Universal.zip.sha256
           cat Choroboros-Beta-macOS-Universal.zip.sha256
 
@@ -162,10 +171,18 @@ jobs:
       - name: Package and checksum
         run: |
           mkdir -p dist
+          source installer/installer_config.sh
+          mkdir -p dist/Assets
+          python3 scripts/build_asset_pack.py \
+            --source-root Assets \
+            --output-root dist/Assets \
+            --pack-version "$CHOROBOROS_VERSION" >/dev/null
           cp -r "build/linux-x64-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
           cp "build/linux-x64-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta" dist/
+          cp "README.md" "LICENSE" "COPYING" "EULA.md" dist/
           cd dist
-          zip -r Choroboros-Beta-linux-x64.zip "Choroboros Beta.vst3" "Choroboros Beta"
+          zip -r Choroboros-Beta-linux-x64.zip \
+            "Choroboros Beta.vst3" "Choroboros Beta" Assets README.md LICENSE COPYING EULA.md
           sha256sum Choroboros-Beta-linux-x64.zip > Choroboros-Beta-linux-x64.zip.sha256
           cat Choroboros-Beta-linux-x64.zip.sha256
 
@@ -237,12 +254,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          New-Item -ItemType Directory -Force -Path dist\contents\Assets | Out-Null
+          $assetPackVersion = (Select-String -Path "Source/Assets/AssetPackVersion.h" -Pattern 'CHOROBOROS_ASSET_PACK_VERSION "([^"]+)"').Matches[0].Groups[1].Value
+          py -3 scripts/build_asset_pack.py --source-root Assets --output-root dist/contents/Assets --pack-version $assetPackVersion | Out-Null
           Copy-Item -Recurse `
             "build\windows-x64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
           Copy-Item `
             "build\windows-x64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
+          Copy-Item "README.md", "LICENSE", "COPYING", "EULA.md" dist\contents\
           Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x64.zip
           $hash = (Get-FileHash dist\Choroboros-Beta-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  Choroboros-Beta-windows-x64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x64.zip.sha256 -Encoding ascii
@@ -313,12 +334,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          New-Item -ItemType Directory -Force -Path dist\contents\Assets | Out-Null
+          $assetPackVersion = (Select-String -Path "Source/Assets/AssetPackVersion.h" -Pattern 'CHOROBOROS_ASSET_PACK_VERSION "([^"]+)"').Matches[0].Groups[1].Value
+          py -3 scripts/build_asset_pack.py --source-root Assets --output-root dist/contents/Assets --pack-version $assetPackVersion | Out-Null
           Copy-Item -Recurse `
             "build\windows-x86-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
           Copy-Item `
             "build\windows-x86-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
+          Copy-Item "README.md", "LICENSE", "COPYING", "EULA.md" dist\contents\
           Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-x86.zip
           $hash = (Get-FileHash dist\Choroboros-Beta-windows-x86.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  Choroboros-Beta-windows-x86.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-x86.zip.sha256 -Encoding ascii
@@ -377,12 +402,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist\contents | Out-Null
+          New-Item -ItemType Directory -Force -Path dist\contents\Assets | Out-Null
+          $assetPackVersion = (Select-String -Path "Source/Assets/AssetPackVersion.h" -Pattern 'CHOROBOROS_ASSET_PACK_VERSION "([^"]+)"').Matches[0].Groups[1].Value
+          py -3 scripts/build_asset_pack.py --source-root Assets --output-root dist/contents/Assets --pack-version $assetPackVersion | Out-Null
           Copy-Item -Recurse `
             "build\windows-arm64-release\Choroboros_artefacts\Release\VST3\Choroboros Beta.vst3" `
             dist\contents\
           Copy-Item `
             "build\windows-arm64-release\Choroboros_artefacts\Release\Standalone\Choroboros Beta.exe" `
             dist\contents\
+          Copy-Item "README.md", "LICENSE", "COPYING", "EULA.md" dist\contents\
           Compress-Archive -Path dist\contents\* -DestinationPath dist\Choroboros-Beta-windows-arm64.zip
           $hash = (Get-FileHash dist\Choroboros-Beta-windows-arm64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  Choroboros-Beta-windows-arm64.zip" | Out-File -FilePath dist\Choroboros-Beta-windows-arm64.zip.sha256 -Encoding ascii
