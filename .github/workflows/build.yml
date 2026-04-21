@@ -16,7 +16,7 @@ env:
 jobs:
 
   # ---------------------------------------------------------------------------
-  # macOS Universal (arm64 + x86_64) — VST3 + AU + Standalone
+  # macOS Universal (arm64 + x86_64) — build/test only
   # ---------------------------------------------------------------------------
   macos:
     name: macOS Universal
@@ -72,38 +72,11 @@ jobs:
           echo "=== Standalone ==="
           lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app/Contents/MacOS/Choroboros Beta"
 
-      - name: Package and checksum
+      - name: Note installer-only distribution
         run: |
-          mkdir -p dist
-          source installer/installer_config.sh
-          mkdir -p dist/Assets
-          python3 scripts/build_asset_pack.py \
-            --source-root Assets \
-            --output-root dist/Assets \
-            --pack-version "$CHOROBOROS_VERSION" >/dev/null
-          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3" dist/
-          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component" dist/
-          cp -R "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app" dist/
-          cp "README.md" "LICENSE" "COPYING" "EULA.md" dist/
-          cd dist
-          zip -r Choroboros-Beta-macOS-Universal.zip \
-            "Choroboros Beta.vst3" \
-            "Choroboros Beta.component" \
-            "Choroboros Beta.app" \
-            Assets \
-            README.md LICENSE COPYING EULA.md
-          shasum -a 256 Choroboros-Beta-macOS-Universal.zip > Choroboros-Beta-macOS-Universal.zip.sha256
-          cat Choroboros-Beta-macOS-Universal.zip.sha256
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: Choroboros-Beta-macOS-Universal
-          path: |
-            dist/Choroboros-Beta-macOS-Universal.zip
-            dist/Choroboros-Beta-macOS-Universal.zip.sha256
-          if-no-files-found: error
-          retention-days: 3
+          echo "macOS CI build verified successfully."
+          echo "No macOS zip artifact is produced."
+          echo "Distribute macOS only through the locally signed/notarized installer pkg."
 
   # ---------------------------------------------------------------------------
   # Linux x64 — VST3 + Standalone

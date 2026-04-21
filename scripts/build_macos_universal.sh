@@ -6,8 +6,8 @@
 #                                Set to an absolute path on an external disk, e.g.
 #                                /Volumes/T7/ChoroborosCMakeBuilds/universal
 #   CHOROBOROS_SKIP_UNIVERSAL_CLEAN   if set to 1, do not rm -rf the CMake build dir first
-#   CHOROBOROS_RELEASE_DIR     folder for the universal .zip (default: repo/Release, or
-#                              $(dirname cmake-tree)/Release when CHOROBOROS_CMAKE_BUILD_DIR is under /Volumes/...)
+#   CHOROBOROS_RELEASE_DIR     legacy folder where old macOS zip artefacts were written.
+#                              Kept only so this script can remove stale zip outputs.
 #   TMPDIR                     use a folder on an external SSD when internal disk is tight (linker temp)
 #   CHOROBOROS_ALLOW_EMBEDDED_ASSET_FALLBACK  optional override for cmake (default here: OFF).
 #                              Set to ON only for local experiments without the shared asset pack.
@@ -30,8 +30,6 @@ source "${REPO_ROOT}/installer/installer_config.sh"
 PRODUCT_NAME="${CHOROBOROS_BUNDLE_BASENAME}"
 PRODUCT_SLUG="${CHOROBOROS_PRODUCT_SLUG}"
 PUBLIC_VERSION="${CHOROBOROS_PUBLIC_VERSION}"
-ARCHIVE_BASENAME="${PRODUCT_SLUG}-${PUBLIC_VERSION}-macOS-Universal.zip"
-
 # Absolute path to CMake binary dir (for cd / rm)
 if [[ "${CHOROBOROS_CMAKE_BUILD_DIR}" = /* ]]; then
     CMAKE_BIN_DIR="${CHOROBOROS_CMAKE_BUILD_DIR}"
@@ -52,14 +50,14 @@ fi
 echo "🎯 Building macOS Universal Binary (arm64 + x86_64)"
 echo "=================================================="
 echo "CMake binary dir: ${CMAKE_BIN_DIR}"
-echo "Release / zip:    ${RELEASE_DIR}"
+echo "Legacy zip dir:   ${RELEASE_DIR}"
 echo ""
 
 if [[ "${CHOROBOROS_SKIP_UNIVERSAL_CLEAN:-0}" != "1" ]]; then
-    echo "🧹 Cleaning this CMake build tree and local zip output..."
+    echo "🧹 Cleaning this CMake build tree and removing stale macOS zip output..."
     rm -rf "${CMAKE_BIN_DIR}"
-    rm -f "${RELEASE_DIR}/${ARCHIVE_BASENAME}" \
-        "${RELEASE_DIR}/${ARCHIVE_BASENAME}.sha256"
+    rm -f "${RELEASE_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-macOS-Universal.zip" \
+        "${RELEASE_DIR}/${PRODUCT_SLUG}-${PUBLIC_VERSION}-macOS-Universal.zip.sha256"
 else
     echo "🧹 SKIP clean (CHOROBOROS_SKIP_UNIVERSAL_CLEAN=1)"
 fi
@@ -100,33 +98,7 @@ if [[ -f "$STANDALONE_BINARY" ]]; then
     lipo -info "$STANDALONE_BINARY"
 fi
 
-echo "📦 Packaging universal build..."
-mkdir -p "${RELEASE_DIR}"
-
-(
-    cd "${ARTEFACT_RELEASE}"
-    zip -r -o "${RELEASE_DIR}/${ARCHIVE_BASENAME}" VST3 AU Standalone
-)
-
-cd "${RELEASE_DIR}"
-unzip -q -o "${ARCHIVE_BASENAME}" || true
-cp "${REPO_ROOT}/README.md" "${REPO_ROOT}/DISTRIBUTION.md" "${REPO_ROOT}/INSTALL.txt" \
-    "${REPO_ROOT}/LICENSE" "${REPO_ROOT}/COPYING" "${REPO_ROOT}/EULA.md" "${REPO_ROOT}/SOURCE_LINK.txt" . 2>/dev/null || true
-cp "${REPO_ROOT}/install.sh" . 2>/dev/null || true
-cp "${REPO_ROOT}/install.sh" "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
-chmod +x install.sh "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
-zip -r -o "${ARCHIVE_BASENAME}" \
-    README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING EULA.md SOURCE_LINK.txt \
-    install.sh "Install ${PRODUCT_NAME}.command" 2>/dev/null || true
-rm -f README.md DISTRIBUTION.md INSTALL.txt LICENSE COPYING EULA.md SOURCE_LINK.txt install.sh "Install ${PRODUCT_NAME}.command"
-rm -rf VST3 AU Standalone
-cd "${REPO_ROOT}"
-
-echo "🔐 Generating SHA256 checksum..."
-shasum -a 256 "${RELEASE_DIR}/${ARCHIVE_BASENAME}" > "${RELEASE_DIR}/${ARCHIVE_BASENAME}.sha256"
-
 echo ""
 echo "✅ macOS Universal build complete!"
-echo "📦 Package: ${RELEASE_DIR}/${ARCHIVE_BASENAME}"
-echo "📊 Size: $(du -h "${RELEASE_DIR}/${ARCHIVE_BASENAME}" | cut -f1)"
 echo "📂 Artefacts: ${ARTEFACT_RELEASE}"
+echo "📦 Distribution path: installer-only via ./scripts/release_macos_signed_installer.sh"
