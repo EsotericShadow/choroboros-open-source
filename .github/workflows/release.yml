@@ -14,70 +14,6 @@ env:
   PRODUCT: "Choroboros Beta"
 
 jobs:
-
-  # ---------------------------------------------------------------------------
-  # macOS Universal (arm64 + x86_64) — build/test only
-  # ---------------------------------------------------------------------------
-  macos:
-    name: macOS Universal
-    runs-on: macos-14
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Install build tools
-        run: brew install ninja
-
-      - name: Cache build directory
-        uses: actions/cache@v4
-        with:
-          path: build/macos-universal-release
-          key: macos-universal-cmake-${{ hashFiles('CMakeLists.txt', 'JUCE/CMakeLists.txt') }}-${{ runner.os }}
-          restore-keys: |
-            macos-universal-cmake-
-
-      - name: Configure
-        run: |
-          cmake -S . -B build/macos-universal-release \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-
-      - name: Build all targets
-        run: |
-          cmake --build build/macos-universal-release \
-            --target Choroboros_VST3 Choroboros_AU Choroboros_Standalone \
-            --parallel
-
-      - name: Build regression harness
-        run: |
-          cmake --build build/macos-universal-release \
-            --target ChoroborosRegressionTests \
-            --parallel
-
-      - name: Run full regression tests (Tier 1+2+3)
-        run: |
-          ./build/macos-universal-release/ChoroborosRegressionTests --tier=1,2,3
-
-      - name: Verify Universal Binary
-        run: |
-          echo "=== VST3 ==="
-          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/VST3/Choroboros Beta.vst3/Contents/MacOS/Choroboros Beta"
-          echo "=== AU ==="
-          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/AU/Choroboros Beta.component/Contents/MacOS/Choroboros Beta"
-          echo "=== Standalone ==="
-          lipo -info "build/macos-universal-release/Choroboros_artefacts/Release/Standalone/Choroboros Beta.app/Contents/MacOS/Choroboros Beta"
-
-      - name: Note installer-only distribution
-        run: |
-          echo "macOS CI build verified successfully."
-          echo "No macOS zip artifact is produced."
-          echo "macOS distribution must come from the locally signed/notarized installer pkg."
-
   # ---------------------------------------------------------------------------
   # Linux x64 — VST3 + Standalone
   # ---------------------------------------------------------------------------
@@ -415,7 +351,7 @@ jobs:
   # ---------------------------------------------------------------------------
   create-release:
     name: Create GitHub Release
-    needs: [macos, linux, windows, windows-x86, windows-arm64]
+    needs: [linux, windows, windows-x86, windows-arm64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -459,6 +395,7 @@ jobs:
 
           | Platform | File |
           |----------|------|
+          | macOS | Local signed/notarized installer uploaded separately |
           | Windows x64 | `Choroboros-Beta-windows-x64.zip` |
           | Windows x86 (32-bit) | `Choroboros-Beta-windows-x86.zip` |
           | Windows ARM64 | `Choroboros-Beta-windows-arm64.zip` |
@@ -471,7 +408,7 @@ jobs:
           ## Install
 
           Replace your existing Choroboros Beta binaries with the builds from this release.
-          macOS distribution is installer-only and is attached separately from the local signed/notarized pipeline.
+          macOS distribution is installer-only and must be uploaded separately from the local signed/notarized pipeline.
 
           ---
           *Choroboros Beta — Kaizen DSP*
