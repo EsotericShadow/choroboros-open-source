@@ -133,29 +133,16 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
     
     constexpr float maximumDelayModulation = 20.0f;
     const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
+    const float* const colorPerSample = dsp.getColorPerSample(blockNumSamples);
     float depthSamples = maximumDelayModulation * spec.sampleRate / 1000.0f;
     
-    // Get smoothed rate and color (computed once per block)
+    // Get smoothed rate once per block; colour can vary per sample.
     float currentRate = dsp.smoothedRate.getCurrentValue();
-    float currentColor = dsp.smoothedColor.getCurrentValue();
     
     // Phase increment per sample (fast, rate-controlled)
     float phaseInc = currentRate / spec.sampleRate;
     
     const auto& tuning = dsp.runtimeTuningSnapshot;
-    const float color = juce::jlimit(0.0f, 1.0f, currentColor);
-
-    // Orbit parameters from color.
-    const float eccentricity = juce::jmax(0.0f, tuning.purpleOrbitEccentricity) * color;
-    const float thetaRate = juce::jmax(0.0f, tuning.purpleOrbitThetaRateBaseHz)
-                          + juce::jmax(0.0f, tuning.purpleOrbitThetaRateScaleHz) * color;
-    const float thetaInc = thetaRate / spec.sampleRate;
-    
-    // Second tap parameters.
-    const float thetaRate2 = thetaRate * juce::jmax(0.1f, tuning.purpleOrbitThetaRate2Ratio);
-    const float thetaInc2 = thetaRate2 / spec.sampleRate;
-    const float eccentricity2 = eccentricity * juce::jmax(0.0f, tuning.purpleOrbitEccentricity2Ratio);
-    
     // Dual tap mix ratios for ensemble density.
     const float mix1 = juce::jlimit(0.0f, 1.0f, tuning.purpleOrbitMix1);
     const float mix2 = 1.0f - mix1;
@@ -194,8 +181,11 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
         {
             const float ms0 = cdPerMs != nullptr ? cdPerMs[0] : currentCentreDelayMs;
             const float centreS0 = ms0 * spec.sampleRate / 1000.0f;
-            float mod1 = computeOrbitModulation(state.phase, state.theta + thetaOffset, eccentricity);
-            float mod2 = computeOrbitModulation(state.phase, state.theta2 + thetaOffset, eccentricity2);
+            const float color0 = juce::jlimit(0.0f, 1.0f, colorPerSample != nullptr ? colorPerSample[0] : dsp.colorBlockValue);
+            const float eccentricity0 = juce::jmax(0.0f, tuning.purpleOrbitEccentricity) * color0;
+            const float eccentricity20 = eccentricity0 * juce::jmax(0.0f, tuning.purpleOrbitEccentricity2Ratio);
+            float mod1 = computeOrbitModulation(state.phase, state.theta + thetaOffset, eccentricity0);
+            float mod2 = computeOrbitModulation(state.phase, state.theta2 + thetaOffset, eccentricity20);
             
             float initialDelay1 = centreS0 + depthSamples * mod1;
             float initialDelay2 = centreS0 + depthSamples * mod2;
@@ -222,6 +212,15 @@ void ChorusCoreOrbit::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>&
             if (state.phase >= 1.0f)
                 state.phase -= 1.0f;
             
+            const float color = juce::jlimit(0.0f, 1.0f, colorPerSample != nullptr ? colorPerSample[i] : dsp.colorBlockValue);
+            const float eccentricity = juce::jmax(0.0f, tuning.purpleOrbitEccentricity) * color;
+            const float thetaRate = juce::jmax(0.0f, tuning.purpleOrbitThetaRateBaseHz)
+                                  + juce::jmax(0.0f, tuning.purpleOrbitThetaRateScaleHz) * color;
+            const float thetaInc = thetaRate / spec.sampleRate;
+            const float thetaRate2 = thetaRate * juce::jmax(0.1f, tuning.purpleOrbitThetaRate2Ratio);
+            const float thetaInc2 = thetaRate2 / spec.sampleRate;
+            const float eccentricity2 = eccentricity * juce::jmax(0.0f, tuning.purpleOrbitEccentricity2Ratio);
+
             state.theta += thetaInc;
             if (state.theta >= 1.0f)
                 state.theta -= 1.0f;

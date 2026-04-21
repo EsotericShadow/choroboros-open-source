@@ -164,6 +164,7 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
     const int numChannels = static_cast<int>(block.getNumChannels());
     const int blockNumSamples = static_cast<int>(block.getNumSamples());
     const auto& tuning = dsp.runtimeTuningSnapshot;
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
 
     const float remappedCentreDelayMs = tuning.bbdCentreBaseMs + (currentCentreDelayMs - 8.0f) * tuning.bbdCentreScale;
     const float depthMs = tuning.bbdDepthMs;
@@ -236,7 +237,9 @@ void ChorusCoreBBD::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& b
 
         for (int i = 0; i < blockNumSamples; ++i)
         {
-            float targetDelayMs = remappedCentreDelayMs + depthMs * channelLfo[i];
+            const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+            const float remappedCentreDelayMsThis = tuning.bbdCentreBaseMs + (centreMsThis - 8.0f) * tuning.bbdCentreScale;
+            float targetDelayMs = remappedCentreDelayMsThis + depthMs * channelLfo[i];
             targetDelayMs = juce::jlimit(delayMinMs, delayMaxMs, targetDelayMs);
 
             chan.smoothedDelayMs.setTargetValue(targetDelayMs);

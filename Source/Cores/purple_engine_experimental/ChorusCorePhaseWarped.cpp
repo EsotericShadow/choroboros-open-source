@@ -116,20 +116,16 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
     
     constexpr float maximumDelayModulation = 20.0f;
     const float* const cdPerMs = dsp.getCentreDelayMsPerSample(blockNumSamples);
+    const float* const colorPerSample = dsp.getColorPerSample(blockNumSamples);
     float depthSamples = maximumDelayModulation * spec.sampleRate / 1000.0f;
     
-    // Get smoothed rate and color (computed once per block)
+    // Get smoothed rate once per block; colour can vary per sample.
     float currentRate = dsp.smoothedRate.getCurrentValue();
-    float currentColor = dsp.smoothedColor.getCurrentValue();
     
     // Phase increment per sample
     float phaseInc = currentRate / spec.sampleRate;
     
     const auto& tuning = dsp.runtimeTuningSnapshot;
-    const float warpAmount = juce::jlimit(0.0f, 1.0f, currentColor);
-    const float warpA = juce::jmax(0.0f, tuning.purpleWarpA) * warpAmount;
-    const float warpB = juce::jmax(0.0f, tuning.purpleWarpB) * warpAmount;
-    const float warpK = juce::jmax(0.1f, tuning.purpleWarpKBase + tuning.purpleWarpKScale * warpAmount);
 
     const float delaySmoothingMs = juce::jmax(0.0f, tuning.purpleWarpDelaySmoothingMs);
     if (std::abs(delaySmoothingMs - lastDelaySmoothingMs) > 1.0e-3f)
@@ -158,7 +154,12 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
         {
             const float ms0 = cdPerMs != nullptr ? cdPerMs[0] : currentCentreDelayMs;
             const float centreS0 = ms0 * spec.sampleRate / 1000.0f;
-            float initialMod = computeWarpedModulation(state.phase, warpA, warpB, warpK);
+            const float color0 = juce::jlimit(0.0f, 1.0f, colorPerSample != nullptr ? colorPerSample[0] : dsp.colorBlockValue);
+            const float warpAmount0 = color0;
+            const float warpA0 = juce::jmax(0.0f, tuning.purpleWarpA) * warpAmount0;
+            const float warpB0 = juce::jmax(0.0f, tuning.purpleWarpB) * warpAmount0;
+            const float warpK0 = juce::jmax(0.1f, tuning.purpleWarpKBase + tuning.purpleWarpKScale * warpAmount0);
+            float initialMod = computeWarpedModulation(state.phase, warpA0, warpB0, warpK0);
             float initialDelay = centreS0 + depthSamples * initialMod;
             initialDelay = juce::jlimit(guardSamples, maxDelaySamples, initialDelay);
             state.smoothedDelay = initialDelay;
@@ -179,6 +180,11 @@ void ChorusCorePhaseWarped::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<f
             if (state.phase >= 1.0f)
                 state.phase -= 1.0f;
             
+            const float currentColor = juce::jlimit(0.0f, 1.0f, colorPerSample != nullptr ? colorPerSample[i] : dsp.colorBlockValue);
+            const float warpAmount = currentColor;
+            const float warpA = juce::jmax(0.0f, tuning.purpleWarpA) * warpAmount;
+            const float warpB = juce::jmax(0.0f, tuning.purpleWarpB) * warpAmount;
+            const float warpK = juce::jmax(0.1f, tuning.purpleWarpKBase + tuning.purpleWarpKScale * warpAmount);
             // Compute warped modulation
             float mod = computeWarpedModulation(state.phase, warpA, warpB, warpK);
             

@@ -138,30 +138,28 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     const float sampleRate = static_cast<float>(spec.sampleRate);
     const float guardSamples = getGuardSamples();
     const float maxDelay = getMaxDelaySamples();
+    const float* const rawDepthPerSample = dsp.getRawDepthPerSample(numSamples);
+    const float* const colorPerSample = dsp.getColorPerSample(numSamples);
+    const float* const cdPerMs = dsp.getCentreDelayMsPerSample(numSamples);
 
-    // Use a longer base delay for the tape mode so modulation reads as chorus, not subtle combing.
-    const float remappedCentreDelayMs = tuning.tapeCentreBaseMs + (currentCentreDelayMs - 8.0f) * tuning.tapeCentreScale;
-    const float targetDelay = juce::jlimit(guardSamples, maxDelay, remappedCentreDelayMs * sampleRate / 1000.0f);
-
-    if (currentFixedDelay < 0.0f)
-    {
-        currentFixedDelay = targetDelay;
-    }
-    else
-    {
-        // Smooth changes to delay time (e.g. from UI) to prevent zippers.
-        // Intentionally slower so rapid depth moves don't produce stepping artifacts.
-        const float delaySmoothingMs = juce::jmax(0.001f, tuning.tapeDelaySmoothingMs);
-        const float blockMs = 1000.0f * static_cast<float>(numSamples) / sampleRate;
-        const float a = std::exp(-blockMs / delaySmoothingMs);
-        currentFixedDelay = a * currentFixedDelay + (1.0f - a) * targetDelay;
-    }
-
-    const float targetDepth = juce::jlimit(0.0f, 1.0f, dsp.smoothedDepthValue);
     // Per-sample depth smoothing coefficient: ~8ms time constant at any sample rate.
     // Longer than before (was 5ms) to better suppress staircase steps when the depth knob moves.
     const float depthSmoothCoeff = std::exp(-1.0f / (0.008f * sampleRate));
-    const float color = juce::jlimit(0.0f, 1.0f, dsp.smoothedColor.getCurrentValue());
+    const float delaySmoothingMs = juce::jmax(0.001f, tuning.tapeDelaySmoothingMs);
+    const float delaySmoothCoeff = std::exp(-1.0f / (delaySmoothingMs * 0.001f * sampleRate));
+    auto* fixedDelayPerSample = dsp.delaySamplesBuffer.getWritePointer(0);
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float centreMsThis = cdPerMs != nullptr ? cdPerMs[i] : currentCentreDelayMs;
+        const float remappedCentreDelayMsThis = tuning.tapeCentreBaseMs + (centreMsThis - 8.0f) * tuning.tapeCentreScale;
+        const float targetDelay = juce::jlimit(guardSamples, maxDelay, remappedCentreDelayMsThis * sampleRate / 1000.0f);
+        if (currentFixedDelay < 0.0f)
+            currentFixedDelay = targetDelay;
+        else
+            currentFixedDelay = delaySmoothCoeff * currentFixedDelay + (1.0f - delaySmoothCoeff) * targetDelay;
+        fixedDelayPerSample[i] = currentFixedDelay;
+    }
+
     // Sample-rate-aware smoothing coefficients
     const float lfoModSmoothAlpha = 1.0f - std::exp(-1.0f / (0.005f * sampleRate));
     const float ratioSmoothAlpha = 1.0f - std::exp(-1.0f / (0.004f * sampleRate));
@@ -170,15 +168,11 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     float toneMin = tuning.tapeToneMinHz;
     if (toneMin > toneMax)
         std::swap(toneMin, toneMax);
-    // Higher Color opens the tone LP (brighter); drive still increases with Color below.
-    const float targetToneCutoff = toneMin + (toneMax - toneMin) * color;
     // Sample-rate-invariant tone cutoff smoothing: snapshot stores τ in ms,
     // converted here to a per-sample α.  Matches lfoModSmoothAlpha / ratioSmoothAlpha
     // pattern 10 lines above.  (Was hardcoded α = 0.08 — only correct at 48 k.)
     const float toneSmoothTauMs = std::max(0.01f, tuning.tapeToneSmoothingCoeff);
     const float toneSmoothAlpha = 1.0f - std::exp(-1.0f / (toneSmoothTauMs * 0.001f * sampleRate));
-    smoothedToneCutoff += toneSmoothAlpha * (targetToneCutoff - smoothedToneCutoff);
-    const float toneAmount = juce::jlimit(0.0f, 1.0f, color);
 
     constexpr float cutoffRecomputeThresholdHz = 5.0f;
 
@@ -193,9 +187,6 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
     // (Was hardcoded per-sample = 0.99999 — only correct at 48 k.)
     const float phaseDampPerSample = std::pow(tuning.tapePhaseDampingPerSec,
                                               1.0f / sampleRate);
-
-    // Drive increases with Color knob
-    const float drive = 1.0f + tuning.tapeDriveScale * color;
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -213,6 +204,12 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
 
         for (int i = 0; i < numSamples; ++i)
         {
+            const float targetDepth = juce::jlimit(0.0f, 1.0f, rawDepthPerSample != nullptr ? rawDepthPerSample[i] : dsp.smoothedDepthValue);
+            const float color = juce::jlimit(0.0f, 1.0f, colorPerSample != nullptr ? colorPerSample[i] : dsp.colorBlockValue);
+            const float targetToneCutoff = toneMin + (toneMax - toneMin) * color;
+            smoothedToneCutoff += toneSmoothAlpha * (targetToneCutoff - smoothedToneCutoff);
+            const float toneAmount = juce::jlimit(0.0f, 1.0f, color);
+            const float drive = 1.0f + tuning.tapeDriveScale * color;
             smoothedDepth[static_cast<size_t>(ch)] = depthSmoothCoeff * smoothedDepth[static_cast<size_t>(ch)]
                                                     + (1.0f - depthSmoothCoeff) * targetDepth;
             const float curDepth = smoothedDepth[static_cast<size_t>(ch)];
@@ -265,14 +262,15 @@ void ChorusCoreTape::processDelay(ChorusDSP& dsp, juce::dsp::AudioBlock<float>& 
             resampler.phaseOffset *= phaseDampPerSample;
 
             // 4. Calculate Read Pulse
-            float effectiveDelay = currentFixedDelay + resampler.phaseOffset;
+            const float baseFixedDelay = fixedDelayPerSample[i];
+            float effectiveDelay = baseFixedDelay + resampler.phaseOffset;
             
             // Clamp delay to buffer bounds (safety)
             // If the integrator allows too much drift, this hard limit saves us.
             effectiveDelay = juce::jlimit(guardSamples, maxDelay, effectiveDelay);
 
             // Update phaseOffset to reflect the clampling (anti-windup)
-            resampler.phaseOffset = effectiveDelay - currentFixedDelay;
+            resampler.phaseOffset = effectiveDelay - baseFixedDelay;
 
             float readPos = static_cast<float>(writePos) - effectiveDelay;
             while (readPos < 0.0f)

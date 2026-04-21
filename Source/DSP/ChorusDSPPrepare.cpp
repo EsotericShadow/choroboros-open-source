@@ -54,6 +54,10 @@ void ChorusDSPPrepare::prepareFilters(ChorusDSP& chorusDSP, const juce::dsp::Pro
     chorusDSP.preEmphasisCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter(spec.sampleRate, 3000.0f, 0.707f, 1.2f);
     chorusDSP.preEmphasis.coefficients = chorusDSP.preEmphasisCoeffs;
     chorusDSP.preEmphasis.prepare(spec);
+    chorusDSP.previousPreEmphasis.coefficients = chorusDSP.preEmphasisCoeffs;
+    chorusDSP.previousPreEmphasis.prepare(spec);
+    chorusDSP.pendingPreEmphasis.coefficients = chorusDSP.preEmphasisCoeffs;
+    chorusDSP.pendingPreEmphasis.prepare(spec);
     
     chorusDSP.widthMidCoeffs1 = juce::dsp::IIR::Coefficients<float>::makeLowPass(spec.sampleRate, 200.0f, 0.707f);
     chorusDSP.widthMidCoeffs2 = juce::dsp::IIR::Coefficients<float>::makeHighPass(spec.sampleRate, 2000.0f, 0.707f);
@@ -79,6 +83,10 @@ void ChorusDSPPrepare::prepareBuffers(ChorusDSP& chorusDSP, const juce::dsp::Pro
     chorusDSP.lfoBuffer.setSize(1, chorusDSP.maxBlockSize);
     chorusDSP.cosBuffer.setSize(1, chorusDSP.maxBlockSize);
     chorusDSP.delaySamplesBuffer.setSize(1, chorusDSP.maxBlockSize);
+    chorusDSP.centreDelayPerSampleMsBuffer.setSize(1, chorusDSP.maxBlockSize);
+    chorusDSP.colorPerSampleBuffer.setSize(1, chorusDSP.maxBlockSize);
+    chorusDSP.rawDepthPerSampleBuffer.setSize(1, chorusDSP.maxBlockSize);
+    chorusDSP.modulationDepthPerSampleBuffer.setSize(1, chorusDSP.maxBlockSize);
     chorusDSP.preEmphOriginalBuffer.setSize(spec.numChannels, chorusDSP.maxBlockSize);
     
     chorusDSP.dryWet.setMixingRule(juce::dsp::DryWetMixingRule::balanced);

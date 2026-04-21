@@ -191,6 +191,9 @@ public:
     void pushThiranTelemetrySample(float dqMs, float coeffXfade) noexcept;
     void copyLatestThiranTelemetryForAnalyzer(float* dqOut, float* xfadeOut, int numSamples) const noexcept;
     const float* getCentreDelayMsPerSample(int blockNumSamples) const noexcept;
+    const float* getColorPerSample(int blockNumSamples) const noexcept;
+    const float* getRawDepthPerSample(int blockNumSamples) const noexcept;
+    const float* getModulationDepthPerSample(int blockNumSamples) const noexcept;
 
     RuntimeTuning& getRuntimeTuning() { return runtimeTuning; }
     const RuntimeTuning& getRuntimeTuning() const { return runtimeTuning; }
@@ -421,6 +424,10 @@ private:
     juce::AudioBuffer<float> preEmphOriginalBuffer;  // Original signal storage for pre-emphasis
     juce::AudioBuffer<float> coreCrossfadeBufferA;  // Wet path buffer for active core
     juce::AudioBuffer<float> coreCrossfadeBufferB;  // Wet path buffer for previous core
+    juce::AudioBuffer<float> centreDelayPerSampleMsBuffer;  // Current audible centre-delay trajectory
+    juce::AudioBuffer<float> colorPerSampleBuffer;  // Current audible color trajectory
+    juce::AudioBuffer<float> rawDepthPerSampleBuffer;  // Current audible raw depth trajectory
+    juce::AudioBuffer<float> modulationDepthPerSampleBuffer;  // Current audible mapped modulation depth trajectory
     
     // Additional processing stages
     juce::dsp::IIR::Filter<float> hpf;  // High pass filter
@@ -428,6 +435,8 @@ private:
     juce::dsp::IIR::Filter<float> lpf;  // Low pass filter (tame highs, e.g. BBD aliasing)
     juce::dsp::IIR::Coefficients<float>::Ptr lpfCoeffs;
     juce::dsp::IIR::Filter<float> preEmphasis;  // Pre-emphasis filter
+    juce::dsp::IIR::Filter<float> previousPreEmphasis;  // Previous-core pre-emphasis state during crossfade
+    juce::dsp::IIR::Filter<float> pendingPreEmphasis;  // Pending-core pre-emphasis state during warmup
     juce::dsp::IIR::Coefficients<float>::Ptr preEmphasisCoeffs;
     float inputLevel = 0.0f;  // Input level tracking
     float previousInputLevel = 0.0f;
@@ -498,8 +507,8 @@ private:
     };
 
     float applySaturation(float sample, float colorValue);  // Saturation
-    void processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float colorValue, WetCharacterState& state);
-    void processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float colorValue, WetCharacterState& state);
+    void processGreenBloomWet(juce::dsp::AudioBlock<float>& block, float colorValue, WetCharacterState& state, const float* colorPerSample = nullptr);
+    void processBlueFocusWet(juce::dsp::AudioBlock<float>& block, float colorValue, WetCharacterState& state, const float* colorPerSample = nullptr);
     void processWidth(juce::dsp::AudioBlock<float>& block);  // Width processing
     float calculateCentreDelay(float depthValue);  // Centre delay calculation
     
@@ -512,6 +521,7 @@ private:
     // Wet-character processing state for Green/Blue color macros.
     WetCharacterState wetCharacterState;
     WetCharacterState previousWetCharacterState;
+    WetCharacterState pendingWetCharacterState;
     void resetWetCharacterState(WetCharacterState& state, size_t channelCount);
 
     // Post-sum peak compressor state. Catches chorus peaks in the final
@@ -532,6 +542,10 @@ private:
 
     // Block-constant smoothed color value advanced in processChorusParameters.
     float colorBlockValue = 0.5f;
+    const float* activeCentreDelayMsPerSample = nullptr;
+    const float* activeColorPerSample = nullptr;
+    const float* activeRawDepthPerSample = nullptr;
+    const float* activeModulationDepthPerSample = nullptr;
 
     RuntimeTuning runtimeTuning;
     RuntimeTuningSnapshot runtimeTuningSnapshot;
