@@ -23,10 +23,11 @@
 namespace
 {
 constexpr auto kDocsUrl = "https://choroboros.kaizenstrategic.ai/docs";
-constexpr auto kSupportMailto = "mailto:info@kaizenstrategic.ai?subject=Choroboros%20Support";
+constexpr auto kSupportUrl = "https://choroboros.kaizenstrategic.ai/support";
 } // namespace
 
-HelpDialog::HelpDialog()
+HelpDialog::HelpDialog(MessageCallback callback)
+    : showMessageCallback(std::move(callback))
 {
     setSize(500, 436);
 
@@ -66,7 +67,7 @@ HelpDialog::HelpDialog()
     supportHeaderLabel.setColour(juce::Label::textColourId, accent);
     addAndMakeVisible(supportHeaderLabel);
 
-    supportBodyLabel.setText("Open your default mail app with a prefilled\nsupport address for setup or account issues.",
+    supportBodyLabel.setText("Open the official support page for setup,\ncompatibility, and release guidance.",
                              juce::dontSendNotification);
     supportBodyLabel.setFont(devpanel::makeLabelFont(devpanel::Typography::description, false));
     supportBodyLabel.setJustificationType(juce::Justification::centredLeft);
@@ -88,7 +89,7 @@ HelpDialog::HelpDialog()
     addAndMakeVisible(docsButton);
 
     devpanel::styleHackerTextButton(supportButton, false);
-    supportButton.setButtonText("Email Support");
+    supportButton.setButtonText("Open Support");
     supportButton.onClick = [this] { emailSupport(); };
     addAndMakeVisible(supportButton);
 
@@ -149,13 +150,30 @@ void HelpDialog::resized()
 
 void HelpDialog::openDocs()
 {
-    juce::URL(kDocsUrl).launchInDefaultBrowser();
+    if (! juce::URL(kDocsUrl).launchInDefaultBrowser() && showMessageCallback)
+    {
+        showMessageCallback(juce::AlertWindow::WarningIcon,
+                            "Couldn't Open Documentation",
+                            "Choroboros couldn't open your default browser.\n\n"
+                            "Open this URL manually:\n" + juce::String(kDocsUrl));
+        return;
+    }
+
     closeDialog();
 }
 
 void HelpDialog::emailSupport()
 {
-    juce::URL(kSupportMailto).launchInDefaultBrowser();
+    if (! juce::URL(kSupportUrl).launchInDefaultBrowser() && showMessageCallback)
+    {
+        showMessageCallback(juce::AlertWindow::WarningIcon,
+                            "Couldn't Open Support Page",
+                            "Choroboros couldn't open your default browser.\n\n"
+                            "Open this URL manually:\n" + juce::String(kSupportUrl) + "\n\n"
+                            "Direct support email:\ninfo@kaizenstrategic.ai");
+        return;
+    }
+
     closeDialog();
 }
 

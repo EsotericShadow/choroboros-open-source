@@ -179,6 +179,7 @@ private:
     void updateValueLabelColors(int colorIndex);
     void repaintHQLitOverlay();
     void invalidateHQLitOverlayCache();
+    void refreshEditorSurfaceAfterEngineVisualChange();
     void invalidateScaleSensitiveCaches();
     void layoutTopChrome();
     void rebuildScaleSensitiveUI(float newScale);

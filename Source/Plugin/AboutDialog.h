@@ -45,8 +45,9 @@ private:
     juce::Label juceLabel;
     juce::TextButton closeButton;
     juce::TextButton licenseButton;
-    juce::HyperlinkButton contactLink;
+    juce::TextButton contactButton;
     
     void closeDialog();
     void showLicense();
+    void openSupport();
 };

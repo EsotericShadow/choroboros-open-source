@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "FeedbackCollector.h"
 
@@ -25,11 +26,18 @@ class FeedbackDialog : public juce::Component,
                        public juce::Button::Listener
 {
 public:
+    using MessageCallback = std::function<void(juce::AlertWindow::AlertIconType,
+                                               const juce::String&,
+                                               const juce::String&)>;
+
     /** Normal feedback mode. */
-    FeedbackDialog (FeedbackCollector& collector);
+    explicit FeedbackDialog (FeedbackCollector* collector = nullptr,
+                             MessageCallback callback = {});
 
     /** Crash report mode — pre-fills with crash context. Collector is optional. */
-    FeedbackDialog (const juce::String& crashReport, FeedbackCollector* collector = nullptr);
+    FeedbackDialog (const juce::String& crashReport,
+                    FeedbackCollector* collector = nullptr,
+                    MessageCallback callback = {});
 
     ~FeedbackDialog() override = default;
 
@@ -39,6 +47,7 @@ public:
 
 private:
     FeedbackCollector* feedbackCollector = nullptr;
+    MessageCallback showMessageCallback;
     bool crashReportMode = false;
     juce::String crashReportText;
 

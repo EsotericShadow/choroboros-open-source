@@ -25,6 +25,10 @@
 
 namespace
 {
+constexpr auto kFeedbackFormUrl =
+    "https://docs.google.com/forms/d/e/"
+    "1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform";
+
 bool saveFeedbackBodyToFile(const juce::String& body)
 {
     auto feedbackDir = FeedbackCollector::getFeedbackDirectory();
@@ -43,15 +47,19 @@ bool saveFeedbackBodyToFile(const juce::String& body)
 // Constructors
 //==============================================================================
 
-FeedbackDialog::FeedbackDialog (FeedbackCollector& collector)
-    : feedbackCollector (&collector)
+FeedbackDialog::FeedbackDialog (FeedbackCollector* collector,
+                                MessageCallback callback)
+    : feedbackCollector (collector),
+      showMessageCallback (std::move(callback))
 {
     initCommon();
 }
 
 FeedbackDialog::FeedbackDialog (const juce::String& crashReport,
-                                FeedbackCollector* collector)
+                                FeedbackCollector* collector,
+                                MessageCallback callback)
     : feedbackCollector (collector),
+      showMessageCallback (std::move(callback)),
       crashReportMode (true),
       crashReportText (crashReport)
 {
@@ -231,17 +239,44 @@ void FeedbackDialog::sendToDeveloper()
                           "?subject=" + juce::URL::addEscapeChars (subject, true)
                         + "&body="    + juce::URL::addEscapeChars (body, true);
 
-    juce::URL (mailto).launchInDefaultBrowser();
+    const bool launched = juce::URL (mailto).launchInDefaultBrowser();
+    const bool saved = feedbackCollector != nullptr
+        ? feedbackCollector->saveFeedbackToFile (body)
+        : saveFeedbackBodyToFile (body);
 
-    if (feedbackCollector != nullptr)
-        feedbackCollector->saveFeedbackToFile (body);
-    else
-        saveFeedbackBodyToFile(body);
+    if (launched)
+    {
+        if (crashReportMode)
+            SessionLog::clearPendingCrashReport();
 
-    if (crashReportMode)
-        SessionLog::clearPendingCrashReport();
+        closeDialog();
+        return;
+    }
 
-    closeDialog();
+    if (showMessageCallback)
+    {
+        juce::String message =
+            "Choroboros couldn't open your default mail app.\n\n"
+            "Send your report manually to:\n"
+            "info@kaizenstrategic.ai\n\n";
+
+        if (saved)
+        {
+            message << "A copy of this report was saved in:\n"
+                    << FeedbackCollector::getFeedbackDirectory().getFullPathName()
+                    << "\n\n";
+        }
+        else
+        {
+            message << "Choroboros also couldn't save a local copy automatically.\n\n";
+        }
+
+        message << "You can also use the Feedback Form button from this dialog.";
+
+        showMessageCallback (juce::AlertWindow::WarningIcon,
+                             "Couldn't Open Mail App",
+                             message);
+    }
 }
 
 juce::String FeedbackDialog::buildEmailBody() const
@@ -284,14 +319,33 @@ void FeedbackDialog::saveFeedback()
         if (crashReportMode)
             SessionLog::clearPendingCrashReport();
         closeDialog();
+        return;
+    }
+
+    if (showMessageCallback)
+    {
+        showMessageCallback(juce::AlertWindow::WarningIcon,
+                            "Couldn't Save Feedback",
+                            "Choroboros couldn't save your report to disk.\n\n"
+                            "Try Send to Developer instead, or copy your notes out before closing the window.");
     }
 }
 
 void FeedbackDialog::openFeedbackForm()
 {
-    juce::URL ("https://docs.google.com/forms/d/e/"
-               "1FAIpQLSc5OQpZlMpVSOfcRr6k2nqo5D25M_COfb0qyhCxdj2WmxpGpw/viewform")
-        .launchInDefaultBrowser();
+    if (! juce::URL (kFeedbackFormUrl).launchInDefaultBrowser())
+    {
+        if (showMessageCallback)
+        {
+            showMessageCallback(juce::AlertWindow::WarningIcon,
+                                "Couldn't Open Feedback Form",
+                                "Choroboros couldn't open your default browser.\n\n"
+                                "Open this URL manually:\n" + juce::String(kFeedbackFormUrl));
+        }
+
+        return;
+    }
+
     closeDialog();
 }
 

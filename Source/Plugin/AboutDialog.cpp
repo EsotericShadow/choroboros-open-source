@@ -22,6 +22,11 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "BinaryData.h"
 
+namespace
+{
+constexpr auto kSupportUrl = "https://choroboros.kaizenstrategic.ai/support";
+}
+
 AboutDialog::AboutDialog(MessageCallback callback)
     : showMessageCallback(std::move(callback))
 {
@@ -78,12 +83,11 @@ AboutDialog::AboutDialog(MessageCallback callback)
     copyrightLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(copyrightLabel);
 
-    // --- Contact link (replaces separate contactLabel + contactLink) ---
-    contactLink.setButtonText("info@kaizenstrategic.ai");
-    contactLink.setURL(juce::URL("mailto:info@kaizenstrategic.ai?subject=Choroboros%20Info"));
-    contactLink.setFont(devpanel::makeLabelFont(devpanel::Typography::label, false), false);
-    contactLink.setColour(juce::HyperlinkButton::textColourId, accent);
-    addAndMakeVisible(contactLink);
+    // --- Support ---
+    devpanel::styleHackerTextButton(contactButton, false);
+    contactButton.setButtonText("Open Support");
+    contactButton.onClick = [this] { openSupport(); };
+    addAndMakeVisible(contactButton);
 
     // --- Built with ---
     juceLabel.setText("Built with JUCE 8.0.12", juce::dontSendNotification);
@@ -144,7 +148,7 @@ void AboutDialog::resized()
 
     copyrightLabel.setBounds(area.removeFromTop(18));
     area.removeFromTop(16);
-    contactLink.setBounds(area.removeFromTop(22));
+    contactButton.setBounds(area.removeFromTop(28).withWidth(140));
     area.removeFromTop(20);
 
     juceLabel.setBounds(area.removeFromTop(18));
@@ -181,61 +185,74 @@ void AboutDialog::closeDialog()
 
 void AboutDialog::showLicense()
 {
-    // Try to load EULA from BinaryData (bundled with plugin)
-    const char* eulaData = BinaryData::EULA_md;
-    int eulaSize = BinaryData::EULA_mdSize;
+    juce::String eulaText;
 
-    if (eulaData != nullptr && eulaSize > 0)
-    {
-        juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-        juce::File tempEula = tempDir.getChildFile("Choroboros_EULA.md");
-
-        if (tempEula.replaceWithData(eulaData, static_cast<size_t>(eulaSize)))
-        {
-            juce::URL("file://" + tempEula.getFullPathName()).launchInDefaultBrowser();
-            return;
-        }
-    }
+    if (BinaryData::EULA_md != nullptr && BinaryData::EULA_mdSize > 0)
+        eulaText = juce::String::fromUTF8(BinaryData::EULA_md, BinaryData::EULA_mdSize);
 
     // Fallback: Try to find EULA.md relative to executable
-    auto appDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
-    juce::File eulaFile;
+    if (eulaText.isEmpty())
+    {
+        auto appDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+        juce::File eulaFile;
 
-    if (appDir.getFileName() == "MacOS")
-    {
-        auto contentsDir = appDir.getParentDirectory();
-        eulaFile = contentsDir.getChildFile("Resources").getChildFile("EULA.md");
-        if (!eulaFile.existsAsFile())
-            eulaFile = contentsDir.getChildFile("EULA.md");
-    }
-    else
-    {
-        eulaFile = appDir.getChildFile("EULA.md");
-        if (!eulaFile.existsAsFile())
-            eulaFile = appDir.getParentDirectory().getChildFile("EULA.md");
+        if (appDir.getFileName() == "MacOS")
+        {
+            auto contentsDir = appDir.getParentDirectory();
+            eulaFile = contentsDir.getChildFile("Resources").getChildFile("EULA.md");
+            if (!eulaFile.existsAsFile())
+                eulaFile = contentsDir.getChildFile("EULA.md");
+        }
+        else
+        {
+            eulaFile = appDir.getChildFile("EULA.md");
+            if (!eulaFile.existsAsFile())
+                eulaFile = appDir.getParentDirectory().getChildFile("EULA.md");
+        }
+
+        if (eulaFile.existsAsFile())
+            eulaText = eulaFile.loadFileAsString();
     }
 
-    if (eulaFile.existsAsFile())
+    if (showMessageCallback)
     {
-        juce::URL("file://" + eulaFile.getFullPathName()).launchInDefaultBrowser();
-    }
-    else
-    {
-        const juce::String fallbackMessage =
-            "Choroboros Beta — License summary\n\n"
-            "Copyright (C) 2026 Kaizen Strategic AI Inc. (Kaizen DSP)\n"
-            "British Columbia, Canada\n\n"
-            "Official beta builds from Kaizen are licensed under the End User License "
-            "Agreement (EULA), not the GPL. The public source on GitHub is available under "
-            "GPLv3 for transparency and self-builds; your obligations differ if you compile "
-            "from that source yourself.\n\n"
-            "The bundled EULA could not be opened from disk. For the full agreement, see "
-            "EULA.md in the repository or contact:\n"
-            "info@kaizenstrategic.ai";
-
-        if (showMessageCallback)
+        if (eulaText.isNotEmpty())
+        {
             showMessageCallback(juce::AlertWindow::InfoIcon,
                                 "End User License Agreement",
-                                fallbackMessage);
+                                eulaText);
+            return;
+        }
+
+        showMessageCallback(juce::AlertWindow::InfoIcon,
+                            "End User License Agreement",
+                            "Choroboros Beta — License summary\n\n"
+                            "Copyright (C) 2026 Kaizen Strategic AI Inc. (Kaizen DSP)\n"
+                            "British Columbia, Canada\n\n"
+                            "Official beta builds from Kaizen are licensed under the End User License "
+                            "Agreement (EULA), not the GPL. The public source on GitHub is available under "
+                            "GPLv3 for transparency and self-builds; your obligations differ if you compile "
+                            "from that source yourself.\n\n"
+                            "The bundled EULA could not be loaded. For the full agreement, see EULA.md in "
+                            "the repository or contact:\ninfo@kaizenstrategic.ai");
     }
+}
+
+void AboutDialog::openSupport()
+{
+    if (! juce::URL(kSupportUrl).launchInDefaultBrowser())
+    {
+        if (showMessageCallback)
+        {
+            showMessageCallback(juce::AlertWindow::WarningIcon,
+                                "Couldn't Open Support Page",
+                                "Choroboros couldn't open your default browser.\n\n"
+                                "Open this URL manually:\n" + juce::String(kSupportUrl) + "\n\n"
+                                "Direct support email:\ninfo@kaizenstrategic.ai");
+        }
+
+        return;
+    }
+
+    closeDialog();
 }

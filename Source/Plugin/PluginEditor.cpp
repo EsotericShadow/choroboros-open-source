@@ -1228,6 +1228,23 @@ void ChoroborosPluginEditor::invalidateHQLitOverlayCache()
         hqLitOverlay_->invalidateCache();
 }
 
+void ChoroborosPluginEditor::refreshEditorSurfaceAfterEngineVisualChange()
+{
+    rateSlider.repaint();
+    depthSlider.repaint();
+    offsetSlider.repaint();
+    widthSlider.repaint();
+    colorSlider.repaint();
+    mixSlider.repaint();
+    repaintHQLitOverlay();
+
+    // Engine visual swaps can move and resize child components. Force the
+    // parent editor surface underneath them to redraw too, otherwise some
+    // hosts preserve stale pixels from the previous engine skin/layout.
+    const int headerBarHeight = getHeaderBarHeight();
+    repaint(0, headerBarHeight, getWidth(), juce::jmax(0, getHeight() - headerBarHeight));
+}
+
 void ChoroborosPluginEditor::invalidateScaleSensitiveCaches()
 {
     invalidateHQLitOverlayCache();
@@ -1369,13 +1386,7 @@ void ChoroborosPluginEditor::setupEngineColorSelector()
 
         applyEngineVisual(engine.visual);
         applyTuningToUI();
-        rateSlider.repaint();
-        depthSlider.repaint();
-        offsetSlider.repaint();
-        widthSlider.repaint();
-        colorSlider.repaint();
-        mixSlider.repaint();
-        repaint();
+        refreshEditorSurfaceAfterEngineVisualChange();
         engineSwitchInProgress = false;
     };
 
@@ -1611,9 +1622,19 @@ void ChoroborosPluginEditor::showAboutWindow()
 
 void ChoroborosPluginEditor::showHelpWindow()
 {
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
     showManagedDialogWindow(helpWindow,
                             helpWindow == nullptr
-                                ? std::unique_ptr<juce::Component>(std::make_unique<HelpDialog>().release())
+                                ? std::make_unique<HelpDialog>(
+                                    [safeThis](juce::AlertWindow::AlertIconType iconType,
+                                               const juce::String& title,
+                                               const juce::String& message)
+                                    {
+                                        if (safeThis == nullptr || safeThis->isShuttingDown())
+                                            return;
+
+                                        safeThis->showStatusWindow(iconType, title, message, "editor_help_link_failure");
+                                    })
                                 : std::unique_ptr<juce::Component>(),
                             "Help & Support",
                             false,
@@ -1624,13 +1645,21 @@ void ChoroborosPluginEditor::showHelpWindow()
 
 void ChoroborosPluginEditor::showFeedbackWindow()
 {
-    auto* collector = audioProcessor.getFeedbackCollector();
-    if (collector == nullptr)
-        return;
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
 
     closeManagedDialogWindow(feedbackWindow);
     showManagedDialogWindow(feedbackWindow,
-                            std::make_unique<FeedbackDialog>(*collector),
+                            std::make_unique<FeedbackDialog>(
+                                audioProcessor.getFeedbackCollector(),
+                                [safeThis](juce::AlertWindow::AlertIconType iconType,
+                                           const juce::String& title,
+                                           const juce::String& message)
+                                {
+                                    if (safeThis == nullptr || safeThis->isShuttingDown())
+                                        return;
+
+                                    safeThis->showStatusWindow(iconType, title, message, "editor_feedback_link_failure");
+                                }),
                             "Feedback",
                             true,
                             500, 440, 800, 800,
@@ -1643,9 +1672,21 @@ void ChoroborosPluginEditor::showCrashReportWindow(const juce::String& crashRepo
     if (crashReport.isEmpty())
         return;
 
+    juce::Component::SafePointer<ChoroborosPluginEditor> safeThis(this);
     closeManagedDialogWindow(feedbackWindow);
     showManagedDialogWindow(feedbackWindow,
-                            std::make_unique<FeedbackDialog>(crashReport, audioProcessor.getFeedbackCollector()),
+                            std::make_unique<FeedbackDialog>(
+                                crashReport,
+                                audioProcessor.getFeedbackCollector(),
+                                [safeThis](juce::AlertWindow::AlertIconType iconType,
+                                           const juce::String& title,
+                                           const juce::String& message)
+                                {
+                                    if (safeThis == nullptr || safeThis->isShuttingDown())
+                                        return;
+
+                                    safeThis->showStatusWindow(iconType, title, message, "editor_crash_report_link_failure");
+                                }),
                             "Crash Report",
                             true,
                             500, 440, 800, 800,
@@ -1872,12 +1913,7 @@ void ChoroborosPluginEditor::applyCurrentEngineVisual()
 
     engineColorBox.setSelectedId(comboId, juce::dontSendNotification);
     applyEngineVisual(activeEngine->visual);
-    rateSlider.repaint();
-    depthSlider.repaint();
-    offsetSlider.repaint();
-    widthSlider.repaint();
-    colorSlider.repaint();
-    mixSlider.repaint();
+    refreshEditorSurfaceAfterEngineVisualChange();
 }
 
 bool ChoroborosPluginEditor::isInterestedInFileDrag(const juce::StringArray& files)
